@@ -776,7 +776,6 @@ async fn pick_version_pair() -> Option<VersionPair> {
 ///
 /// **默认不跑**：要真下载整合包引用的全部模组，耗时数分钟。显式跑：
 /// `cargo test -p mml-game --test modpack_upgrade -- --ignored --nocapture`
-#[ignore = "在线真包测试：会下载整合包与全部模组，耗时数分钟；用 -- --ignored 显式跑"]
 #[tokio::test]
 async fn upgrade_modpack_end_to_end_matches_new_manifest() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -1024,7 +1023,6 @@ async fn upgrade_modpack_end_to_end_matches_new_manifest() {
 ///
 /// **默认不跑**：同样要装一次真包。显式跑：
 /// `cargo test -p mml-game --test modpack_upgrade -- --ignored --nocapture`
-#[ignore = "在线真包测试：会下载整合包与全部模组，耗时数分钟；用 -- --ignored 显式跑"]
 #[tokio::test]
 async fn upgrade_modpack_cancelled_keeps_old_manifest() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -1213,7 +1211,6 @@ fn read_cf_manifest(zip_path: &Path) -> CurseForgePackObj {
 /// $env:MML_CF_API_KEY = "<key>"
 /// cargo test -p mml-game --test modpack_upgrade -- --ignored --nocapture upgrade_curseforge
 /// ```
-#[ignore = "在线真包测试：需要 MML_CF_API_KEY，且会下载整合包与全部模组；用 -- --ignored 显式跑"]
 #[tokio::test]
 async fn upgrade_curseforge_pack_end_to_end_matches_new_manifest() {
     use mml_net::curseforge_api::{self, CurseFogreArg};

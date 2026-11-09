@@ -1,6 +1,4 @@
-//! 在线版本接口测试，依赖网络，默认忽略。
-//!
-//! 运行方式：`cargo test --test online -- --ignored --nocapture`
+//! 在线版本接口测试，依赖网络；拉不到版本清单时跳过，不算失败。
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -28,11 +26,31 @@ fn init_all() -> PathBuf {
     .clone()
 }
 
+/// 探测 Mojang 版本清单能否访问，离线时由调用方跳过
+///
+/// # 返回值
+///
+/// 清单非空时为 true
+async fn network_available() -> bool {
+    let ok = mml_net::get_work_client()
+        .get_bytes("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
+        .await
+        .map(|data| !data.is_empty())
+        .unwrap_or(false);
+    if !ok {
+        eprintln!("跳过: 网络不可用（无法获取 Mojang 版本清单）");
+    }
+    ok
+}
+
 /// 在线检查版本更新：能拉到指定版本的启动参数 JSON 并落盘缓存。
 #[tokio::test]
-#[ignore = "依赖 Mojang 在线接口，仅在手动验证网络功能时运行"]
 async fn check_update_online() {
     init_all();
+
+    if !network_available().await {
+        return;
+    }
 
     let obj = mml_game::launcher_path::version_path::check_update("1.20.4")
         .await
@@ -48,9 +66,12 @@ async fn check_update_online() {
 
 /// 在线检查不存在的版本号：应返回版本未找到错误而不是 panic。
 #[tokio::test]
-#[ignore = "依赖 Mojang 在线接口，仅在手动验证网络功能时运行"]
 async fn check_update_unknown_version() {
     init_all();
+
+    if !network_available().await {
+        return;
+    }
 
     let res = mml_game::launcher_path::version_path::check_update("0.0.0-not-exist").await;
     assert!(res.is_err(), "不存在的版本号应返回错误");

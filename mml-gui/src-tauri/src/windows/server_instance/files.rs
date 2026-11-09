@@ -197,6 +197,25 @@ pub(super) fn file(base: &Path, name: &str) -> Result<PathBuf, String> {
     Ok(rel)
 }
 
+/// 校验一个要删除的文件路径
+///
+/// 不要求文件还在：发布者可能先删了实例里的文件再来标记；但指向目录的路径拒绝，
+/// 整目录清理要用「删除目录」的同步方式。
+///
+/// - `base`: 游戏目录
+/// - `name`: 相对游戏目录的路径
+///
+/// # 返回值
+///
+/// 相对路径；越界、非法或指向目录时返回错误文案
+pub(super) fn delete_target(base: &Path, name: &str) -> Result<PathBuf, String> {
+    let rel = relative(base, name)?;
+    if base.join(&rel).is_dir() {
+        return Err(err_keys::SERVER_INSTANCE_DIR.to_string());
+    }
+    Ok(rel)
+}
+
 /// 把一个路径展开成文件；目录递归展开
 ///
 /// - `base`: 游戏目录
@@ -418,6 +437,22 @@ pub(super) fn zip_files(base: &Path, files: &[PathBuf], file: &Path) -> Result<(
     // 生成是一次性动作，没有取消入口
     let cancel = AtomicBool::new(false);
     archive::write_zip(file, &entries, &[], &None, &cancel)
+}
+
+/// 写一个空压缩包，用来让客户端删掉清单里的目标路径
+///
+/// 客户端把「空包 + Over」当成删除指令，目标由条目的 `Path` 决定：目录用
+/// `<目录>.zip`，单个文件用 `<文件>.delete.zip`，两边是同一条解压前清理逻辑。
+///
+/// - `file`: 输出压缩包
+///
+/// # 返回值
+///
+/// 写盘成功返回 `Ok(())`；压缩失败返回错误文案
+pub(super) fn empty_zip(file: &Path) -> Result<(), String> {
+    // 生成是一次性动作，没有取消入口
+    let cancel = AtomicBool::new(false);
+    archive::write_zip(file, &[], &[], &None, &cancel)
 }
 
 /// 把文件按相对路径复制到输出文件夹，父目录不存在就建

@@ -470,7 +470,7 @@ fn push_head_cube(quads: &mut Vec<Quad>, tex: &Pixmap, path: &str, tex_off: [f32
 /// # 返回值
 ///
 /// 见 [`BakedModelTextures`]；贴图读取失败时返回 `None`
-fn bake_head(
+pub fn bake_head(
     archive: &BaseArchive,
     tex_rel: &str,
     hat: bool,
@@ -505,7 +505,7 @@ fn bake_head(
 /// # 返回值
 ///
 /// 返回烘焙产物，基础层 6 面，带帽子层时再加 6 面
-fn bake_head_model(tex: Pixmap, hat: bool, path: &str) -> BakedModel {
+pub fn bake_head_model(tex: Pixmap, hat: bool, path: &str) -> BakedModel {
     let mut quads = Vec::new();
     push_head_cube(&mut quads, &tex, path, [0.0, 0.0], 0.0);
     if hat {
@@ -1247,10 +1247,6 @@ pub(crate) fn mml_tex_draw_id() -> String {
 #[cfg(test)]
 #[path = "../../tests/unit/block_mod_icon_table_tests.rs"]
 mod icon_table_tests;
-
-#[cfg(test)]
-#[path = "../../tests/unit/block_mod_head_render_tests.rs"]
-mod head_render_tests;
 
 #[cfg(test)]
 #[path = "../../tests/unit/block_mod_sprite_tests.rs"]

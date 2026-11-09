@@ -17,8 +17,7 @@ static INIT: Once = Once::new();
 /// 初始化配置系统与后台保存线程等全局依赖，返回运行根目录
 fn ensure_env() -> PathBuf {
     INIT.call_once(|| {
-        let dir =
-            mml_testutil::temp_dir().join(format!("mml-jvms-unit-{}", std::process::id()));
+        let dir = mml_testutil::temp_dir().join(format!("mml-jvms-unit-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
@@ -229,8 +228,7 @@ fn scan_java_does_not_panic() {
 
     // 记录扫描前已有条目，扫描后清掉新增条目，
     // 避免本机真实 JVM 残留干扰其他用例，如 get_java 的版本匹配断言
-    let before: std::collections::HashSet<String> =
-        JVMS.read().unwrap().keys().cloned().collect();
+    let before: std::collections::HashSet<String> = JVMS.read().unwrap().keys().cloned().collect();
 
     scan_java();
 
@@ -243,4 +241,3 @@ fn scan_java_does_not_panic() {
         .unwrap()
         .retain(|name, _| before.contains(name));
 }
-

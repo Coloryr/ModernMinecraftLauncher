@@ -283,6 +283,10 @@ fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     use mml_names::i18_items::error_type::MoveToTrashErrorData;
     use std::os::windows::ffi::OsStrExt;
     use windows::Win32::Foundation::HWND;
+    use windows::Win32::System::Com::COINIT_APARTMENTTHREADED;
+    use windows::Win32::System::Com::COINIT_MULTITHREADED;
+    use windows::Win32::System::Com::CoInitializeEx;
+    use windows::Win32::System::Com::CoUninitialize;
     use windows::Win32::UI::Shell::FO_DELETE;
     use windows::Win32::UI::Shell::FOF_ALLOWUNDO;
     use windows::Win32::UI::Shell::FOF_NOCONFIRMATION;
@@ -298,6 +302,11 @@ fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
     let dir: std::path::PathBuf = dir.as_ref().to_path_buf();
     let err_path = dir.clone();
     let (result, aborted) = std::thread::spawn(move || -> (i32, bool) {
+        // Shell 删除要求调用线程已初始化 COM，没初始化时 SHFileOperationW 返回 0x8
+        // 且什么都不删；受限环境里 STA 会被拒，退回 MTA 同样能删进回收站。
+        let com = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }.is_ok()
+            || unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.is_ok();
+
         // pFrom 要求双 \0 结尾的路径列表，HSTRING 只有一个 \0 且结尾字节取自堆内存，
         // 会让 SHFileOperationW 间歇性返回 0x2；这里手动补足双 \0。
         let mut buf: Vec<u16> = dir.as_os_str().encode_wide().collect();
@@ -317,7 +326,12 @@ fn move_to_trash_windows<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
         };
 
         let result = unsafe { SHFileOperationW(&mut operation) };
-        (result, operation.fAnyOperationsAborted.as_bool())
+        let aborted = operation.fAnyOperationsAborted.as_bool();
+        // 线程是刚建的，初始化成功就该配对释放
+        if com {
+            unsafe { CoUninitialize() };
+        }
+        (result, aborted)
     })
     .join()
     .unwrap_or((-1, false));

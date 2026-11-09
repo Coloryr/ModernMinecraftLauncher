@@ -273,30 +273,31 @@ pub fn add_info_item(info: JavaInfoObj) -> Arc<JavaInfoObj> {
 pub fn add_info_items(list: Vec<JavaInfoObj>) -> Vec<Arc<JavaInfoObj>> {
     let mut added = Vec::with_capacity(list.len());
 
-    let mut jvms = JVMS.write().unwrap();
-    let mut config = mml_config::write_config();
+    // 配置写锁必须在 save() 之前释放：save() 要拿同一把锁的读侧，同线程先写后读会自锁
+    {
+        let mut jvms = JVMS.write().unwrap();
+        let mut config = mml_config::write_config();
 
-    for item in list {
-        let name = unique_java_name(&jvms, &item);
+        for item in list {
+            let name = unique_java_name(&jvms, &item);
 
-        jvms.remove(&name);
-        config
-            .java_list
-            .retain(|saved| !saved.name.eq_ignore_ascii_case(&name));
+            jvms.remove(&name);
+            config
+                .java_list
+                .retain(|saved| !saved.name.eq_ignore_ascii_case(&name));
 
-        let info = Arc::new(JavaInfoObj {
-            name: name.clone(),
-            ..item
-        });
-        jvms.insert(name.clone(), info.clone());
-        config.java_list.push(JvmConfigObj {
-            name,
-            local: info.path.to_string_lossy().to_string(),
-        });
-        added.push(info);
+            let info = Arc::new(JavaInfoObj {
+                name: name.clone(),
+                ..item
+            });
+            jvms.insert(name.clone(), info.clone());
+            config.java_list.push(JvmConfigObj {
+                name,
+                local: info.path.to_string_lossy().to_string(),
+            });
+            added.push(info);
+        }
     }
-
-    drop(jvms);
 
     // 事件回调会读 JVMS，save() 要拿配置读锁，都得在锁释放后触发
     invoke_jvm_change();

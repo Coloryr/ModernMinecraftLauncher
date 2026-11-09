@@ -81,6 +81,8 @@ pub(super) struct MetaConfig {
     pub(super) mode: String,
     /// 取消勾选的文件，相对游戏目录
     pub(super) exclude: Vec<String>,
+    /// 下次同步要删掉的文件，相对游戏目录；老数据没有这一项
+    pub(super) delete: Vec<String>,
     /// 压缩包解压前先删掉客户端旧目录；老数据没有这一项
     pub(super) delete_old: Option<bool>,
 }

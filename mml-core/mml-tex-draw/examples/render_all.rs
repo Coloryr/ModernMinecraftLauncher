@@ -1,9 +1,8 @@
-//! 全量渲染测试：走真实下载链，版本清单 → 客户端jar → 解包，分别渲染全部方块 / 全部物品
+//! 全量渲染工具：走真实下载链，版本清单 → 客户端jar → 解包，分别渲染全部方块 / 全部物品
 //!
 //! 运行，需外网，首次会下载约 25MB 的客户端jar：
-//! `cargo test -p mml-tex-draw --test render_all -- --nocapture`
+//! `cargo run -p mml-tex-draw --example render_all`
 //! 无外网时自动跳过；渲染输出在 tests/out/block 与 tests/out/items
-
 use std::{path::PathBuf, sync::Arc, sync::Once};
 
 use mml_base::{
@@ -130,7 +129,6 @@ async fn ensure_jar() -> BaseArchive {
 }
 
 /// 手动测试：渲染全部方块图标，走真实下载链
-#[tokio::test]
 async fn render_all_blocks() {
     let _lock = CHAIN_LOCK.lock().await;
     ensure_init();
@@ -231,7 +229,6 @@ async fn render_all_blocks() {
 }
 
 /// 手动测试：渲染全部物品图标，走真实下载链
-#[tokio::test]
 async fn render_all_items() {
     let _lock = CHAIN_LOCK.lock().await;
     ensure_init();
@@ -315,4 +312,10 @@ async fn render_all_items() {
     let apple = mml_tex_draw::get_item_path("minecraft:apple").expect("apple应已注册");
     assert!(apple.exists(), "apple图标应已写盘：{}", apple.display());
     println!("注册：{} 个物品图标", items.len());
+}
+
+#[tokio::main]
+async fn main() {
+    render_all_blocks().await;
+    render_all_items().await;
 }

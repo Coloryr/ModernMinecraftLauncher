@@ -135,6 +135,8 @@ pub(super) fn export_pack(
                 ConfigMode::Delete | ConfigMode::None => continue,
             };
             files::retain_excluded(&game_path, &mut list, &item.exclude)?;
+            // 标记删除的文件不进包，清单里的空包负责让客户端删掉
+            files::retain_excluded(&game_path, &mut list, &item.delete)?;
             for rel in list {
                 pending.insert(
                     PathBuf::from(names::GAME_DIR).join(&rel),

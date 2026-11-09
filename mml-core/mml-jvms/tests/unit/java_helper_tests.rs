@@ -137,4 +137,3 @@ fn test_java_output_without_version_returns_none() {
 
     assert!(test_java(&fake).is_none(), "无版本行不应被识别为 Java");
 }
-

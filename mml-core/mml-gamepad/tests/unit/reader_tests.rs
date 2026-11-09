@@ -160,23 +160,3 @@ fn dpad_buttons_synthesize_axes() {
         assert_eq!(pad.axes[index], 0.0);
     }
 }
-
-/// 手动验证手柄读取：接上手柄后运行
-/// cargo test -p mml-gamepad --lib gamepad_manual -- --ignored --nocapture
-#[test]
-#[ignore = "需要接手柄"]
-fn gamepad_manual() {
-    let dir = mml_testutil::temp_dir().join(format!("gamepad_manual_{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    mml_log::start(&dir).unwrap();
-
-    crate::init(&dir);
-    thread::sleep(Duration::from_secs(2));
-    for pad in pads() {
-        println!("手柄 {}：{}", pad.id, pad.name);
-        if let Some(state) = pad_state(pad.id) {
-            println!("{state:?}");
-        }
-    }
-}

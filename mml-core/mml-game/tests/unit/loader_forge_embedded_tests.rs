@@ -134,8 +134,7 @@ async fn empty_url_without_local_file_is_not_in_list() {
     let rel = format!("test/absent/{}/lib.jar", Uuid::new_v4().simple());
     let info = vec![embedded_lib(&rel, "00")];
 
-    let list =
-        build_forge_libs(&info, "1.12.2", "14.23.5.2864", false, false, false, false).await;
+    let list = build_forge_libs(&info, "1.12.2", "14.23.5.2864", false, false, false, false).await;
 
     assert!(
         !list.iter().any(|item| item.url.is_empty()),
@@ -158,12 +157,10 @@ async fn empty_url_with_local_file_stays_in_list() {
     std::fs::write(&local, data).unwrap();
 
     let info = vec![embedded_lib(&rel, &sha1)];
-    let list =
-        build_forge_libs(&info, "1.12.2", "14.23.5.2864", false, false, false, false).await;
+    let list = build_forge_libs(&info, "1.12.2", "14.23.5.2864", false, false, false, false).await;
 
     assert!(
         list.iter().any(|item| item.file == local),
         "本地已有且校验值相符的条目应留在列表里"
     );
 }
-

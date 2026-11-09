@@ -37,8 +37,8 @@ cargo run -p mml-gamepad --example probe
 ```
 
 物理验收仍需连接手柄后检查热插拔、摇杆方向与死区、各按钮、游戏和菜单切换。
-自动测试不能替代驱动和实际手感验证。上游的 `gamepad_manual` 用例默认忽略，
-需连接手柄后按源码内命令单独运行。
+自动测试不能替代驱动和实际手感验证；接上手柄后跑 `cargo run -p mml-gamepad --example gamepad_demo`
+做手感验收。
 
 ## English
 

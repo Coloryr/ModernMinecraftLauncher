@@ -1,12 +1,11 @@
-//! 单方块与单物品渲染：GPU 管道冒烟与遮挡、透明诊断，直接用本地 jar，不走下载链
+//! 单方块与单物品渲染工具：GPU 管道冒烟与遮挡、透明诊断，直接用本地 jar，不走下载链
 //!
-//! 运行：cargo test -p mml-tex-draw --test render_single -- --ignored --nocapture
+//! 运行：`cargo run -p mml-tex-draw --example render_single`
 //! 环境变量：
 //! - MML_TEST_JAR 指定客户端 jar，缺省用反编译参考 jar
 //! - MML_TEST_BLOCK 指定方块模型，如 block/big_dripleaf，缺省 block/oak_stairs
 //! - MML_TEST_ITEM 指定物品 ID，如 enchanted_book，缺省 apple
 //! 出图到 tests/out/
-
 use std::{collections::HashMap, path::PathBuf};
 
 use mml_base::archives::BaseArchive;
@@ -49,8 +48,6 @@ fn write_png(path: &PathBuf, size: u32, rgba: &[u8]) {
 }
 
 /// 渲染单个方块模型并出图，用于诊断遮挡与透明问题
-#[test]
-#[ignore]
 fn render_one_block() {
     let jar = ref_jar();
     assert!(jar.exists(), "参考jar不存在：{}", jar.display());
@@ -140,8 +137,6 @@ fn render_one_block() {
 ///
 /// 样例：diamond_sword 挤出、enchanted_book glint、compass condition→range_dispatch、
 /// spyglass select、leather_chestplate tint、trident select gui 分支
-#[test]
-#[ignore]
 fn render_one_item() {
     let jar = ref_jar();
     assert!(jar.exists(), "参考jar不存在：{}", jar.display());
@@ -163,4 +158,9 @@ fn render_one_item() {
         out_path(&format!("{name}_gpu.png")),
     )
     .unwrap();
+}
+
+fn main() {
+    render_one_block();
+    render_one_item();
 }

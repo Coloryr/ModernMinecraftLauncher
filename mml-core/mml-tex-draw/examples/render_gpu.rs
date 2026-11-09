@@ -1,10 +1,8 @@
-//! GPU 渲染测试：每后端渲染同一组模型出图对照，含方块模型、extrude 物品与 glint 物品
+//! 多后端 GPU 渲染工具：每个后端渲染同一组模型出图对照，含方块模型、extrude 物品与 glint 物品
 //!
-//! 每个后端一个用例，可单独过滤运行；VK 与 GL 在部分机器上可能无适配器，失败只打印跳过：
-//! `cargo test -p mml-tex-draw --test render_gpu -- --ignored --nocapture render_dx12`
-//! 环境变量 MML_TEST_JAR 指定客户端 jar，缺省用反编译参考 jar
+//! 运行：`cargo run -p mml-tex-draw --example render_gpu`
+//! 环境变量 MML_TEST_JAR 指定客户端 jar，缺省用反编译参考 jar；无适配器的后端只打印跳过
 //! 输出：tests/out/{furnace,apple,enchanted_book}_{DX12,VULKAN,GL}.png
-
 use std::{collections::HashMap, path::PathBuf, sync::Once};
 
 use mml_base::archives::BaseArchive;
@@ -149,8 +147,6 @@ fn render_backend_suite(tag: &str, ctx: &GpuCtx) {
 }
 
 /// DX12 后端，Windows 缺省
-#[test]
-#[ignore]
 fn render_dx12() {
     match GpuCtx::try_new_backend("DX12", wgpu::Backends::DX12) {
         Some(ctx) => render_backend_suite("DX12", &ctx),
@@ -159,8 +155,6 @@ fn render_dx12() {
 }
 
 /// VULKAN 后端
-#[test]
-#[ignore]
 fn render_vulkan() {
     match GpuCtx::try_new_backend("VULKAN", wgpu::Backends::VULKAN) {
         Some(ctx) => render_backend_suite("VULKAN", &ctx),
@@ -169,11 +163,15 @@ fn render_vulkan() {
 }
 
 /// GL 后端
-#[test]
-#[ignore]
 fn render_gl() {
     match GpuCtx::try_new_backend("GL", wgpu::Backends::GL) {
         Some(ctx) => render_backend_suite("GL", &ctx),
         None => println!("GL 无可用适配器，跳过"),
     }
+}
+
+fn main() {
+    render_dx12();
+    render_vulkan();
+    render_gl();
 }

@@ -9,9 +9,6 @@
 //!   起进程、读输出、发退出事件。唯一"假"的是主类：用 `AdvanceJvmObj.main_class` 换成
 //!   探针（源文件模式的小 Java 程序），于是不必真开游戏窗口，也能断言参数与类路径都是真的。
 //!
-//! **两条都带 `#[ignore]`**：首次跑要下载几十 MB（客户端 jar + 运行库）。下载结果留在
-//! `target/temp/mml-real-launch`，重复跑基本只补缺的文件。显式运行：
-//!
 //! ```text
 //! cargo test -p mml-game --test real_launch -- --ignored --nocapture
 //! ```
@@ -25,13 +22,14 @@ use std::time::{Duration, Instant};
 
 use mml_auth::LoginObj;
 use mml_config::config_obj::{GCType, ProxyState, ProxyType, RunArgObj};
-use mml_downloader::{DownloadTaskState, IDownloadGui, download_item::DownloadItem};
 use mml_game::game_launch::{AutoJoinType, GameLaunchArg, LaunchDebugger};
 use mml_game::game_log::GameLog;
 use mml_game::launcher::instance_setting_obj::{AdvanceJvmObj, InstanceSettingObj};
 use mml_game::{InstanceLog, InstanceLogType};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+
+mod common;
 
 /// 测试用的游戏版本：客户端 jar 二十几 MB、运行库几十个文件，够真又不算太重
 const VERSION: &str = "1.20.1";
@@ -44,28 +42,22 @@ fn run_dir() -> PathBuf {
     mml_testutil::temp_dir().join("mml-real-launch")
 }
 
-/// 下载回调：测试里不关心进度，全部吞掉
-struct QuietDownload {}
 
-impl IDownloadGui for QuietDownload {
-    /// 单文件进度：不输出
-    fn update(&self, _thread: u32, _file: &Arc<DownloadItem>) {}
-
-    /// 任务级状态：不输出
-    fn update_task(&self, _state: DownloadTaskState) {}
-}
-
-/// 走本机代理：默认 `127.0.0.1:7890`
+/// 可选测试代理 `MML_TEST_PROXY=ip:port`
 ///
-/// `MML_TEST_PROXY=off` 关掉，`MML_TEST_PROXY=host:port` 换地址。必须在 `mml_net::init()`
-/// 之前设：客户端是拿配置建出来的，建完再改就不生效了。
+/// 不设就直连，不预设任何代理地址。必须在 `mml_net::init()` 之前设：
+/// 客户端是拿配置建出来的，建完再改就不生效了。
 fn apply_proxy() {
-    let proxy = std::env::var("MML_TEST_PROXY").unwrap_or_else(|_| "127.0.0.1:7890".to_string());
+    let Some(proxy) = std::env::var("MML_TEST_PROXY").ok() else {
+        return;
+    };
     if proxy.eq_ignore_ascii_case("off") {
         return;
     }
-    let (ip, port) = proxy.split_once(':').unwrap_or(("127.0.0.1", "7890"));
-    let port = port.parse().unwrap_or(7890);
+    let Some((ip, port)) = proxy.split_once(':') else {
+        panic!("MML_TEST_PROXY 格式应为 ip:port");
+    };
+    let port: u16 = port.parse().expect("MML_TEST_PROXY 端口不合法");
 
     let mut config = mml_config::write_config();
     config.http.work_proxy = ProxyState::User;
@@ -90,7 +82,7 @@ fn ensure_init() {
         mml_config::config_save::start();
         apply_proxy();
         mml_net::init();
-        mml_downloader::set_gui_handel(Box::new(QuietDownload {}));
+        mml_downloader::set_gui_handel(Box::new(common::PrintDownloader::new()));
         mml_downloader::init(mml_base::get_base_dir()).unwrap();
         mml_downloader::start();
         mml_game::init(mml_base::get_base_dir()).unwrap();
@@ -269,18 +261,24 @@ fn make_launch_arg() -> GameLaunchArg {
 }
 
 /// 真下载：版本 json、客户端 jar、运行库、资源索引都要真的落到磁盘上
-#[ignore = "在线下载测试：会下载版本 json / 客户端 jar / 运行库，用 -- --ignored 显式跑"]
 #[tokio::test]
 async fn real_download_prepares_game_files() {
     ensure_init();
     let base = mml_base::get_base_dir();
     let instance = make_instance(Uuid::new_v4(), "real-download", None);
 
+    println!("[real_launch] 开始检查并下载 {VERSION} 的游戏文件…");
+    let started = Instant::now();
+
     let mut arg = make_launch_arg();
     let obj = instance
         .check_game_file(&mut arg, None, CancellationToken::new())
         .await
         .expect("检查并补齐游戏文件应成功");
+    println!(
+        "[real_launch] 游戏文件就绪，用时 {:.1}s",
+        started.elapsed().as_secs_f64()
+    );
 
     // 版本 json 解析出了主类，说明它确实被取到并读过了
     assert!(!obj.main_class.is_empty(), "版本 json 里应解析出主类");
@@ -321,7 +319,6 @@ async fn real_download_prepares_game_files() {
 }
 
 /// 真启动：检查文件、拼命令行、起进程、读输出、发退出事件，一条都不省
-#[ignore = "在线启动测试：会下载版本 json / 客户端 jar / 运行库并真起进程，用 -- --ignored 显式跑"]
 #[tokio::test]
 async fn real_launch_downloads_and_starts() {
     ensure_init();

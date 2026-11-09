@@ -1,5 +1,6 @@
-//! 实测：用**已配置好的用户代理**发起真实加载器查询，看能否成功
+//! 实测：用**显式给出的**代理发起真实加载器查询，看能否成功
 //!
+//! 需要 `MML_TEST_PROXY_IP` 与 `MML_TEST_PROXY_PORT`，没设就跳过；不预设任何代理地址。
 //! 本测试直接调用 `get_support_loaders`，用真实网络加真实代理配置，看每一路的结果
 //! 与错误，定位到底哪一路失败。
 
@@ -25,11 +26,18 @@ fn init_once() {
 fn forge_official_with_user_proxy() {
     init_once();
 
-    let proxy_ip = std::env::var("MML_TEST_PROXY_IP").unwrap_or_else(|_| "127.0.0.1".to_string());
-    let proxy_port: u16 = std::env::var("MML_TEST_PROXY_PORT")
+    // 只在显式给出代理时才跑，不预设任何地址与端口
+    let Some(proxy_ip) = std::env::var("MML_TEST_PROXY_IP").ok() else {
+        eprintln!("跳过: 未设置 MML_TEST_PROXY_IP / MML_TEST_PROXY_PORT");
+        return;
+    };
+    let Some(proxy_port) = std::env::var("MML_TEST_PROXY_PORT")
         .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(7890);
+        .and_then(|p| p.parse::<u16>().ok())
+    else {
+        eprintln!("跳过: 未设置 MML_TEST_PROXY_IP / MML_TEST_PROXY_PORT");
+        return;
+    };
 
     let url = "https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml";
     println!("目标：{url}");

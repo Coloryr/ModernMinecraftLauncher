@@ -38,6 +38,20 @@ pub fn archive_name(dir: &str) -> String {
     format!("{}.zip", dir.replace(['/', '\\'], "."))
 }
 
+/// 删除单个文件用的空压缩包文件名
+///
+/// 客户端把「空包 + Over」当成删除目标路径的指令；单文件与目录共用这个机制，
+/// 只在包名上加 `.delete` 后缀区分，避免和 `config.zip` 这类目录包重名。
+///
+/// - `path`: 相对游戏目录的文件路径，正斜杠写法
+///
+/// # 返回值
+///
+/// 形如 `config.a.toml.delete.zip`
+pub fn delete_archive_name(path: &str) -> String {
+    format!("{}.delete.zip", path.replace(['/', '\\'], "."))
+}
+
 /// 按实例生成 MML 服务器实例清单
 ///
 /// 版本、加载器、启动参数与窗口设置都取自实例：客户端靠这份清单得知该用什么环境启动。

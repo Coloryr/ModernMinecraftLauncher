@@ -186,191 +186,78 @@ fn matches_wildcard(text: &str, pattern: &str) -> bool {
     })
 }
 
-/// 压缩源目录为 zip 并断言成功
-#[test]
-fn zip() {
-    let file = Path::new("test_run");
-    let source = Path::new("tests").join("test_compress/");
-    let zip = file.join("test.zip");
-    let filter = Some(vec![
-        String::from("skip.text"),
-        String::from("dir1/skip.text"),
-    ]);
-    let res = BaseArchive::compress(ArchiveType::Zip, &zip, &source, Some(&source), &filter, None);
-    assert!(res.is_ok());
+/// 压缩源目录，`skip.text` 与 `dir1/skip.text` 是被过滤掉的那两个
+fn source_dir() -> PathBuf {
+    Path::new("tests").join("test_compress")
 }
 
-/// 解压 zip 到目录并断言成功，依赖 `zip` 先产出压缩包
-#[test]
-#[ignore]
-fn unzip() {
-    let file = Path::new("test_run");
-    let zip = file.join("test.zip");
-    let dir = file.join("test_zip/");
-    let res = BaseArchive::decompress(ArchiveType::Zip, &zip, &dir, None);
-    assert!(res.is_ok());
+/// 压缩 → 解压 → 逐文件对比，一条龙跑完一种格式
+///
+/// 每个用例各建临时目录，不依赖别的用例留下的产物，也不往仓库目录里写文件。
+///
+/// - `archive_type`: 压缩格式
+/// - `ext`: 压缩包扩展名，同时用作临时目录名
+fn roundtrip(archive_type: ArchiveType, ext: &str) {
+    let root = mml_testutil::temp_dir().join(format!("mml-archives-{ext}-{}", std::process::id()));
+    fs::remove_dir_all(&root).ok();
+    fs::create_dir_all(&root).unwrap();
+
+    let source = source_dir();
+    let archive = root.join(format!("roundtrip.{ext}"));
+    let out = root.join("out");
+    let skip = vec![String::from("skip.text"), String::from("dir1/skip.text")];
+
+    BaseArchive::compress(
+        archive_type,
+        &archive,
+        &source,
+        Some(&source),
+        &Some(skip.clone()),
+        None,
+    )
+    .expect("压缩失败");
+    BaseArchive::decompress(archive_type, &archive, &out, None).expect("解压失败");
+
+    assert!(
+        compare_folders(&source, &out, &skip),
+        "{ext} 解压结果与源目录不一致"
+    );
+
+    fs::remove_dir_all(&root).ok();
 }
 
-/// 断言 zip 解压结果与源目录一致，依赖 `unzip` 先执行
+/// zip 往返：压缩、解压、比对
 #[test]
-#[ignore]
-fn zip_equal() {
-    let file = Path::new("test_run");
-    let source = Path::new("tests").join("test_compress/");
-    let dir1 = file.join("test_zip/");
-    assert!(compare_folders(&source, &dir1, &[
-        String::from("skip.text"),
-        String::from("dir1/skip.text"),
-    ]));
+fn zip_roundtrip() {
+    roundtrip(ArchiveType::Zip, "zip");
 }
 
-/// 压缩源目录为 7z 并断言成功
+/// 7z 往返：压缩、解压、比对
 #[test]
-#[ignore]
-fn r7z() {
-    let file = Path::new("test_run");
-    let source = Path::new("tests").join("test_compress/");
-    let zip = file.join("test.7z");
-    let filter = Some(vec![
-        String::from("skip.text"),
-        String::from("dir1/skip.text"),
-    ]);
-    let res = BaseArchive::compress(ArchiveType::R7Z, &zip, &source, Some(&source), &filter, None);
-    assert!(res.is_ok());
+fn r7z_roundtrip() {
+    roundtrip(ArchiveType::R7Z, "7z");
 }
 
-/// 解压 7z 到目录并断言成功
+/// tar.gz 往返：压缩、解压、比对
 #[test]
-#[ignore]
-fn unr7z() {
-    let file = Path::new("test_run");
-    let zip = file.join("test.7z");
-    let dir = file.join("test_7z/");
-    let res = BaseArchive::decompress(ArchiveType::R7Z, &zip, &dir, None);
-    assert!(res.is_ok());
+fn targz_roundtrip() {
+    roundtrip(ArchiveType::TarGz, "tar.gz");
 }
 
-/// 断言 7z 解压结果与源目录一致
+/// tar.xz 往返：压缩、解压、比对
 #[test]
-#[ignore]
-fn r7z_equal() {
-    let file = Path::new("test_run");
-    let source = Path::new("tests").join("test_compress/");
-    let dir1 = file.join("test_7z/");
-    assert!(compare_folders(&source, &dir1, &[
-        String::from("skip.text"),
-        String::from("dir1/skip.text"),
-    ]));
-}
-
-/// 压缩源目录为 tar.gz 并断言成功
-#[test]
-#[ignore]
-fn targz() {
-    let file = Path::new("test_run");
-    let source = Path::new("tests").join("test_compress/");
-    let zip = file.join("test.tar.gz");
-    let filter = Some(vec![
-        String::from("skip.text"),
-        String::from("dir1/skip.text"),
-    ]);
-    let res = BaseArchive::compress(ArchiveType::TarGz, &zip, &source, Some(&source), &filter, None);
-    assert!(res.is_ok());
-}
-
-/// 解压 tar.gz 到目录并断言成功
-#[test]
-#[ignore]
-fn untargz() {
-    let file = Path::new("test_run");
-    let zip = file.join("test.tar.gz");
-    let dir = file.join("test_targz/");
-    let res = BaseArchive::decompress(ArchiveType::TarGz, &zip, &dir, None);
-    assert!(res.is_ok());
-}
-
-/// 断言 tar.gz 解压结果与源目录一致
-#[test]
-#[ignore]
-fn targz_equal() {
-    let file = Path::new("test_run");
-    let source = Path::new("tests").join("test_compress/");
-    let dir1 = file.join("test_targz/");
-    assert!(compare_folders(&source, &dir1, &[
-        String::from("skip.text"),
-        String::from("dir1/skip.text"),
-    ]));
-}
-
-/// 压缩源目录为 tar.xz 并断言成功
-#[test]
-#[ignore]
-fn tarxz() {
-   let file = Path::new("test_run");
-    let source = Path::new("tests").join("test_compress/");
-    let zip = file.join("test.tar.xz");
-    let filter = Some(vec![
-        String::from("skip.text"),
-        String::from("dir1/skip.text"),
-    ]);
-    let res = BaseArchive::compress(ArchiveType::TarXz, &zip, &source, Some(&source), &filter, None);
-    assert!(res.is_ok());
-}
-
-/// 解压 tar.xz 到目录并断言成功
-#[test]
-#[ignore]
-fn untarxz() {
-    let file = Path::new("test_run");
-    let zip = file.join("test.tar.xz");
-    let dir = file.join("test_tarxz/");
-    let res = BaseArchive::decompress(ArchiveType::TarXz, &zip, &dir, None);
-    assert!(res.is_ok());
-}
-
-/// 断言 tar.xz 解压结果与源目录一致
-#[test]
-#[ignore]
-fn tarxz_equal() {
-    let file = Path::new("test_run");
-    let source = Path::new("tests").join("test_compress/");
-    let dir1 = file.join("test_tarxz/");
-    assert!(compare_folders(&source, &dir1, &[
-        String::from("skip.text"),
-        String::from("dir1/skip.text"),
-    ]));
+fn tarxz_roundtrip() {
+    roundtrip(ArchiveType::TarXz, "tar.xz");
 }
 
 /// 校验 TarMode 按后缀识别 gz 与 xz，不支持的返回 `None`
 #[test]
 fn test_tar_mode_from_path() {
-    // 测试 .tar.gz
-    let path_gz = &Path::new("archive.tar.gz").to_path_buf();
-    assert_eq!(TarMode::try_from_path(path_gz), Some(TarMode::Gz));
-    
-    // 测试 .tgz
-    let path_tgz = &Path::new("archive.tgz").to_path_buf();
-    assert_eq!(TarMode::try_from_path(path_tgz), Some(TarMode::Gz));
-    
-    // 测试 .tar.xz
-    let path_xz = &Path::new("archive.tar.xz").to_path_buf();
-    assert_eq!(TarMode::try_from_path(path_xz), Some(TarMode::Xz));
-    
-    // 测试 .txz
-    let path_txz = &Path::new("archive.txz").to_path_buf();
-    assert_eq!(TarMode::try_from_path(path_txz), Some(TarMode::Xz));
-    
-    // 测试不支持的类型
-    let path_zip = &Path::new("archive.zip").to_path_buf();
-    assert!(TarMode::try_from_path(path_zip).is_none());
-}
-
-/// 清理用例产生的 `test_run` 目录
-#[test]
-#[ignore]
-fn remove_file() {
-    let file = Path::new("test_run");
-    fs::remove_dir_all(file).ok();
+    assert_eq!(TarMode::try_from_path(&Path::new("archive.tar.gz").to_path_buf()), Some(TarMode::Gz));
+    assert_eq!(TarMode::try_from_path(&Path::new("archive.tgz").to_path_buf()), Some(TarMode::Gz));
+    assert_eq!(TarMode::try_from_path(&Path::new("archive.tar.xz").to_path_buf()), Some(TarMode::Xz));
+    assert_eq!(TarMode::try_from_path(&Path::new("archive.txz").to_path_buf()), Some(TarMode::Xz));
+    assert!(TarMode::try_from_path(&Path::new("archive.zip").to_path_buf()).is_none());
 }
 
 /// 校验 zip / 7z / tar.gz 的压缩、打开、读条目与单文件解压
@@ -597,25 +484,4 @@ fn add_files_data_inplace() {
     assert_eq!(base2.read("data.bin").unwrap(), vec![9u8]);
 
     fs::remove_dir_all(file).ok();
-}
-
-/// 按顺序跑完整套压缩包用例，覆盖压缩、解压与一致性对比
-#[test]
-fn archive_test() {
-    zip();
-    r7z();
-    targz();
-    tarxz();
-
-    unzip();
-    unr7z();
-    untargz();
-    untarxz();
-
-    zip_equal();
-    r7z_equal();
-    targz_equal();
-    tarxz_equal();
-
-    remove_file();
 }

@@ -218,6 +218,7 @@ pub async fn server_instance_get_meta(
                         dir: item.dir.clone(),
                         mode: item.mode.clone(),
                         exclude: item.exclude.clone(),
+                        delete: item.delete.clone(),
                         delete_old: item.delete_old,
                     })
                     .collect()
@@ -341,6 +342,8 @@ struct ConfigDir {
     mode: ConfigMode,
     /// 取消勾选的文件，相对游戏目录
     exclude: Vec<String>,
+    /// 要删除的文件，相对游戏目录
+    delete: Vec<String>,
     /// 压缩包解压前先删掉客户端旧目录
     delete_old: bool,
 }
@@ -396,6 +399,36 @@ fn config_dir(value: &str) -> Result<String, String> {
     Ok(dir)
 }
 
+/// 收集要删除的文件
+///
+/// 每条路径只接受它所在条目负责的范围，前端传错路径时不误删别处；重复标记只留一份。
+/// 文件不要求还在：发布者可能先删了实例里的文件再来标记。
+///
+/// - `base`: 游戏目录
+/// - `configs`: 配置目录选项
+///
+/// # 返回值
+///
+/// 去重排序后的相对路径；路径非法、指向目录或在条目范围外时返回错误文案
+fn config_deletions(base: &Path, configs: &[ConfigDir]) -> Result<Vec<PathBuf>, String> {
+    let mut list = BTreeSet::new();
+    for config in configs {
+        // 不参与同步 / 整目录删除的条目不单独删文件，前者不该动客户端，后者已经删掉了
+        if matches!(config.mode, ConfigMode::None | ConfigMode::Delete) {
+            continue;
+        }
+        let dir = Path::new(&config.dir);
+        for path in &config.delete {
+            let rel = files::delete_target(base, path)?;
+            if rel == dir || !rel.starts_with(dir) {
+                return Err(err_keys::SERVER_INSTANCE_DIR.to_string());
+            }
+            list.insert(rel);
+        }
+    }
+    Ok(list.into_iter().collect())
+}
+
 /// 生成入口：校验参数 → 展开勾选 → 写 MML 清单
 ///
 /// - `game`: 源实例
@@ -430,6 +463,7 @@ fn generate(
             dir,
             mode,
             exclude: item.exclude.clone(),
+            delete: item.delete.clone(),
             delete_old,
         });
     }
@@ -555,6 +589,9 @@ fn generate_mml(
         depth.cmp(&other).then_with(|| a.dir.cmp(&b.dir))
     });
 
+    // 单文件删除不进包，另发空包让客户端按路径删掉
+    let deletions = config_deletions(base, &contents.configs)?;
+
     // 先把目录内容列出来：进度总数与后面的打包都要用
     let mut config_files: Vec<(&ConfigDir, Vec<PathBuf>)> = Vec::new();
     for config in selected {
@@ -580,11 +617,14 @@ fn generate_mml(
             list.retain(|rel| !children.iter().any(|child| rel.starts_with(*child)));
         }
         files::retain_excluded(base, &mut list, &config.exclude)?;
+        // 标记删除的文件同样不进包，删掉它们交给下面的空包
+        files::retain_excluded(base, &mut list, &config.delete)?;
         // 删除目录与空目录整包同步要留空压缩包；其余情况没有文件就不生成条目。
         // 整包同步把文件全取消勾选、或所有下级都单独配过时不写空包，避免误删客户端目录。
         let keep_empty = matches!(config.mode, ConfigMode::Delete)
             || (matches!(config.mode, ConfigMode::ArchiveAll)
                 && config.exclude.is_empty()
+                && config.delete.is_empty()
                 && children.is_empty());
         if list.is_empty() && !keep_empty {
             continue;
@@ -597,7 +637,8 @@ fn generate_mml(
             .iter()
             .map(|(config, list)| if config.mode.is_archive() { 1 } else { list.len() })
             .sum::<usize>()
-        + contents.packs.len();
+        + contents.packs.len()
+        + deletions.len();
 
     let mut now = 0;
     let mut items = Vec::new();
@@ -757,6 +798,27 @@ fn generate_mml(
         }
     }
 
+    // 单文件删除：空包 + Over，客户端解压前把目标移走，删完不留空目录
+    for rel in &deletions {
+        let wire = files::wire_path(rel);
+        progress(now, total, wire.clone());
+        now += 1;
+        let name = generate::delete_archive_name(&wire);
+        let zip = out.join(&name);
+        files::empty_zip(&zip)?;
+        let sha1 = files::sha1(&zip)?;
+        archives.push(ServerArchiveItemObj {
+            file: name.clone(),
+            dir: wire.clone(),
+            delete_old: true,
+            url: format!("{url}/{}", files::encode_url_path(&name)),
+            sha1: Some(sha1),
+            sha256: None,
+        });
+        changed.insert(wire);
+        written.insert(name);
+    }
+
     let mut pack_snapshot: BTreeMap<String, mapping::EntrySnapshot> = BTreeMap::new();
     for pack in &contents.packs {
         let rel = &pack.path;
@@ -856,6 +918,7 @@ fn generate_mml(
                     dir: item.dir.clone(),
                     mode: item.mode.clone(),
                     exclude: item.exclude.clone(),
+                    delete: item.delete.clone(),
                     delete_old: item.delete_old,
                 })
                 .collect(),

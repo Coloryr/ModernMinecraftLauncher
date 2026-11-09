@@ -312,12 +312,37 @@ pub async fn build_forge_client(mc: &str, version: &str, hash: bool) -> FileItem
 /// 返回下载项
 pub async fn build_forge_launcher(mc: &str, version: &str, hash: bool) -> FileItemObj {
     let mut item = build_forge_item(mc, version, names::FILE_LAUNCHER, hash).await;
-    item.url = format!(
+    item.url = mirror_maven(&format!(
         "{}net/minecraftforge/forge/{mc}-{version}/forge-{mc}-{version}-{}.jar",
         urls::FORGE,
         names::FILE_LAUNCHER
-    );
+    ));
     item
+}
+
+/// 镜像源下把加载器运行库地址换到 BMCLAPI
+///
+/// Forge / NeoForge 的运行库地址写在加载器清单里，是绝对地址，不会跟着下载源变；
+/// 不换的话选了镜像源仍然去连官方 maven。
+///
+/// - `url`: 加载器清单里的绝对下载地址
+///
+/// # 返回值
+///
+/// 镜像源且命中已知 maven 前缀时返回镜像地址，否则原样返回
+fn mirror_maven(url: &str) -> String {
+    if url_helper::get_source() != mml_config::config_obj::SourceLocal::Bmclapi {
+        return url.to_string();
+    }
+    for prefix in [
+        "https://maven.neoforged.net/releases/",
+        "https://maven.minecraftforge.net/",
+    ] {
+        if let Some(rest) = url.strip_prefix(prefix) {
+            return format!("{}maven/{rest}", urls::BMCLAPI);
+        }
+    }
+    url.to_string()
 }
 
 /// 构建 Forge 运行库下载项目列表
@@ -359,7 +384,7 @@ pub async fn build_forge_libs(
         let obj = FileItemObj {
             name: item.name.clone(),
             file: libraries_path::get_lib_dir().join(&artifact.path),
-            url: artifact.url.clone(),
+            url: mirror_maven(&artifact.url),
             hash: FileHash::Sha1(artifact.sha1.clone()),
             later: Default::default(),
         };

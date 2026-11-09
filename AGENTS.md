@@ -205,8 +205,11 @@ windows/<窗口>/mod.rs 里：
 
 ### 6.2 缓存目录
 
-- 渲染测试的运行缓存（下载的客户端 jar 等）在 `mml-core/mml-tex-draw/tests/out/run`
-  （`render_all.rs` 的 `run_dir`，跨进程复用）。
+- 渲染工具的运行缓存（下载的客户端 jar 等）在 `mml-core/mml-tex-draw/tests/out/run`
+  （`examples/render_all.rs` 的 `run_dir`，跨进程复用）。
+- **出图 / 重生成参考图的工具放各 crate 的 `examples/`，不要写成 `tests/` 里的
+  `#[ignore]` 用例**：它们依赖本机 jar、GPU 或会覆盖参考图，既不该进 CI 的测试矩阵，
+  也不该在 `cargo test` 里以"被忽略"的形态挂着。
 - 工作缓存（反编译 jar、提取脚本等）放根目录 `target/temp`，与其他临时文件同源，
   不要另建目录，也不要放系统盘。
 - 判据：**`target/temp` 放这一轮用完就能删的；`tests/out/run` 放删了要重下一遍、

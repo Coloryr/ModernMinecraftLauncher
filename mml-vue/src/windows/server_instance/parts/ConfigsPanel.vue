@@ -4,7 +4,11 @@ import BaseButton from "../../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import { t } from "../../../lib/i18n";
 import { ServerInstanceKey } from "../context";
-import { CONFIG_MODE_INHERIT, type ConfigMode } from "../useServerInstance";
+import {
+  CONFIG_MODE_INHERIT,
+  type ConfigFileAction,
+  type ConfigMode,
+} from "../useServerInstance";
 const ctx = inject(ServerInstanceKey);
 if (!ctx) throw new Error("server instance context missing");
 const {
@@ -18,6 +22,7 @@ const {
   configDeleteLocked,
   configFileState,
   setConfigFile,
+  setConfigFileAction,
   toggleConfigFile,
   configDirOn,
   configDirEditable,
@@ -37,12 +42,26 @@ const {
 /** 下拉里的同步方式，顺序与产品口径一致 */
 const MODES: ConfigMode[] = ["none", "archiveAll", "archiveSelf", "filesAll", "filesSelf", "delete"];
 
-/** 文件复选框不可用时的说明 */
+/** 文件复选框与下拉的说明 */
 function fileTitle(path: string): string | undefined {
   const state = configFileState(path);
   if (state === "none") return t("serverInstance.configFileNoOwner");
   if (state === "locked") return t("serverInstance.configFileLocked");
+  if (state === "delete") return t("serverInstance.configFileDeleteHint");
   return undefined;
+}
+
+/** 文件下拉的取值：锁定 / 无归属时按不同步显示 */
+function fileActionOf(path: string): ConfigFileAction {
+  const state = configFileState(path);
+  if (state === "delete") return "delete";
+  return state === "sync" ? "sync" : "skip";
+}
+
+/** 文件下拉禁用：没有归属或被删除目录锁住 */
+function fileLocked(path: string): boolean {
+  const state = configFileState(path);
+  return state === "none" || state === "locked";
 }
 
 /** 目录勾选框不可用时的说明 */
@@ -112,8 +131,8 @@ function sizeText(size: number): string {
               :title="dirTitle(row.path)"
               @change="setConfigDir(row.path, ($event.target as HTMLInputElement).checked)" />
             <input v-else type="checkbox" class="si-box"
-              :checked="configFileState(row.path) === 'on'"
-              :disabled="busy || configFileState(row.path) === 'none' || configFileState(row.path) === 'locked'"
+              :checked="configFileState(row.path) === 'sync'"
+              :disabled="busy || fileLocked(row.path)"
               :title="fileTitle(row.path)"
               @change="setConfigFile(row.path, ($event.target as HTMLInputElement).checked)" />
           </span>
@@ -157,6 +176,19 @@ function sizeText(size: number): string {
               <option v-for="mode in MODES" :key="mode" :value="mode">
                 {{ t(`serverInstance.sync.${mode}`) }}
               </option>
+            </select>
+          </template>
+          <!-- 文件：同步 / 不进包 / 让客户端删掉这个文件 -->
+          <template v-else>
+            <select class="field-select si-cell-control si-config-mode"
+              :value="fileActionOf(row.path)"
+              :disabled="busy || fileLocked(row.path)"
+              :title="fileTitle(row.path)"
+              :aria-label="t('serverInstance.configFileAction')"
+              @change="setConfigFileAction(row.path, ($event.target as HTMLSelectElement).value as ConfigFileAction)">
+              <option value="sync">{{ t("serverInstance.configFileSync") }}</option>
+              <option value="skip">{{ t("serverInstance.sync.none") }}</option>
+              <option value="delete">{{ t("serverInstance.configFileDelete") }}</option>
             </select>
           </template>
         </div>

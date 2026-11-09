@@ -117,7 +117,7 @@ pub struct ServerArchiveItemObj {
     pub delete_old: bool,
     /// 下载地址
     #[serde(rename = "Url")]
-    pub url: String,
+    pub url: Option<String>,
     /// SHA1 校验
     #[serde(rename = "Sha1")]
     pub sha1: Option<String>,

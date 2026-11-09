@@ -28,6 +28,9 @@ import type {
 /** 同步方式下拉里"跟着上级走"的占位值：选中它就删掉自己的条目 */
 export const CONFIG_MODE_INHERIT = "inherit";
 
+/** 单个文件的处理方式：跟随目录同步 / 不进包 / 下次同步删掉 */
+export type ConfigFileAction = "sync" | "skip" | "delete";
+
 /** 文件夹的同步方式 */
 export type ConfigMode =
   | "none"
@@ -151,6 +154,8 @@ const configModes = ref(new Map<string, ConfigMode>());
 const configDeleteOld = ref(new Map<string, boolean>());
 /** 取消勾选的文件，相对游戏目录 */
 const configExcluded = ref(new Set<string>());
+/** 标记删除的文件，相对游戏目录；下次同步客户端会删掉 */
+const configDeleted = ref(new Set<string>());
 /** 展开后加载到的子项，目录路径 → 直接子项 */
 const configChildren = ref(new Map<string, ExportEntryDto[]>());
 /** 展开着的目录 */
@@ -684,26 +689,41 @@ function setConfigDir(path: string, on: boolean) {
   applyConfigMode(path, defaultConfigMode(path));
 }
 
-/** 文件勾选状态：没归属、被删除目录锁定、已勾、取消勾选 */
-function configFileState(path: string): "on" | "off" | "locked" | "none" {
+/** 文件在配置树里的处理方式：同步、不进包、删除，或被上级锁定 / 没有归属 */
+function configFileState(
+  path: string,
+): "sync" | "skip" | "delete" | "locked" | "none" {
   const owner = configFileOwner(path);
   if (!owner) return "none";
   if (owner.mode === "delete") return "locked";
-  return configExcluded.value.has(path) ? "off" : "on";
+  if (configDeleted.value.has(path)) return "delete";
+  return configExcluded.value.has(path) ? "skip" : "sync";
 }
 
-/** 勾选 / 取消一个文件 */
+/** 改一个文件的处理方式；被上级锁定时不生效 */
+function setConfigFileAction(path: string, action: ConfigFileAction) {
+  const state = configFileState(path);
+  if (state === "locked" || state === "none") return;
+  const excluded = new Set(configExcluded.value);
+  const deleted = new Set(configDeleted.value);
+  if (action === "skip") excluded.add(path);
+  else excluded.delete(path);
+  if (action === "delete") deleted.add(path);
+  else deleted.delete(path);
+  configExcluded.value = excluded;
+  configDeleted.value = deleted;
+}
+
+/** 勾选 / 取消一个文件；勾回来会一并取消删除标记 */
 function setConfigFile(path: string, on: boolean) {
-  const next = new Set(configExcluded.value);
-  if (on) next.delete(path);
-  else next.add(path);
-  configExcluded.value = next;
+  setConfigFileAction(path, on ? "sync" : "skip");
 }
 
-/** 点文件名时切换文件勾选；目录名由调用方负责展开 */
+/** 点文件名时在同步与不同步之间切换；目录名由调用方负责展开 */
 function toggleConfigFile(path: string) {
   const state = configFileState(path);
-  if (state === "on" || state === "off") setConfigFile(path, state !== "on");
+  if (state === "sync") setConfigFileAction(path, "skip");
+  else if (state === "skip" || state === "delete") setConfigFileAction(path, "sync");
 }
 
 /** 改一个目录的同步方式；选"跟随上级"就收回自己的条目 */
@@ -1016,14 +1036,17 @@ async function loadInstance(uuid: string) {
       .filter((item) => item.deleteOld !== null)
       .map((item) => [item.dir, item.deleteOld as boolean]),
   );
-  // 取消勾选跟着上次生成走：发布者只排掉个别文件的设置要还在
+  // 勾选与删除标记跟着上次生成走：发布者只排掉 / 删掉个别文件的设置要还在
   const excluded = new Set<string>();
+  const deleted = new Set<string>();
   if (Array.isArray(meta?.configs)) {
     for (const item of meta.configs) {
       for (const path of item.exclude) excluded.add(path);
+      for (const path of item.delete) deleted.add(path);
     }
   }
   configExcluded.value = excluded;
+  configDeleted.value = deleted;
   result.value = null;
   progress.value = null;
   changedPaths.value = new Set();
@@ -1192,6 +1215,7 @@ function clearInstance() {
   configModes.value = new Map();
   configDeleteOld.value = new Map();
   configExcluded.value = new Set();
+  configDeleted.value = new Set();
   configDirs.value = [];
   configChildren.value = new Map();
   configOpened.value = new Set();
@@ -1353,6 +1377,10 @@ function buildOptions(): ServerInstanceOptionsDto {
         exclude: [...configExcluded.value].filter(
           (path) => path === dir || path.startsWith(`${dir}/`),
         ),
+        // 删除标记只跟着文件的实际归属下发，避免父目录重复带一份
+        delete: [...configDeleted.value].filter(
+          (path) => configFileOwner(path)?.dir === dir,
+        ),
       })),
     baseFiles: [...pickedBase.value],
     resourcePacks: packs.value
@@ -1487,7 +1515,7 @@ onBeforeUnmount(() => {
     packs, pickedPacks, pickAllPacks, packPidOf, packFidOf, packUrlOf,
     setPackId, setPackUrl, packIdTypeOf, isPackCustomType, setPackIdType,
     configDirs, configModes, configRows, configCount, configModeOf, configAncestorLock,
-    configDeleteLocked, configFileState, setConfigFile, toggleConfigFile,
+    configDeleteLocked, configFileState, setConfigFile, setConfigFileAction, toggleConfigFile,
     configDirOn, configDirEditable, setConfigDir,
     configDeleteOldOf, setConfigDeleteOld, configArchiveOwner, configRowDeleteOld,
     configUnderRecursive, configModeSelect,

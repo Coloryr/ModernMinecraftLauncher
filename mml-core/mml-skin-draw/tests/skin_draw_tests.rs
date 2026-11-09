@@ -2,7 +2,7 @@ use std::path::Path;
 
 use mml_skin_draw::{
     Draw2DType, Draw3DType, DrawCapeType, DrawElytraType, DrawHeadType, DrawSkinType, draw_cape,
-    draw_cape_3d, draw_elytra, draw_elytra_3d, draw_head, draw_skin,
+    draw_elytra, draw_head, draw_skin,
 };
 use tiny_skia::{Pixmap, Point};
 
@@ -169,55 +169,4 @@ fn test_elytra_2d_flying() {
     let res = res.unwrap();
 
     assert_bitmap_eq(&res, &load_reference("out_elytra_2d_flying.png"));
-}
-
-/// 重新生成 3D 参考图
-///
-/// 3D 输出带抗锯齿，换光栅器后不可能与旧图逐字节一致，所以这两张图由本实现重新生成：
-/// `cargo test -p mml-skin-draw --test skin_draw_tests regen_3d_refs -- --ignored`
-#[test]
-#[ignore]
-fn regen_3d_refs() {
-    let image = load_skin("skin_slim.png");
-
-    let a =
-        draw_head(&image, DrawHeadType::Type3D(Draw3DType::TypeADown)).expect("3d typea 应成功");
-    mml_skin::save_bitmap(&a, Path::new("tests").join("out_head_3d_a.png").as_path());
-
-    let b = draw_head(
-        &image,
-        DrawHeadType::Type3D(Draw3DType::TypeBRotate(Point::from_xy(15.0, 65.0))),
-    )
-    .expect("3d typeb 应成功");
-    mml_skin::save_bitmap(&b, Path::new("tests").join("out_head_3d_b.png").as_path());
-}
-
-/// 渲染披风与鞘翅的输出样例，供人眼确认，默认不跑
-///
-/// 要出图时：
-/// `cargo test -p mml-skin-draw --test skin_draw_tests render_samples -- --ignored`
-///
-/// PNG 写到 `target/temp/skin_samples/`，走 `mml_testutil` 的测试临时目录约定；
-/// 3D 那几张需要可用 GPU。2D 出图都有逐字节参考图钉着（见上面的用例），
-/// 3D 输出带抗锯齿、换光栅器就不一致，所以只出样不比对。
-#[test]
-#[ignore]
-fn render_samples() {
-    let dir = mml_testutil::temp_path("skin_samples");
-    std::fs::create_dir_all(&dir).unwrap();
-    let image = load_skin("cape.png");
-
-    let samples: [(&str, Option<Pixmap>); 4] = [
-        ("cape_3d_yaw0.png", draw_cape_3d(&image, 0.0, 0.0)),
-        ("cape_3d_yaw30.png", draw_cape_3d(&image, 25.0, 45.0)),
-        ("elytra_3d_yaw0.png", draw_elytra_3d(&image, 0.0, 0.0)),
-        ("elytra_3d_yaw30.png", draw_elytra_3d(&image, 0.0, 30.0)),
-    ];
-
-    for (name, bitmap) in samples {
-        let Some(bitmap) = bitmap else {
-            panic!("{name} 应出图")
-        };
-        mml_skin::save_bitmap(&bitmap, dir.join(name).as_path());
-    }
 }

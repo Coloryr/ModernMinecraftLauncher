@@ -1,10 +1,7 @@
 //! Mojang API 的离线测试。
 //!
 //! 覆盖各数据结构对真实 Mojang / minecraft.net API 响应结构的反序列化。
-//! 含一个标记 `#[ignore]` 的真实网络测试，即版本清单。
-//!
-//! 运行网络测试：
-//! `cargo test -p mml-net --test mojang_api_test -- --ignored`
+//! 另有一条真实网络用例，即版本清单；连不上外网时跳过。
 
 use mml_net::mojang_api::{
     ArticleGridObj, DefaultTileObj, ImageObj, MinecraftNewsObj, MinecraftProfileObj,
@@ -137,20 +134,24 @@ fn token_res_defaults_on_missing_fields() {
     assert!(obj.expires_in <= 0);
 }
 
-/// 获取主版本清单，真实网络请求，默认忽略。
-///
-/// 运行方式：
-/// `cargo test -p mml-net --test mojang_api_test -- --ignored`
+/// 获取主版本清单，真实网络请求；连不上外网时跳过。
 #[tokio::test]
-#[ignore = "需要真实网络：请求 Mojang 版本清单，cargo test -- --ignored 运行"]
 async fn versions_manifest_network() {
-    // 初始化配置与 HTTP 客户端，用临时目录，测后清理
+    // 日志 / 配置 / HTTP 客户端都是进程级单例：少了日志初始化，init 里的日志会 panic
     let dir = mml_testutil::temp_dir().join(format!("mml-net-mojang-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("创建临时配置目录失败");
+    let _ = mml_log::start(&dir);
     let _ = mml_config::init(&dir);
     mml_net::init();
 
-    let data = get_versions(None).await.expect("版本清单请求失败");
+    // 外网不通就跳过：离线环境不该把请求失败报成接口错误
+    let data = match get_versions(None).await {
+        Ok(data) => data,
+        Err(err) => {
+            eprintln!("跳过: 网络不可用（{err}）");
+            return;
+        }
+    };
     assert!(!data.is_empty(), "版本清单不应为空");
 
     let json: serde_json::Value = serde_json::from_slice(&data).expect("清单应为合法 JSON");

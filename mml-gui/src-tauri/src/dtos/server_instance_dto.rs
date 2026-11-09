@@ -77,6 +77,9 @@ pub struct ServerInstanceConfigDto {
     /// 取消勾选的文件，相对游戏目录；只对这个目录负责的范围生效
     #[serde(default)]
     pub exclude: Vec<String>,
+    /// 下次同步要删掉的文件，相对游戏目录；不进包，客户端按空包 + Over 删除
+    #[serde(default)]
+    pub delete: Vec<String>,
     /// 压缩包解压前先删掉客户端旧目录；`None` 按同步方式的默认值
     #[serde(default)]
     pub delete_old: Option<bool>,

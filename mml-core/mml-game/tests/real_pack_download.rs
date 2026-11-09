@@ -1,10 +1,6 @@
 //! 真实整合包下载安装测试：从网上下载真包，走完整安装链
 //! 1. Modrinth 真包 Fabulously Optimized，Fabric，48 文件
 //! 2. Modrinth 真包 Optimized FPS，NeoForge，17 文件
-//! 3. CurseForge 真包 Fabulously Optimized，`#[ignore]` 手动测试，key 由环境
-//!    变量 `MML_CF_API_KEY` 注入，与 GUI 运行时同源
-//! 4. Modrinth 大体积真包 Fresh & Smooth，`#[ignore]` 手动测试，约 310MB，
-//!    mods/resourcepacks/shaderpacks 多目录安装
 //!
 //! 无网时自动跳过。全局初始化每进程一次，互斥锁串行各用例。
 
@@ -335,7 +331,6 @@ async fn install_real_modrinth_neoforge_pack() {
 ///     install_real_curseforge_pack -- --ignored --nocapture
 /// ```
 #[tokio::test]
-#[ignore]
 async fn install_real_curseforge_pack() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     ensure_init();
@@ -485,7 +480,6 @@ async fn install_cf_pack_with_loader(loader: u32, loader_name: &str, expect_load
 /// CurseForge 真包在线安装：Fabric 加载器，手动测试，key 与网络要求同
 /// [`install_real_curseforge_pack`]
 #[tokio::test]
-#[ignore]
 async fn install_real_curseforge_fabric_pack() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     ensure_init();
@@ -510,7 +504,6 @@ async fn install_real_curseforge_fabric_pack() {
 /// CurseForge 真包在线安装：NeoForge 加载器，手动测试，key 与网络要求同
 /// [`install_real_curseforge_pack`]
 #[tokio::test]
-#[ignore]
 async fn install_real_curseforge_neoforge_pack() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     ensure_init();
@@ -541,7 +534,6 @@ async fn install_real_curseforge_neoforge_pack() {
 ///     -- --ignored --nocapture
 /// ```
 #[tokio::test]
-#[ignore]
 async fn install_real_modrinth_heavy_pack() {
     let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     ensure_init();

@@ -117,7 +117,6 @@ impl mml_downloader::IDownloadGui for TestDownloader {
 
 /// 用本机真实压缩包跑一遍完整的 CurseForge 整合包安装
 #[tokio::test]
-#[ignore]
 async fn install_curseforge_pack() {
     let run_dir = mml_testutil::temp_dir().join("mml-modpack-test");
     std::fs::create_dir_all(&run_dir).unwrap();

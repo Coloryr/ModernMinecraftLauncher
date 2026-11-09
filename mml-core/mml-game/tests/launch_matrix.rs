@@ -25,14 +25,12 @@
 //! - `不适用`：上游没有该组合（如 1.7.10 没有 Fabric），或查不到加载器版本；
 //! - `缺 Java`：本机没有该版本要的 Java（1.7.10 / 1.12.2 要 Java 8）——下载与检查照跑，
 //!   只有最后起进程这一步跳过；
-//! - `失败`：其它错误，算真失败，会汇总在末尾并让用例不通过。
-//!
-//! `#[ignore]`：联网 + 首次要下几百 MB，缓存落在 `target/temp/mml-launch-matrix`。
-//! 走本机代理（默认 `127.0.0.1:7890`），`MML_TEST_PROXY=off` 关掉。
+//! - `失败`：其它错误，算真失败，直接让用例不通过。
 //!
 //! ```text
-//! cargo test -p mml-game --test launch_matrix -- --ignored --nocapture
-//! $env:MML_MATRIX = "normal:26.3,forge:1.12.2"   # 只跑指定几格
+//! cargo test -p mml-game --test launch_matrix
+//! $env:MML_TEST_PROXY = "127.0.0.1:1080"   # 可选，显式代理；不设就直连
+//! $env:MML_TEST_SOURCE = "bmclapi"         # 可选，官方 maven 解析不到时改走镜像
 //! ```
 
 use std::collections::HashSet;
@@ -43,7 +41,6 @@ use std::time::{Duration, Instant};
 
 use mml_auth::LoginObj;
 use mml_config::config_obj::{GCType, ProxyState, ProxyType, RunArgObj};
-use mml_downloader::{DownloadTaskState, IDownloadGui, download_item::DownloadItem};
 use mml_game::game_launch::{AutoJoinType, GameLaunchArg, LaunchDebugger};
 use mml_game::launcher::instance_setting_obj::{AdvanceJvmObj, InstanceSettingObj};
 use mml_game::loader::LoaderType;
@@ -52,18 +49,7 @@ use mml_names::i18_items::error_type::ErrorType;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-/// 要覆盖的游戏版本
-const VERSIONS: [&str; 3] = ["26.3", "1.12.2", "1.7.10"];
-
-/// 要覆盖的加载器
-const LOADERS: [LoaderType; 6] = [
-    LoaderType::Normal,
-    LoaderType::Forge,
-    LoaderType::Fabric,
-    LoaderType::NeoForge,
-    LoaderType::Cleanroom,
-    LoaderType::LiteLoader,
-];
+mod common;
 
 /// 探针：打印类路径与游戏参数，并同样写进工作目录
 const PROBE: &str = r#"import java.nio.charset.StandardCharsets;
@@ -103,14 +89,6 @@ struct Ctx {
     exited: Arc<Mutex<HashSet<Uuid>>>,
 }
 
-/// 下载回调：什么都不做
-struct Quiet {}
-
-impl IDownloadGui for Quiet {
-    fn update(&self, _thread: u32, _file: &Arc<DownloadItem>) {}
-    fn update_task(&self, _state: DownloadTaskState) {}
-}
-
 /// 矩阵与实例文件都留在这个目录里，重复跑不必再下一遍
 fn run_dir() -> PathBuf {
     mml_testutil::temp_dir().join("mml-launch-matrix")
@@ -143,17 +121,21 @@ fn ctx() -> Option<&'static Ctx> {
     .as_ref()
 }
 
-/// 走本机代理：默认 `127.0.0.1:7890`
+/// 可选测试代理 `MML_TEST_PROXY=ip:port`
 ///
-/// `MML_TEST_PROXY=off` 关掉，`MML_TEST_PROXY=host:port` 换地址。必须在 `mml_net::init()`
-/// 之前设：客户端是拿配置建出来的，建完再改就不生效了。
+/// 不设就直连，不预设任何代理地址。必须在 `mml_net::init()` 之前设：
+/// 客户端是拿配置建出来的，建完再改就不生效了。
 fn apply_proxy() {
-    let proxy = std::env::var("MML_TEST_PROXY").unwrap_or_else(|_| "127.0.0.1:7890".to_string());
+    let Some(proxy) = std::env::var("MML_TEST_PROXY").ok() else {
+        return;
+    };
     if proxy.eq_ignore_ascii_case("off") {
         return;
     }
-    let (ip, port) = proxy.split_once(':').unwrap_or(("127.0.0.1", "7890"));
-    let port = port.parse().unwrap_or(7890);
+    let Some((ip, port)) = proxy.split_once(':') else {
+        panic!("MML_TEST_PROXY 格式应为 ip:port");
+    };
+    let port: u16 = port.parse().expect("MML_TEST_PROXY 端口不合法");
 
     let mut config = mml_config::write_config();
     config.http.work_proxy = ProxyState::User;
@@ -184,7 +166,7 @@ fn ensure_init() {
         mml_config::config_save::start();
         apply_proxy();
         mml_net::init();
-        mml_downloader::set_gui_handel(Box::new(Quiet {}));
+        mml_downloader::set_gui_handel(Box::new(common::PrintDownloader::new()));
         mml_downloader::init(mml_base::get_base_dir()).unwrap();
         mml_downloader::start();
         mml_game::init(mml_base::get_base_dir()).unwrap();
@@ -196,6 +178,10 @@ fn ensure_init() {
         config.check.assets = std::env::var("MML_TEST_ASSETS").is_ok();
         config.check.core = true;
         config.check.lib = true;
+        // 可选镜像源：官方 maven 解析不到时用 `MML_TEST_SOURCE=bmclapi` 改走 BMCLAPI
+        if std::env::var("MML_TEST_SOURCE").is_ok_and(|v| v.eq_ignore_ascii_case("bmclapi")) {
+            config.http.source = mml_config::config_obj::SourceLocal::Bmclapi;
+        }
     });
 }
 
@@ -289,6 +275,16 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
         };
     };
 
+    let combo = format!("{}:{version}", loader.id());
+    say(&format!(
+        "[测试] 开始 {combo}（加载器 {}）",
+        if loader_version.is_empty() {
+            "原版"
+        } else {
+            loader_version
+        }
+    ));
+
     let base = mml_base::get_base_dir();
     let uuid = Uuid::new_v4();
     let dir = format!("{}-{version}", loader.id());
@@ -322,7 +318,8 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
         skip_server_pack: false,
         server_pack_skip: Vec::new(),
         server_pack_cancel: None,
-        debugger: LaunchDebugger::None, jvm_debug: None,
+        debugger: LaunchDebugger::None,
+        jvm_debug: None,
     };
     let check_started = Instant::now();
     let check = match instance
@@ -369,6 +366,7 @@ pub async fn launch(version: &str, loader: LoaderType, loader_version: &str) -> 
     };
 
     // ---- 启动游戏 ----
+    say(&format!("[测试] {combo} 已就绪，启动进程…"));
     let launched = Instant::now();
     // 上一次运行的凭据不能当本次结果：否则进程根本没跑起来也会被旧文件蒙混过关
     let receipt = base
@@ -505,22 +503,6 @@ fn java_hint(version: &str, loader: LoaderType) -> &'static str {
     }
 }
 
-/// 该不该跑这一格：`MML_MATRIX=loader:version,...` 过滤，没设就全跑
-///
-/// - `loader`: 加载器
-/// - `version`: 游戏版本
-///
-/// # 返回值
-///
-/// 该跑返回 `true`
-fn wanted(loader: &LoaderType, version: &str) -> bool {
-    let Ok(filter) = std::env::var("MML_MATRIX") else {
-        return true;
-    };
-    let key = format!("{}:{version}", loader.id());
-    filter.split(',').any(|item| item.trim() == key)
-}
-
 /// 原版各版的执行体，给 [`launch_one_normal`] 与 [`launch_one_auto`] 共用
 async fn run_normal() {
     report(launch("26.3", LoaderType::Normal, "").await);
@@ -588,24 +570,10 @@ async fn cleanroom_cell() {
     report(launch_auto("1.12.2", LoaderType::Cleanroom).await);
 }
 
-/// 只跑 Cleanroom：1.12.2
-#[ignore = "联网 + 会下载 / 启动 Cleanroom 实例"]
-#[tokio::test]
-async fn run_cleanroom() {
-    cleanroom_cell().await;
-}
-
 /// LiteLoader 的两格，给单跑测试与总入口共用
 async fn liteloader_cells() {
     report(launch_auto("1.12.2", LoaderType::LiteLoader).await);
     report(launch_auto("1.7.10", LoaderType::LiteLoader).await);
-}
-
-/// 只跑 LiteLoader：1.12.2 与 1.7.10
-#[ignore = "联网 + 会下载 / 启动 LiteLoader 实例"]
-#[tokio::test]
-async fn run_liteloader() {
-    liteloader_cells().await;
 }
 
 /// 单格调试总入口：把全部单格串起来跑一遍
@@ -613,7 +581,6 @@ async fn run_liteloader() {
 /// `#[tokio::test]` 宏把测试函数展开成同步函数，直接互相调用既不能
 /// `.await`、又会在运行时里再嵌一个运行时，所以这里只能串"执行体"；
 /// 想钻某一格先单独跑它的测试入口（如 `run_cleanroom` / `run_liteloader`），能省前面格子的耗时
-#[ignore = "联网 + 首次要下几百 MB，串行跑全格"]
 #[tokio::test]
 async fn launch_one_auto() {
     run_normal().await;
@@ -630,76 +597,26 @@ async fn launch_one_auto() {
 ///
 /// - `outcome`: [`launch`] / [`launch_auto`] 的结论
 fn report(outcome: Outcome) {
-    eprintln!(
-        "[矩阵] {}（加载器 {}）：下载/检查 {}；启动 {}",
-        outcome.combo, outcome.loader_version, outcome.check, outcome.launch
-    );
+    let loader = if outcome.loader_version.is_empty() {
+        "原版"
+    } else {
+        outcome.loader_version.as_str()
+    };
+    say(&format!(
+        "[测试] {}（加载器 {loader}）：下载/检查 {}；启动 {}",
+        outcome.combo, outcome.check, outcome.launch
+    ));
     assert!(!outcome.failed, "{} 失败了", outcome.combo);
 }
 
-/// 启动矩阵：下载 → 检查资源 → 启动，逐格跑完并汇总
-#[ignore = "在线矩阵测试：会下载各版本 / 各加载器的文件并真起进程，用 -- --ignored 显式跑"]
-#[tokio::test]
-async fn launch_matrix() {
-    if ctx().is_none() {
-        eprintln!("跳过矩阵：本机没有可用的 JDK");
-        return;
-    }
+/// 直接写标准输出的进度行
+///
+/// libtest 默认把 `println!` 收进缓冲区，用例跑完才回显，长用例运行期间一个字都看不到；
+/// 这里绕开 `print!` 的捕获，直接写 [`std::io::stdout`]。
+fn say(text: &str) {
+    use std::io::Write;
 
-    let mut outcomes: Vec<Outcome> = Vec::new();
-    for loader in LOADERS {
-        for version in VERSIONS {
-            if !wanted(&loader, version) {
-                continue;
-            }
-            eprintln!("[矩阵] ==== {}:{version} ====", loader.id());
-            let outcome = launch_auto(version, loader).await;
-            eprintln!("[矩阵]   下载 / 检查：{}", outcome.check);
-            eprintln!("[矩阵]   启动：{}", outcome.launch);
-            outcomes.push(outcome);
-        }
-    }
-
-    // ---- 汇总 ----
-    eprintln!("\n[矩阵] 结果：");
-    eprintln!(
-        "{:<20} {:<24} {:<18} {}",
-        "组合", "加载器版本", "下载/检查", "启动"
-    );
-    for item in &outcomes {
-        eprintln!(
-            "{:<20} {:<24} {:<18} {}{}",
-            item.combo,
-            if item.loader_version.is_empty() {
-                "-".to_string()
-            } else {
-                item.loader_version.clone()
-            },
-            if item.check.chars().count() > 16 {
-                format!("{}…", item.check.chars().take(16).collect::<String>())
-            } else {
-                item.check.clone()
-            },
-            item.launch,
-            if item.failed { "  ← 失败" } else { "" }
-        );
-    }
-
-    let launched = outcomes
-        .iter()
-        .filter(|item| item.launch.starts_with("ok"))
-        .count();
-    let failed: Vec<&str> = outcomes
-        .iter()
-        .filter(|item| item.failed)
-        .map(|item| item.combo.as_str())
-        .collect();
-    eprintln!(
-        "[矩阵] 共 {} 格：启动成功 {launched}，失败 {}",
-        outcomes.len(),
-        failed.len()
-    );
-
-    assert!(failed.is_empty(), "这些组合失败了：{failed:?}");
-    assert!(launched > 0, "至少有一格要能真启动起来（当前 0 格）");
+    let mut out = std::io::stdout().lock();
+    let _ = writeln!(out, "{text}");
+    let _ = out.flush();
 }

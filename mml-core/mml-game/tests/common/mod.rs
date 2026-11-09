@@ -250,3 +250,104 @@ pub struct TextEntry<'a> {
 pub fn text_entry<'a>(name: &'a str, text: &'a str) -> TextEntry<'a> {
     TextEntry { name, text }
 }
+
+// ===================== 长用例的进度输出 =====================
+
+/// 进度输出的落点，参数是整行文本
+///
+/// 用例可以用它把进度直接写到终端，绕过测试框架对 `println!` 的捕获。
+pub type ProgressSink = fn(&str);
+
+/// 下载进度回调：把任务与单文件两条线打到控制台，长时间下载时不会一直没动静
+///
+/// 两条线各自限流，避免每个数据块都打一行。
+pub struct PrintDownloader {
+    /// 上次打印单文件进度的时间
+    last_file: std::sync::Mutex<std::time::Instant>,
+    /// 上次打印任务进度的时间
+    last_task: std::sync::Mutex<std::time::Instant>,
+    /// 自定义输出；为 `None` 时走 `println!`
+    sink: Option<ProgressSink>,
+}
+
+impl PrintDownloader {
+    /// 新建回调，进度走 `println!`
+    pub fn new() -> Self {
+        Self::with_opt(None)
+    }
+
+    /// 新建回调，进度交给指定落点
+    pub fn with_sink(sink: ProgressSink) -> Self {
+        Self::with_opt(Some(sink))
+    }
+
+    /// 两个限流点都从当前时刻算起
+    fn with_opt(sink: Option<ProgressSink>) -> Self {
+        let now = std::time::Instant::now();
+        Self {
+            last_file: std::sync::Mutex::new(now),
+            last_task: std::sync::Mutex::new(now),
+            sink,
+        }
+    }
+
+    /// 输出一行进度
+    fn say(&self, text: String) {
+        match self.sink {
+            Some(sink) => sink(&text),
+            None => println!("{text}"),
+        }
+    }
+}
+
+impl mml_downloader::IDownloadGui for PrintDownloader {
+    /// 单文件进度，每 2 秒最多打一行
+    fn update(
+        &self,
+        thread: u32,
+        file: &std::sync::Arc<mml_downloader::download_item::DownloadItem>,
+    ) {
+        let Ok(mut last) = self.last_file.lock() else {
+            return;
+        };
+        // 还没拿到响应头时总长为 0，这一帧没有信息量
+        if file.get_all_size() == 0 {
+            return;
+        }
+        let now = std::time::Instant::now();
+        if now.duration_since(*last) < std::time::Duration::from_secs(2) {
+            return;
+        }
+        *last = now;
+        self.say(format!(
+            "[下载] 线程 {thread} {} {}/{} 字节 {:.0}%",
+            file.base.name,
+            file.get_now_size(),
+            file.get_all_size(),
+            file.progress()
+        ));
+    }
+
+    /// 任务级状态：新建 / 结束照打，进度每 1 秒最多打一行
+    fn update_task(&self, state: mml_downloader::DownloadTaskState) {
+        match state {
+            mml_downloader::DownloadTaskState::AddTask(id) => {
+                self.say(format!("[下载] 新任务 {id}"))
+            }
+            mml_downloader::DownloadTaskState::RemoveTask(id) => {
+                self.say(format!("[下载] 任务结束 {id}"))
+            }
+            mml_downloader::DownloadTaskState::UpdateTask(obj) => {
+                let Ok(mut last) = self.last_task.lock() else {
+                    return;
+                };
+                let now = std::time::Instant::now();
+                if now.duration_since(*last) < std::time::Duration::from_secs(1) {
+                    return;
+                }
+                *last = now;
+                self.say(format!("[下载] 任务 {} {:.1}%", obj.id, obj.progress));
+            }
+        }
+    }
+}

@@ -44,6 +44,7 @@ fn options(
                 dir: dir.to_string(),
                 mode: mode.to_string(),
                 exclude: Vec::new(),
+                delete: Vec::new(),
                 delete_old: None,
             })
             .collect(),
@@ -81,6 +82,7 @@ fn contents(base: &Path, options: &ServerInstanceOptionsDto) -> Contents {
                     dir: item.dir.clone(),
                     mode,
                     exclude: item.exclude.clone(),
+                    delete: item.delete.clone(),
                     delete_old,
                 }
             })
@@ -336,6 +338,59 @@ fn delete_mode_writes_empty_archive_with_over() {
     let zip = mml_base::archives::BaseArchive::open_readonly(out.join("config.zip")).unwrap();
     assert!(zip.entries().is_empty(), "删除目录的包不能带文件");
     assert!(result.files.iter().any(|name| name == "config.zip"));
+
+    crate::test_support::cleanup(&[&instance, &out]);
+}
+
+/// 单文件标记删除：不进包，另写空包让客户端删掉这个路径
+#[test]
+fn file_delete_writes_tombstone_archive() {
+    crate::test_support::ensure_boot();
+    let instance = crate::test_support::temp_dir("server-instance-config-file-delete");
+    let base = instance.join(names::GAME_DIR);
+    let out = crate::test_support::temp_dir("server-instance-config-file-delete-out");
+    fs::create_dir_all(base.join("config")).unwrap();
+    fs::write(base.join("config").join("a.toml"), b"a").unwrap();
+    fs::write(base.join("config").join("b.toml"), b"b").unwrap();
+
+    let mut game = game();
+    game.dir = instance.to_string_lossy().to_string();
+    let mut options = options(&[], &[("config", "archiveAll")], &[]);
+    options.configs[0].delete = vec!["config/b.toml".to_string()];
+    let contents = contents(&base, &options);
+    generate_mml(
+        &game,
+        &HashMap::new(),
+        &base,
+        &out,
+        "https://example.invalid/pack",
+        &options,
+        &contents,
+        &|_, _, _| {},
+    )
+    .unwrap();
+
+    let pack: ServerPackObj =
+        serde_json::from_slice(&fs::read(out.join("server.json")).unwrap()).unwrap();
+    assert_eq!(pack.archive_list.len(), 2, "目录包与删除空包各一条");
+    let dir_archive = pack
+        .archive_list
+        .iter()
+        .find(|item| item.dir == "config")
+        .expect("应写出目录压缩包");
+    let zip = mml_base::archives::BaseArchive::open_readonly(out.join(&dir_archive.file)).unwrap();
+    let names: Vec<&str> = zip.entries().iter().map(|item| item.name.as_str()).collect();
+    assert_eq!(names, vec!["a.toml"], "标记删除的文件不能进目录包");
+
+    let tombstone = pack
+        .archive_list
+        .iter()
+        .find(|item| item.dir == "config/b.toml")
+        .expect("应写出删除空包");
+    assert!(tombstone.delete_old, "删除单个文件同样要 Over");
+    assert_eq!(tombstone.file, "config.b.toml.delete.zip");
+    let zip = mml_base::archives::BaseArchive::open_readonly(out.join(&tombstone.file)).unwrap();
+    assert!(zip.entries().is_empty(), "删除空包不能带文件");
 
     crate::test_support::cleanup(&[&instance, &out]);
 }

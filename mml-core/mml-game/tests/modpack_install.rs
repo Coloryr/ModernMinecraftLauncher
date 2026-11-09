@@ -14,7 +14,6 @@ use std::sync::{Arc, Mutex, Once};
 mod common;
 
 use common::{ZipEntry, entry};
-use mml_downloader::download_item::DownloadItem;
 use mml_game::add_game::{self, PackType};
 use mml_game::gui_hook::{AddModPackState, IAddInstanceGui, IAddModPackGui};
 use mml_game::launcher::ModPackType;
@@ -46,7 +45,7 @@ fn ensure_init() {
         mml_net::init();
 
         mml_downloader::init(&dir).unwrap();
-        mml_downloader::set_gui_handel(Box::new(TestDownloader));
+        mml_downloader::set_gui_handel(Box::new(common::PrintDownloader::new()));
         mml_downloader::start();
     });
 }
@@ -148,7 +147,9 @@ fn state_id(state: &AddModPackState) -> &'static str {
 impl IAddModPackGui for StateRecorder {
     /// 记下到达的阶段
     fn set_state(&self, state: AddModPackState) {
-        self.states.lock().unwrap().push(state_id(&state));
+        let id = state_id(&state);
+        println!("[安装] 阶段 {id}");
+        self.states.lock().unwrap().push(id);
     }
 
     /// 总体进度桩，测试不校验
@@ -161,16 +162,6 @@ impl IAddModPackGui for StateRecorder {
     fn set_sub_now(&self, _value: usize, _all: Option<usize>) {}
 }
 
-/// 下载回调桩，测试里什么都不做
-struct TestDownloader;
-
-impl mml_downloader::IDownloadGui for TestDownloader {
-    /// 单文件进度桩，测试不校验
-    fn update(&self, _thread: u32, _file: &Arc<DownloadItem>) {}
-
-    /// 任务状态桩，测试不校验
-    fn update_task(&self, _state: mml_downloader::DownloadTaskState) {}
-}
 
 /// 程序化造出的整合包：压缩包与它所在的临时目录
 struct PackFixture {
@@ -238,7 +229,8 @@ async fn install_curseforge_pack_end_to_end() {
     // 类型检测
     let detected = add_game::detect_pack(&zip).expect("类型检测失败");
     assert!(matches!(detected.pack_type, PackType::CurseForge));
-    assert_eq!(detected.name, "CF安装测试包");
+    // 检测结果给界面预填实例名，口径是「包名-版本」，与安装时的默认实例名一致
+    assert_eq!(detected.name, "CF安装测试包-1.0");
 
     let recorder = StateRecorder::default();
     let token = CancellationToken::new();
@@ -266,7 +258,8 @@ async fn install_curseforge_pack_end_to_end() {
     assert!(game.is_modpack);
     assert!(matches!(game.loader, LoaderType::Forge));
     assert_eq!(game.loader_version.as_deref(), Some("41.0.100"));
-    assert!(matches!(game.modpack_type, ModPackType::CurseForge));
+    // 本地包没有项目 / 文件 ID，类型被清成「无」，否则界面会给出查不到的在线更新
+    assert!(matches!(game.modpack_type, ModPackType::None));
     drop(game);
 
     // 分组不在实例配置里：归属得去内核分组表查，安装时选的分组不能丢
@@ -333,7 +326,8 @@ async fn install_modrinth_pack_end_to_end() {
 
     let detected = add_game::detect_pack(&zip).expect("类型检测失败");
     assert!(matches!(detected.pack_type, PackType::Modrinth));
-    assert_eq!(detected.name, "MR安装测试包");
+    // 同 CurseForge：检测结果带版本，后面建实例用的也是这个名字
+    assert_eq!(detected.name, "MR安装测试包-1.0.0");
 
     let recorder = StateRecorder::default();
     let uuid = add_game::install_archive_from_file(
@@ -357,7 +351,8 @@ async fn install_modrinth_pack_end_to_end() {
     assert!(game.is_modpack);
     assert!(matches!(game.loader, LoaderType::Fabric));
     assert_eq!(game.loader_version.as_deref(), Some("0.15.11"));
-    assert!(matches!(game.modpack_type, ModPackType::Modrinth));
+    // 同 CurseForge：本地包没有项目号，类型留「无」
+    assert!(matches!(game.modpack_type, ModPackType::None));
     drop(game);
 
     let game_path = mml_game::get_instance(&uuid)
