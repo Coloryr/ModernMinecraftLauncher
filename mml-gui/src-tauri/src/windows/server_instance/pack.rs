@@ -48,10 +48,11 @@ const RESERVED_NAMES: [&str; 4] = [
 /// - `options`: 生成选项，包名 / 发布地址 / 勾选都取自它
 /// - `file`: 输出的 zip 路径，父目录不存在会创建
 /// - `complete`: `true` 连同模组 / 资源包 / 配置目录一起打包，`false` 只带基础文件
+/// - `progress`: 写入包内条目时的进度回调
 ///
 /// # 返回值
 ///
-/// 写盘成功返回 `Ok(())`；格式不是 `mml`、包名为空、路径越界或打包失败返回错误文案
+/// 写盘成功返回 `Ok(())`；包名为空、路径越界或打包失败返回错误文案
 pub(super) fn export_pack(
     game: &InstanceSettingObj,
     options: &ServerInstanceOptionsDto,

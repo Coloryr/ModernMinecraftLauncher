@@ -1,4 +1,4 @@
-//! 启动器自带的 RenderDoc
+//! 启动器按需下载的 RenderDoc
 //!
 //! Windows / Linux 用得到：用 `renderdoccmd capture` 把游戏拉起来并注入捕获库。
 //! 整个启动器一份，放 `tools/renderdoc`，换整合包、删实例都不会把它带走。
@@ -13,7 +13,7 @@ const RENDERDOC_URL: &str = "https://renderdoc.org/stable/latest/RenderDoc_lates
 #[cfg(target_os = "linux")]
 const RENDERDOC_URL: &str = "https://renderdoc.org/stable/latest/renderdoc_latest.tar.gz";
 
-/// 自带的 RenderDoc 目录，`tools/renderdoc`
+/// 启动器下载 RenderDoc 的目录，`tools/renderdoc`
 ///
 /// # 返回值
 ///
@@ -33,7 +33,7 @@ pub fn captures_dir() -> PathBuf {
     crate::tools_dir().join("renderdoc-captures")
 }
 
-/// 找自带的 RenderDoc 命令行工具
+/// 找已下载的 RenderDoc 命令行工具
 ///
 /// # 返回值
 ///
@@ -77,7 +77,7 @@ pub fn find_in(dir: &Path) -> Option<PathBuf> {
     search(dir, 4)
 }
 
-/// 找自带的 RenderDoc 界面程序，即 Qt 版的 `qrenderdoc`
+/// 找已下载的 RenderDoc 界面程序，即 Qt 版的 `qrenderdoc`
 ///
 /// 便携包里它与 `renderdoccmd` 同目录，所以按命令行工具的位置找。
 ///
@@ -161,7 +161,7 @@ pub fn capture_args(
     out
 }
 
-/// 下载并解出自带的 RenderDoc
+/// 按需下载并解出 RenderDoc
 ///
 /// 便携包解到 `tools/renderdoc`，里面自带 `renderdoccmd` 与捕获库。
 ///

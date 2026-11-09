@@ -26,7 +26,7 @@ use mml_net::modrinth_api::version_obj::ModrinthVersionObj;
 
 use crate::serverpack::serverpack_obj::{ServerArchiveItemObj, ServerItemObj, ServerPackObj};
 
-/// 升级时要删除的旧内容
+/// 升级时要删除的旧文件；目录不随条目移除而删除
 #[derive(Debug, Default)]
 pub struct ServerPackRemovals<'a> {
     /// 要删除的文件：旧有新无，或同一项目换了路径
@@ -35,7 +35,7 @@ pub struct ServerPackRemovals<'a> {
     pub dirs: Vec<&'a ServerArchiveItemObj>,
 }
 
-/// 算出升级时要删除的旧文件与旧目录
+/// 算出升级时要删除的旧文件
 ///
 /// 规则与原内联逻辑一致：
 ///
@@ -53,7 +53,7 @@ pub struct ServerPackRemovals<'a> {
 ///
 /// # 返回值
 ///
-/// 要从旧包里删掉的文件与目录清单
+/// 要从旧包里删掉的文件清单；目录字段保留但为空
 pub fn plan_removals<'a>(old: &'a ServerPackObj, new: &ServerPackObj) -> ServerPackRemovals<'a> {
     let mut out = ServerPackRemovals::default();
 

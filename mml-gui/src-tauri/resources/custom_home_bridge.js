@@ -22,7 +22,7 @@
 // 有非空的 <style>）时不再注入，尊重页面自己的设计。
 //
 // 消息全部走 postMessage（iframe 是 opaque origin，没有 allow-same-origin，
-// 只能 targetOrigin "*"）。消息格式见 TASK.md 与父窗口侧 `lib/customHomeBridge.ts`。
+// 只能 targetOrigin "*"）。消息格式见父窗口侧 `mml-vue/src/lib/customHomeBridge.ts`。
 (function () {
   "use strict";
 

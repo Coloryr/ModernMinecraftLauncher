@@ -1,6 +1,6 @@
 //! 主窗口 DTO：事件负载 + 实例更新补丁，前端 wire，camelCase
 //!
-//! 从 `../windows/main.rs` 挪出：这些类型只用于跨 Tauri IPC，即事件 / 命令入参，
+//! 从主窗口模块拆出：这些类型只用于跨 Tauri IPC，即事件 / 命令入参，
 //! 无业务方法、不参与磁盘持久化，归入 DTO 层。
 
 use std::collections::HashMap;
@@ -218,7 +218,7 @@ pub struct DebugLaunchDto {
 
 /// 本机可用的图形调试器
 ///
-/// RenderDoc 由启动器自带，不用检测；Nsight Graphics 只能由用户自己装，装没装要问本机。
+/// RenderDoc 由启动器按需下载，不依赖本机预装；Nsight Graphics 只能由用户自己装，装没装要问本机。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DebuggerInfoDto {

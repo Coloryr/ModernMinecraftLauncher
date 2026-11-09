@@ -798,16 +798,6 @@ impl InstanceSettingObj {
         None
     }
 
-    /// 执行指令
-    ///
-    /// - `cmd`: 命令行，按换行分隔
-    /// - `env`: 环境变量
-    /// - `wait_run`: 是否等待执行完成
-    /// - `admin`: 是否以管理员方式启动
-    ///
-    /// # 返回值
-    ///
-    /// 成功返回 `Ok(())`；程序不存在或启动失败返回对应错误
     /// 老版本 Forge 的 FMLTweaker 要设 SecurityManager，Java 18 起默认禁止设置，得显式放行
     ///
     /// 只有 Java 24 以下认这个开关：24 起它本身是致命错误（VM 启动阶段直接失败，`System.initPhase3`）。

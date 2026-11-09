@@ -452,13 +452,6 @@ pub async fn get_team(id: &str) -> CoreResult<Vec<ModrinthTeamObj>> {
         .await
 }
 
-/// 获取指定项目的内容
-///
-/// - `id`: 项目编号
-///
-/// # 返回值
-///
-/// 返回项目详情
 /// 批量获取用户信息
 ///
 /// 搜索结果只给作者名与作者 ID，没有头像；列表要显示作者头像就得按 ID 再查一次。
