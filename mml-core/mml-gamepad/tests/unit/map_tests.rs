@@ -1,5 +1,7 @@
 use super::*;
 
+use std::path::Path;
+
 /// 界面上列出的动作名都能被解析
 #[test]
 fn action_names_parse() {

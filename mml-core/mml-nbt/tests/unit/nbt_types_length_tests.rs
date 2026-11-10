@@ -1,6 +1,8 @@
 use super::*;
 use std::io::Cursor;
 
+use crate::{NbtStream, NbtType};
+
 #[test]
 fn string_lengths_use_unsigned_bytes() {
     for len in [32767, 32768, 65535] {

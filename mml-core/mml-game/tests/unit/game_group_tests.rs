@@ -1,7 +1,9 @@
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use super::*;
+use crate::game_group::types::{LegacyGroup, LegacyGroups};
 
 /// 文件四列：分组顺序 / 组名 / 归属 / 组内次序，都要能原样往返
 ///

@@ -1,5 +1,7 @@
 use std::{fs, path::Path};
 
+use mml_names::names;
+
 use super::*;
 
 /// init 应在指定路径下创建 block 数据目录，且目录名来自 names::BLOCK_DIR

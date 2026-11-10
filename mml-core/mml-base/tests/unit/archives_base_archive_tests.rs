@@ -1,4 +1,9 @@
-use super::*;
+use std::fs;
+
+use uuid::Uuid;
+
+use crate::archives::base_archive::util::replace_archive;
+use crate::archives::{ArchiveType, base_archive::BaseArchive};
 
 #[test]
 fn replacement_failure_keeps_original() {
@@ -29,4 +34,3 @@ fn created_archive_opens_by_type_even_with_temp_file_name() {
     assert_eq!(reopened.entries().len(), 1);
     fs::remove_dir_all(&root).unwrap();
 }
-

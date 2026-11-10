@@ -1,6 +1,14 @@
 use super::*;
 use std::io::Cursor;
 
+use std::fs;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+
+use mml_names::i18_items::error_type::CoreResult;
+
+use crate::path_helper::trash::{move_to_trash_linux, move_to_trash_macos};
+
 #[test]
 fn trash_backends_share_path_result_contract() {
     // 只编译并核对各平台接口，不调用系统回收站或启动 Finder。
@@ -342,4 +350,3 @@ async fn test_delete_async() {
 
     let _ = fs::remove_dir_all(&root);
 }
-

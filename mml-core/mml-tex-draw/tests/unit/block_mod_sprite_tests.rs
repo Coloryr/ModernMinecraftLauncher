@@ -1,5 +1,7 @@
 use super::*;
 
+use tiny_skia::Pixmap;
+
 /// 构造竖排动画条带，n 帧 16x16，每帧灰度渐变便于区分
 fn anim_strip(frames: usize) -> Pixmap {
     let mut data = vec![0u8; 16 * 16 * frames * 4];
@@ -50,4 +52,3 @@ fn sprite_apng_smoke() {
     // 16×16纯色帧压缩后很小，仅验证编码产物有效
     assert!(data.unwrap().len() > 100, "APNG应有实际内容");
 }
-

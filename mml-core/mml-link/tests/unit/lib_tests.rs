@@ -1,5 +1,12 @@
 use super::*;
 
+use std::fs;
+
+use mml_config::config_save;
+use mml_names::names;
+
+use crate::info::{ResourceInfoObj, ResourceType};
+
 /// 公共文件名保留真实文件名，只清掉路径片段和非法字符
 #[test]
 fn file_name_keeps_real_name() {
@@ -130,8 +137,7 @@ fn link_info_is_written_inside_instance() {
 
     assert!(!dir.join(names::LINK_INFO_FILE).exists());
     let file = base.join(names::LINK_INFO_FILE);
-    let data: Vec<LinkInfoObj> =
-        serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
+    let data: Vec<LinkInfoObj> = serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
     assert_eq!(data.len(), 1);
     assert_eq!(data[0].path, ".minecraft/mods/demo.jar");
     assert!(data[0].is_link);
@@ -147,4 +153,3 @@ fn link_info_is_written_inside_instance() {
 
     let _ = fs::remove_dir_all(&dir);
 }
-

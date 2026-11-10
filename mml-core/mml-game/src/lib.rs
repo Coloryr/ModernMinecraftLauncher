@@ -8,7 +8,7 @@
 //! - **实例** — 一个可启动的 Minecraft 游戏环境，由版本、加载器与独立游戏目录组成，
 //!   对应 [`launcher::instance_setting_obj::InstanceSettingObj`]，
 //!   全局以 [`GameInstance`] 形式共享，即 `Arc<RwLock<...>>`
-//! - **分组** — 实例的分组展示，组名到实例 UUID 的映射保存在内存
+//! - **分组** — 实例的分组展示，独立存在 `group_save.json`，内存里有一份缓存
 //! - **运行句柄** — 启动后的实例由 [`game_launch::InstanceHandle`] 跟踪，
 //!   后台线程每秒轮询退出状态并触发 [`InstanceExit`] 事件
 //! - **事件** — 实例退出 / 变更 / 运行日志 / 目录外部增删分别通过
@@ -19,9 +19,7 @@
 //! | 模块 | 用途 |
 //! |------|------|
 //! | [`add_game`] | 添加游戏实例：导入版本、文件夹或压缩包 |
-//! | [`class_scan`] | 模组 Side 扫描，即 1.12.2 时代 mod 的 client/server 判定 |
 //! | [`curseforge`] | CurseForge 整合包下载安装 |
-//! | [`data_res`] | 实例内资源下载位置与类型切换，覆盖资源包、光影包、存档、数据包 |
 //! | [`game_arg`] | 启动参数生成 |
 //! | [`game_check`] | 实例文件校验 |
 //! | [`game_count`] | 启动与游戏时长统计 |
@@ -31,15 +29,13 @@
 //! | [`game_launch`] | 游戏实例启动 |
 //! | [`game_libraries`] | 实例运行库处理 |
 //! | [`game_log`] | 实例日志，含运行日志与过往日志 |
-//! | [`game_mods`] | 实例模组管理 |
 //! | [`game_options`] | options.txt 配置读写 |
-//! | [`game_resourcepacks`] | 实例资源包管理 |
-//! | [`game_saves`] | 实例存档管理，含存档内数据包 |
-//! | [`game_schematics`] | 结构文件读取 |
-//! | [`game_screenshots`] | 实例截图管理 |
 //! | [`game_server`] | 实例服务器管理 |
-//! | [`game_shaderpacks`] | 实例光影包管理 |
 //! | [`gui_hook`] | GUI 回调钩子，用于启动与安装进度等界面交互 |
+//! | `instance_event` | 实例事件：退出 / 变更 / 目录外部增删 / 运行日志 |
+//! | `instance_group` | 分组查询、移动与增删的对外 API |
+//! | `instance_lang` | 游戏内语言列表与语言代码匹配 |
+//! | `instance_runtime` | 运行日志与运行句柄 |
 //! | [`launcher`] | 实例设置与运行配置 |
 //! | [`launcher_path`] | 各类目录路径管理，覆盖版本、库、资源、实例 |
 //! | [`loader`] | 加载器安装，覆盖 Forge、Fabric、Quilt、OptiFine、LiteLoader、自定义 |
@@ -50,18 +46,18 @@
 //! | [`other_launcher`] | 其他启动器实例导入，覆盖 HMCL、PCL、官方、MMC |
 //! | [`path_watch`] | 实例目录文件监视 |
 //! | [`player_skin`] | 玩家皮肤获取 |
+//! | [`resource`] | 实例内资源，覆盖模组、资源包、光影包、存档、截图、结构文件、数据包与资源链接 |
 //! | [`scan_game`] | 扫描游戏版本 |
 //! | [`serverpack`] | 服务端整合包生成 |
 
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::HashMap,
     path::{Path, PathBuf},
     sync::{Arc, LazyLock, RwLock},
     thread,
     time::Duration,
 };
 
-use mml_base::events::EventArgHandler;
 use mml_names::{
     i18_items::error_type::{ArgEmptyData, CoreResult, ErrorType, FileSystemErrorData},
     names,
@@ -72,22 +68,14 @@ use mml_sys::path_helper;
 use uuid::Uuid;
 
 use crate::{
-    game_launch::InstanceHandle,
-    game_log::{GameLog, GameLogItemObj, InstanceRuntimeLog},
     gui_hook::{AddInstanceGui, ProgressGui},
     launcher::instance_setting_obj::InstanceSettingObj,
-    launcher_path::{
-        assets_path,
-        instance_path::{self},
-        version_path,
-    },
+    launcher_path::{instance_path::{self}, version_path},
 };
 
 pub mod add_game;
-pub mod class_scan;
 mod cmd_shell;
 pub mod curseforge;
-pub mod data_res;
 mod error;
 pub mod game_arg;
 pub mod game_check;
@@ -97,18 +85,15 @@ pub mod game_group;
 pub mod game_lan;
 pub mod game_launch;
 pub mod game_libraries;
-pub mod game_link;
 pub mod game_log;
-pub mod game_mods;
 pub mod game_motd;
 pub mod game_options;
-pub mod game_resourcepacks;
-pub mod game_saves;
-pub mod game_schematics;
-pub mod game_screenshots;
 pub mod game_server;
-pub mod game_shaderpacks;
 pub mod gui_hook;
+mod instance_event;
+mod instance_group;
+mod instance_lang;
+mod instance_runtime;
 pub mod launcher;
 pub mod launcher_path;
 pub mod loader;
@@ -119,10 +104,35 @@ pub mod name_check;
 pub mod other_launcher;
 pub mod path_watch;
 pub mod player_skin;
+pub mod resource;
 pub mod scan_game;
 pub mod serverpack;
 
+pub use self::instance_event::{
+    InstanceChange, InstanceExit, InstanceLog, InstanceLogType, InstanceWatchChange, add_change,
+    add_exit, add_run_log, add_watch_change, remove_change, remove_exit, remove_run_log,
+    remove_watch_change,
+};
+pub(crate) use self::instance_event::{invoke_change, invoke_exit, invoke_watch_change};
+pub use self::instance_group::{
+    add_group, get_group, get_group_list, get_instance_group, get_instance_order, move_group,
+    move_instance, remove_group, reorder_groups,
+};
+pub use self::instance_lang::{InstanceLangObj, game_lang_code, get_instance_langs};
+#[cfg(test)]
+pub(crate) use self::instance_runtime::RUNTIME_LOGS;
+pub(crate) use self::instance_runtime::{
+    add_game_log, add_game_log_item, add_run_game, clear_game_log,
+};
+pub use self::instance_runtime::{get_running_instances, is_running, stop_game};
+
 pub use name_check::check_name;
+
+// 资源模块已下沉到 [`resource`]，这里按原路径再导出，既有引用不必改
+pub use self::resource::{
+    class_scan, data_res, game_link, game_mods, game_resourcepacks, game_saves, game_schematics,
+    game_screenshots, game_shaderpacks,
+};
 
 #[cfg(test)]
 #[path = "../tests/unit/lib_test_support.rs"]
@@ -130,58 +140,6 @@ mod test_support;
 
 /// 实例共享句柄，全局以 `Arc<RwLock>` 形式持有实例设置
 pub type GameInstance = Arc<RwLock<InstanceSettingObj>>;
-
-/// 实例结束运行事件
-pub struct InstanceExit {
-    /// 实例 UUID
-    pub uuid: Uuid,
-    /// 进程退出码，正常退出为 0
-    pub code: i32,
-}
-
-/// 实例修改事件参数
-pub enum InstanceChange {
-    /// 添加实例，携带实例 UUID
-    AddInstance(Uuid),
-    /// 删除实例，携带实例 UUID
-    RemoveInstance(Uuid),
-    /// 移动分组，依次为实例 UUID 与分组 uuid，`None` 表示默认分组
-    MoveGroup(Uuid, Option<Uuid>),
-}
-
-/// 实例目录被外部增删的事件参数
-///
-/// 只由实例根目录的监视线程发出；启动器自己的增删走 `InstanceChange`。
-pub enum InstanceWatchChange {
-    /// 外部新增实例，携带实例 UUID
-    Add(Uuid),
-    /// 外部删除实例，携带实例 UUID
-    Remove(Uuid),
-}
-
-/// 实例日志事件参数
-pub enum InstanceLogType {
-    /// 新增一条日志
-    AddLog(GameLogItemObj),
-    /// 清空日志
-    ClearLog,
-}
-
-/// 实例日志事件
-pub struct InstanceLog {
-    /// 实例 UUID
-    pub uuid: Uuid,
-    /// 本次日志变更的内容
-    pub log: InstanceLogType,
-}
-
-/// 各实例的运行日志，按实例 UUID 存内存
-static RUNTIME_LOGS: LazyLock<RwLock<HashMap<Uuid, InstanceRuntimeLog>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
-
-/// 正在运行的实例句柄，按实例 UUID 存内存
-static HANDELS: LazyLock<RwLock<HashMap<Uuid, InstanceHandle>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 // 分组表已拆到 [`game_group`]：分组不再存在实例配置里，也没有 GROUPS 静态表，
 // 而是独立的 group_save.json，这样空分组才能存在、组内顺序也有了落点。
@@ -191,131 +149,6 @@ static HANDELS: LazyLock<RwLock<HashMap<Uuid, InstanceHandle>>> =
 static INSTANCES: LazyLock<RwLock<HashMap<Uuid, GameInstance>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// 实例退出事件
-static EXIT_EVENT: LazyLock<EventArgHandler<InstanceExit>> =
-    LazyLock::new(|| EventArgHandler::new());
-/// 实例修改事件
-static CHANGE_EVENT: LazyLock<EventArgHandler<InstanceChange>> =
-    LazyLock::new(|| EventArgHandler::new());
-/// 实例运行日志事件
-static LOG_EVENT: LazyLock<EventArgHandler<InstanceLog>> = LazyLock::new(|| EventArgHandler::new());
-/// 实例目录外部增删事件
-static WATCH_EVENT: LazyLock<EventArgHandler<InstanceWatchChange>> =
-    LazyLock::new(|| EventArgHandler::new());
-
-/// 订阅实例退出事件
-///
-/// - `handler`: 事件回调
-///
-/// # 返回值
-///
-/// 返回回调 ID，供 `remove_exit` 取消订阅
-pub fn add_exit<F>(handler: F) -> u64
-where
-    F: Fn(&InstanceExit) + Send + Sync + 'static,
-{
-    EXIT_EVENT.add_handler(handler)
-}
-
-/// 订阅实例变更事件
-///
-/// - `handler`: 事件回调
-///
-/// # 返回值
-///
-/// 返回回调 ID，供 `remove_change` 取消订阅
-pub fn add_change<F>(handler: F) -> u64
-where
-    F: Fn(&InstanceChange) + Send + Sync + 'static,
-{
-    CHANGE_EVENT.add_handler(handler)
-}
-
-/// 订阅实例目录外部增删事件
-///
-/// - `handler`: 事件回调
-///
-/// # 返回值
-///
-/// 返回回调 ID，供 `remove_watch_change` 取消订阅
-pub fn add_watch_change<F>(handler: F) -> u64
-where
-    F: Fn(&InstanceWatchChange) + Send + Sync + 'static,
-{
-    WATCH_EVENT.add_handler(handler)
-}
-
-/// 订阅实例运行日志事件
-///
-/// - `handler`: 事件回调
-///
-/// # 返回值
-///
-/// 返回回调 ID，供 `remove_run_log` 取消订阅
-pub fn add_run_log<F>(handler: F) -> u64
-where
-    F: Fn(&InstanceLog) + Send + Sync + 'static,
-{
-    LOG_EVENT.add_handler(handler)
-}
-
-/// 取消订阅实例退出事件
-///
-/// - `id`: `add_exit` 返回的回调 ID
-pub fn remove_exit(id: u64) {
-    EXIT_EVENT.remove_handel(id);
-}
-
-/// 取消订阅实例变更事件
-///
-/// - `id`: `add_change` 返回的回调 ID
-pub fn remove_change(id: u64) {
-    CHANGE_EVENT.remove_handel(id);
-}
-
-/// 取消订阅实例目录外部增删事件
-///
-/// - `id`: `add_watch_change` 返回的回调 ID
-pub fn remove_watch_change(id: u64) {
-    WATCH_EVENT.remove_handel(id);
-}
-
-/// 取消订阅实例运行日志事件
-///
-/// - `id`: `add_run_log` 返回的回调 ID
-pub fn remove_run_log(id: u64) {
-    LOG_EVENT.remove_handel(id);
-}
-
-/// 发出实例退出事件，由退出轮询线程调用
-///
-/// - `uuid`: 实例 UUID
-/// - `code`: 进程退出码
-pub(crate) fn invoke_exit(uuid: Uuid, code: i32) {
-    EXIT_EVENT.emit(InstanceExit { uuid, code });
-}
-
-/// 发出实例变更事件
-///
-/// - `change`: 变更内容
-pub(crate) fn invoke_change(change: InstanceChange) {
-    CHANGE_EVENT.emit(change);
-}
-
-/// 发出实例目录外部增删事件
-///
-/// - `change`: 变更内容
-pub(crate) fn invoke_watch_change(change: InstanceWatchChange) {
-    WATCH_EVENT.emit(change);
-}
-
-/// 发出实例运行日志事件
-///
-/// - `uuid`: 实例 UUID
-/// - `log`: 日志变更内容
-pub(crate) fn invoke_run_log(uuid: Uuid, log: InstanceLogType) {
-    LOG_EVENT.emit(InstanceLog { uuid, log });
-}
 
 /// 初始化
 ///
@@ -347,33 +180,10 @@ pub fn load() -> CoreResult<()> {
 
     thread::spawn(|| {
         loop {
-            let to_remove: Vec<(Uuid, i32)> = {
-                let handels = HANDELS.read().unwrap();
-                handels
-                    .iter()
-                    .filter_map(|(k, v)| {
-                        v.tick();
-                        if v.is_exit() {
-                            Some((*k, v.code()))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            };
-
-            if !to_remove.is_empty() {
-                let mut handels = HANDELS.write().unwrap();
-                for (uuid, _) in &to_remove {
-                    handels.remove(uuid);
-                }
-
-                drop(handels);
-                for (uuid, code) in &to_remove {
-                    invoke_exit(*uuid, *code);
-                }
+            // 句柄的推进与摘除都在 instance_runtime 里，这里只把退出事件发出去
+            for (uuid, code) in instance_runtime::poll_exited() {
+                invoke_exit(uuid, code);
             }
-
             thread::sleep(Duration::from_secs(1));
         }
     });
@@ -456,277 +266,6 @@ pub fn get_instance(uuid: &Uuid) -> Option<GameInstance> {
     Some(list.get(uuid)?.clone())
 }
 
-/// 游戏内语言，语言代码加显示名
-pub struct InstanceLangObj {
-    /// 语言代码：资源索引里 `minecraft/lang/<code>.json` 的 `<code>`，如 `zh_cn`
-    pub code: String,
-    /// 显示名：该语言文件里的 `language.name`，如“简体中文”；读不到时为语言代码
-    pub name: String,
-}
-
-/// 获取实例的游戏内语言列表，从资源索引里查 `minecraft/lang/*.json`
-///
-/// 1.7.10 及更早的语言文件是 `minecraft/lang/*.lang`（代码大写，如 `zh_CN`），
-/// 1.13 起才改成 `*.json`（代码小写）；两种都收，代码原样保留 —— 写进 `options.txt`
-/// 的 `lang:` 必须和游戏认的那个完全一致。
-///
-/// 每项的显示名就写在该语言文件里，即 `language.name`，如 zh_CN 对应“简体中文”，
-/// 与游戏内语言菜单同一份数据；资源没下全或文件里没有这个键时回落为语言代码本身。
-///
-/// 资源索引未下载或版本数据缺失时返回空列表，由前端回退默认语言，即中文与英文。
-///
-/// - `uuid`: 实例 UUID
-///
-/// # 返回值
-///
-/// 返回按语言代码排序的语言列表，每项含代码与显示名
-pub fn get_instance_langs(uuid: &Uuid) -> Vec<InstanceLangObj> {
-    let Some(instance) = get_instance(uuid) else {
-        return Vec::new();
-    };
-    let version = instance.read().unwrap().version.clone();
-    let mut langs: Vec<InstanceLangObj> = lang_entries(&version)
-        .into_iter()
-        .map(|entry| {
-            let name = read_lang_name(&entry.hash, &entry.code, entry.legacy)
-                .unwrap_or_else(|| entry.code.clone());
-            InstanceLangObj {
-                code: entry.code,
-                name,
-            }
-        })
-        .collect();
-    langs.sort_by(|a, b| a.code.cmp(&b.code));
-    langs
-}
-
-/// 资源索引里的一条语言
-struct LangEntry {
-    /// 游戏认的语言代码，旧版大写（`zh_CN`），新版小写（`zh_cn`）
-    code: String,
-    /// 语言文件的资源哈希
-    hash: String,
-    /// 是否旧版 `.lang` 文本（1.7.10 及更早）
-    legacy: bool,
-}
-
-/// 从版本的资源索引里列出全部语言：`minecraft/lang/*.json` 与 `*.lang` 都要收
-///
-/// - `version`: 游戏版本号
-///
-/// # 返回值
-///
-/// 语言条目列表；索引未下载或版本数据缺失时为空
-fn lang_entries(version: &str) -> Vec<LangEntry> {
-    let Ok(obj) = version_path::get_version(version) else {
-        return Vec::new();
-    };
-    let Some(index) = &obj.asset_index else {
-        return Vec::new();
-    };
-    let Ok(assets) = assets_path::get_index(index) else {
-        return Vec::new();
-    };
-    assets
-        .objects
-        .iter()
-        .filter_map(|(key, item)| {
-            let name = key.strip_prefix(names::LANG_KEY1)?;
-            let (code, legacy) = if let Some(code) = name.strip_suffix(".json") {
-                (code, false)
-            } else if let Some(code) = name.strip_suffix(".lang") {
-                (code, true)
-            } else {
-                return None;
-            };
-            Some(LangEntry {
-                code: code.to_string(),
-                hash: item.hash.clone(),
-                legacy,
-            })
-        })
-        .collect()
-}
-
-/// 在版本支持的语言里找与给定语言（忽略大小写）匹配的代码
-///
-/// 同一种语言在旧版是 `zh_CN`、新版是 `zh_cn`，写进 `options.txt` 必须是该版本认的那个。
-///
-/// - `version`: 游戏版本号
-/// - `want`: 期望语言，如 `zh_CN` / `zh_cn`
-///
-/// # 返回值
-///
-/// 游戏实际使用的代码；版本数据或索引取不到时返回 `None`
-pub fn game_lang_code(version: &str, want: &str) -> Option<String> {
-    lang_entries(version)
-        .into_iter()
-        .map(|entry| entry.code)
-        .find(|code| code.eq_ignore_ascii_case(want))
-}
-
-/// 已解析出的语言显示名缓存，键为语言代码
-///
-/// 打开一次实例设置要把上百个语言文件的 `language.name` 读出来，单个 500KB 上下，
-/// 而这份名单在所有实例之间是共用的，读到的名字缓存起来，之后再开就直接命中。
-/// **只缓存真读到名字的项**：回落成代码的不进缓存，等资源下全了还能再补上。
-static LANG_NAMES: LazyLock<RwLock<HashMap<String, String>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
-
-/// 从资源对象里读出语言文件的显示名，即 `language.name`
-///
-/// - `hash`: 语言文件在资源索引里的 sha1
-/// - `code`: 语言代码，缓存命中时直接返回
-/// - `legacy`: 是否旧版 `.lang` 文本（1.7.10 及更早）
-///
-/// # 返回值
-///
-/// 返回显示名；两处都读不到、解析失败或没有该键时返回 `None`
-fn read_lang_name(hash: &str, code: &str, legacy: bool) -> Option<String> {
-    if let Some(name) = LANG_NAMES.read().unwrap().get(code) {
-        return Some(name.clone());
-    }
-
-    // 两个来源按可靠性排序：一是游戏资源对象 `assets/…/objects/<sha1>`，与游戏内语言菜单
-    // 同一来源，资源下全时最权威；二是本地语言文件缓存 `langs/<code>.json`，
-    // mml-tex-draw 从客户端 jar 提取或按资源索引下载，方块与物品名单也用它。
-    // **玩家还没启动过游戏时资源对象是空的**，就得靠后者，否则下拉里只会看到一堆 zh_cn 这样的代码。
-    let name = read_object_lang_name(hash, legacy).or_else(|| read_cached_lang_name(code))?;
-    LANG_NAMES
-        .write()
-        .unwrap()
-        .insert(code.to_string(), name.clone());
-    Some(name)
-}
-
-/// 从游戏资源对象里读语言名
-///
-/// 对象按 sha1 前两位分目录存放。**读不到就静默返回 None**，不走
-/// [`assets_path::read_assets_text`]，那个失败时会记一条错误日志，而这里一次要读上百个
-/// 语言文件，资源没下全就会把日志刷满。
-fn read_object_lang_name(hash: &str, legacy: bool) -> Option<String> {
-    if hash.len() < 2 {
-        return None;
-    }
-    let file = assets_path::get_obj_dir().join(&hash[..2]).join(hash);
-    lang_name_from_file(&file, legacy)
-}
-
-/// 从 mml-tex-draw 的语言文件缓存 `langs/<code>.json` 里读语言名
-///
-/// 旧版代码是大写（`zh_CN`），缓存按小写文件名存，找不到时再试小写一次。
-fn read_cached_lang_name(code: &str) -> Option<String> {
-    let dir = mml_base::get_base_dir().join(names::LANG_DIR);
-    let mut names = vec![format!("{code}.json")];
-    let lower = code.to_lowercase();
-    if lower != code {
-        names.push(format!("{lower}.json"));
-    }
-    names
-        .iter()
-        .find_map(|name| lang_name_from_file(&dir.join(name), false))
-}
-
-/// 读一个语言文件里的 `language.name`
-///
-/// 新版是 JSON（`{"language":{"name":"简体中文"}}`），旧版是 `key=value` 文本
-/// （`language.name=简体中文`）。
-///
-/// - `file`: 语言文件路径
-/// - `legacy`: 是否旧版 `.lang` 文本
-///
-/// # 返回值
-///
-/// 返回显示名；文件不存在、解析失败或没有该键时返回 `None`
-fn lang_name_from_file(file: &Path, legacy: bool) -> Option<String> {
-    if !file.is_file() {
-        return None;
-    }
-    let text = path_helper::read_text(file).ok()?;
-    if legacy {
-        return text
-            .lines()
-            .find_map(|line| line.strip_prefix("language.name=").map(str::trim))
-            .filter(|value| !value.is_empty())
-            .map(String::from);
-    }
-    // 按 Value 解析而不是直接 HashMap<String, String>：语言文件里万一有个非字符串的值，
-    // 整份解析就废了，而这里只关心 language.name 一项，别被别处带崩
-    let map = mml_base::serialize_tools::json_from_str::<HashMap<String, serde_json::Value>>(&text)
-        .ok()?;
-    map.get(names::LANG_NAME_KEY)
-        .and_then(|item| item.as_str())
-        .map(String::from)
-}
-
-/// 获取所有分组，含空分组
-///
-/// # 返回值
-///
-/// 返回分组条目列表，每项含 uuid 与显示名；默认分组置顶，其余按用户排定的顺序
-pub fn get_group_list() -> Vec<game_group::GroupInfoObj> {
-    game_group::group_list()
-}
-
-/// 取某个实例所属的分组 uuid
-///
-/// 分组归属存在独立的 `group_save.json`，实例配置里没有这个字段，
-/// 所以想显示"这个实例在哪个组"必须来这里查。
-///
-/// - `uuid`: 实例 UUID
-///
-/// # 返回值
-///
-/// 返回分组 uuid；属于默认分组时返回 `None`，即"没有分组"就是默认分组的表示
-pub fn get_instance_group(uuid: &Uuid) -> Option<Uuid> {
-    let group = game_group::group_of(uuid);
-    if group == game_group::DEFAULT_GROUP_UUID {
-        None
-    } else {
-        Some(group)
-    }
-}
-
-/// 取某个实例在它所属分组里的显示次序，从 0 起
-///
-/// 组内次序存在独立的 `group_save.json` 里，键是实例 uuid 到次序的映射，
-/// 不再写各实例的 `gui_setting.json`。
-///
-/// - `uuid`: 实例 UUID
-///
-/// # 返回值
-///
-/// 返回组内位置；实例不在任何分组里时返回 `None`
-pub fn get_instance_order(uuid: &Uuid) -> Option<i32> {
-    game_group::index_of(uuid)
-}
-
-/// 按给定顺序重排分组，默认分组只是初始排首位，同样可以换位置
-///
-/// - `order`: 期望的分组 uuid 顺序；不存在的忽略，没提到的组保持在后
-pub fn reorder_groups(order: &[Uuid]) {
-    game_group::reorder_groups(order);
-}
-
-/// 把某个实例移到分组的第 `index` 位，跨组移动与组内排序一次到位
-///
-/// 归属与组内次序都在 `group_save.json`：拖拽落点既可能换组、也可能只是同组内换位置，
-/// 统一由这一个入口处理；移动完成后发 `MoveGroup` 事件。
-///
-/// - `uuid`: 实例 UUID；不存在时什么都不做，也不发事件
-/// - `group`: 目标分组 uuid；`None` 表示默认分组
-/// - `index`: 目标下标；超出范围则排到末尾
-pub fn move_instance(uuid: &Uuid, group: Option<Uuid>, index: usize) {
-    if !INSTANCES.read().unwrap().contains_key(uuid) {
-        return;
-    }
-
-    game_group::place_in_group(uuid, group, index);
-
-    // 用回读到的实际分组发事件：目标组不存在时内核会落到默认分组，
-    // 拿传进来的那个 uuid 发就跟实际状态不符了
-    invoke_change(InstanceChange::MoveGroup(*uuid, get_instance_group(uuid)));
-}
 
 /// 获取游戏版本类型列表，取 Mojang 版本清单的 type 字段
 ///
@@ -738,81 +277,6 @@ pub fn move_instance(uuid: &Uuid, group: Option<Uuid>, index: usize) {
 /// 返回版本类型 ID 列表
 pub fn get_version_types() -> Vec<&'static str> {
     vec!["release", "snapshot", "old_beta", "old_alpha"]
-}
-
-/// 从分组 uuid 获取对应的实例
-///
-/// - `uuid`: 分组 uuid
-///
-/// # 返回值
-///
-/// 返回该分组下的实例列表，组内按用户排定的次序
-pub fn get_group(uuid: &Uuid) -> Vec<GameInstance> {
-    let mut list = Vec::new();
-
-    for item in game_group::group_items(uuid) {
-        if let Some(instance) = get_instance(&item) {
-            list.push(instance.clone());
-        }
-    }
-
-    list
-}
-
-/// 添加分组
-///
-/// - `name`: 分组名
-///
-/// # 返回值
-///
-/// 添加成功返回新分组的 uuid；分组已存在或名字为空返回 `None`
-pub fn add_group(name: &str) -> Option<Uuid> {
-    game_group::add_group(name)
-}
-
-/// 删除分组
-///
-/// - `uuid`: 分组 uuid
-///
-/// # 返回值
-///
-/// 删除成功返回 `true`，组内实例移入默认分组；分组不存在或为默认分组返回 `false`
-pub fn remove_group(uuid: &Uuid) -> bool {
-    // 只通知**被移入默认分组的那些**实例，不是整个默认分组
-    let Some(moved) = game_group::remove_group(uuid) else {
-        return false;
-    };
-    for instance in moved {
-        invoke_change(InstanceChange::MoveGroup(instance, None));
-    }
-    true
-}
-
-/// 移动实例到分组
-///
-/// - `list`: 需要移动的实例列表
-/// - `new`: 目标分组 uuid；`None` 表示默认分组
-///
-/// 移动完成后为每个实例发一次 `MoveGroup` 事件。
-///
-/// 分组表是独立存储的 `group_save.json`，实例配置里不再有 group 字段，
-/// 所以这里只需改表与通知，不必逐个 `save()` 实例。
-pub fn move_group(list: Vec<Uuid>, new: Option<Uuid>) {
-    // 只处理真实存在的实例，避免把不存在的 uuid 写进分组表
-    let moved: Vec<Uuid> = list
-        .into_iter()
-        .filter(|u| INSTANCES.read().unwrap().contains_key(u))
-        .collect();
-    if moved.is_empty() {
-        return;
-    }
-
-    game_group::move_group(moved.clone(), new);
-
-    // 回读实际分组发事件，目标组不存在时内核会把实例落到默认分组
-    for uuid in moved {
-        invoke_change(InstanceChange::MoveGroup(uuid, get_instance_group(&uuid)));
-    }
 }
 
 /// 从实例名字获取实例
@@ -1066,93 +530,6 @@ pub fn copy_instance(uuid: &Uuid, name: &str) -> CoreResult<GameInstance> {
 
     let game = add_to_group(obj, get_instance_group(uuid));
     Ok(game)
-}
-
-/// 添加运行日志
-///
-/// - `uuid`: 实例 UUID
-/// - `data`: 日志原文
-pub(crate) fn add_game_log(uuid: &Uuid, data: &str) {
-    // 先入库、后发事件，而且要放开写锁再发：事件回调可能回头读日志（GUI 就会读到），
-    // 持锁发事件会自锁。每一行都要发 —— 只在新建日志那一次发，实时日志就只剩第一行
-    let item = {
-        let mut logs = RUNTIME_LOGS.write().unwrap();
-        if !logs.contains_key(uuid) {
-            logs.insert(uuid.clone(), InstanceRuntimeLog::new());
-        }
-        logs.get_mut(uuid).unwrap().add_game_log(&data)
-    };
-
-    invoke_run_log(uuid.clone(), InstanceLogType::AddLog(item));
-}
-
-/// 添加运行日志
-///
-/// - `uuid`: 实例 UUID
-/// - `data`: 已解析的日志项
-pub(crate) fn add_game_log_item(uuid: &Uuid, data: GameLog) {
-    // 与 [`add_game_log`] 同一条：每一行都发事件，且发之前放开写锁
-    let item = {
-        let mut logs = RUNTIME_LOGS.write().unwrap();
-        if !logs.contains_key(uuid) {
-            logs.insert(uuid.clone(), InstanceRuntimeLog::new());
-        }
-        logs.get_mut(uuid).unwrap().add_log_item(data)
-    };
-
-    invoke_run_log(uuid.clone(), InstanceLogType::AddLog(item));
-}
-
-/// 清理日志
-///
-/// - `uuid`: 实例 UUID
-pub(crate) fn clear_game_log(uuid: &Uuid) {
-    let mut logs = RUNTIME_LOGS.write().unwrap();
-    if let Some(log) = logs.get_mut(uuid) {
-        log.clear();
-    } else {
-        let log = InstanceRuntimeLog::new();
-        logs.insert(uuid.clone(), log);
-    }
-
-    invoke_run_log(uuid.clone(), InstanceLogType::ClearLog);
-}
-
-/// 添加启动的游戏实例
-///
-/// - `handel`: 实例运行句柄
-pub(crate) fn add_run_game(handel: InstanceHandle) {
-    let mut games = HANDELS.write().unwrap();
-    games.insert(handel.uuid, handel);
-}
-
-/// 获取正在运行的实例 UUID 列表
-///
-/// # 返回值
-///
-/// 返回运行中实例的 UUID 列表，顺序不保证
-pub fn get_running_instances() -> Vec<Uuid> {
-    HANDELS.read().unwrap().keys().cloned().collect()
-}
-
-/// 判断实例是否正在运行
-///
-/// - `uuid`: 实例 UUID
-///
-/// # 返回值
-///
-/// 正在运行返回 `true`
-pub fn is_running(uuid: &Uuid) -> bool {
-    HANDELS.read().unwrap().contains_key(uuid)
-}
-
-/// 强制结束正在运行的实例
-///
-/// - `uuid`: 实例 UUID
-pub fn stop_game(uuid: &Uuid) {
-    if let Some(handle) = HANDELS.read().unwrap().get(uuid) {
-        handle.kill();
-    }
 }
 
 /// 按图标字节判断扩展名；GIF 原样保留，其余常见格式也给出真实扩展
@@ -1481,34 +858,5 @@ impl InstanceSettingObj {
         game.save();
 
         Ok(())
-    }
-
-    /// 获取运行中的日志
-    ///
-    /// # 返回值
-    ///
-    /// 返回当前运行日志快照；没有运行日志返回 `None`
-    pub fn get_runtime_log(&self) -> Option<Arc<VecDeque<GameLogItemObj>>> {
-        let logs = RUNTIME_LOGS.read().unwrap();
-        logs.get(&self.uuid)
-            .map(|log| log.logs.read().unwrap().clone())
-    }
-}
-
-#[cfg(test)]
-mod lang_tests {
-    use super::*;
-
-    /// 旧版 `.lang` 是 key=value 文本，语言名在 `language.name` 这一行；
-    /// 同一份文件按新版 JSON 解析必须失败，两种格式不能混着猜
-    #[test]
-    fn legacy_lang_file_is_key_value_text() {
-        let dir = mml_testutil::temp_dir().join(format!("mml-lang-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let file = dir.join("zh_CN.lang");
-        std::fs::write(&file, "language.name=简体中文\nlanguage.region=中国\n").unwrap();
-
-        assert_eq!(lang_name_from_file(&file, true).as_deref(), Some("简体中文"));
-        assert_eq!(lang_name_from_file(&file, false), None);
     }
 }

@@ -5,12 +5,28 @@
 //!
 //! 顺序上**先等日志、再 tick**：`tick` 判定退出会置退出标志，而读流线程每行都查这个标志，
 //! 先 tick 可能让最后几行没读完就收工。
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex, atomic::AtomicBool},
+    thread,
+    time::{Duration, Instant},
+};
 
+use mml_auth::LoginObj;
 use uuid::Uuid;
 
-use super::*;
 use crate::test_support::boot;
+use crate::{
+    game_arg::GameLaunchObj,
+    game_launch::{
+        GameRunObj, InstanceHandle, LaunchDebugger,
+        handle::read_process_stream,
+        java::{fix_zgc_args, jdwp_arg_for},
+    },
+    game_log::GameLog,
+    launcher::{LogEncoding, instance_setting_obj::InstanceSettingObj},
+};
 
 /// 假游戏输出里的标记，用来在运行日志里找那一行
 const MARK: &str = "mml-launch-ok";

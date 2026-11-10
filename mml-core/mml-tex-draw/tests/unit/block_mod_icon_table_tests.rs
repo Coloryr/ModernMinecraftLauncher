@@ -1,7 +1,6 @@
-use super::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use crate::block::icons::{SpecialForm, special_form};
+use crate::block::icons::{BLOCK_ICONS, IconSpec, SpecialForm, special_form};
 
 /// 固定表完整性：方块 ID 唯一、分类非空、各规格内容非空
 #[test]
@@ -107,4 +106,3 @@ fn special_form_lookup() {
         }
     }
 }
-

@@ -3,6 +3,10 @@
 use super::*;
 use std::{fs, io::Read};
 
+use mml_names::names;
+
+use crate::game_export::mmc::{mmc_instance_cfg, mmc_jvm_args};
+
 #[tokio::test]
 async fn modrinth_archive_uses_portable_paths_for_both_download_sources() {
     let run = crate::test_support::boot();
