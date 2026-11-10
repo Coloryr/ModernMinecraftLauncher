@@ -10,14 +10,12 @@ use tiny_skia::Pixmap;
 use crate::{
     block::read_anim_meta,
     model::{
-        BakedModel, BakedModelTextures, Quad, Resolved, calculate_facing,
-        face_index_of, face_normal, load_texture, rect_translucent, resolve, texture_path,
+        BakedModel, BakedModelTextures, Quad, Resolved, calculate_facing, face_index_of,
+        face_normal, load_texture, rect_translucent, resolve, texture_path,
     },
 };
 
-
 use super::model::{FaceData, bake_face};
-use super::*;
 
 /// extrude 挤出烘焙，照反编译 ItemModelGenerator：
 /// layer0..layer4 依次叠加遇缺失即止，layer0 缺失整体失败；每层

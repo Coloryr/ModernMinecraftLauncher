@@ -108,34 +108,34 @@ const MAX_FRAME_SIZE: usize = 1 << 20;
 type TcpChannel = mpsc::UnboundedSender<BytesMut>;
 
 /// 已连接的客户端，广播时使用
-static CLIENTS: RwLock<Vec<TcpChannel>> = RwLock::new(Vec::new());
+pub(crate) static CLIENTS: RwLock<Vec<TcpChannel>> = RwLock::new(Vec::new());
 /// 已注册的游戏实例通道，键为实例 ID
-static GAME_CHANNELS: LazyLock<RwLock<HashMap<Uuid, TcpChannel>>> =
+pub(crate) static GAME_CHANNELS: LazyLock<RwLock<HashMap<Uuid, TcpChannel>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 /// 服务器列表，用于向游戏广播 MOTD
-static SERVER_INFOS: RwLock<Vec<ServerInfo>> = RwLock::new(Vec::new());
+pub(crate) static SERVER_INFOS: RwLock<Vec<ServerInfo>> = RwLock::new(Vec::new());
 /// 新启动实例传入的启动参数，用于防止多开时的参数转发
-static RUN_ARG: RwLock<Vec<String>> = RwLock::new(Vec::new());
+pub(crate) static RUN_ARG: RwLock<Vec<String>> = RwLock::new(Vec::new());
 /// 游戏上报的鼠标状态，键为实例 ID
-static MOUSE_STATES: LazyLock<RwLock<HashMap<Uuid, bool>>> =
+pub(crate) static MOUSE_STATES: LazyLock<RwLock<HashMap<Uuid, bool>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 /// 游戏上报的窗口大小，键为实例 ID
-static WINDOW_SIZES: LazyLock<RwLock<HashMap<Uuid, WindowSize>>> =
+pub(crate) static WINDOW_SIZES: LazyLock<RwLock<HashMap<Uuid, WindowSize>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 /// 游戏上报的窗口聚焦状态，键为实例 ID
-static FOCUS_STATES: LazyLock<RwLock<HashMap<Uuid, bool>>> =
+pub(crate) static FOCUS_STATES: LazyLock<RwLock<HashMap<Uuid, bool>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 /// IPC 服务端口，只初始化一次
-static IPC_PORT: OnceLock<u16> = OnceLock::new();
+pub(crate) static IPC_PORT: OnceLock<u16> = OnceLock::new();
 /// 游戏连接的验证密钥，服务启动时随机生成一次
-static AUTH_KEY: OnceLock<String> = OnceLock::new();
+pub(crate) static AUTH_KEY: OnceLock<String> = OnceLock::new();
 /// 保护服务启动过程：并发调用 [`init()`] 时只启动一个服务，其余复用同一端口
-static INIT_LOCK: Mutex<()> = Mutex::new(());
+pub(crate) static INIT_LOCK: Mutex<()> = Mutex::new(());
 
 /// 启动显示事件：新启动的启动器实例请求已运行实例显示主窗口
-static IPC_EVENT: LazyLock<EventHandler> = LazyLock::new(|| EventHandler::new());
+pub(crate) static IPC_EVENT: LazyLock<EventHandler> = LazyLock::new(|| EventHandler::new());
 /// 启动参数事件：新启动的启动器实例传入的启动参数
-static IPC_ARG_EVENT: LazyLock<EventArgHandler<Vec<String>>> =
+pub(crate) static IPC_ARG_EVENT: LazyLock<EventArgHandler<Vec<String>>> =
     LazyLock::new(|| EventArgHandler::new());
 
 /// 服务器信息
@@ -294,138 +294,18 @@ pub fn clear_servers() {
 ///
 /// 消息体只含标题，与 ColorMC 一致，游戏实例由 `uuid` 对应的通道定位；
 /// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`
-pub fn set_title(uuid: Uuid, title: &str) -> bool {
-    let mut content = BytesMut::new();
-    content.put_i32(TYPE_SET_TITLE);
-    content.write_string(title);
-    send_to_game(uuid, content)
-}
+pub(crate) mod broadcast;
+mod protocol;
 
-/// 向指定游戏实例发送鼠标相对移动
-///
-/// - `uuid`: 游戏实例 ID
-/// - `dx`: 水平相对位移，单位像素，正数向右
-/// - `dy`: 垂直相对位移，单位像素，正数向下
-///
-/// # 返回值
-///
-/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`。
-/// 游戏抓取鼠标时该消息用于转动视角，未抓取时用于移动游戏窗口内的系统光标
-pub fn send_mouse_move(uuid: Uuid, dx: f64, dy: f64) -> bool {
-    let mut content = BytesMut::new();
-    content.put_i32(TYPE_MOUSE_MOVE);
-    content.put_f64(dx);
-    content.put_f64(dy);
-    send_to_game(uuid, content)
-}
+#[cfg(test)]
+pub(crate) use self::protocol::{message_len, process_message};
+mod send;
+mod server;
 
-/// 向指定游戏实例发送鼠标按键
-///
-/// - `uuid`: 游戏实例 ID
-/// - `button`: 鼠标按键，与 GLFW 一致，0 左键、1 右键、2 中键
-/// - `down`: `true` 按下，`false` 抬起
-///
-/// # 返回值
-///
-/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`
-pub fn send_mouse_button(uuid: Uuid, button: i32, down: bool) -> bool {
-    let mut content = BytesMut::new();
-    content.put_i32(TYPE_MOUSE_BUTTON);
-    content.put_i32(button);
-    content.put_u8(if down { 1 } else { 0 });
-    send_to_game(uuid, content)
-}
+pub(crate) use self::broadcast::cleanup;
+pub use self::send::*;
+pub(crate) use self::server::run_server;
 
-/// 向指定游戏实例发送键盘按键
-///
-/// - `uuid`: 游戏实例 ID
-/// - `key`: GLFW 键码，例如 W 为 87
-/// - `down`: `true` 按下，`false` 抬起
-///
-/// # 返回值
-///
-/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`
-pub fn send_key(uuid: Uuid, key: i32, down: bool) -> bool {
-    let mut content = BytesMut::new();
-    content.put_i32(TYPE_KEYBOARD_KEY);
-    content.put_i32(key);
-    content.put_u8(if down { 1 } else { 0 });
-    send_to_game(uuid, content)
-}
-
-/// 向指定游戏实例发送鼠标滚轮
-///
-/// - `uuid`: 游戏实例 ID
-/// - `amount`: 滚轮格数，正数向上
-///
-/// # 返回值
-///
-/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`
-pub fn send_mouse_scroll(uuid: Uuid, amount: i32) -> bool {
-    let mut content = BytesMut::new();
-    content.put_i32(TYPE_MOUSE_SCROLL);
-    content.put_i32(amount);
-    send_to_game(uuid, content)
-}
-
-/// 通知已运行的启动器实例，防止多开 —— 启动器客户端
-///
-/// - `port`: 已运行实例的监听端口
-/// - `args`: 本进程的启动参数，为空则发送「启动显示」
-///
-/// # 返回值
-///
-/// 作为客户端向 `port` 发送一次数据后立即关闭连接，本进程不会启动 IPC 服务。
-/// 根据启动参数决定发送的消息：
-/// - `args` 为空时发送「启动显示」(3)，请求已运行实例显示主窗口；
-/// - `args` 非空时发送「启动参数」(4)，把本次启动参数交给已运行实例。
-///
-/// 返回 `true` 表示已通知成功，当前进程应退出，由已有实例接管；
-/// 返回 `false` 表示没有可连接的实例，端口错误或服务未运行
-pub fn notify_existing(port: u16, args: Vec<String>) -> bool {
-    use std::io::Write;
-
-    let Ok(mut stream) = std::net::TcpStream::connect(("127.0.0.1", port)) else {
-        return false;
-    };
-    if stream
-        .set_write_timeout(Some(Duration::from_secs(2)))
-        .is_err()
-    {
-        return false;
-    }
-
-    // 协议无总长度前缀，与 ColorMC 一致，消息体自定界
-    let mut content = BytesMut::new();
-    if args.is_empty() {
-        content.put_i32(TYPE_LAUNCH_SHOW);
-    } else {
-        content.put_i32(TYPE_LAUNCH_ARG);
-        content.write_string_list(&args);
-    }
-
-    stream.write_all(&content).is_ok()
-}
-
-/// 初始化 IPC 服务，含单开检查
-///
-/// - `port`: 已运行启动器实例记录的端口，无已运行实例时为 `None`
-///
-/// # 返回值
-///
-/// `port` 由调用方从端口文件或启动环境读取：
-/// - 为 `Some(port)` 时：读取本进程命令行参数，根据有无启动参数调用
-///   [`notify_existing()`] 通知已运行实例，无参数发送「启动显示」，有参数发送
-///   「启动参数」。通知成功返回 `Ok(None)`，调用方应退出当前进程；通知失败
-///   说明原实例已退出，端口过期，本进程继续作为第一个实例启动服务。
-/// - 为 `None` 时：直接作为第一个实例启动服务。
-///
-/// 服务在本机绑定一个临时端口，在独立线程上启动接收客户端连接和服务器列表
-/// 广播任务。返回 `Ok(Some(port))` 表示本进程作为服务端，应将该端口作为
-/// `GameLaunchArg.mixin` 传入并记录供后续启动实例使用；返回 `Ok(None)` 表示
-/// 已通知已运行实例，本进程应立即退出。
-///
-/// 本进程已启动过服务时，重复调用直接返回第一次绑定的端口
 pub fn init(port: Option<u16>) -> CoreResult<Option<u16>> {
     // 串行化服务启动：并发调用时只有一个线程真正启动服务并设置 IPC_PORT，
     // 其余线程等待锁后直接复用同一端口，否则各自绑定会返回不同端口
@@ -488,342 +368,6 @@ pub fn get_auth_key() -> Option<&'static str> {
 /// 在独立线程上运行 IPC 服务，阻塞直到线程结束
 ///
 /// - `port_tx`: 回传绑定端口的通道
-fn run_server(port_tx: std::sync::mpsc::Sender<u16>) {
-    let runtime = match tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(rt) => rt,
-        Err(err) => {
-            mml_log::error_type(IpcRuntimeCreateError(ErrorData::from_error(err)));
-            return;
-        }
-    };
-
-    runtime.block_on(async {
-        let listener = match tokio::net::TcpListener::bind("127.0.0.1:0").await {
-            Ok(listener) => listener,
-            Err(err) => {
-                mml_log::error_type(IpcBindError(ErrorData::from_error(err)));
-                return;
-            }
-        };
-
-        // 端口对外之前先生成密钥，避免刚连上的客户端拿不到验证帧
-        let _ = AUTH_KEY.set(Uuid::new_v4().to_string());
-
-        // 回传绑定端口
-        let port = listener.local_addr().map(|addr| addr.port()).unwrap_or(0);
-        let _ = port_tx.send(port);
-
-        let _ = tokio::spawn(accept_loop(listener));
-        let _ = tokio::spawn(broadcast_servers());
-        std::future::pending::<()>().await;
-    });
-}
-
-/// 接受客户端连接，为每个连接启动处理任务
-async fn accept_loop(listener: TcpListener) -> CoreResult<()> {
-    loop {
-        let (stream, addr) = match listener.accept().await {
-            Ok(conn) => conn,
-            Err(err) => {
-                mml_log::error_type(IpcAcceptError(ErrorData::from_error(err)));
-                continue;
-            }
-        };
-
-        mml_log::info_type(InfoType::IpcClientConnected {
-            addr: addr.to_string(),
-        });
-        tokio::spawn(handle_client(stream));
-    }
-}
-
-/// 处理单个客户端连接，含读取循环与写入任务
-///
-/// 每个连接分配一条出站通道，写入任务负责将通道中的消息发送到 TCP；
-/// 该通道同时注册进 [`CLIENTS`] 用于广播，并注册为游戏通道用于定向发送。
-async fn handle_client(stream: TcpStream) -> CoreResult<()> {
-    let (mut reader, mut writer) = tokio::io::split(stream);
-    let (write_tx, mut write_rx) = mpsc::unbounded_channel::<BytesMut>();
-
-    // 先发连接验证，客户端收到的第一条消息必须是密钥
-    if let Some(key) = AUTH_KEY.get() {
-        let mut auth = BytesMut::new();
-        auth.put_i32(TYPE_GAME_AUTH);
-        auth.write_string(key);
-        let _ = write_tx.send(auth);
-    }
-
-    // 注册客户端到广播列表
-    CLIENTS.write().unwrap().push(write_tx.clone());
-
-    // 写入任务：从通道接收数据并发送到 TCP
-    let write_handle = tokio::spawn(async move {
-        while let Some(msg) = write_rx.recv().await {
-            if let Err(err) = writer.write_all(&msg).await {
-                mml_log::error_type(IpcWriteError(ErrorData::from_error(err)));
-                break;
-            }
-        }
-    });
-
-    // 读取循环：消息无总长度前缀，按类型自定界解析，与 ColorMC 一致
-    let mut buf = BytesMut::with_capacity(1024);
-    loop {
-        let msg_len = match message_len(&buf) {
-            Ok(length) => length,
-            Err(err) => {
-                mml_log::error_type(err);
-                break;
-            }
-        };
-        if let Some(msg_len) = msg_len {
-            let mut msg = buf.split_to(msg_len);
-            if let Err(err) = process_message(&mut msg, &write_tx).await {
-                mml_log::error_type(err);
-                break;
-            }
-        } else {
-            // 缓冲区内数据不足一条完整消息：继续读取；
-            // 缓冲区异常膨胀仍无法解析说明流失步/坏数据，断开连接
-            if buf.len() > MAX_FRAME_SIZE {
-                mml_log::error_type(IpcBufferOverrun);
-                break;
-            }
-            let n = reader
-                .read_buf(&mut buf)
-                .await
-                .map_err(|err| SocketError(ErrorData::from_error(err)))?;
-            if n == 0 {
-                break;
-            }
-        }
-    }
-
-    // 连接关闭，停止写入任务；通道清理由 cleanup() 惰性处理
-    write_handle.abort();
-    Ok(())
-}
-
-/// 计算缓冲区首条消息的完整长度，单位字节，不消费数据
-///
-/// 消息无总长度前缀，按类型读取字段推算边界，字符串与列表自带长度；
-/// 缓冲区中数据不足一条完整消息时返回 `Ok(None)`，无效长度立即报错。未知类型无法确定长度，
-/// 按一条仅含类型头的 4 字节消息处理。
-fn message_len(buf: &[u8]) -> CoreResult<Option<usize>> {
-    if buf.len() < 4 {
-        return Ok(None);
-    }
-    let msg_type = i32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]);
-    let mut offset = 4usize;
-
-    /// 在消息限额内推进偏移，数据不足时返回 false。
-    fn advance(buf: &[u8], offset: &mut usize, len: usize) -> CoreResult<bool> {
-        let end = offset
-            .checked_add(len)
-            .ok_or(IpcFrameTooLarge { len: usize::MAX })?;
-        if end > MAX_FRAME_SIZE {
-            return Err(IpcFrameTooLarge { len: end });
-        }
-        if end > buf.len() {
-            return Ok(false);
-        }
-        *offset = end;
-        Ok(true)
-    }
-
-    /// 拒绝负数字符串长度，再检查内容是否完整。
-    fn string_field(buf: &[u8], offset: &mut usize) -> CoreResult<bool> {
-        if !advance(buf, offset, 4)? {
-            return Ok(false);
-        }
-        let len = i32::from_be_bytes(buf[*offset - 4..*offset].try_into().unwrap());
-        let len = usize::try_from(len).map_err(|_| IpcInvalidFrame)?;
-        advance(buf, offset, len)
-    }
-
-    match msg_type {
-        TYPE_LAUNCH_SHOW => {}
-        TYPE_GAME_MOUSE_STATE => {
-            if !string_field(buf, &mut offset)? || !advance(buf, &mut offset, 1)? {
-                return Ok(None);
-            }
-        }
-        TYPE_LAUNCH_ARG => {
-            if !advance(buf, &mut offset, 4)? {
-                return Ok(None);
-            }
-            let count = i32::from_be_bytes(buf[offset - 4..offset].try_into().unwrap());
-            let count = usize::try_from(count).map_err(|_| IpcInvalidFrame)?;
-            // 每个字符串至少占四字节长度头，提前拒绝不可能容纳的列表。
-            if count > (MAX_FRAME_SIZE - offset) / 4 {
-                return Err(IpcFrameTooLarge {
-                    len: offset.saturating_add(count.saturating_mul(4)),
-                });
-            }
-            for _ in 0..count {
-                if !string_field(buf, &mut offset)? {
-                    return Ok(None);
-                }
-            }
-        }
-        TYPE_GAME_CHANNEL => {
-            if !string_field(buf, &mut offset)? {
-                return Ok(None);
-            }
-        }
-        TYPE_GAME_WINDOW_SIZE => {
-            if !string_field(buf, &mut offset)? || !advance(buf, &mut offset, 8)? {
-                return Ok(None);
-            }
-        }
-        TYPE_GAME_WINDOW_FOCUS => {
-            if !string_field(buf, &mut offset)? || !advance(buf, &mut offset, 1)? {
-                return Ok(None);
-            }
-        }
-        _ => {
-            mml_log::warn_type(InfoType::IpcUnknownMessageType { msg_type });
-            return Ok(Some(4));
-        }
-    }
-
-    Ok(Some(offset))
-}
-
-/// 处理一条消息
-///
-/// - `data`: 消息体，不含类型头，读完即消费
-/// - `client_tx`: 该连接的出站通道，注册游戏通道时使用
-async fn process_message(
-    data: &mut BytesMut,
-    client_tx: &mpsc::UnboundedSender<BytesMut>,
-) -> CoreResult<()> {
-    if data.len() < 4 {
-        return Ok(());
-    }
-    let msg_type = data.get_i32();
-
-    match msg_type {
-        TYPE_GAME_MOUSE_STATE => {
-            let uuid_str = data.read_string();
-            let guid = Uuid::parse_str(&uuid_str)
-                .map_err(|err| SocketError(ErrorData::from_error(err)))?;
-            let value = data.read_bool();
-            MOUSE_STATES.write().unwrap().insert(guid, value);
-        }
-        TYPE_LAUNCH_SHOW => {
-            mml_log::info_type(InfoType::IpcLauncherShowWindow);
-            IPC_EVENT.emit();
-        }
-        TYPE_LAUNCH_ARG => {
-            let args = data.read_string_list();
-            let mut write = RUN_ARG.write().unwrap();
-            write.clear();
-            write.extend(args.clone());
-            IPC_ARG_EVENT.emit(args);
-        }
-        TYPE_GAME_CHANNEL => {
-            let uuid_str = data.read_string();
-            let guid = Uuid::parse_str(&uuid_str)
-                .map_err(|err| SocketError(ErrorData::from_error(err)))?;
-            GAME_CHANNELS
-                .write()
-                .unwrap()
-                .insert(guid, client_tx.clone());
-            mml_log::info_type(InfoType::IpcGameChannelBound {
-                guid: guid.to_string(),
-            });
-        }
-        TYPE_GAME_WINDOW_SIZE => {
-            let uuid_str = data.read_string();
-            let guid = Uuid::parse_str(&uuid_str)
-                .map_err(|err| SocketError(ErrorData::from_error(err)))?;
-            let width = data.get_i32();
-            let height = data.get_i32();
-            WINDOW_SIZES
-                .write()
-                .unwrap()
-                .insert(guid, WindowSize { width, height });
-        }
-        TYPE_GAME_WINDOW_FOCUS => {
-            let uuid_str = data.read_string();
-            let guid = Uuid::parse_str(&uuid_str)
-                .map_err(|err| SocketError(ErrorData::from_error(err)))?;
-            let value = data.read_bool();
-            FOCUS_STATES.write().unwrap().insert(guid, value);
-        }
-        _ => {
-            mml_log::warn_type(InfoType::IpcUnknownMessageType { msg_type });
-        }
-    }
-
-    Ok(())
-}
-
-/// 周期广播服务器 MOTD 给所有游戏客户端
-async fn broadcast_servers() {
-    let mut interval = time::interval(Duration::from_secs(2));
-    loop {
-        interval.tick().await;
-
-        // 复制服务器列表，避免长期持有锁
-        let servers = SERVER_INFOS.read().unwrap().clone();
-
-        if servers.is_empty() {
-            continue;
-        }
-
-        for server in servers {
-            let mut content = BytesMut::new();
-            content.put_i32(TYPE_GAME_MOTD);
-
-            content.write_string(&server.ip);
-            content.write_string(&server.port);
-            content.write_string(&server.motd);
-
-            broadcast(content);
-        }
-    }
-}
-
-/// 清理已关闭的客户端通道
-fn cleanup() {
-    CLIENTS.write().unwrap().retain(|tx| !tx.is_closed());
-    GAME_CHANNELS
-        .write()
-        .unwrap()
-        .retain(|_uuid, tx| !tx.is_closed());
-}
-
-/// 广播消息给所有客户端
-///
-/// - `msg`: 完整消息，含类型头与消息体
-fn broadcast(msg: BytesMut) {
-    cleanup();
-    for tx in CLIENTS.read().unwrap().iter() {
-        let _ = tx.send(msg.clone());
-    }
-}
-
-/// 发送消息给指定游戏实例
-///
-/// - `uuid`: 游戏实例 ID
-/// - `msg`: 完整消息，含类型头与消息体
-///
-/// # 返回值
-///
-/// 发送成功返回 `true`，实例未注册通道或通道已关闭时返回 `false`
-fn send_to_game(uuid: Uuid, msg: BytesMut) -> bool {
-    cleanup();
-    if let Some(tx) = GAME_CHANNELS.read().unwrap().get(&uuid) {
-        return tx.send(msg).is_ok();
-    }
-    false
-}
-
 #[cfg(test)]
 #[path = "../tests/unit/lib_tests.rs"]
 mod tests;

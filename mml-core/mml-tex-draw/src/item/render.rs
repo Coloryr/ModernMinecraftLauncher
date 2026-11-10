@@ -15,12 +15,9 @@ use tiny_skia::Pixmap;
 use crate::{
     block::{fit_composite, render_baked},
     gpu::GpuCtx,
-    model::{
-        BakedModel, BakedModelTextures, GuiTransform, load_texture,
-    },
+    model::{BakedModel, BakedModelTextures, GuiTransform, load_texture},
 };
 use mml_sys::path_helper;
-
 
 use super::icons;
 use super::*;

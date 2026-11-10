@@ -8,23 +8,20 @@ use serde::Deserialize;
 use crate::{
     block::GRASS_TINT,
     model::{
-        FACE_INFO, calculate_facing,
-        face_index_of, face_normal, recalculate_winding,
-        select_extent,
+        FACE_INFO, calculate_facing, face_index_of, face_normal, recalculate_winding, select_extent,
     },
 };
-
 
 use super::*;
 
 /// 一个可渲染子模型，composite 展平后的项
-pub(super) struct ChildModel {
+pub(crate) struct ChildModel {
     /// models/ 下的相对名，如 item/apple
-    pub(super) model: String,
+    pub(crate) model: String,
     /// tint 表，tintindex 索引
-    pub(super) tints: Vec<[u8; 3]>,
+    pub(crate) tints: Vec<[u8; 3]>,
     /// 节点自带 transformation，烘焙期直接作用于顶点
-    pub(super) transform: Option<Mat4>,
+    pub(crate) transform: Option<Mat4>,
 }
 
 /// 解析 model 节点为可渲染子模型列表；special/empty/未知类型返回 None，即跳过该物品
@@ -34,7 +31,7 @@ pub(super) struct ChildModel {
 /// # 返回值
 ///
 /// 返回展平后的子模型列表，类型不可渲染或引用缺失时返回 `None`
-pub(super) fn resolve_item_models(node: &ItemModelJson) -> Option<Vec<ChildModel>> {
+pub(crate) fn resolve_item_models(node: &ItemModelJson) -> Option<Vec<ChildModel>> {
     match node.kind.as_deref() {
         None | Some("minecraft:model") => {
             let model = match node.model.as_ref()? {
@@ -97,7 +94,7 @@ pub(super) fn resolve_item_models(node: &ItemModelJson) -> Option<Vec<ChildModel
 /// # 返回值
 ///
 /// 返回去前缀后的相对名
-pub(super) fn strip_ns(name: &str) -> String {
+pub(crate) fn strip_ns(name: &str) -> String {
     name.strip_prefix("minecraft:").unwrap_or(name).to_string()
 }
 
@@ -106,7 +103,7 @@ pub(super) fn strip_ns(name: &str) -> String {
 /// special 在解析期已被跳过，用不到该字段
 #[derive(Deserialize)]
 #[serde(untagged)]
-pub(super) enum ModelRef {
+pub(crate) enum ModelRef {
     /// models/ 下的相对名，可带命名空间前缀
     Name(String),
     /// 对象形式，special 的 model.type 等
@@ -121,7 +118,7 @@ pub(super) enum ModelRef {
 /// # 返回值
 ///
 /// 返回 RGB 染色，0..255
-pub(super) fn tint_color(t: &TintJson) -> [u8; 3] {
+pub(crate) fn tint_color(t: &TintJson) -> [u8; 3] {
     match t.kind.as_deref() {
         Some("minecraft:grass") => GRASS_TINT,
         _ => argb_rgb(t.value.or(t.default).unwrap_or(-1)),
@@ -135,7 +132,7 @@ pub(super) fn tint_color(t: &TintJson) -> [u8; 3] {
 /// # 返回值
 ///
 /// 返回 RGB 分量，0..255
-pub(super) fn argb_rgb(v: i64) -> [u8; 3] {
+pub(crate) fn argb_rgb(v: i64) -> [u8; 3] {
     let u = v as u32;
     [(u >> 16) as u8, (u >> 8) as u8, u as u8]
 }
@@ -147,7 +144,7 @@ pub(super) fn argb_rgb(v: i64) -> [u8; 3] {
 /// # 返回值
 ///
 /// 返回组合后的变换矩阵
-pub(super) fn transform_matrix(t: &TransformDefJson) -> Mat4 {
+pub(crate) fn transform_matrix(t: &TransformDefJson) -> Mat4 {
     let take = |v: &Option<Vec<f32>>, i: usize, d: f32| {
         v.as_ref().and_then(|v| v.get(i).copied()).unwrap_or(d)
     };
@@ -178,13 +175,13 @@ pub(super) fn transform_matrix(t: &TransformDefJson) -> Mat4 {
 /// ===== bake：extrude 挤出，照反编译 ItemModelGenerator；以及物品模型烘焙 =====
 
 /// 一个面的顶点数据，烘进 `Quad` 前仍是模型空间
-pub(super) struct FaceData {
+pub(crate) struct FaceData {
     /// 4 个顶点位置，模型空间 0..1
-    pub(super) pos: [[f32; 3]; 4],
+    pub(crate) pos: [[f32; 3]; 4],
     /// 4 个顶点 uv，0..1，与 `pos` 同序
-    pub(super) uv: [[f32; 2]; 4],
+    pub(crate) uv: [[f32; 2]; 4],
     /// 面法线，轴向单位向量；朝向无法量化时取 (0,1,0)
-    pub(super) normal: [f32; 3],
+    pub(crate) normal: [f32; 3],
 }
 
 /// bakeQuad 核心，无元素旋转，照 FaceBakery.bakeQuad：FaceInfo 角选点/16 → uv 角映射
@@ -199,7 +196,7 @@ pub(super) struct FaceData {
 /// # 返回值
 ///
 /// 见 [`FaceData`]；位置与 uv 都已归一到 0..1 模型空间
-pub(super) fn bake_face(from: &[f32; 3], to: &[f32; 3], facing: usize, uvs: [f32; 4]) -> FaceData {
+pub(crate) fn bake_face(from: &[f32; 3], to: &[f32; 3], facing: usize, uvs: [f32; 4]) -> FaceData {
     let corner = |i: usize| -> [f32; 3] {
         let info = FACE_INFO[facing][i];
         [

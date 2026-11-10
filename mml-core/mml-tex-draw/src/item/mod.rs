@@ -13,27 +13,23 @@
 
 pub mod icons;
 
-
 use rayon::prelude::*;
-
-
 
 mod bake;
 mod json;
 mod model;
 mod render;
 
-pub(crate) use self::render::render_items;
 pub(crate) use self::bake::{bake_item_model, items_id};
 pub(crate) use self::json::*;
 pub(crate) use self::model::*;
+pub use self::render::{ItemIconOutput, render_item, render_items};
 
 #[allow(unused_imports)]
 pub(crate) use mml_base::serialize_tools;
 
 /// 附魔光效贴图
-pub(crate) const GLINT_TEX: &str =
-    "assets/minecraft/textures/misc/enchanted_glint_item.png";
+pub(crate) const GLINT_TEX: &str = "assets/minecraft/textures/misc/enchanted_glint_item.png";
 
 /// 默认带附魔光效的物品
 pub(crate) const GLINT_IDS: [&str; 2] = ["enchanted_book", "enchanted_golden_apple"];

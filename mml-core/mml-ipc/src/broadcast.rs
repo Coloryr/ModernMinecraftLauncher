@@ -1,0 +1,61 @@
+use crate::*;
+
+pub(crate) async fn broadcast_servers() {
+    let mut interval = time::interval(Duration::from_secs(2));
+    loop {
+        interval.tick().await;
+
+        // 复制服务器列表，避免长期持有锁
+        let servers = SERVER_INFOS.read().unwrap().clone();
+
+        if servers.is_empty() {
+            continue;
+        }
+
+        for server in servers {
+            let mut content = BytesMut::new();
+            content.put_i32(TYPE_GAME_MOTD);
+
+            content.write_string(&server.ip);
+            content.write_string(&server.port);
+            content.write_string(&server.motd);
+
+            broadcast(content);
+        }
+    }
+}
+
+/// 清理已关闭的客户端通道
+pub(crate) fn cleanup() {
+    CLIENTS.write().unwrap().retain(|tx| !tx.is_closed());
+    GAME_CHANNELS
+        .write()
+        .unwrap()
+        .retain(|_uuid, tx| !tx.is_closed());
+}
+
+/// 广播消息给所有客户端
+///
+/// - `msg`: 完整消息，含类型头与消息体
+pub(crate) fn broadcast(msg: BytesMut) {
+    cleanup();
+    for tx in CLIENTS.read().unwrap().iter() {
+        let _ = tx.send(msg.clone());
+    }
+}
+
+/// 发送消息给指定游戏实例
+///
+/// - `uuid`: 游戏实例 ID
+/// - `msg`: 完整消息，含类型头与消息体
+///
+/// # 返回值
+///
+/// 发送成功返回 `true`，实例未注册通道或通道已关闭时返回 `false`
+pub(crate) fn send_to_game(uuid: Uuid, msg: BytesMut) -> bool {
+    cleanup();
+    if let Some(tx) = GAME_CHANNELS.read().unwrap().get(&uuid) {
+        return tx.send(msg).is_ok();
+    }
+    false
+}
