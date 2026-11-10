@@ -13,7 +13,7 @@
 //! 抄的是 ColorMC 的结构，但 `Mod.Groups` 的形状已经改过：对方是"组名 → SHA1 数组"，M²L 是
 //! "分组 uuid → 对象"。若沿用同名文件，从 ColorMC 搬过来的实例会让 M²L 整份解析失败、
 //! 回落成默认值，随后又把它覆盖掉 —— 改名之后，ColorMC 那份 `guisetting.json` 只是
-//! 一个 M²L 不读的额外文件，迁移不会毁掉它，见 `windows/colormc.rs`。
+//! 一个 M²L 不读的额外文件，迁移不会毁掉它，见 `windows/colormc/mod.rs`。
 
 use std::collections::{HashMap, HashSet};
 

@@ -7,11 +7,11 @@
 //! - `mml-ipc/src/listens.ts`：事件名常量、`EventPayloads` 与订阅函数
 //! - `$OUT_DIR/invokes_gen.rs`：`tauri_commands!` 注册宏 + `listens` 常量
 //!
-//! [`generate`] 是纯函数：只读源码、只返回文本，不碰环境变量也不写文件。
+//! [`generate`] 只读源码并返回生成文本，不碰环境变量也不写文件。
 //! 写文件与 cargo 指令由调用方 `src-tauri/build.rs` 负责。
 //!
-//! 命令标记是 `#[gui_macros::command]`，事件标记是 `#[gui_macros::emit]`；
-//! 两者都是裸文本匹配，注释里写出字面量同样会被当成标记。
+//! 命令与事件的属性标记均按裸文本匹配；
+//! 在扫描范围的注释中写出完整标记也会被识别。
 
 mod emit_rs;
 mod emit_ts;

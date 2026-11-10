@@ -711,15 +711,11 @@ pub fn reorder_groups(order: &[Uuid]) {
 /// 把某个实例移到分组的第 `index` 位，跨组移动与组内排序一次到位
 ///
 /// 归属与组内次序都在 `group_save.json`：拖拽落点既可能换组、也可能只是同组内换位置，
-/// 统一由这一个入口处理。
+/// 统一由这一个入口处理；移动完成后发 `MoveGroup` 事件。
 ///
 /// - `uuid`: 实例 UUID；不存在时什么都不做，也不发事件
 /// - `group`: 目标分组 uuid；`None` 表示默认分组
 /// - `index`: 目标下标；超出范围则排到末尾
-///
-/// # 返回值
-///
-/// 无返回值；移动完成后发 `MoveGroup` 事件
 pub fn move_instance(uuid: &Uuid, group: Option<Uuid>, index: usize) {
     if !INSTANCES.read().unwrap().contains_key(uuid) {
         return;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 设置窗口 · 本地文件标签
 //
-// 列出运行目录下各文件夹的占用：缓存类可以就地清理，界面数据与游戏实例只统计不删。
+// 列出运行目录下各文件夹的占用：缓存、下载内容与界面数据可清理，游戏实例和 Java 只统计。
 // 统计只在第一次打开本标签时做，之后靠「重新统计」刷新。
 import { computed, onMounted, ref } from "vue";
 import { t } from "../../../../lib/i18n";
@@ -26,7 +26,7 @@ const { entries, loading, downloading, clearing, total, load, clear, open } = pr
 /** 等待确认清理的项 id；空串表示没有弹窗 */
 const pending = ref("");
 
-/** 展开了明细的行 id；目前只有「游戏实例」这一行带 children */
+/** 展开了明细的行 id；游戏实例与下载内容两行带 children */
 const expanded = ref<Set<string>>(new Set());
 
 /** 明细行高，单位 px；与 .local-file-child 的 height 一致 */
@@ -61,7 +61,7 @@ function childName(child: LocalFileChildDto): string {
 }
 
 /**
- * 展开 / 收起某一行的实例明细
+ * 展开 / 收起某一行的明细
  *
  * - `id`: 行的 id，取自 `entries`
  */

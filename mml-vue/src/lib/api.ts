@@ -1106,7 +1106,7 @@ export const api = {
   /**
    * 检测本机可用的图形调试器
    *
-   * RenderDoc 由启动器自带，不用检测；只返回本机装没装 Nsight Graphics。
+   * RenderDoc 由启动器按需下载，不依赖本机预装；这里只返回本机装没装 Nsight Graphics。
    */
   async detectDebuggers(): Promise<DebuggerInfoDto> {
     return commands.main.detectDebuggers();

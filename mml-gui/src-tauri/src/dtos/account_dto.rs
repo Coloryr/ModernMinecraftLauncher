@@ -19,7 +19,7 @@ pub struct AccountStoreViewDto {
     pub locked: bool,
 }
 
-/// 单个账户，前端 wire 为 camelCase，字段即 `mml-vue/src/lib/types.ts` 的 Account
+/// 单个账户，跨 IPC 传输时字段使用 camelCase
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountStoreDto {

@@ -139,6 +139,8 @@ fn ensure_game_lang(inst: &InstanceSettingObj) {
 /// - `server_pack_skip`: 这次同步里先不更新的文件，取清单里的相对路径
 /// - `run_commands`: 启动前 / 后命令这次执不执行，`Some(false)` 为用户在弹窗里选了跳过
 /// - `renderdoc`: 是否用 RenderDoc 启动
+/// - `nsight`: 是否用 Nsight Graphics 启动，优先于 RenderDoc
+/// - `jvm_debug`: JVM 远程调试端口；`None` 表示不加 JDWP 参数
 ///
 /// # 返回值
 ///
@@ -196,7 +198,8 @@ pub async fn main_launch_game(
 /// - `server_pack`: 服务器包处理方式，`Some("skip")` 表示不比对清单直接启动
 /// - `server_pack_skip`: 这次同步里先不更新的文件，取清单里的相对路径
 /// - `run_commands`: 启动前 / 后命令这次执不执行，`Some(false)` 为跳过；`None` 为执行
-/// - `renderdoc`: 是否用 RenderDoc 启动
+/// - `debugger`: 本次使用的图形调试器，`None` 表示直接启动 Java
+/// - `jvm_debug`: JVM 远程调试端口；`None` 表示不加 JDWP 参数
 /// - `lobby`: 大厅的临时账户与进服方式，`None` 表示走当前账户与常规规则
 ///
 /// # 返回值
@@ -881,7 +884,7 @@ fn emit_launch_state(app: &AppHandle, event: StateEvent) {
 
 /// 检测本机可用的图形调试器
 ///
-/// RenderDoc 由启动器自带，不用检测；这里只找 Nsight Graphics——它得用户自己装，
+/// RenderDoc 由启动器按需下载，不依赖本机预装；这里只找 Nsight Graphics——它得用户自己装，
 /// 而且只认 NVIDIA 的默认安装位置。
 ///
 /// # 返回值

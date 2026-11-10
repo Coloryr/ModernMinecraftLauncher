@@ -1,7 +1,7 @@
 //! 服务器实例清单生成
 //!
-//! "在线实例"有两份服务端清单要生成：MML 的 `server.json` 与 HMCL 的
-//! `server-manifest.json`。这里只做"实例 + 文件条目 → 清单"的映射，
+//! 提供 MML 的 `server.json` 与 HMCL 的 `server-manifest.json` 构造函数；
+//! 当前生成窗口只使用 MML 清单。这里只做"实例 + 文件条目 → 清单"的映射，
 //! 文件的收集、哈希与落盘都在界面侧，所以全是纯函数，可以离线测。
 
 use mml_names::names;

@@ -1,13 +1,13 @@
-//! 游戏日志窗口 DTO：设置项与切换目标实例事件的负载，前端 wire，camelCase
+//! 日志设置与窗口目标实例切换事件的 DTO，前端 wire 使用 camelCase
 //!
-//! 切换目标实例（[`LogFocusDto`]）那条链路只剩导出窗口在用，即 `export-focus`：
-//! 日志窗口的目标实例在开窗时就锁进窗口身份，不再需要事件切换。
+//! [`LogFocusDto`] 供导出与生成服务器实例窗口切换目标实例；
+//! 日志窗口的目标实例在开窗时锁进窗口身份，不需要事件切换。
 
 use serde::{Deserialize, Serialize};
 
 use crate::gui_setting::{GameGuiSettingObj, GameLogSettingObj};
 
-/// 切换目标实例事件：导出窗口已存在时再次打开，壳层推送 `export-focus` 让已开窗口切换实例
+/// 切换目标实例事件：导出或生成服务器实例窗口已存在时再次打开，壳层推送对应事件切换实例
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LogFocusDto {

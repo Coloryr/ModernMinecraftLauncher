@@ -249,7 +249,7 @@ pub async fn window_open_window(
 ) -> Result<(), String> {
     kind_parse_check(&kind, &instance)?;
     // 新窗口的目标参数只能靠 URL 送达：前端组装好了就用它，里面带 uuid / 项目参数；
-    // 没给就退回老路子 —— 只有窗口族与 export 把 uuid 拼进去
+    // 没给就退回按 kind 拼 URL：窗口族、导出、服务器包与生成服务器实例可带 uuid
     let url_path = match query.as_deref().filter(|q| !q.is_empty()) {
         Some(query) => {
             ensure_query_ok(query)?;
@@ -292,7 +292,7 @@ pub async fn window_open_window(
         }
         return Err(error);
     }
-    // 新创建的窗口靠 URL query 拿目标；已存在的窗口 URL 不变，靠事件切换
+    // 新窗口从 URL 取目标；导出与生成服务器实例窗口已存在时靠事件切换目标
     if let Some(instance) = &instance {
         let event = LogFocusDto {
             uuid: instance.clone(),

@@ -670,9 +670,9 @@ export function projectParamToItem(p: WindowProjectParam): ProjectItemDto {
 /**
  * 报给后端的"是哪个实例"参数
  *
- * 只有窗口族、导出窗口与服务器包窗口认它：窗口族靠它定位到族里那一个窗口，
- * 导出 / 服务器包窗口靠它在已开窗口上切目标实例。其余窗口传了会被后端
- * `kind_parse_check` 拒掉，所以这里一律给 null。
+ * 窗口族、导出、服务器包与生成服务器实例窗口认它：窗口族靠它定位窗口；
+ * 导出与生成服务器实例窗口已打开时还会收到切换目标的事件。
+ * 其余窗口传了会被后端 `kind_parse_check` 拒掉，所以这里一律给 null。
  *
  * - `kind`: 窗口类型
  * - `params`: 本次打开带入的参数
