@@ -1,64 +1,6 @@
-//! 加载器版本列表
-//!
-//! 添加实例窗口的"加载器版本"下拉数据源：按加载器类型，可选按游戏版本，
-//! 拉取可用版本号列表，全部来自 mml-net 的对应 API / 镜像源。
+//! 各加载器的版本拉取与支持列表查询，按配置源选择官方源或镜像
 
-use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, LazyLock, Mutex, RwLock};
-
-use regex::Regex;
-
-use mml_base::serialize_tools;
-use mml_config::config_obj::SourceLocal;
-use mml_names::i18_items::error_type::{CoreResult, DataNotFoundData, ErrorType};
-
-use crate::gui_hook::ProgressGui;
-use crate::launcher_path::version_path;
-use crate::loader::LoaderType;
-use crate::loader::liteloader_meta_obj::LiteloaderMetaObj;
-
-/// Forge 官方源全量版本缓存；maven-metadata.xml 较大，避免每次选择重复下载解析
-static FORGE_META_ALL: LazyLock<RwLock<Option<Vec<String>>>> = LazyLock::new(|| RwLock::new(None));
-/// Forge BMCLAPI 源按游戏版本的列表缓存
-static FORGE_BMCLAPI: LazyLock<Mutex<HashMap<String, Vec<String>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-/// NeoForge 官方源全量版本缓存，版本号 → 所属游戏版本分组，避免重复下载解析
-static NEOFORGE_META_ALL: LazyLock<RwLock<Option<HashMap<String, Vec<String>>>>> =
-    LazyLock::new(|| RwLock::new(None));
-/// NeoForge BMCLAPI 源按游戏版本的列表缓存
-static NEOFORGE_BMCLAPI: LazyLock<Mutex<HashMap<String, Vec<String>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-/// Cleanroom 官方 maven 全量版本缓存；它只服务 1.12.2，列表不随游戏版本变化
-static CLEANROOM_LIST: LazyLock<RwLock<Option<Vec<String>>>> = LazyLock::new(|| RwLock::new(None));
-/// Fabric meta 缓存：加载器版本与支持的游戏版本
-static FABRIC_META: LazyLock<RwLock<Option<Arc<LoaderMeta>>>> = LazyLock::new(|| RwLock::new(None));
-/// Quilt meta 缓存：加载器版本与支持的游戏版本
-static QUILT_META: LazyLock<RwLock<Option<Arc<LoaderMeta>>>> = LazyLock::new(|| RwLock::new(None));
-
-/// 按 meta 判断加载器是否支持该游戏版本
-///
-/// 只看 `game` 数组：加载器版本列表任何游戏版本都非空，拿它当判据会误报。
-///
-/// - `meta`: 加载器 meta
-/// - `mc`: 游戏版本号
-///
-/// # 返回值
-///
-/// 该版本是否在支持列表里
-fn meta_supports(meta: &LoaderMeta, mc: &str) -> bool {
-    meta.games.contains(mc)
-}
-
-/// 加载器 meta 里跟"哪个游戏版本能用"有关的两份数据
-///
-/// Fabric / Quilt 的加载器版本列表不随游戏版本变化，只看它非空就当成"支持所有版本"，
-/// 会给 1.12.2 也列出 Fabric。真正能装哪些版本看 meta 的 `game` 数组。
-struct LoaderMeta {
-    /// 加载器版本号，新版本在前
-    loaders: Vec<String>,
-    /// 支持的游戏版本
-    games: HashSet<String>,
-}
+use super::*;
 
 /// 获取加载器的可用版本列表，新版本在前
 ///
@@ -305,32 +247,6 @@ async fn liteloader_supports(mc: &str) -> CoreResult<bool> {
     }
 }
 
-/// 版本号比较：a >= b，按 `.` 分段做数值比较
-///
-/// - `a`: 左侧版本号
-/// - `b`: 右侧版本号
-///
-/// # 返回值
-///
-/// 返回 `a` 是否大于等于 `b`
-fn version_ge(a: &str, b: &str) -> bool {
-    /// 把版本号按 `.` 拆成数值段，非数字段按 0 计
-    fn parts(v: &str) -> Vec<u64> {
-        v.split('.')
-            .map(|n| n.parse::<u64>().unwrap_or(0))
-            .collect()
-    }
-    let (pa, pb) = (parts(a), parts(b));
-    for i in 0..pa.len().max(pb.len()) {
-        let x = pa.get(i).copied().unwrap_or(0);
-        let y = pb.get(i).copied().unwrap_or(0);
-        if x != y {
-            return x > y;
-        }
-    }
-    true
-}
-
 /// Forge：官方源为 maven-metadata.xml，全量，按 `{mc}-` 前缀筛选并去前缀；
 /// BMCLAPI 源为按游戏版本的 JSON 数组，直接是构建号；两者都取新版本在前
 ///
@@ -428,24 +344,6 @@ async fn forge_versions_offical(mc: &str) -> CoreResult<Vec<String>> {
     Ok(forge_of_mc(&all, mc))
 }
 
-/// 从 Forge 全量版本列表中筛出指定游戏版本的构建号
-///
-/// 元数据条目形如 `1.20.1-47.1.0`，旧版本可能带分支后缀，去掉 `{mc}-` 前缀。
-///
-/// - `all`: 全量版本条目
-/// - `mc`: 游戏版本号
-///
-/// # 返回值
-///
-/// 返回该游戏版本的构建号列表
-fn forge_of_mc(all: &[String], mc: &str) -> Vec<String> {
-    let prefix = format!("{mc}-");
-    all.iter()
-        .filter(|v| v.starts_with(&prefix))
-        .map(|v| v[prefix.len()..].to_string())
-        .collect()
-}
-
 /// 解析 NeoForge 官方源全量列表：把每个版本号归入对应的游戏版本分组
 ///
 /// 数据为 JSON `{"versions": [...]}`，全量按游戏版本分组缓存，返回指定游戏版本的构建号。
@@ -482,46 +380,6 @@ async fn parse_neoforge_offical(mc: &str, data: &str) -> CoreResult<Vec<String>>
     let list = map.get(mc).cloned().unwrap_or_default();
     *NEOFORGE_META_ALL.write().unwrap() = Some(map);
     Ok(list)
-}
-
-/// 从 NeoForge 版本号推断所属的游戏版本
-///
-/// - 旧方案：`21.1.77` → `1.21.1`，即 `1.` 加前两段
-/// - 新方案，主版本 ≥ 26：`26.2.0.0-beta` → `26.2`，`26.1.1.x` → `26.1.1`，
-///   带 `+snapshot-x` 的映射到对应快照版本
-/// - 以 `0` 开头的愚人节版本返回 `None`，如 `0.25w14craftmine.3-beta`
-///
-/// - `version`: NeoForge 版本号
-///
-/// # 返回值
-///
-/// 返回所属的游戏版本号；无法推断返回 `None`
-fn neoforge_mc_version(version: &str) -> Option<String> {
-    if version.starts_with('0') {
-        return None;
-    }
-
-    let mut spl = version.split('.');
-    let major: u64 = spl.next()?.parse().ok()?;
-    let second = spl.next()?;
-
-    if major >= 26 {
-        let mut mc = format!("{major}.{second}");
-        // 26.1.0.x → 26.1；26.1.1.x → 26.1.1
-        let third = spl.next().unwrap_or("0");
-        if third != "0" {
-            mc.push('.');
-            mc.push_str(third);
-        }
-        // 26.1.0.0-alpha+snapshot-1 → 26.1-snapshot-1
-        if let Some((_, suffix)) = version.split_once('+') {
-            mc.push('-');
-            mc.push_str(suffix);
-        }
-        Some(mc)
-    } else {
-        Some(format!("1.{major}.{second}"))
-    }
 }
 
 /// NeoForge：按配置源拉取版本列表
@@ -728,29 +586,3 @@ async fn liteloader_versions(mc: &str) -> CoreResult<Vec<String>> {
     }
     Ok(list)
 }
-
-/// 从 JSON 值提取版本号列表：元素为对象取 `version` 字段，为字符串直接取
-///
-/// - `value`: JSON 数组值
-///
-/// # 返回值
-///
-/// 返回版本号列表
-fn value_versions(value: &serde_json::Value) -> Vec<String> {
-    let Some(arr) = value.as_array() else {
-        return Vec::new();
-    };
-    arr.iter()
-        .filter_map(|item| match item {
-            serde_json::Value::String(s) => Some(s.clone()),
-            serde_json::Value::Object(map) => map
-                .get("version")
-                .and_then(|v| v.as_str())
-                .map(String::from),
-            _ => None,
-        })
-        .collect()
-}
-#[cfg(test)]
-#[path = "../../tests/unit/loader_loader_versions_tests.rs"]
-mod tests;
