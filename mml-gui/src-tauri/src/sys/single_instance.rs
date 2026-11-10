@@ -169,5 +169,5 @@ pub fn start(app: &AppHandle) {
 }
 
 #[cfg(test)]
-#[path = "../tests/unit/single_instance_tests.rs"]
+#[path = "../../tests/unit/single_instance_tests.rs"]
 mod tests;

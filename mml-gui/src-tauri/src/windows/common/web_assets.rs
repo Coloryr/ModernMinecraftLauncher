@@ -30,7 +30,7 @@ pub(crate) const BRIDGE_PATH: &str = "/__mml_bridge.js";
 ///
 /// `include_str!` 在编译期嵌入二进制，运行时不需要分发这个文件，因此**不要**把它
 /// 加进 tauri.conf.json 的 `bundle.resources`，那会多打一份没人读的副本。
-pub(crate) const BRIDGE_JS: &str = include_str!("../../resources/custom_home_bridge.js");
+pub(crate) const BRIDGE_JS: &str = include_str!("../../../resources/custom_home_bridge.js");
 
 /// 注入到 HTML 里的桥接脚本标签
 pub(crate) const BRIDGE_TAG: &str = "<script src=\"/__mml_bridge.js\"></script>";
@@ -457,5 +457,5 @@ pub fn replace_atomic(src: &Path, dst: &Path) -> Result<(), String> {
 }
 
 #[cfg(test)]
-#[path = "../../tests/unit/windows_web_assets_tests.rs"]
+#[path = "../../../tests/unit/windows_web_assets_tests.rs"]
 mod tests;

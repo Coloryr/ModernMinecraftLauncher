@@ -25,7 +25,10 @@ use mml_game::{
 use mml_names::names;
 use uuid::Uuid;
 
-use super::{config_dir, files, normalize_url, ConfigMode};
+use super::{
+    config::{ConfigMode, config_dir, normalize_url},
+    files,
+};
 use crate::{dtos::server_instance_dto::ServerInstanceOptionsDto, err_keys};
 
 /// 内嵌的同步 agent，导入后由 MMC 的 `JvmArgs` 拉起来

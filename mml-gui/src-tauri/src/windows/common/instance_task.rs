@@ -79,5 +79,5 @@ pub(crate) fn is_busy(instance: &Uuid) -> bool {
 }
 
 #[cfg(test)]
-#[path = "../../tests/unit/windows_instance_task_tests.rs"]
+#[path = "../../../tests/unit/windows_instance_task_tests.rs"]
 mod tests;

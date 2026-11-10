@@ -47,6 +47,11 @@ fn main() {
 
     let generated = gui_ipc_gen::generate(&gui_ipc_gen::GenConfig {
         src_dir: manifest.join("src"),
+        // GUI 配置枚举现在在 config/ 下，类型来源要跟着指过去
+        type_sources: gui_ipc_gen::TypeSources {
+            enum_files: vec!["config/gui_config.rs".into()],
+            ..Default::default()
+        },
         // mml-names 的 Lang 是外部 crate 的 unit 枚举：线上是变体名，
         // 变体固定 zh_cn / en_us，前端一直这么写死，见 lib/guiConfig.ts 的 Locale
         external_types: BTreeMap::from([("Lang".to_string(), "\"zh_cn\" | \"en_us\"".to_string())]),

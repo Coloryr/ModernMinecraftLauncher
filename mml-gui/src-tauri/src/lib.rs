@@ -2,25 +2,15 @@
 //!
 //! | 模块 | 说明 |
 //! | --- | --- |
-//! | [`block_groups`] | 方块窗口的用户数据，文件 block_groups.json |
-//! | [`build_info`] | 版本号与构建通道，主页面据此提示测试版 / 预发布版 |
-//! | `client_lock` | 客户端设置锁，密码只存加盐哈希 |
-//! | [`collect_utils`] | 收藏数据读写 |
-//! | [`dtos`] | 跨 IPC DTO，Rust 结构转 camelCase |
-//! | [`err_box`] | 致命错误弹窗 |
-//! | [`err_keys`] | 命令返回给前端的错误键，与语言表对账 |
-//! | [`gui_config`] | GUI 配置读写 |
-//! | [`gui_setting`] | 实例 GUI 设置读写，文件 gui_setting.json，归属 GUI 而非内核 |
+//! | [`config`] | 配置与用户数据：GUI 配置、实例设置、收藏、客户端锁、跨电脑绑定 |
 //! | [`image_manager`] | 图片资源加载，走 `mml-image://` 协议 |
-//! | [`integrations`] | 云连接与跨电脑实例绑定配置，文件 integrations.json |
+//! | [`sys`] | 系统集成：托盘、通知、单开、启动参数、菜单、错误弹窗、音乐协议 |
+//! | [`dtos`] | 跨 IPC DTO，Rust 结构转 camelCase |
+//! | [`err_keys`] | 命令返回给前端的错误键，与语言表对账 |
 //! | [`log_text`] | 界面侧日志文案，中英两套，不进内核 i18n |
-//! | [`menu`] | macOS 应用菜单：按焦点窗口重建，动作发给该窗口 |
-//! | [`music`] | 自定义音乐，走 `mml-music` 协议 |
-//! | [`notify`] | 系统通知，启动器不在前台时把结果推给用户 |
-//! | [`single_instance`] | 单开与唤回，运行目录下的端口文件 `temp` |
-//! | [`start_arg`] | 启动参数（命令行 / `mml:` 协议）解析，等前端初始化后取走执行 |
-//! | [`tray`] | 有实例运行时才出现的系统托盘 |
 //! | [`windows`] | 各窗口的规格 / IPC 命令 / 事件，窗口创建 / 聚焦 / 关闭统一处理 |
+//!
+//! 各模块的细分见 `config/mod.rs` 与 `sys/mod.rs` 的模块文档。
 //!
 //! 自定义主页面走 `mml-home://` 协议，其压缩包在运行根目录常驻，
 //! 启动时打开成常驻句柄、请求时按条目现读，**全程不落盘解压**，见 [`windows::custom_home`]。
@@ -32,27 +22,22 @@ use tauri::Manager;
 
 use crate::windows::{block, download, main};
 
-pub mod block_groups;
-pub mod build_info;
-pub(crate) mod client_lock;
-pub mod collect_utils;
+pub mod config;
 pub mod dtos;
-pub mod err_box;
 pub mod err_keys;
-pub mod gui_config;
-pub mod gui_setting;
 pub mod image_manager;
-pub mod integrations;
 pub mod log_text;
-// 菜单只在 macOS 上真正挂出去：其余平台的构建照样编译它，只是这些条目没有调用点
-#[cfg_attr(not(target_os = "macos"), allow(dead_code, unused_imports))]
-pub(crate) mod menu;
-pub mod music;
-pub mod notify;
-pub mod single_instance;
-pub mod start_arg;
-pub mod tray;
+pub mod sys;
 pub mod windows;
+
+// 旧路径兼容：模块已按 config / sys 分组，业务代码仍按 crate::<模块> 引用
+pub use self::config::{block_groups, collect_utils, gui_config, gui_setting, integrations};
+pub(crate) use self::config::client_lock;
+pub use self::sys::{
+    build_info, err_box, music, notify, single_instance, start_arg, tray,
+};
+#[cfg_attr(not(target_os = "macos"), allow(dead_code, unused_imports))]
+pub(crate) use self::sys::menu;
 
 /// 单元测试的共用启动，内核单例每进程只 boot 一次，见 AGENTS.md §6.1
 #[cfg(test)]

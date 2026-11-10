@@ -455,5 +455,5 @@ fn set_hidden(path: &Path) {
 }
 
 #[cfg(test)]
-#[path = "../tests/unit/client_lock_tests.rs"]
+#[path = "../../tests/unit/client_lock_tests.rs"]
 mod tests;

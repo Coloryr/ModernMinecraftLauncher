@@ -1,5 +1,5 @@
 // 日期选择器的月历网格：只做算术，不碰 DOM 也不引 vue，方便单测（见 tests/dateGrid.test.mjs）。
-// 组件在 components/ui/BaseDatePicker.vue。
+// 组件在 components/ui/BaseDatePicker.vue 与 DatePickerPopover.vue。
 
 /** 一格日期 */
 export interface DayCell {

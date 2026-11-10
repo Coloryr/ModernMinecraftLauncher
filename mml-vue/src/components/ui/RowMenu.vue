@@ -68,10 +68,12 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKey, true);
 });
 
+/** 点菜单外面收起 */
 function onOutside(e: PointerEvent) {
   if (!el.value?.contains(e.target as Node)) emit("close");
 }
 
+/** Esc 收起，并拦住继续冒泡 */
 function onKey(e: KeyboardEvent) {
   if (e.key !== "Escape") return;
   // 菜单开着时 Esc 只收菜单：不再往下传，免得顺手把窗口也关了

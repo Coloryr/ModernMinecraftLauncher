@@ -645,5 +645,5 @@ pub fn save() {
 }
 
 #[cfg(test)]
-#[path = "../tests/unit/gui_config_tests.rs"]
+#[path = "../../tests/unit/gui_config_tests.rs"]
 mod tests;

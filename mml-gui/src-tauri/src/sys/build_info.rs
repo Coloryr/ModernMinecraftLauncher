@@ -94,5 +94,5 @@ pub async fn app_build_exe_info() -> Result<ExeInfoDto, String> {
 }
 
 #[cfg(test)]
-#[path = "../tests/unit/build_info_tests.rs"]
+#[path = "../../tests/unit/build_info_tests.rs"]
 mod tests;

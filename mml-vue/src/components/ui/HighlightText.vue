@@ -10,11 +10,15 @@ const props = defineProps<{
   query: string;
 }>();
 
+/** 一段文本：hit 为 true 表示命中查询词 */
 interface Part {
+  /** 这一段原文 */
   text: string;
+  /** 是否命中查询词 */
   hit: boolean;
 }
 
+/** 按查询词切段；查询词为空时整段原样输出 */
 const parts = computed<Part[]>(() => {
   const q = props.query.trim();
   if (!q) return [{ text: props.text, hit: false }];

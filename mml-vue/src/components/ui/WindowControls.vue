@@ -4,10 +4,10 @@
 // - windows 样式：右端三个小图标按钮（最小化 / 最大化 / 关闭），参照网易云音乐
 // - macos 样式：左端三个圆点（关闭 / 最小化 / 最大化），符号只在悬停整组时显示
 //
-// 最大化按钮右键菜单：全屏连任务栏一起盖住，占满屏幕只铺工作区、留出任务栏
-//
+// 最大化按钮的右键菜单拆在 WindowMaximizeMenu：这里只管按钮、开关状态与动作，
+// 定位 / Esc / 点外面收起都由菜单自己处理。
 // 自包含：命令与 quitWindow() 都在内部调用，宿主只需传 style。
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { t } from "../../lib/i18n";
 import { isTauri, quitWindow } from "../../windows/windowManager";
@@ -20,6 +20,7 @@ import {
   toggleMaximizeWindow,
   type TitleBarStyle,
 } from "../../lib/titlebar";
+import WindowMaximizeMenu from "./WindowMaximizeMenu.vue";
 
 const props = defineProps<{
   /** 标题栏样式；windows 是右端三个图标按钮，macos 是左端三个圆点 */
@@ -58,7 +59,13 @@ const maximizeLabel = computed(() => {
   return t(maximized.value ? "titlebar.restore" : "titlebar.maximize");
 });
 
-/** 按钮顺序：windows 是 最小化 / 最大化 / 关闭，macos 是 关闭 / 最小化 / 最大化 */
+/**
+ * 按钮顺序与动作
+ *
+ * # 返回值
+ *
+ * windows 是 最小化 / 最大化 / 关闭，macos 是 关闭 / 最小化 / 最大化
+ */
 const buttons = computed(() => {
   const minimize = {
     id: "minimize",
@@ -82,43 +89,28 @@ const buttons = computed(() => {
 
 /** 菜单是否展开 */
 const menuOpen = ref(false);
-/** 菜单左上角，单位 px；渲染后按真实尺寸收进窗口 */
-const menuPos = ref({ x: 0, y: 0 });
-const menuEl = ref<HTMLElement | null>(null);
-/** 菜单与窗口边缘的最小距离，单位 px */
-const MENU_MARGIN = 8;
+/** 菜单锚点：右键的那枚最大化按钮 */
+const menuAnchor = ref<HTMLElement | null>(null);
 
 /**
- * 在最大化按钮上右键：菜单贴着按钮右下角弹出
+ * 在最大化按钮上右键：记下锚点并打开菜单
  *
  * 原生贴靠热区会吃掉热区内的鼠标消息，那种情况下由 lib/decoration.ts 派发一个
  * 合成 contextmenu 事件到这里，`currentTarget` 仍是按钮。
  */
-async function onMaximizeContextMenu(e: MouseEvent) {
+function onMaximizeContextMenu(e: MouseEvent) {
   const btn = e.currentTarget as HTMLElement | null;
   if (!btn) return;
   // 启动画面的标题栏里最大化按钮是 visibility: hidden 的占位，别在那个位置弹菜单
   if (window.getComputedStyle(btn).visibility === "hidden") return;
-  const rect = btn.getBoundingClientRect();
-  // 先按"右缘对齐按钮右缘"摆，量到真实宽高后再收进窗口
-  menuPos.value = { x: rect.right, y: rect.bottom + 4 };
+  menuAnchor.value = btn;
   menuOpen.value = true;
-  await nextTick();
-  const menuRect = menuEl.value?.getBoundingClientRect();
-  if (!menuRect) return;
-  menuPos.value = {
-    x: Math.max(
-      MENU_MARGIN,
-      Math.min(rect.right - menuRect.width, window.innerWidth - menuRect.width - MENU_MARGIN),
-    ),
-    y: Math.min(rect.bottom + 4, window.innerHeight - menuRect.height - MENU_MARGIN),
-  };
 }
 
 /** 只有最大化按钮开菜单，其它按钮的右键照旧什么都不弹 */
 function onButtonContextMenu(e: MouseEvent, id: string) {
   if (id === "maximize") {
-    void onMaximizeContextMenu(e);
+    onMaximizeContextMenu(e);
   }
 }
 
@@ -140,24 +132,6 @@ async function onMenuFillScreen() {
   await fillScreenWindow();
   await refresh();
 }
-
-/** Esc 收起菜单 */
-function onMenuKeydown(e: KeyboardEvent) {
-  if (e.key === "Escape") {
-    closeMenu();
-  }
-}
-
-// 菜单开着时挂两个窗口级监听：Esc 收起、窗口尺寸变了位置就不对了
-watch(menuOpen, (open) => {
-  if (open) {
-    window.addEventListener("keydown", onMenuKeydown, true);
-    window.addEventListener("resize", closeMenu);
-  } else {
-    window.removeEventListener("keydown", onMenuKeydown, true);
-    window.removeEventListener("resize", closeMenu);
-  }
-});
 
 /**
  * 窗口尺寸监听的退订函数
@@ -185,8 +159,6 @@ onMounted(async () => {
 onUnmounted(() => {
   unlistenResize?.();
   unlistenResize = null;
-  window.removeEventListener("keydown", onMenuKeydown, true);
-  window.removeEventListener("resize", closeMenu);
 });
 </script>
 
@@ -215,27 +187,9 @@ onUnmounted(() => {
     </button>
   </div>
 
-  <!-- 最大化按钮右键菜单：全屏 / 占满屏幕；Teleport 到 body 避免被标题栏裁切 -->
-  <Teleport to="body">
-    <div v-if="menuOpen" class="wc-menu-layer" @pointerdown.self="closeMenu" @contextmenu.prevent>
-      <div ref="menuEl" class="wc-menu" :style="{ left: menuPos.x + 'px', top: menuPos.y + 'px' }" role="menu">
-        <button class="wc-menu-item" :class="{ 'is-active': fullscreen }" role="menuitem" @click="onMenuFullscreen">
-          <svg class="wc-menu-check" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor"
-            stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m2.5 6.2 2.4 2.4 4.6-5.2" />
-          </svg>
-          {{ t("titlebar.fullscreen") }}
-        </button>
-        <button class="wc-menu-item" role="menuitem" @click="onMenuFillScreen">
-          <svg class="wc-menu-check" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor"
-            stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m2.5 6.2 2.4 2.4 4.6-5.2" />
-          </svg>
-          {{ t("titlebar.fillScreen") }}
-        </button>
-      </div>
-    </div>
-  </Teleport>
+  <!-- 最大化按钮右键菜单：全屏 / 占满屏幕；外观与收起都在组件里 -->
+  <WindowMaximizeMenu v-if="menuOpen" :anchor="menuAnchor" :fullscreen="fullscreen" @close="closeMenu"
+    @toggle-fullscreen="onMenuFullscreen" @fill-screen="onMenuFillScreen" />
 </template>
 
 <style scoped>
@@ -331,73 +285,5 @@ onUnmounted(() => {
 
 .window-controls.macos:hover .wc-btn svg {
   opacity: 1;
-}
-
-/* ---------- 最大化按钮的右键菜单 ---------- */
-
-/* 整屏透明层：接住菜单外的按下与右键，点哪儿都先收起菜单 */
-.wc-menu-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-}
-
-.wc-menu {
-  position: fixed;
-  min-width: 160px;
-  padding: 6px;
-  background: var(--bg-modal);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-  animation: wc-menu-in 0.18s ease;
-}
-
-@keyframes wc-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.wc-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 10px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  font-size: 12.5px;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.12s;
-}
-
-.wc-menu-item:hover {
-  background: var(--bg-hover);
-}
-
-/* 勾选位常驻占位：切换时文字不左右跳 */
-.wc-menu-check {
-  flex-shrink: 0;
-  opacity: 0;
-  color: var(--accent);
-}
-
-.wc-menu-item.is-active .wc-menu-check {
-  opacity: 1;
-}
-
-.wc-menu-item.is-active {
-  color: var(--accent);
 }
 </style>

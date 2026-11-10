@@ -105,7 +105,7 @@ pub fn run_dir(args: impl IntoIterator<Item = String>) -> Option<std::path::Path
 }
 
 #[cfg(test)]
-#[path = "../tests/unit/start_arg_tests.rs"]
+#[path = "../../tests/unit/start_arg_tests.rs"]
 mod tests;
 
 /// 取走待办，取过一次就没了

@@ -105,9 +105,10 @@ fn shortcut_name(name: &str) -> String {
 mod platform {
     use std::path::PathBuf;
 
+    use windows::Win32::Foundation::RPC_E_CHANGED_MODE;
     use windows::Win32::System::Com::{
-        CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
-        CoTaskMemFree, IPersistFile,
+        CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree,
+        IPersistFile,
     };
     use windows::Win32::UI::Shell::{
         FOLDERID_Desktop, IShellLinkW, KF_FLAG_DEFAULT, SHGetKnownFolderPath, ShellLink,
@@ -158,8 +159,12 @@ mod platform {
         let path = dir.join(format!("{}.lnk", super::shortcut_name(name)));
 
         unsafe {
-            // 命令跑在 worker 线程上，这里自己要初始化一次 COM；已初始化时返回 S_FALSE，忽略
-            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+            // 用 MTA：这里不需要消息泵，ShellLink 在 MTA 下可用。
+            // 线程已在别的单元时返回 RPC_E_CHANGED_MODE，此时 COM 仍是可用的，照常往下走
+            let hr = CoInitializeEx(None, COINIT_MULTITHREADED);
+            if hr.is_err() && hr != RPC_E_CHANGED_MODE {
+                return Err(format!("COM init failed: {}", hr.message()));
+            }
 
             let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER)
                 .map_err(|err| err.message().to_string())?;

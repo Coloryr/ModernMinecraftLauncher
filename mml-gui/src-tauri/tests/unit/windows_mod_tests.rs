@@ -1,6 +1,8 @@
 use super::{
-    clean_url, find_http, main_window_label, read_shortcut_url, take_startup_quiet,
-    window_probe_drop, work_area_is_full_monitor,
+    main_window_label, window_probe_drop,
+    shell::chrome::take_startup_quiet,
+    shell::chrome::fullscreen::work_area_is_full_monitor,
+    shell::drop_probe::{clean_url, find_http, read_shortcut_url},
 };
 use crate::test_support::{cleanup, temp_dir};
 

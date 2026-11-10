@@ -1,7 +1,7 @@
 // 资源管理窗口的共享类型与分类清单
 
 import type { ModItemDto } from "../../lib/bindings";
-import type { GlyphName } from "../../components/ui/GlyphIcon.vue";
+import type { GlyphName } from "../../components/ui/glyphs";
 
 /** 资源分类，即左侧导航的一项 */
 export type CategoryId =

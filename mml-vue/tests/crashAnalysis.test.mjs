@@ -7,6 +7,7 @@ import { renderToString } from "@vue/server-renderer";
 import * as vue from "vue";
 import ts from "typescript";
 import { presentFinding } from "../src/lib/crashAnalysisPresentation.ts";
+import { GLYPHS, isGlyphName } from "../src/components/ui/glyphs.ts";
 import zh from "../src/lib/i18n/locales/zh-CN.ts";
 import en from "../src/lib/i18n/locales/en-US.ts";
 
@@ -40,6 +41,7 @@ function component(messages) {
       if (id === "vue") return vue;
       if (id === "../lib/i18n") return { t: translator(messages) };
       if (id === "../lib/crashAnalysisPresentation") return { presentFinding };
+      if (id === "./glyphs") return { GLYPHS, isGlyphName };
       if (id.endsWith(".vue")) return { __esModule: true, default: load(id.replace(/^\.\//, "")) };
       throw new Error(`Unexpected runtime import: ${id}`);
     };

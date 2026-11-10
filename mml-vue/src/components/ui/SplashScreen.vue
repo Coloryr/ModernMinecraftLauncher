@@ -1,10 +1,10 @@
 <script setup lang="ts">
-// 启动画面：初始化中显示 splash，初始化失败显示错误页（splashError）+ 问题反馈入口
+// 启动画面：初始化中显示 splash，初始化失败显示错误页（BootErrorPage）+ 问题反馈入口
 //
 // 加载期间**主窗口顶栏照常渲染**，见 MainWindow 模板，所以这里不需要自己的关闭按钮：
 // 系统装饰在窗口一出现就被插件摘掉，关闭由顶栏那三个窗口按钮负责。
 import { t } from "../../lib/i18n";
-import BaseButton from "./BaseButton.vue";
+import BootErrorPage from "./BootErrorPage.vue";
 
 withDefaults(
   defineProps<{
@@ -35,16 +35,7 @@ const emit = defineEmits<{
   </div>
 
   <!-- 初始化失败错误页：closeSplash(error) 后显示 -->
-  <div v-else-if="splashError" class="boot-error">
-    <div class="boot-error-card">
-      <div class="boot-error-icon">!</div>
-      <h1>{{ t("init.failed") }}</h1>
-      <p class="boot-error-text">{{ splashError }}</p>
-      <BaseButton class="boot-error-btn" @click="emit('feedback')">
-        {{ t("init.feedback") }}
-      </BaseButton>
-    </div>
-  </div>
+  <BootErrorPage v-else-if="splashError" :error="splashError" @feedback="emit('feedback')" />
 </template>
 
 <style scoped>
@@ -97,65 +88,5 @@ const emit = defineEmits<{
 .splash-text {
   font-size: 13px;
   color: var(--text-dim);
-}
-
-/* 初始化失败错误页 */
-.boot-error {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(160deg, var(--bg-side) 0%, var(--bg) 100%);
-}
-
-.boot-error-card {
-  width: 440px;
-  padding: 36px;
-  border-radius: 14px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.boot-error-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--splash-error-bg);
-  color: var(--splash-error);
-  font-size: 30px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.boot-error-card h1 {
-  font-size: 18px;
-  margin: 14px 0 10px;
-  color: var(--text);
-}
-
-.boot-error-text {
-  width: 100%;
-  margin-bottom: 22px;
-  padding: 12px 14px;
-  border-radius: 8px;
-  background: var(--bg-side);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  font-size: 13px;
-  word-break: break-all;
-  max-height: 180px;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
-}
-
-.boot-error-btn {
-  min-width: 120px;
 }
 </style>

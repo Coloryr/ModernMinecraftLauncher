@@ -1,16 +1,23 @@
 <script setup lang="ts">
-// 统一分段切换控件，配合 `v-model` 使用，值为 string；选项可带图标
+// 统一分段切换控件，配合 `v-model` 使用，值为 string；选项可带图标。
+//
+// 图标走 GlyphIcon（几何在 glyphs.ts），不再在这里维护一份 v-html 的 path 表 ——
+// 同一枚 folder / grid / list 在别处也画，两套定义迟早会漂移。
+import { computed } from "vue";
+import GlyphIcon from "./GlyphIcon.vue";
+import { isGlyphName } from "./glyphs";
+
 interface SegOption {
   /** 选中值，也就是 `v-model` 的值 */
   value: string;
   /** 显示文案，调用方已 `t()` 好的成品 */
   label: string;
-  /** 内置图标名，取值为下面 ICONS 的键；不传则只显示文案 */
+  /** 图标名，取 glyphs.ts 的键；不传或认不出则只显示文案 */
   icon?: string;
 }
 
 const props = defineProps<{
-  /** 可选项；`value` 为选中值，`icon` 是下面 ICONS 里的内置图标名 */
+  /** 可选项；`value` 为选中值，`icon` 是 glyphs.ts 里的图标名 */
   options: SegOption[];
   /** 当前选中值，配合 `v-model` 使用 */
   modelValue: string;
@@ -25,26 +32,21 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: string): void;
 }>();
 
-// 内置图标（线条风格）
-const ICONS: Record<string, string> = {
-  folder:
-    '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>',
-  grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
-  list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
-  // 柱状图：三根高低不同的柱子
-  bars: '<path d="M6 20V11M12 20V4M18 20v-6"/>',
-  // 饼图：圆 + 一撇切出来的扇形
-  pie: '<circle cx="12" cy="12" r="9"/><path d="M12 3v9h9"/>',
-};
+/** 选项 + 解析好的图标名；icon 认不出时为 null，模板据此不画图标 */
+const items = computed(() =>
+  props.options.map((opt) => ({
+    ...opt,
+    glyph: opt.icon && isGlyphName(opt.icon) ? opt.icon : null,
+  })),
+);
 </script>
 
 <template>
   <div class="seg-tabs">
-    <button v-for="opt in options" :key="opt.value" class="seg-btn"
+    <button v-for="opt in items" :key="opt.value" class="seg-btn"
       :class="{ active: modelValue === opt.value, 'icon-only': props.iconOnly }" :disabled="props.disabled"
       :aria-label="opt.label" v-tip="opt.label" @click="emit('update:modelValue', opt.value)">
-      <svg v-if="opt.icon && ICONS[opt.icon]" class="seg-icon" viewBox="0 0 24 24" width="14" height="14" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" v-html="ICONS[opt.icon]" />
+      <GlyphIcon v-if="opt.glyph" class="seg-icon" :name="opt.glyph ?? 'globe'" :size="14" :weight="2" />
       <span v-if="!props.iconOnly">{{ opt.label }}</span>
     </button>
   </div>

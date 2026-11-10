@@ -44,7 +44,7 @@ impl Drop for StagedFile {
 /// # 返回值
 ///
 /// 文件已替换返回 `Ok(())`；写入或改名失败返回错误文案
-pub(super) fn write(
+pub(crate) fn write(
     path: &Path,
     write: impl FnOnce(&mut File) -> Result<(), String>,
 ) -> Result<(), String> {
@@ -67,7 +67,7 @@ pub(super) fn write(
 /// # 返回值
 ///
 /// 文件已替换返回 `Ok(())`；导出被取消或失败时返回错误文案
-pub(super) async fn write_async<F: Future<Output = Result<(), String>>>(
+pub(crate) async fn write_async<F: Future<Output = Result<(), String>>>(
     path: &Path,
     write: impl FnOnce(PathBuf) -> F,
 ) -> Result<(), String> {
@@ -82,5 +82,5 @@ pub(super) async fn write_async<F: Future<Output = Result<(), String>>>(
 }
 
 #[cfg(test)]
-#[path = "../../tests/unit/windows_export_file_tests.rs"]
+#[path = "../../../tests/unit/windows_export_file_tests.rs"]
 mod tests;

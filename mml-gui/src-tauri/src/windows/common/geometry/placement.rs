@@ -134,5 +134,5 @@ pub(super) fn fits(placement: &Placement, child: &SizeF, area: &RectF) -> bool {
 }
 
 #[cfg(test)]
-#[path = "../../../tests/unit/windows_geometry_placement_placement_tests.rs"]
+#[path = "../../../../tests/unit/windows_geometry_placement_placement_tests.rs"]
 mod placement_tests;

@@ -25,58 +25,58 @@ use crate::log_text::NotifyText;
 use crate::windows::add_resource::SourceInfo;
 
 /// 进行中的整合包安装任务，键为 pid+fid，同键不重复安装
-pub(super) static DOWNLOAD_NOW: LazyLock<RwLock<HashMap<SourceInfo, Arc<ModPackTask>>>> =
+pub(crate) static DOWNLOAD_NOW: LazyLock<RwLock<HashMap<SourceInfo, Arc<ModPackTask>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// 任务主/子进度快照，各回调分别更新字段
-pub(super) struct ModPackProgress {
+pub(crate) struct ModPackProgress {
     /// 安装阶段 ID，见 [`pack_state_id`]
-    pub(super) state: String,
+    pub(crate) state: String,
     /// 主进度：已完成数
-    pub(super) now: u32,
+    pub(crate) now: u32,
     /// 主进度：总数
-    pub(super) total: u32,
+    pub(crate) total: u32,
     /// 子任务说明文字
-    pub(super) sub_text: Option<String>,
+    pub(crate) sub_text: Option<String>,
     /// 子任务进度：已完成数
-    pub(super) sub_now: u32,
+    pub(crate) sub_now: u32,
     /// 子任务进度：总数
-    pub(super) sub_total: u32,
+    pub(crate) sub_total: u32,
 }
 
 /// 一个整合包安装任务：进度 + 取消令牌 + 终态标记
 ///
 /// 终态为 done / failed / cancelled 的任务保留在表里供前端展示，
 /// 由 `add_modpack_clear_done` 清除。
-pub(super) struct ModPackTask {
+pub(crate) struct ModPackTask {
     /// 任务 ID，安装开始时生成，与最终实例 uuid 无关
-    pub(super) uuid: Uuid,
+    pub(crate) uuid: Uuid,
     /// 整合包来源平台 ID
-    pub(super) source: String,
+    pub(crate) source: String,
     /// 整合包项目 ID
-    pub(super) pid: String,
+    pub(crate) pid: String,
     /// 整合包文件 ID
-    pub(super) fid: String,
+    pub(crate) fid: String,
     /// 显示名，安装开始时从列表缓存取
-    pub(super) name: String,
+    pub(crate) name: String,
     /// 整合包图标地址，同样取自列表缓存；空串表示没有，界面用首字母占位
-    pub(super) icon: String,
+    pub(crate) icon: String,
     /// 这次任务在干什么，取值 `install` / `upgrade`；前端据此换提示文案
-    pub(super) kind: String,
+    pub(crate) kind: String,
     /// 取消令牌
-    pub(super) cancel: CancellationToken,
+    pub(crate) cancel: CancellationToken,
     /// 主/子进度快照
-    pub(super) progress: Mutex<ModPackProgress>,
+    pub(crate) progress: Mutex<ModPackProgress>,
     /// 安装完成
-    pub(super) done: AtomicBool,
+    pub(crate) done: AtomicBool,
     /// 安装失败
-    pub(super) failed: AtomicBool,
+    pub(crate) failed: AtomicBool,
     /// 已取消
-    pub(super) cancelled: AtomicBool,
+    pub(crate) cancelled: AtomicBool,
     /// 失败错误文案，failed 为 true 时有值
-    pub(super) error: Mutex<Option<String>>,
+    pub(crate) error: Mutex<Option<String>>,
     /// 安装出的实例 uuid，成功后回填
-    pub(super) instance_uuid: Mutex<Option<String>>,
+    pub(crate) instance_uuid: Mutex<Option<String>>,
 }
 
 impl ModPackTask {
@@ -117,7 +117,7 @@ impl ModPackTask {
 /// # 返回值
 ///
 /// 当前全部任务与窗口开闭状态
-pub(super) fn build_status(app: &AppHandle) -> ModPackStatusDto {
+pub(crate) fn build_status(app: &AppHandle) -> ModPackStatusDto {
     let map = DOWNLOAD_NOW.read().unwrap();
     ModPackStatusDto {
         window_open: app.get_webview_window("mml-add_modpack").is_some(),
@@ -164,7 +164,7 @@ pub(crate) struct RegisteredTask {
 
 /// 登记一个整合包安装任务，同 pid+fid 不重复安装；返回任务句柄与安装进度回调
 ///
-/// 在线安装 [`add_modpack_install`] 与本地压缩包导入 [`super::add::add_import_archive`]
+/// 在线安装 [`add_modpack_install`] 与本地压缩包导入 [`crate::windows::add::add_import_archive`]
 /// 共用它：两条路径产生的任务、进度事件、取消与终态处理完全一致，
 /// 标题栏指示器、进度弹窗、主窗口列表刷新都复用那一套。
 ///
@@ -295,7 +295,7 @@ pub(crate) fn finish_task(
 ///
 /// `downloadPack` / `readInfo` / `getInfo` / `checkServerPack` / `checkFile` /
 /// `downloadFile` / `extract` / `done` 之一
-pub(super) fn pack_state_id(state: AddModPackState) -> &'static str {
+pub(crate) fn pack_state_id(state: AddModPackState) -> &'static str {
     match state {
         AddModPackState::DownloadPack => "downloadPack",
         AddModPackState::ReadInfo => "readInfo",
@@ -309,7 +309,7 @@ pub(super) fn pack_state_id(state: AddModPackState) -> &'static str {
 }
 
 /// 整合包安装进度回调：把安装状态 / 进度写进任务并广播总览事件
-pub(super) struct TaskPackGui {
+pub(crate) struct TaskPackGui {
     /// 回调对应的任务，进度写进它
     task: Arc<ModPackTask>,
     /// 应用句柄，广播总览事件用

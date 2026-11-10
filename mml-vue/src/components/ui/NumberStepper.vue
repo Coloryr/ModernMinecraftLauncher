@@ -24,7 +24,9 @@ const emit = defineEmits<{
   (e: "update:modelValue", v: number): void;
 }>();
 
+/** 是否处于编辑态：草稿只在本态覆盖显示值 */
 const editing = ref(false);
+/** 编辑中的草稿；失焦 / 回车才提交，清空不算 0 */
 const draft = ref(String(props.modelValue));
 
 /** 把值夹进 min~max，越界取边界 */
@@ -37,10 +39,12 @@ function commit(v: number) {
   emit("update:modelValue", clamp(v));
 }
 
+/** 减一步；夹紧由 commit 统一做 */
 function dec() {
   commit(props.modelValue - props.step);
 }
 
+/** 加一步 */
 function inc() {
   commit(props.modelValue + props.step);
 }

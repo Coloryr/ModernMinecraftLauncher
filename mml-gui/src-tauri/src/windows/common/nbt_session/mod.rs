@@ -176,5 +176,5 @@ fn write_session(session: &mut NbtSession, chunk: Option<u32>) -> Result<String,
 }
 
 #[cfg(test)]
-#[path = "../../../tests/unit/windows_nbt_session_mod_tests.rs"]
+#[path = "../../../../tests/unit/windows_nbt_session_mod_tests.rs"]
 mod tests;

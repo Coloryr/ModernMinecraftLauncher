@@ -51,6 +51,8 @@ export { default as CompUiAsyncImage } from "../components/ui/AsyncImage.vue";
 export { default as CompUiAuthorTag } from "../components/ui/AuthorTag.vue";
 export { default as CompUiBaseDatePicker } from "../components/ui/BaseDatePicker.vue";
 export { default as CompUiBaseModal } from "../components/ui/BaseModal.vue";
+export { default as CompUiBootErrorPage } from "../components/ui/BootErrorPage.vue";
+export { default as CompUiDatePickerPopover } from "../components/ui/DatePickerPopover.vue";
 export { default as CompUiDragGhost } from "../components/ui/DragGhost.vue";
 export { default as CompUiDropOverlay } from "../components/ui/DropOverlay.vue";
 export { default as CompUiFormattedText } from "../components/ui/FormattedText.vue";
@@ -64,3 +66,4 @@ export { default as CompUiSplashScreen } from "../components/ui/SplashScreen.vue
 export { default as CompUiVirtualList } from "../components/ui/VirtualList.vue";
 export { default as CompUiWindowControls } from "../components/ui/WindowControls.vue";
 export { default as CompUiWindowFrame } from "../components/ui/WindowFrame.vue";
+export { default as CompUiWindowMaximizeMenu } from "../components/ui/WindowMaximizeMenu.vue";

@@ -2,8 +2,10 @@
 // 通用图标选项卡：图标 + 渐变激活态，按数量等分填满整行
 //
 // 原「添加实例」窗口的 ModeTabs，导出窗口要用同一套观感，所以挪到这里共用。
-// 图标按名字画 cube / box / folder / download 四种，其余（含 globe）回落成地球。
+// 图标统一走 GlyphIcon：配置里只写名字，认不出的回落到地球，不再在这里各画一份 path。
 import { t } from "../../lib/i18n";
+import GlyphIcon from "./GlyphIcon.vue";
+import { isGlyphName, type GlyphName } from "./glyphs";
 
 defineProps<{
   /** 页签清单，顺序即显示顺序 */
@@ -12,7 +14,7 @@ defineProps<{
     id: T;
     /** 文案的 i18n key */
     labelKey: string;
-    /** 图标名，见文件头的四种加地球兜底 */
+    /** 图标名，见 glyphs.ts；认不出时画地球兜底 */
     icon: string;
     /** 跟在标签后的数量一类小尾巴；不传则不画 */
     suffix?: string;
@@ -27,6 +29,19 @@ const emit = defineEmits<{
   /** 切换页签 */
   (e: "update:modelValue", v: T): void;
 }>();
+
+/**
+ * 把页签配置里的图标名收窄成 GlyphName
+ *
+ * - `icon`: 配置里的字符串
+ *
+ * # 返回值
+ *
+ * 已注册的图标名；认不出时回落成 `globe`
+ */
+function glyphOf(icon: string): GlyphName {
+  return isGlyphName(icon) ? icon : "globe";
+}
 </script>
 
 <template>
@@ -34,33 +49,7 @@ const emit = defineEmits<{
     <button v-for="tab in tabs" :key="tab.id" type="button" role="tab" class="tab-btn"
       :class="{ active: modelValue === tab.id }" :aria-selected="modelValue === tab.id" :disabled="disabled"
       @click="emit('update:modelValue', tab.id)">
-      <svg v-if="tab.icon === 'cube'" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 3 4.5 7.5v9L12 21l7.5-4.5v-9L12 3z" />
-        <path d="M4.5 7.5 12 12l7.5-4.5" />
-        <path d="M12 12v9" />
-      </svg>
-      <svg v-else-if="tab.icon === 'box'" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 8v13H3V8" />
-        <path d="M1 3h22v5H1z" />
-        <path d="M10 12h4" />
-      </svg>
-      <svg v-else-if="tab.icon === 'folder'" viewBox="0 0 24 24" width="17" height="17" fill="none"
-        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-      </svg>
-      <svg v-else-if="tab.icon === 'download'" viewBox="0 0 24 24" width="17" height="17" fill="none"
-        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 3v11" />
-        <path d="m7 10 5 5 5-5" />
-        <path d="M5 20h14" />
-      </svg>
-      <svg v-else viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"
-        stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
-      </svg>
+      <GlyphIcon :name="glyphOf(tab.icon)" :size="17" :weight="1.8" />
       <span class="tab-label">{{ t(tab.labelKey) }}</span>
       <span v-if="tab.suffix" class="tab-suffix">{{ tab.suffix }}</span>
     </button>
