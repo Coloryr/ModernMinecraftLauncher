@@ -71,7 +71,7 @@ export function createCommands(invoke: Invoke) {
       getSupportLoaders: (mc: string) => invoke<string[]>("add_get_support_loaders", { mc }),
       getVersionTypes: () => invoke<string[]>("add_get_version_types"),
       importArchive: (path: string, packType: string, name: string | null, group: string | null, unselect: string[] | null) => invoke<string>("add_import_archive", { path, packType, name, group, unselect }),
-      importFolder: (path: string, name: string | null, group: string | null) => invoke<string>("add_import_folder", { path, name, group }),
+      importFolder: (path: string, name: string | null, group: string | null, dataRoot: string | null, copyData: boolean) => invoke<string>("add_import_folder", { path, name, group, dataRoot, copyData }),
       importServerPack: (url: string, name: string | null, group: string | null, skip: string[] | null) => invoke<string>("add_import_server_pack", { url, name, group, skip }),
       importUrl: (url: string, name: string | null, group: string | null) => invoke<string>("add_import_url", { url, name, group }),
       listArchive: (path: string) => invoke<ArchiveProbeDto>("add_list_archive", { path }),

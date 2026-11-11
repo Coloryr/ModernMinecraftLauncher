@@ -83,6 +83,19 @@ const windowMap: Record<WindowKind, Component> = {
 
 const currentWindow = computed(() => windowMap[currentKind.value]);
 
+/**
+ * Java 安装进度弹窗是否显示
+ *
+ * 下载窗口与单窗口模式下的下载管理弹窗整页都是下载管理，不在它们上面叠 Java 安装列表。
+ */
+const showJavaInstallPopup = computed(
+  () =>
+    javaPopupOpen.value &&
+    javaTasks.value.length > 0 &&
+    currentKind.value !== "download" &&
+    !downloadPopupOpen.value,
+);
+
 // 整页包里的组件可以直接复用内置窗口：ReplaceWindow 会从 window.__mmlWindows 取 main
 ; (window as unknown as { __mmlWindows?: Record<string, Component> }).__mmlWindows = windowMap;
 
@@ -248,8 +261,9 @@ const closeAskButton = computed(() =>
     <!-- 资源下载进度弹窗：入口是标题栏上的 ResourceTitleIndicator，关掉只收起、下载照跑 -->
     <ResourcePopup v-if="resourcePopupOpen && resourceStatus?.tasks.length" :status="resourceStatus"
       @close="closeResourcePopup" />
-    <!-- Java 安装进度弹窗：入口是标题栏上的 JavaTitleIndicator，关掉只收起、安装照跑 -->
-    <JavaInstallPopup v-if="javaPopupOpen && javaTasks.length" :tasks="javaTasks"
+    <!-- Java 安装进度弹窗：入口是标题栏上的 JavaTitleIndicator，关掉只收起、安装照跑；
+         下载窗口 / 下载管理弹窗之上不显示 -->
+    <JavaInstallPopup v-if="showJavaInstallPopup" :tasks="javaTasks"
       @close="closeJavaPopup" />
     <!-- 全局轻提示（所有窗口统一） -->
     <AppToast />

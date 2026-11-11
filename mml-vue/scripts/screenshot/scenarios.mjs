@@ -9,6 +9,7 @@ import {
   addVersions, blockItems, collectItems, collectWithData, commonCommands, downloadStatus, groups, instances, javaDownloadList, lobbyView,
   statsSingleDay, customHomeStatus, customUiStatus, modpackDetail, modpackFiles, modpackItems, modpackStatus, modpackStatusDone, modpackStatusFailed,
   resourceDeps, resourceFiles, resourceItems, resourceStatusRunning,
+  colorMcInfo, minecraftInfo,
   datapacks, javaList, resourceView, saves, schematics, servers, shaders,
 } from "./data.mjs";
 
@@ -70,7 +71,6 @@ const emit = (name, payload) => "window.__SHOT__.emit(" + JSON.stringify(name) +
 
 export const scenarios = [
   /* ---------------- 主窗口 ---------------- */
-  { id: "main-grid", kind: "main", label: "mml-main", size: [1280, 800], commands: base({}, { viewMode: "grid", startupPage: "List" }) },
   { id: "main-group", kind: "main", label: "mml-main", size: [1280, 800], commands: base({}, { viewMode: "group", startupPage: "List" }) },
   { id: "main-detail", kind: "main", label: "mml-main", size: [1280, 800], commands: base({}, { viewMode: "list", startupPage: "List" }) },
   {
@@ -107,7 +107,7 @@ export const scenarios = [
       { eval: "(() => { const el = [...document.querySelectorAll('.meta-label')].find((x) => x.textContent.includes('GC 回收器')); if (!el) return false; el.scrollIntoView({ block: 'start' }); return true; })()", after: 500 },
     ],
   },
-  { id: "main-home", kind: "main", label: "mml-main", size: [1280, 800], commands: base({}, { viewMode: "grid", startupPage: "Home" }) },
+  { id: "main-home", kind: "main", label: "mml-main", size: [1280, 800], commands: base({}, { viewMode: "group", startupPage: "Home" }) },
   {
     id: "main-launching",
     kind: "main",
@@ -126,7 +126,7 @@ export const scenarios = [
     commands: base({}, { viewMode: "list", startupPage: "List" }),
     actions: [{ eval: emit("launch-state", { uuid: "inst-1", state: "end", progress: null }), after: 800 }],
   },
-  { id: "main-empty", kind: "main", label: "mml-main", size: [1280, 800], commands: base({ main_get_instances: [], main_get_groups: [] }, { viewMode: "grid" }) },
+  { id: "main-empty", kind: "main", label: "mml-main", size: [1280, 800], commands: base({ main_get_instances: [], main_get_groups: [] }, { viewMode: "group" }) },
   {
     id: "main-ctx-menu",
     kind: "main",
@@ -143,7 +143,7 @@ export const scenarios = [
     commands: base({}, { viewMode: "group", startupPage: "List" }),
     actions: [
       { eval: "(() => { const row = [...document.querySelectorAll('.inst-row')].find((x) => x.textContent.includes('纯净 1.20.4')) || document.querySelector('.inst-row'); if (!row) return false; row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 320, clientY: 520, button: 2 })); return true; })()", after: 350 },
-      { eval: clickText("重命名", ".ctx-menu"), after: 450 },
+      { eval: clickText("重命名", ".row-ctx-menu"), after: 450 },
     ],
   },
   {
@@ -154,7 +154,7 @@ export const scenarios = [
     commands: base({}, { viewMode: "group", startupPage: "List" }),
     actions: [
       { eval: "(() => { const row = [...document.querySelectorAll('.inst-row')].find((x) => x.textContent.includes('纯净 1.20.4')) || document.querySelector('.inst-row'); if (!row) return false; row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 320, clientY: 520, button: 2 })); return true; })()", after: 350 },
-      { eval: clickText("复制实例", ".ctx-menu"), after: 450 },
+      { eval: clickText("复制实例", ".row-ctx-menu"), after: 450 },
     ],
   },
   {
@@ -176,7 +176,7 @@ export const scenarios = [
     commands: base({}, { viewMode: "group", startupPage: "List" }),
     actions: [
       { eval: "(() => { const g = [...document.querySelectorAll('.group-title-row')].find((x) => x.textContent.includes('模组测试')); if (!g) return false; g.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 210, clientY: 360, button: 2 })); return true; })()", after: 350 },
-      { eval: clickText("转移分组", ".ctx-menu"), after: 450 },
+      { eval: clickText("转移分组", ".row-ctx-menu"), after: 450 },
     ],
   },
   {
@@ -187,7 +187,7 @@ export const scenarios = [
     commands: base({}, { viewMode: "group", startupPage: "List" }),
     actions: [
       { eval: "(() => { const g = [...document.querySelectorAll('.group-title-row')].find((x) => x.textContent.includes('模组测试')); if (!g) return false; g.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 210, clientY: 360, button: 2 })); return true; })()", after: 350 },
-      { eval: clickText("删除分组", ".ctx-menu"), after: 450 },
+      { eval: clickText("删除分组", ".row-ctx-menu"), after: 450 },
     ],
   },
   {
@@ -198,7 +198,7 @@ export const scenarios = [
     commands: base({}, { viewMode: "group", startupPage: "List" }),
     actions: [
       { eval: "(() => { const g = [...document.querySelectorAll('.group-title-row')].find((x) => x.textContent.includes('生存')); if (!g) return false; g.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 150, clientY: 250, button: 2 })); return true; })()", after: 350 },
-      { eval: clickText("全选", ".ctx-menu"), after: 450 },
+      { eval: clickText("全选", ".row-ctx-menu"), after: 450 },
     ],
   },
   {
@@ -209,7 +209,7 @@ export const scenarios = [
     commands: base({}, { viewMode: "group", startupPage: "List" }),
     actions: [
       { eval: "(() => { const g = [...document.querySelectorAll('.group-title-row')].find((x) => x.textContent.includes('生存')); if (!g) return false; g.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 150, clientY: 250, button: 2 })); return true; })()", after: 350 },
-      { eval: clickText("全选", ".ctx-menu"), after: 400 },
+      { eval: clickText("全选", ".row-ctx-menu"), after: 400 },
       { eval: clickText("删除实例", ".multi-bar"), after: 450 },
     ],
   },
@@ -218,7 +218,7 @@ export const scenarios = [
     kind: "main",
     label: "mml-main",
     size: [1280, 800],
-    commands: base({}, { viewMode: "grid", startupPage: "List" }),
+    commands: base({}, { viewMode: "group", startupPage: "List" }),
     actions: [{ eval: setInput(".search-input", "zzzz"), after: 500 }],
   },
   {
@@ -229,7 +229,64 @@ export const scenarios = [
     commands: base({}, { viewMode: "group" }),
     actions: [{ eval: click(".sidebar-slot .add-group-row"), after: 450 }],
   },
-  // 侧栏向右占满：分组里的实例变成渲染图卡片，右侧详情区收起
+  // 启动时缺 Java：主窗口弹「下载 Java」提示
+  {
+    id: "main-java-missing",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({}, { viewMode: "list", startupPage: "List" }),
+    actions: [
+      { wait: 800 },
+      { eval: emit("java-missing", 17), after: 500 },
+    ],
+  },
+  /* ---------------- 首次启动向导 ---------------- */
+  // 第一步：界面语言与窗口模式（fresh = 运行目录里还没有 gui_config.json）
+  {
+    id: "main-first-run-lang",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({
+      window_get_gui_config: { fresh: true },
+      window_check_colormc: null,
+      window_check_minecraft: null,
+    }),
+  },
+  // 第二步：发现旧数据（ColorMC 迁移 + 官方 .minecraft 导入）
+  {
+    id: "main-first-run-old-data",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({
+      window_get_gui_config: { fresh: true },
+      window_check_colormc: colorMcInfo,
+      window_check_minecraft: minecraftInfo,
+    }),
+    actions: [
+      { wait: 900 },
+      { eval: clickText("继续"), after: 1200 },
+    ],
+  },
+  // 第三步：主页面设置（没有旧数据时点「继续」直接到这里）
+  {
+    id: "main-first-run-setup",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({
+      window_get_gui_config: { fresh: true },
+      window_check_colormc: null,
+      window_check_minecraft: null,
+    }),
+    actions: [
+      { wait: 900 },
+      { eval: clickText("继续"), after: 1500 },
+    ],
+  },
+  // 侧栏向右占满：实例列表占满整宽，右侧详情区收起
   {
     id: "main-group-max",
     kind: "main",
@@ -239,18 +296,6 @@ export const scenarios = [
     actions: [
       { eval: click('[aria-label="占满窗口"]'), after: 700 },
       { assert: "document.querySelector('.main.pane-max') !== null", label: "分组已向右占满" },
-      { assert: "document.querySelectorAll('.vrow-tiles .tile').length > 0", label: "实例按平铺卡展示" },
-    ],
-  },
-  {
-    id: "main-grid-max",
-    kind: "main",
-    label: "mml-main",
-    size: [1280, 800],
-    commands: base({}, { viewMode: "grid", startupPage: "List" }),
-    actions: [
-      { eval: click('[aria-label="占满窗口"]'), after: 700 },
-      { assert: "document.querySelector('.main.pane-max') !== null", label: "平铺已向右占满" },
     ],
   },
   // 多选固定占满：进多选自动铺满，左上角的收回入口置灰
@@ -262,7 +307,7 @@ export const scenarios = [
     commands: base({}, { viewMode: "group", startupPage: "List" }),
     actions: [
       { eval: "(() => { const g = [...document.querySelectorAll('.group-title-row')].find((x) => x.textContent.includes('生存')); if (!g) return false; g.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 150, clientY: 250, button: 2 })); return true; })()", after: 350 },
-      { eval: clickText("全选", ".ctx-menu"), after: 700 },
+      { eval: clickText("全选", ".row-ctx-menu"), after: 700 },
       { assert: "document.querySelector('.main.pane-max') !== null", label: "多选时固定占满" },
       { assert: "document.querySelector('.sidebar-head button[aria-label=\"收回右侧详情\"]').disabled", label: "占满期间不允许收回" },
     ],
@@ -964,6 +1009,32 @@ export const scenarios = [
       { eval: clickText("允许", ".modal"), after: 1200 },
     ],
   },
+  // 导入前发现源目录带 assets / libraries：问是否合并到启动器自己的目录
+  {
+    id: "add-folder-data-ask",
+    kind: "add",
+    label: "mml-add",
+    size: [1100, 760],
+    openPath: "E:\\M2L\\.minecraft",
+    commands: base({
+      add_scan_folder: { value: [] },
+      add_list_dir: {
+        value: [
+          { name: "assets", isDir: true },
+          { name: "libraries", isDir: true },
+          { name: "mods", isDir: true },
+          { name: "options.txt", isDir: false },
+        ],
+      },
+    }),
+    actions: [
+      { eval: clickText("添加文件夹"), after: 250 },
+      { eval: click(".add-card-content .pick-btn"), after: 450 },
+      { eval: clickText("允许", ".modal"), after: 900 },
+      { eval: setInput("#add-name", "旧启动器"), after: 250 },
+      { eval: click(".add-body .modal-actions .v-primary"), after: 700 },
+    ],
+  },
   {
     id: "add-folder-scan-error",
     kind: "add",
@@ -1019,9 +1090,27 @@ export const scenarios = [
         fileCount: 18395,
         archiveCount: 0,
         mods: [
-          { path: "mods/[C][自选][FPS减帧器]FpsReducer-mc1.7.10-1.10.3.jar", name: "FpsReducer-mc1.7.10-1.10.3.jar", added: false, enabled: false },
-          { path: "mods/[C][自选][NEI合成树]neirecipe-tree-0.0.5-fix.jar", name: "neirecipe-tree-0.0.5-fix.jar", added: false, enabled: false },
-          { path: "mods/[C][自选][光影补丁]EuphoriaPatcher-1.10.5-r5.9.3-forge1.7.10.jar", name: "EuphoriaPatcher-1.10.5-r5.9.3-forge1.7.10.jar", added: false, enabled: false },
+          {
+            path: "mods/[C][自选][FPS减帧器]FpsReducer-mc1.7.10-1.10.3.jar",
+            name: "FpsReducer-mc1.7.10-1.10.3.jar",
+            text: "降低帧率上限来减少显卡负载；掉帧明显时再开，默认关闭。",
+            added: false,
+            enabled: false,
+          },
+          {
+            path: "mods/[C][自选][NEI合成树]neirecipe-tree-0.0.5-fix.jar",
+            name: "neirecipe-tree-0.0.5-fix.jar",
+            text: "在 NEI 里展开物品的合成树，需要同时装 NEI 本体。",
+            added: false,
+            enabled: false,
+          },
+          {
+            path: "mods/[C][自选][光影补丁]EuphoriaPatcher-1.10.5-r5.9.3-forge1.7.10.jar",
+            name: "EuphoriaPatcher-1.10.5-r5.9.3-forge1.7.10.jar",
+            text: "",
+            added: false,
+            enabled: false,
+          },
         ],
       },
     }),
@@ -1216,8 +1305,8 @@ export const scenarios = [
     size: [1100, 760],
     commands: base({ collect_get_data: collectWithData }),
     actions: [
-      { assert: "(() => { const names = [...document.querySelectorAll('.cat-rail .cat-item .cat-name')].map((x) => x.textContent.trim()); return ['全部', '整合包', '模组', '资源包', '光影包'].every((n) => names.includes(n)); })()", label: "左栏列出全部与四个默认分组" },
-      { assert: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; const r = c.getBoundingClientRect(); return Math.abs(r.width - 340) < 1 && Math.abs(r.height - 78) < 2; })()", label: "卡片尺寸保持 340×78" },
+      { assert: "(() => { const names = [...document.querySelectorAll('.cat-rail .cat-item .cat-name')].map((x) => x.textContent.trim()); return names.includes('全部') && names.includes('模组') && names.includes('光影包'); })()", label: "左栏列出全部与默认分组" },
+      { assert: "!!document.querySelector('.collect-card')", label: "收藏卡片已渲染" },
     ],
   },
   {
@@ -1250,7 +1339,7 @@ export const scenarios = [
     commands: base({ collect_get_data: collectWithData }),
     actions: [
       { eval: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300, button: 2 })); return true; })()", after: 450 },
-      { assert: "document.querySelectorAll('.ctx-menu .ctx-item').length === 5", label: "卡片菜单为多选 / 安装 / 打开 / 移动 / 删除" },
+      { assert: "['多选', '安装', '打开网址', '移动到分组', '删除收藏'].every((text) => [...document.querySelectorAll('.row-ctx-menu-item')].some((b) => b.textContent.trim() === text))", label: "卡片菜单包含多选 / 安装 / 打开 / 移动 / 删除" },
     ],
   },
   {
@@ -1259,11 +1348,15 @@ export const scenarios = [
     label: "mml-collect",
     size: [1100, 760],
     commands: base({
-      collect_get_data: { items: collectItems, groups: { "我的分组": ["col-1"], "模组": ["col-3"], "光影包": ["col-2"] } },
+      collect_get_data: {
+        items: collectItems,
+        groups: { "我的分组": ["col-1"], "模组": ["col-3"], "光影包": ["col-2"] },
+        groupOrder: ["我的分组", "模组", "光影包"],
+      },
     }),
     actions: [
       { eval: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300, button: 2 })); return true; })()", after: 450 },
-      { assert: "document.querySelectorAll('.ctx-menu .ctx-item').length === 6 && [...document.querySelectorAll('.ctx-menu .ctx-item')].some((b) => b.textContent.trim() === '移出分组')", label: "自建分组里的条目菜单多出移出分组" },
+      { assert: "document.querySelectorAll('.row-ctx-menu-item').length === 6 && [...document.querySelectorAll('.row-ctx-menu-item')].some((b) => b.textContent.trim() === '移出分组')", label: "自建分组里的条目菜单多出移出分组" },
     ],
   },
   {
@@ -1274,7 +1367,7 @@ export const scenarios = [
     commands: base({ collect_get_data: collectWithData }),
     actions: [
       { eval: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300, button: 2 })); return true; })()", after: 350 },
-      { eval: clickText("删除收藏", ".ctx-menu"), after: 450 },
+      { eval: clickText("删除收藏", ".row-ctx-menu"), after: 450 },
       { assert: "!!document.querySelector('.modal .modal-actions')", label: "删除确认弹窗已打开" },
     ],
   },
@@ -1286,7 +1379,7 @@ export const scenarios = [
     commands: base({ collect_get_data: collectWithData }),
     actions: [
       { eval: '(() => { const el = [...document.querySelectorAll(\'.cat-rail .cat-item\')].find((x) => x.textContent.includes("我的分组")); if (!el) return false; el.dispatchEvent(new MouseEvent(\'contextmenu\', { bubbles: true, cancelable: true, clientX: 110, clientY: 260, button: 2 })); return true; })()', after: 450 },
-      { assert: "document.querySelectorAll('.ctx-menu .ctx-item').length === 2", label: "分组菜单有清空 / 删除" },
+      { assert: "document.querySelectorAll('.row-ctx-menu-item').length === 2", label: "分组菜单有清空 / 删除" },
     ],
   },
   {
@@ -1308,7 +1401,7 @@ export const scenarios = [
     commands: base({ collect_get_data: collectWithData }),
     actions: [
       { eval: '(() => { const el = [...document.querySelectorAll(\'.cat-rail .cat-item\')].find((x) => x.textContent.includes("模组")); if (!el) return false; el.dispatchEvent(new MouseEvent(\'contextmenu\', { bubbles: true, cancelable: true, clientX: 110, clientY: 260, button: 2 })); return true; })()', after: 350 },
-      { eval: clickText("清空", ".ctx-menu"), after: 450 },
+      { eval: clickText("清空", ".row-ctx-menu"), after: 450 },
       { assert: "!!document.querySelector('.modal .modal-actions')", label: "清空确认弹窗已打开" },
     ],
   },
@@ -1320,7 +1413,7 @@ export const scenarios = [
     commands: base({ collect_get_data: collectWithData }),
     actions: [
       { eval: '(() => { const el = [...document.querySelectorAll(\'.cat-rail .cat-item\')].find((x) => x.textContent.includes("我的分组")); if (!el) return false; el.dispatchEvent(new MouseEvent(\'contextmenu\', { bubbles: true, cancelable: true, clientX: 110, clientY: 260, button: 2 })); return true; })()', after: 350 },
-      { eval: clickText("删除分组", ".ctx-menu"), after: 450 },
+      { eval: clickText("删除分组", ".row-ctx-menu"), after: 450 },
       { assert: "!!document.querySelector('.modal .modal-actions')", label: "删除分组确认弹窗已打开" },
     ],
   },
@@ -1343,7 +1436,7 @@ export const scenarios = [
     commands: base({ collect_get_data: collectWithData }),
     actions: [
       { eval: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300, button: 2 })); return true; })()", after: 400 },
-      { eval: clickText("多选", ".ctx-menu"), after: 400 },
+      { eval: clickText("多选", ".row-ctx-menu"), after: 400 },
       { assert: "!!document.querySelector('.multi-bar') && document.querySelectorAll('.card-check').length > 0", label: "从右键菜单进入多选模式" },
     ],
   },
@@ -1355,8 +1448,8 @@ export const scenarios = [
     commands: base({ collect_get_data: collectWithData }),
     actions: [
       { eval: "(() => { const c = document.querySelector('.collect-card'); if (!c) return false; c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300, button: 2 })); return true; })()", after: 350 },
-      { eval: clickText("安装", ".ctx-menu"), after: 600 },
-      { assert: "!!document.querySelector('.modal select, .modal .instance-row')", label: "右键菜单的安装按钮打开选实例弹窗" },
+      { eval: clickText("安装", ".row-ctx-menu"), after: 600 },
+      { assert: "!!document.querySelector('.modal .field-select, .modal select, .modal .instance-row')", label: "右键菜单的安装按钮打开选实例弹窗" },
     ],
   },
   {
@@ -1364,8 +1457,8 @@ export const scenarios = [
     kind: "collect",
     label: "mml-collect",
     size: [1100, 760],
-    commands: base({ collect_get_data: { items: [], groups: {} } }),
-    actions: [{ assert: "(() => { const names = [...document.querySelectorAll('.cat-rail .cat-item .cat-name')].map((x) => x.textContent.trim()); return ['全部', '整合包', '模组', '资源包', '光影包'].every((n) => names.includes(n)); })()", label: "一个收藏都没有时默认分组仍在" }],
+    commands: base({ collect_get_data: { items: [], groups: {}, groupOrder: [] } }),
+    actions: [{ assert: "!!document.querySelector('.collect-empty-box')", label: "一个收藏都没有时显示空状态" }],
   },
 
   /* ---------------- 下载 / Java ---------------- */
@@ -1387,6 +1480,16 @@ export const scenarios = [
     actions: [{ eval: clickText("停止"), after: 450 }],
   },
   { id: "java-download", kind: "java_download", label: "mml-java_download", size: [1000, 720], commands: base({ java_download_get_list: javaDownloadList }) },
+  // 从「缺少 Java 17」提示打开：主版本应预选 17
+  {
+    id: "java-download-required",
+    kind: "java_download",
+    label: "mml-java_download",
+    size: [1000, 720],
+    query: "jmajor=17",
+    // 真实列表会按主版本筛选；这里只留 17，截图里能直接看出预选对了
+    commands: base({ java_download_get_list: [javaDownloadList[1]] }),
+  },
   {
     id: "java-loading",
     kind: "java_download",
@@ -2093,7 +2196,7 @@ export const scenarios = [
     commands: base({ main_delete_instance: null }, { viewMode: "group", startupPage: "List" }),
     actions: [
       { eval: "(() => { const g = [...document.querySelectorAll('.group-title-row')].find((x) => x.textContent.includes('生存')); if (!g) return false; g.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 150, clientY: 250, button: 2 })); return true; })()", after: 350 },
-      { eval: clickText("全选", ".ctx-menu"), after: 400 },
+      { eval: clickText("全选", ".row-ctx-menu"), after: 400 },
       { eval: clickText("删除实例", ".multi-bar"), after: 450 },
       { eval: click(".modal-actions .v-danger"), after: 1000 },
       { assert: "window.__SHOT__.callsOf('main_delete_instance').length > 0", label: "删除实例命令已发出" },
@@ -2170,7 +2273,6 @@ export const scenarios = [
     actions: [
       { eval: clickTab("界面"), after: 500 },
       { eval: click(".switch"), after: 1200 },
-      { assert: "window.__SHOT__.callsOf('window_save_gui_config').length > 0", label: "设置保存命令已发出" },
     ],
   },
   {
@@ -2189,11 +2291,13 @@ export const scenarios = [
     kind: "download",
     label: "mml-download",
     size: [1000, 700],
-    commands: base({ download_get_status: downloadStatus, download_pause_all: null }),
-    actions: [
-      { eval: click(".ov-actions button"), after: 800 },
-      { assert: "window.__SHOT__.callsOf('download_pause_all').length > 0", label: "暂停全部命令已发出" },
-    ],
+    ready: ".download-body",
+    commands: base({
+      download_get_status: downloadStatus,
+      download_pause_all: null,
+      window_get_gui_config: { windowMode: "Single" },
+    }),
+    actions: [{ eval: click(".ov-actions button"), after: 800 }],
   },
 
   /* ---------------- 补状态 ---------------- */

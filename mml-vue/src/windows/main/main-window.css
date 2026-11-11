@@ -172,7 +172,7 @@
   color: var(--accent);
 }
 
-/* ----- 侧栏（分组 / 平铺）：样式见 MainSidebar.vue ----- */
+/* ----- 侧栏（分组列表）：样式见 MainSidebar.vue ----- */
 
 /* ----- 右侧内容区 ----- */
 
@@ -581,14 +581,50 @@
   text-align: center;
 }
 
-/* 列表模式的启动区：启动按钮一行，下面一行三个次级小按钮。
+/* 列表模式的启动区：启动按钮一行，下面一行次级按钮。
    两块宽度**不同**：启动按钮不额外定宽、就按文案取宽（同改动前，lg 内边距撑开），
-   下面那行按三个按钮的文案取宽（中文约 330px）；整块居中，不撑满内容区 */
+   下面那行按按钮的文案取宽；整块居中，不撑满内容区 */
 .launch-actions {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
+}
+
+/* 启动按钮 + 右侧启动方式下拉：外观是一颗按钮，箭头压在右端内侧，点右侧出菜单 */
+.launch-row {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.launch-drop-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 0 var(--ctl-radius) var(--ctl-radius) 0;
+  background: transparent;
+  color: var(--on-accent);
+  cursor: pointer;
+  z-index: 1;
+  transition: background 0.12s;
+}
+
+/* 只做一块淡淡的悬停底，不画竖线，视觉上仍是一颗按钮 */
+.launch-drop-toggle:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--on-accent) 14%, transparent);
+}
+
+.launch-drop-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* 列表模式的启动按钮：高度沿用原来的口径，46px 最小高；宽度 230px，比下面那行窄。

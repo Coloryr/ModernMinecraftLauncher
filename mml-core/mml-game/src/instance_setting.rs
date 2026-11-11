@@ -217,7 +217,7 @@ impl InstanceSettingObj {
     /// 将文件复制到其他地方
     ///
     /// - `path`: 目标目录
-    /// - `skip`: 需要跳过的相对路径列表；`None` 表示一个都不跳过
+    /// - `skip`: 需要跳过的相对路径列表，文件或目录均可；`None` 表示一个都不跳过
     /// - `is_base`: `true` 复制实例整个目录，`false` 只复制游戏目录
     /// - `gui`: 进度界面回调
     ///
@@ -253,7 +253,11 @@ impl InstanceSettingObj {
             })?;
 
             if let Some(skip) = &skip {
-                if skip.contains(&file.to_path_buf()) {
+                // 目录项按组件前缀跳过：assets / libraries 传进来就整棵跳过
+                if skip
+                    .iter()
+                    .any(|item| file == item || file.starts_with(item))
+                {
                     index += 1;
                     if let Some(gui) = &gui {
                         gui.set_progress_now(index, Some(list.len()));

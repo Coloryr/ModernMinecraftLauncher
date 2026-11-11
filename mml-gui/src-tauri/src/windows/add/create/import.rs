@@ -3,9 +3,12 @@
 //! 目录、压缩包、下载地址三条路都汇到同一份任务上；
 //! 建实例是最后一步，前面任何一步失败都不落盘。
 
+use std::path::PathBuf;
+
 use tauri::{AppHandle, WebviewWindow};
 
 use mml_game::add_game::{self, PackType};
+use mml_names::names;
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 
 use crate::windows::add_resource::SourceInfo;
@@ -25,6 +28,8 @@ use crate::windows::add::model::{instance_gui, pack_gui};
 /// - `path`: 待导入的文件夹路径
 /// - `name`: 实例名，缺省由内核定
 /// - `group`: 分组 uuid；空 / 非法 = 默认分组
+/// - `data_root`: 源目录里 assets / libraries 所在的根；有值时实例内不再复制这两块
+/// - `copy_data`: 是否把这两个文件夹合并进启动器自己的 assets / libraries
 ///
 /// # 返回值
 ///
@@ -37,6 +42,8 @@ pub async fn add_import_folder(
     path: String,
     name: Option<String>,
     group: Option<String>,
+    data_root: Option<String>,
+    copy_data: bool,
 ) -> Result<String, String> {
     let PreparedTask {
         model: _store,
@@ -51,18 +58,56 @@ pub async fn add_import_folder(
     }
     // 安装 future 非 Send：阻塞线程 block_on；读锁在块内释放后再发事件
     let gui = instance_gui(&window);
+    // assets / libraries 归启动器自己共用：实例内一律不复制，是否合并到共用目录由 copy_data 决定
+    let unselect = data_root.as_ref().map(|_| {
+        vec![
+            PathBuf::from(names::GAME_ASSETS_DIR),
+            PathBuf::from(names::LIBRARIES_DIR),
+        ]
+    });
     let res = tauri::async_runtime::spawn_blocking(move || {
         tauri::async_runtime::block_on(async {
-            add_game::add_game_folder(&path, name, group, None, gui, None, token).await
+            add_game::add_game_folder(&path, name, group, unselect, gui, None, token).await
         })
     })
     .await
     .map_err(|e| e.to_string())?
     .map_err(|e| e.to_string())?;
     let uuid = res.read().unwrap().uuid.to_string();
+
+    // 用户选了复制：把源目录的 assets / libraries 合并进启动器自己的目录；
+    // 失败只记日志，实例已经建好，缺的资源首次启动会重新下载
+    if copy_data && let Some(root) = data_root {
+        let _ = tauri::async_runtime::spawn_blocking(move || copy_shared_data(&root)).await;
+    }
     crate::windows::main::emit_instance_change(&app, "add");
     crate::windows::add::notify_instance_added(&app, &uuid);
     Ok(uuid)
+}
+
+/// 把源目录的 assets / libraries 合并到启动器自己的资产与运行库目录
+///
+/// - `root`: 源目录，即 assets / libraries 的父目录
+fn copy_shared_data(root: &str) {
+    let root = std::path::Path::new(root);
+    for (name, dest) in [
+        (
+            names::GAME_ASSETS_DIR,
+            mml_game::launcher_path::assets_path::get_assets_dir(),
+        ),
+        (
+            names::LIBRARIES_DIR,
+            mml_game::launcher_path::libraries_path::get_lib_dir(),
+        ),
+    ] {
+        let src = root.join(name);
+        if !src.is_dir() {
+            continue;
+        }
+        if let Err(err) = mml_sys::path_helper::copy_dir(&src, &dest) {
+            mml_log::error_type(err);
+        }
+    }
 }
 
 /// 导入整合包压缩包为实例

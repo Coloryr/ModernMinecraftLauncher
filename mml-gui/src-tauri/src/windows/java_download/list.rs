@@ -59,8 +59,14 @@ pub async fn java_download_get_list(
                 if item.binary.architecture != arch || item.binary.image_type != java_type {
                     continue;
                 }
-                let filename = item.binary.name;
-                if !unpackable(&filename) {
+                // Adoptium v3 把文件名放在 binary.package.name，binary.name 是空的；
+                // 老版本接口反过来写，再兜底取下载地址最后一段
+                let filename = adoptium_filename(
+                    &item.binary.package.name,
+                    &item.binary.name,
+                    &item.binary.package.link,
+                );
+                if !usable_filename(&filename) {
                     continue;
                 }
                 let ext = extension_of(&filename);
@@ -118,6 +124,9 @@ pub async fn java_download_get_list(
 
             for item in list {
                 let filename = file_name_of(&item.url).to_string();
+                if !usable_filename(&filename) {
+                    continue;
+                }
                 let ext = extension_of(&filename);
                 let java_version = item
                     .java_version
@@ -180,6 +189,9 @@ pub async fn java_download_get_list(
                     continue;
                 }
                 let filename = file_name_of(&url).to_string();
+                if !usable_filename(&filename) {
+                    continue;
+                }
                 let ext = extension_of(&filename);
                 let name = display_name(
                     "Semeru",
@@ -221,7 +233,7 @@ pub async fn java_download_get_list(
             list.sort_by_key(|a| std::cmp::Reverse(version_key(&a.java_version)));
 
             for item in list {
-                if !unpackable(&item.filename) {
+                if !usable_filename(&item.filename) {
                     continue;
                 }
                 let ext = extension_of(&item.filename);
@@ -282,6 +294,41 @@ pub async fn java_download_get_list(
 /// 该地址对应的 UUIDv5
 pub(super) fn uuid_of(url: &str) -> Uuid {
     Uuid::new_v5(&Uuid::NAMESPACE_URL, url.as_bytes())
+}
+
+/// 取 Adoptium 包的文件名
+///
+/// v3 接口把文件名放在 `binary.package.name`，`binary.name` 为空；老接口反过来。
+/// 两边都认，再兜底取下载地址的最后一段。
+///
+/// - `package_name`: 响应里的 `binary.package.name`
+/// - `binary_name`: 响应里的 `binary.name`
+/// - `link`: 下载地址
+///
+/// # 返回值
+///
+/// 文件名；三处都取不到时为空串
+fn adoptium_filename(package_name: &str, binary_name: &str, link: &str) -> String {
+    if !package_name.is_empty() {
+        package_name.to_string()
+    } else if !binary_name.is_empty() {
+        binary_name.to_string()
+    } else {
+        file_name_of(link).to_string()
+    }
+}
+
+/// 文件名是否可用
+///
+/// 空名字会让下载目标退化成下载目录本身，必须挡在进列表之前。
+///
+/// - `name`: 文件名或下载地址
+///
+/// # 返回值
+///
+/// 非空且扩展名可解包时为 `true`
+fn usable_filename(name: &str) -> bool {
+    !name.is_empty() && unpackable(name)
 }
 
 /// 拼列表显示名：发行版 + 版本 + 类型 / 平台 / 格式
@@ -423,5 +470,32 @@ mod tests {
         let a = uuid_of("https://example.com/a.zip");
         assert_eq!(a, uuid_of("https://example.com/a.zip"));
         assert_ne!(a, uuid_of("https://example.com/b.zip"));
+    }
+
+    #[test]
+    fn adoptium_filename_prefers_package_name() {
+        // v3 响应里 binary.name 为空，文件名在 package.name
+        assert_eq!(
+            adoptium_filename("jdk-21.zip", "", "https://example.com/download"),
+            "jdk-21.zip"
+        );
+        // 老接口只有 binary.name
+        assert_eq!(
+            adoptium_filename("", "jdk-17.zip", "https://example.com/download"),
+            "jdk-17.zip"
+        );
+        // 都没有就取地址最后一段
+        assert_eq!(
+            adoptium_filename("", "", "https://example.com/jdk-8.zip"),
+            "jdk-8.zip"
+        );
+        assert_eq!(adoptium_filename("", "", "https://example.com/"), "");
+    }
+
+    #[test]
+    fn empty_filename_is_not_usable() {
+        assert!(!usable_filename(""));
+        assert!(!usable_filename("jdk-21.msi"));
+        assert!(usable_filename("jdk-21.zip"));
     }
 }

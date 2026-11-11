@@ -1,4 +1,4 @@
-/* 实例勾选态（多选模式）：主窗口实例列表 / 平铺与左侧栏共用的同一套。
+/* 实例勾选态（多选模式）：主窗口实例列表与左侧栏共用的同一套。
  * 用法见 multi-bar.css 的说明：同一个文件被多个组件各自 scoped 编译。
  */
 
@@ -30,9 +30,4 @@
 .inst-row.multi-checked {
   background: var(--accent-soft);
   outline: 1px solid var(--accent-border);
-}
-
-.tile.multi-checked {
-  border-color: var(--accent);
-  background: var(--accent-soft);
 }

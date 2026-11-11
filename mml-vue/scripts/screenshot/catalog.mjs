@@ -203,8 +203,12 @@ const PHRASE = [
 
 /** 单独给出的完整说明，优先于词元拼接 */
 const OVERRIDE = {
-  "main-grid": "主窗口 · 网格视图",
   "main-group": "主窗口 · 分组视图",
+  "main-java-missing": "主窗口 · 启动缺少 Java",
+  "java-download-required": "Java 下载 · 缺 Java 时预选版本",
+  "main-first-run-lang": "主窗口 · 首次启动 · 语言与窗口模式",
+  "main-first-run-old-data": "主窗口 · 首次启动 · 发现旧数据",
+  "main-first-run-setup": "主窗口 · 首次启动 · 主页面设置",
   "main-detail": "主窗口 · 实例详情",
   "main-detail-scroll": "主窗口 · 实例详情 · 滚动",
   "main-advanced": "主窗口 · 实例设置 · 扩展参数",
@@ -256,9 +260,9 @@ const OVERRIDE = {
   "add-resource-deps-skip": "添加资源 · 跳过前置确认",
   "main-launch": "主窗口 · 点击启动（断言命令）",
   "main-create-group": "主窗口 · 新建分组（断言命令）",
-  "settings-save": "设置 · 改动保存（断言命令）",
+  "settings-save": "设置 · 改动保存",
   "java-download-start": "Java 下载 · 点击下载（断言命令）",
-  "download-pause": "下载 · 暂停全部（断言命令）",
+  "download-pause": "下载 · 暂停全部",
   "java-download-empty": "Java 下载 · 无匹配",
   "download-failed": "下载 · 有失败任务",
   "stats-empty": "统计 · 无数据",
@@ -275,6 +279,7 @@ const OVERRIDE = {
   "add-archive-read-error": "添加实例 · 压缩包读取失败",
   "add-online-optional-mods": "添加实例 · 首次导入挑选可选模组",
   "add-folder-scan-error": "添加实例 · 文件夹扫描失败",
+  "add-folder-data-ask": "添加实例 · 文件夹 · 复制资源与运行库",
   "add-folder-read-error": "添加实例 · 文件夹读取失败",
   "addmodpack-install-popup": "下载整合包 · 安装进度弹窗",
   "collect-group-pick": "收藏 · 选中分组",

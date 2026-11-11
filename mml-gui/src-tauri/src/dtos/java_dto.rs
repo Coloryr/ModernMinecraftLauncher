@@ -13,8 +13,10 @@ pub struct JavaInfoDto {
     pub version: String,
     /// 主版本号
     pub major: i32,
-    /// 发行类型：JDK / JRE
+    /// 启动器首词：openjdk / java
     pub java_type: String,
+    /// 发行商：Oracle / Zulu / Temurin / OpenJDK / Java 等
+    pub vendor: String,
     /// 位数：x86 / x64
     pub arch: String,
 }

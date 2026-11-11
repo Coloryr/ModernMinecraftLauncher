@@ -9,11 +9,11 @@
 cd mml-vue
 
 # 只跑一张：名字就是下面的「图片」列
-npm run shots -- --scene=main-grid
-npm run shots -- main-grid
+npm run shots -- --scene=main-group
+npm run shots -- main-group
 
 # 一次跑多张
-npm run shots -- --scene=main-grid,settings-ui
+npm run shots -- --scene=main-group,settings-ui
 
 # 按前缀成组跑
 npm run shots -- --only=settings
@@ -39,7 +39,7 @@ npm run shots -- --clean
 
 ## 场景表
 
-共 255 个场景，按窗口分组。
+共 259 个场景，按窗口分组。
 「窗口」列是页面的 `kind`，窗口族场景会自动带上实例参数，不需要在命令里另写；
 控件场景的 `control` 是截图工具里的预览页，不是启动器窗口。
 
@@ -47,7 +47,6 @@ npm run shots -- --clean
 
 | 图片 | 画面 | 窗口 | 视口 |
 | --- | --- | --- | --- |
-| `main-grid` | 主窗口 · 网格视图 | `main` | 1280×800 |
 | `main-group` | 主窗口 · 分组视图 | `main` | 1280×800 |
 | `main-detail` | 主窗口 · 实例详情 | `main` | 1280×800 |
 | `main-detail-scroll` | 主窗口 · 实例详情 · 滚动 | `main` | 1280×900 |
@@ -67,8 +66,11 @@ npm run shots -- --clean
 | `main-multi-delete` | 主窗口 · 批量删除 | `main` | 1280×800 |
 | `main-search-empty` | 主窗口 · 搜索 · 空状态 | `main` | 1280×800 |
 | `main-add-group-modal` | 主窗口 · 添加分组弹窗 | `main` | 1280×800 |
+| `main-java-missing` | 主窗口 · 启动缺少 Java | `main` | 1280×800 |
+| `main-first-run-lang` | 主窗口 · 首次启动 · 语言与窗口模式 | `main` | 1280×800 |
+| `main-first-run-old-data` | 主窗口 · 首次启动 · 发现旧数据 | `main` | 1280×800 |
+| `main-first-run-setup` | 主窗口 · 首次启动 · 主页面设置 | `main` | 1280×800 |
 | `main-group-max` | 主窗口 · 分组 · 占满 | `main` | 1280×800 |
-| `main-grid-max` | 主窗口 · 网格 · 占满 | `main` | 1280×800 |
 | `main-multi-max` | 主窗口 · 多选 · 占满 | `main` | 1280×800 |
 | `main-launch` | 主窗口 · 点击启动（断言命令） | `main` | 1280×800 |
 | `main-delete-confirm` | 主窗口 · 删除 · 确认 | `main` | 1280×800 |
@@ -99,7 +101,7 @@ npm run shots -- --clean
 | `settings-local-clear` | 设置 · 本地文件 · 清理确认 | `settings` | 1100×760 |
 | `settings-gamepad-new` | 设置 · 手柄 · 新建配置 | `settings` | 1100×860 |
 | `settings-custom-css` | 设置 · 界面 · 自定义样式包 | `settings` | 1100×800 |
-| `settings-save` | 设置 · 改动保存（断言命令） | `settings` | 1100×760 |
+| `settings-save` | 设置 · 改动保存 | `settings` | 1100×760 |
 
 ### 资源管理
 
@@ -184,6 +186,7 @@ npm run shots -- --clean
 | `add-folder-loading` | 添加实例 · 文件夹 · 加载中 | `add` | 1100×760 |
 | `add-folder-loaded` | 添加实例 · 文件夹 · 已加载 | `add` | 1100×760 |
 | `add-folder-tree-loaded` | 添加实例 · 文件夹 · 目录树 · 已加载 | `add` | 1100×760 |
+| `add-folder-data-ask` | 添加实例 · 文件夹 · 复制资源与运行库 | `add` | 1100×760 |
 | `add-folder-scan-error` | 添加实例 · 文件夹扫描失败 | `add` | 1100×760 |
 | `add-folder-read-error` | 添加实例 · 文件夹读取失败 | `add` | 1100×760 |
 | `add-folder-empty-error` | 添加实例 · 文件夹 · 空状态 · 错误 | `add` | 1100×760 |
@@ -255,7 +258,7 @@ npm run shots -- --clean
 | `download-empty` | 下载 · 空状态 | `download` | 1000×700 |
 | `download-paused` | 下载 · 已暂停 | `download` | 1000×700 |
 | `download-stop-modal` | 下载 · 停止确认弹窗 | `download` | 1000×700 |
-| `download-pause` | 下载 · 暂停全部（断言命令） | `download` | 1000×700 |
+| `download-pause` | 下载 · 暂停全部 | `download` | 1000×700 |
 | `download-failed` | 下载 · 有失败任务 | `download` | 1000×700 |
 
 ### Java 下载
@@ -263,6 +266,7 @@ npm run shots -- --clean
 | 图片 | 画面 | 窗口 | 视口 |
 | --- | --- | --- | --- |
 | `java-download` | Java 下载 · 列表 | `java_download` | 1000×720 |
+| `java-download-required` | Java 下载 · 缺 Java 时预选版本 | `java_download` | 1000×720 |
 | `java-loading` | Java 下载 · 加载中 | `java_download` | 1000×720 |
 | `java-download-start` | Java 下载 · 点击下载（断言命令） | `java_download` | 1000×700 |
 | `java-download-empty` | Java 下载 · 无匹配 | `java_download` | 1000×700 |

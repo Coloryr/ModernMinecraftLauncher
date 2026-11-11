@@ -192,7 +192,6 @@ export default {
 
   // List modes
   "mode.group": "Group",
-  "mode.grid": "Grid",
   "mode.list": "List",
   // The line under the icon in list mode: launch stats of the selected instance
   "list.launchStats": "Launched {count} times · {hours} h total",
@@ -1165,6 +1164,7 @@ export default {
   // Debugger launch: JVM remote debugging and render debugging are separate switches
   "debugger.entry": "Launch with a debugger",
   "debugger.entryTip": "Launch with a debugger; RenderDoc downloads on first use (about 100 MB)",
+  "debugger.debugLaunch": "Debug launch",
   "debugger.title": "Launch with a debugger",
   "debugger.desc": "JVM remote debugging and render debugging have their own switches; both off is a normal launch.",
   "debugger.jvm": "JVM debugging",
@@ -1215,6 +1215,9 @@ export default {
   "launch.exitedCode": "Exited (code {code})",
   "launch.waitLog": "Waiting for game log…",
   "launch.error": "[Error] {msg}",
+  "launch.javaMissingTitle": "Java required",
+  "launch.javaMissingText": "This instance needs Java {java}, but no matching Java was found. Download it now?",
+  "launch.javaMissingDownload": "Download Java {java}",
 
   // Launch states
   "state.launching": "Launching…",
@@ -1324,6 +1327,12 @@ export default {
   "add.folderNone": "No importable instance found; the whole folder will be used as one instance",
   "add.folderPickNone": "Tick at least one instance",
   "add.folderImported": "Imported {n} instance(s)",
+  "add.folderDataTitle": "Copy assets and libraries",
+  "add.folderDataBoth": "This folder contains assets and libraries. Copy them into the launcher's own assets / libraries? If not, they will be downloaded on first launch.",
+  "add.folderDataAssets": "This folder contains assets. Copy them into the launcher's own assets folder? If not, they will be downloaded on first launch.",
+  "add.folderDataLibraries": "This folder contains libraries. Copy them into the launcher's own libraries folder? If not, they will be downloaded on first launch.",
+  "add.folderDataCopy": "Copy to launcher",
+  "add.folderDataSkip": "Do not copy",
   "add.folderNameHint": "Each instance is named after its own folder",
   "add.folderEmpty": "Please choose a folder first",
   "add.folderReadFail": "Failed to read folder contents",
@@ -1675,6 +1684,7 @@ export default {
   "winJavaDownload.systemAix": "AIX",
   "winJavaDownload.systemSolaris": "Solaris",
   "winJavaDownload.listEmpty": "No matching Java",
+  "winJavaDownload.majorMissing": "This source does not offer Java {java}; the first available version is selected",
   "winJavaDownload.downloading": "Downloading…",
   "winJavaDownload.running": "Installing {count}",
   "winJavaDownload.finished": "{count} finished",
@@ -1927,7 +1937,7 @@ export default {
 
   // Instance list display mode
   "winSettings.viewMode": "Display Mode",
-  "winSettings.viewModeDesc": "How the main window arranges instances: Group spreads them out by group, Grid as a tile grid, List shows only the selected one.",
+  "winSettings.viewModeDesc": "How the main window arranges instances: Group spreads them out by group, List shows only the selected one.",
 
   // Stats window
   "build.prereleaseBadge": "Pre-release",
@@ -1991,8 +2001,8 @@ export default {
 
   // Skin window
   "winSkin.noSkin": "No skin available for this account (offline account or download failed)",
-  "winSkin.mode2d": "2D Flat",
-  "winSkin.mode3d": "3D Model",
+  "winSkin.mode2d": "2D",
+  "winSkin.mode3d": "3D",
   "winSkin.skinType": "Skin type",
   "winSkin.skinAuto": "Auto",
   "winSkin.skinClassic": "Classic",
@@ -2030,7 +2040,6 @@ export default {
   "firstRun.title": "Main page settings",
   "firstRun.modeTitle": "Main page layout",
   "firstRun.modeGroupDesc": "Grouped list, groups can collapse",
-  "firstRun.modeGridDesc": "Icon grid, several per row",
   "firstRun.modeListDesc": "Only the selected one",
   "firstRun.bgTitle": "Background image",
   "firstRun.bgPick": "Choose image",

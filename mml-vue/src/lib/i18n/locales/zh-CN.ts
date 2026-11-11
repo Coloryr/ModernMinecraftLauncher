@@ -192,7 +192,6 @@ export default {
 
   // 列表模式
   "mode.group": "分组",
-  "mode.grid": "平铺",
   "mode.list": "列表",
   // 列表模式图标下那行：选中实例的启动统计
   "list.launchStats": "已启动 {count} 次 · 累计 {hours} 小时",
@@ -1166,6 +1165,7 @@ export default {
   // 调试器启动：JVM 远程调试与渲染调试各自开关
   "debugger.entry": "使用调试器启动",
   "debugger.entryTip": "使用调试器启动；首次用 RenderDoc 会自动下载（约 100MB）",
+  "debugger.debugLaunch": "调试启动",
   "debugger.title": "使用调试器启动",
   "debugger.desc": "JVM 远程调试与渲染调试各自开关，两边都不开就是普通启动。",
   "debugger.jvm": "JVM 调试",
@@ -1216,6 +1216,9 @@ export default {
   "launch.exitedCode": "已退出（代码 {code}）",
   "launch.waitLog": "等待游戏日志输出…",
   "launch.error": "[错误] {msg}",
+  "launch.javaMissingTitle": "缺少 Java",
+  "launch.javaMissingText": "启动这个实例需要 Java {java}，本机没有可用的 Java {java}。现在去下载对应版本？",
+  "launch.javaMissingDownload": "下载 Java {java}",
 
   // 启动状态
   "state.launching": "正在启动…",
@@ -1325,6 +1328,12 @@ export default {
   "add.folderNone": "目录里没有可导入的实例，将整个文件夹作为一个实例",
   "add.folderPickNone": "请至少勾选一个实例",
   "add.folderImported": "已导入 {n} 个实例",
+  "add.folderDataTitle": "复制资源和运行库",
+  "add.folderDataBoth": "这个文件夹里有 assets 和 libraries。要复制到启动器自己的 assets / libraries 吗？不复制的话首次启动会重新下载。",
+  "add.folderDataAssets": "这个文件夹里有 assets（资源）。要复制到启动器自己的 assets 吗？不复制的话首次启动会重新下载。",
+  "add.folderDataLibraries": "这个文件夹里有 libraries（运行库）。要复制到启动器自己的 libraries 吗？不复制的话首次启动会重新下载。",
+  "add.folderDataCopy": "复制到启动器",
+  "add.folderDataSkip": "不复制",
   "add.folderNameHint": "实例名取各自的目录名，无需在此填写",
   "add.folderEmpty": "请先选择文件夹",
   "add.folderReadFail": "读取文件夹内容失败",
@@ -1676,6 +1685,7 @@ export default {
   "winJavaDownload.systemAix": "AIX",
   "winJavaDownload.systemSolaris": "Solaris",
   "winJavaDownload.listEmpty": "暂无匹配的 Java",
+  "winJavaDownload.majorMissing": "当前下载源没有 Java {java}，已选第一个可用版本",
   "winJavaDownload.downloading": "下载中…",
   "winJavaDownload.running": "正在安装 {count} 个",
   "winJavaDownload.finished": "已结束 {count} 个",
@@ -1928,7 +1938,7 @@ export default {
 
   // 实例列表显示模式
   "winSettings.viewMode": "显示模式",
-  "winSettings.viewModeDesc": "主窗口里项目列表按哪种方式排列：分组按分组铺开、平铺按图标网格、列表只显示选中的那一个。",
+  "winSettings.viewModeDesc": "主窗口里项目列表按哪种方式排列：分组按分组铺开、列表只显示选中的那一个。",
 
   // 统计窗口
   "build.prereleaseBadge": "预发布",
@@ -1992,8 +2002,8 @@ export default {
 
   // 皮肤窗口
   "winSkin.noSkin": "无法获取该账户的皮肤（离线账户或皮肤下载失败）",
-  "winSkin.mode2d": "2D 平面",
-  "winSkin.mode3d": "3D 模型",
+  "winSkin.mode2d": "2D",
+  "winSkin.mode3d": "3D",
   "winSkin.skinType": "皮肤类型",
   "winSkin.skinAuto": "自动",
   "winSkin.skinClassic": "经典",
@@ -2031,7 +2041,6 @@ export default {
   "firstRun.title": "主页面设置",
   "firstRun.modeTitle": "主页面样式",
   "firstRun.modeGroupDesc": "按分组铺开，组可以收起",
-  "firstRun.modeGridDesc": "图标网格，一排多个",
   "firstRun.modeListDesc": "只显示选中的那一个",
   "firstRun.bgTitle": "背景图",
   "firstRun.bgPick": "选择图片",

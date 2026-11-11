@@ -95,10 +95,64 @@ fn test_java_parses_fake_bat_output() {
     assert_eq!(info.version, "17.0.2");
     assert_eq!(info.major_version, 17);
     assert_eq!(info.java_type, "openjdk");
+    assert_eq!(info.vendor, "OpenJDK");
     // 输出包含 64-Bit，架构应与当前系统的 64 位架构一致
     assert_eq!(info.arch, mml_sys::get_system_info().system_arch);
     assert_eq!(info.path, fake);
     assert!(info.name.starts_with("openjdk-17.0.2-"));
+}
+
+/// 发行商识别：运行时行优先，路径只作兜底
+#[test]
+fn detect_vendor_from_output_and_path() {
+    use std::path::Path;
+
+    let empty = Path::new("");
+    assert_eq!(
+        detect_vendor(
+            "openjdk version \"21.0.5\"\nOpenJDK Runtime Environment Temurin-21.0.5+11",
+            empty,
+            "openjdk"
+        ),
+        "Temurin"
+    );
+    assert_eq!(
+        detect_vendor(
+            "openjdk version \"21.0.5\"\nOpenJDK Runtime Environment Zulu21.38+21-CA",
+            empty,
+            "openjdk"
+        ),
+        "Zulu"
+    );
+    assert_eq!(
+        detect_vendor(
+            "java version \"21.0.5\"\nJava(TM) SE Runtime Environment",
+            empty,
+            "java"
+        ),
+        "Oracle"
+    );
+    assert_eq!(
+        detect_vendor(
+            "openjdk version \"21.0.5\"\nOpenJDK Runtime Environment (build 21)",
+            empty,
+            "openjdk"
+        ),
+        "OpenJDK"
+    );
+    assert_eq!(
+        detect_vendor("java version \"1.8.0\"", empty, "java"),
+        "Java"
+    );
+    // 输出里没有厂商名时才看路径
+    assert_eq!(
+        detect_vendor(
+            "openjdk version \"21.0.5\"",
+            Path::new("C:\\Program Files\\Zulu\\zulu-21"),
+            "openjdk"
+        ),
+        "Zulu"
+    );
 }
 
 /// 用模拟输出验证 `java -version` 的解析逻辑，Unix 走 shell 脚本

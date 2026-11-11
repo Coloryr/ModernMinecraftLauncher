@@ -137,6 +137,8 @@ export interface WindowOpenParams {
   category?: string;
   /** 打开后要做的一次性动作；账户窗口用：add（打开添加表单）/ relogin（重新登录当前账户） */
   action?: "add" | "relogin";
+  /** Java 下载窗口要预选的主版本，如 17；启动缺 Java 时从提示弹窗带过去 */
+  javaMajor?: number;
 }
 
 /**
@@ -162,6 +164,8 @@ export interface WindowParamsState {
   category: string | null;
   /** 打开后要做的一次性动作，见 {@link WindowOpenParams.action} */
   action: string | null;
+  /** Java 下载窗口要预选的主版本，见 {@link WindowOpenParams.javaMajor} */
+  javaMajor: number | null;
 }
 
 /** 一份空参数，字段与 {@link WindowOpenParams} 一一对应；重置点共用它，别各抄一份 */
@@ -175,6 +179,7 @@ function emptyWindowParams(): WindowParamsState {
     logBottom: false,
     category: null,
     action: null,
+    javaMajor: null,
   };
 }
 
@@ -476,6 +481,9 @@ const CATEGORY_PARAM = "rcat";
 /** 一次性动作参数在 URL 上的键；账户窗口用（多窗口模式下只能靠 URL 送） */
 const ACTION_PARAM = "wact";
 
+/** Java 下载窗口预选主版本的 URL 键；多窗口模式下只能靠 URL 送 */
+const JAVA_MAJOR_PARAM = "jmajor";
+
 /** 按 kind 与带入参数拼出目标窗口的 URL；多窗口模式下新窗口靠它取参数 */
 function urlFor(
   kind: WindowKind,
@@ -516,6 +524,11 @@ function urlFor(
     url.searchParams.set(ACTION_PARAM, params.action);
   } else {
     url.searchParams.delete(ACTION_PARAM);
+  }
+  if (params?.javaMajor) {
+    url.searchParams.set(JAVA_MAJOR_PARAM, String(params.javaMajor));
+  } else {
+    url.searchParams.delete(JAVA_MAJOR_PARAM);
   }
   if (params?.drop) {
     url.searchParams.set(DROP_PARAMS.path, params.drop.path);
@@ -614,6 +627,20 @@ export function projectFromUrl(): WindowProjectParam | null {
  */
 export function actionFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get(ACTION_PARAM);
+}
+
+/**
+ * 从 URL 读取 Java 下载窗口要预选的主版本
+ *
+ * # 返回值
+ *
+ * 主版本号；没有该参数或不是正整数时为 null
+ */
+export function javaMajorFromUrl(): number | null {
+  const raw = new URLSearchParams(window.location.search).get(JAVA_MAJOR_PARAM);
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : null;
 }
 
 export function dropFromUrl(): WindowDropParam | null {
@@ -761,6 +788,7 @@ export async function openWindow(kind: WindowKind, params?: WindowOpenParams) {
       logBottom: params?.logBottom ?? false,
       category: params?.category ?? null,
       action: params?.action ?? null,
+      javaMajor: params?.javaMajor ?? null,
     };
     if (!isTauri()) window.history.pushState({}, "", urlFor(kind, params));
     return;
@@ -785,6 +813,7 @@ export async function openWindow(kind: WindowKind, params?: WindowOpenParams) {
       params?.logBottom ||
       params?.category ||
       params?.action ||
+      params?.javaMajor ||
       params?.project ||
       (kind === "server_pack" && !!params?.uuid)
     ) {

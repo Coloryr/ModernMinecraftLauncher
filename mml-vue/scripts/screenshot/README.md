@@ -7,9 +7,9 @@
 ```bash
 cd mml-vue
 npm run shots                           # 全部场景
-npm run shots -- main-grid              # 只跑一张，名字见 docs/screenshots.md
-npm run shots -- --scene=main-grid      # 同上
-npm run shots -- --scene=main-grid,settings-ui   # 一次跑多张
+npm run shots -- main-group             # 只跑一张，名字见 docs/screenshots.md
+npm run shots -- --scene=main-group     # 同上
+npm run shots -- --scene=main-group,settings-ui  # 一次跑多张
 npm run shots -- --only=settings        # 只跑 id 含 settings 的场景
 npm run shots -- --skip=lobby           # 排除 id 含 lobby 的场景
 npm run shots -- --list                 # 只列场景 id

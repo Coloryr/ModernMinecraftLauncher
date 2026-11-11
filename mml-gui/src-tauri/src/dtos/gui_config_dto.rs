@@ -61,7 +61,7 @@ pub struct MainWindowConfigDto {
     pub sidebar_side: SidebarSide,
     /// 侧栏是否收起
     pub sidebar_collapsed: bool,
-    /// 实例列表显示模式：list / group / grid，默认 list
+    /// 实例列表显示模式：list / group，默认 list；旧的 grid 读入时并入 group
     pub view_mode: ViewMode,
     /// 启动时先显示哪一屏：Home / List，默认 Home
     pub startup_page: StartupPage,

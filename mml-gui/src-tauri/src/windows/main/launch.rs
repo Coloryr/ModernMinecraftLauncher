@@ -821,7 +821,7 @@ impl ILaunchGui for LaunchGuiHook {
         true
     }
 
-    /// 没有可用的 Java：写进启动日志，让原因在界面上看得到
+    /// 没有可用的 Java：写进启动日志，并通知前端弹出下载提示
     fn no_java(&self, java: i32) {
         emit_log_line(
             &self.app,
@@ -829,12 +829,22 @@ impl ILaunchGui for LaunchGuiHook {
             &LogText::LaunchNoJava { java }.text(),
             false,
         );
+        emit_java_missing(&self.app, java);
     }
 
     /// 启动前 / 后命令：按用户在弹窗里的选择放行或跳过
     fn launch_process(&self, _run_type: ProcessRunType) -> bool {
         self.run_commands
     }
+}
+
+/// 缺少 Java 事件：启动时找不到所需主版本的 Java，前端弹「下载 Java」提示
+///
+/// - `app`: 应用句柄，事件的发送方
+/// - `java`: 所需主版本，如 17
+#[gui_macros::emit]
+fn emit_java_missing(app: &AppHandle, java: i32) {
+    let _ = app.emit(listens::JAVA_MISSING, java);
 }
 
 /// 启动阶段对应的前端状态名，与 i18n 的 `state.*` 一一对应

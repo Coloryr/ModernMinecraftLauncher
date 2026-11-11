@@ -30,6 +30,7 @@ export const GuiViewModeChange = "gui-view-mode-change"
 export const InstanceChange = "instance-change"
 export const JavaChange = "java-change"
 export const JavaInstallStatus = "java-install-status"
+export const JavaMissing = "java-missing"
 export const LaunchError = "launch-error"
 export const LaunchState = "launch-state"
 export const LoadDone = "load-done"
@@ -79,6 +80,7 @@ export interface EventPayloads {
   [InstanceChange]: InstanceChangeEvent;
   [JavaChange]: void;
   [JavaInstallStatus]: JavaInstallTaskDto[];
+  [JavaMissing]: number;
   [LaunchError]: ErrorEvent;
   [LaunchState]: StateEvent;
   [LoadDone]: LoadState;
@@ -142,6 +144,7 @@ export function createEvents(on: EventOn) {
     onInstanceChange: (cb: (payload: InstanceChangeEvent) => void) => on(InstanceChange, cb),
     onJavaChange: (cb: () => void) => on(JavaChange, cb),
     onJavaInstallStatus: (cb: (payload: JavaInstallTaskDto[]) => void) => on(JavaInstallStatus, cb),
+    onJavaMissing: (cb: (payload: number) => void) => on(JavaMissing, cb),
     onLaunchError: (cb: (payload: ErrorEvent) => void) => on(LaunchError, cb),
     onLaunchState: (cb: (payload: StateEvent) => void) => on(LaunchState, cb),
     onLoadDone: (cb: (payload: LoadState) => void) => on(LoadDone, cb),

@@ -12,6 +12,7 @@ import { commands } from "../../../lib/bindings";
 import { SettingsJavaProgress } from "../../../lib/listens";
 import { listen } from "@tauri-apps/api/event";
 import type { JavaImportProgressDto, JavaInfoDto } from "../../../lib/bindings";
+import { compareVendors, normalizeVendor } from "../../../lib/javaVendors";
 import { isTauri, openWindow } from "../../windowManager";
 
 /**
@@ -19,8 +20,8 @@ import { isTauri, openWindow } from "../../windowManager";
  *
  * # 返回值
  *
- * - `javaList` / `javaGroups`: 已注册的 Java 列表，以及按发行类型分好的分组
- * - `collapsedTypes` / `toggleType` / `typeOpen`: 分组的展开状态
+ * - `javaList` / `javaGroups`: 已注册的 Java 列表，以及按发行商分好的分组
+ * - `collapsedVendors` / `toggleVendor` / `vendorOpen`: 分组的展开状态
  * - `newJavaName` / `newJavaPath` / `addingJava` / `browseJava` / `addJava` / `removeJava` / `removeAllJava` / `confirmRemoveAll`: 手动增删
  * - `scanJava` / `scanJavaDir` / `scanning` / `scanningDir` / `importJavaArchive` / `importingJava` / `importProgress` / `importPercent` / `downloadJava`: 扫描、导入与下载
  * - `inTauri` / `load` / `resetGroup`: 环境判断、加载与分组级恢复默认
@@ -30,8 +31,8 @@ export function useSettingsJava() {
   const { track: trackUnlisten } = useUnlisteners();
 
   const javaList = ref<JavaInfoDto[]>([]);
-  /** 按类型收起的分组（默认全展开） */
-  const collapsedTypes = ref<Record<string, boolean>>({});
+  /** 按发行商收起的分组（默认全展开） */
+  const collapsedVendors = ref<Record<string, boolean>>({});
   const scanning = ref(false);
   const scanningDir = ref(false);
   const confirmRemoveAll = ref(false);
@@ -50,18 +51,29 @@ export function useSettingsJava() {
     return Math.min(100, Math.round((p.now / p.total) * 100));
   });
 
-  /** Java 列表按发行类型（JDK / JRE）分组，保持首次出现顺序 */
+  /**
+   * Java 列表按发行商分组，顺序固定
+   *
+   * 具名发行商在前，OpenJDK / Java 永远最后；组内按主版本倒序，避免列表每次
+   * 重拉都换一个顺序。
+   */
   const javaGroups = computed(() => {
-    const groups: { type: string; items: JavaInfoDto[] }[] = [];
+    const groups: { vendor: string; items: JavaInfoDto[] }[] = [];
     const index = new Map<string, JavaInfoDto[]>();
     for (const j of javaList.value) {
-      let items = index.get(j.javaType);
+      const vendor = normalizeVendor(j.vendor);
+      let items = index.get(vendor);
       if (!items) {
         items = [];
-        index.set(j.javaType, items);
-        groups.push({ type: j.javaType, items });
+        index.set(vendor, items);
+        groups.push({ vendor, items });
       }
       items.push(j);
+    }
+
+    groups.sort((a, b) => compareVendors(a.vendor, b.vendor));
+    for (const group of groups) {
+      group.items.sort((a, b) => b.major - a.major || a.name.localeCompare(b.name));
     }
     return groups;
   });
@@ -88,12 +100,12 @@ export function useSettingsJava() {
 
   // ---------- 分组展开 ----------
 
-  function toggleType(type: string) {
-    collapsedTypes.value[type] = !collapsedTypes.value[type];
+  function toggleVendor(vendor: string) {
+    collapsedVendors.value[vendor] = !collapsedVendors.value[vendor];
   }
 
-  function typeOpen(type: string) {
-    return !collapsedTypes.value[type];
+  function vendorOpen(vendor: string) {
+    return !collapsedVendors.value[vendor];
   }
 
   // ---------- 添加 / 删除 ----------
@@ -240,9 +252,9 @@ export function useSettingsJava() {
     inTauri,
     javaList,
     javaGroups,
-    collapsedTypes,
-    toggleType,
-    typeOpen,
+    collapsedVendors,
+    toggleVendor,
+    vendorOpen,
     scanning,
     scanningDir,
     newJavaName,

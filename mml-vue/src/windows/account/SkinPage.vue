@@ -654,27 +654,34 @@ onBeforeUnmount(destroyViewer);
   min-width: 0;
 }
 
+/* 左侧整块白底：3D / 2D 开关与预览共用同一张卡片，不再各占一块 */
 .preview {
   flex: 1;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-/* SegmentedTabs（2D / 3D）只占自身宽度，下方留缝；
-   不写 align-self 会按 flex 列容器的默认拉伸铺满整行 */
-.mode-toggle {
-  align-self: flex-start;
-  margin-bottom: 12px;
-}
-
-.preview-stage {
-  flex: 1;
-  min-height: 280px;
+  padding: 12px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 14px;
+  overflow: hidden;
+}
+
+/* SegmentedTabs（3D / 2D）只占自身宽度，下方留缝；
+   不写 align-self 会按 flex 列容器的默认拉伸铺满整行 */
+.mode-toggle {
+  align-self: flex-start;
+  margin-bottom: 10px;
+}
+
+/* 预览区直接铺在白底卡片里：开关已经在卡片内，这里不再套第二层边框 */
+.preview-stage {
+  flex: 1;
+  min-height: 280px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;

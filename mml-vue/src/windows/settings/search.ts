@@ -91,7 +91,7 @@ const SETTINGS_INDEX: IndexEntry[] = [
     tab: "ui",
     group: "mainWindow",
     labelKey: "winSettings.viewMode",
-    extra: ["view mode", "group", "grid", "list", "分组", "平铺", "列表", "显示模式"],
+    extra: ["view mode", "group", "list", "分组", "列表", "显示模式"],
   },
   { tab: "ui", group: "mainWindow", labelKey: "winSettings.sidebar", extra: ["sidebar", "侧栏"] },
   { tab: "ui", group: "bgImage", labelKey: "winSettings.bgImage", extra: ["background", "壁纸", "背景"] },

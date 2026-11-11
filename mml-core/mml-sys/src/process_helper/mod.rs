@@ -142,6 +142,9 @@ pub fn is_run_as_admin() -> bool {
 
 /// 启动进程
 ///
+/// Windows 上不创建控制台窗口：启动器是 GUI 进程，子进程若是控制台程序
+/// （如用户手动选的 `java.exe`），默认会自建一个黑窗。
+///
 /// - `path`: 可执行文件路径
 /// - `args`: 程序参数
 /// - `env`: 环境变量
@@ -161,10 +164,11 @@ pub fn launch<P: AsRef<Path>>(
     launch_inner(path, args, env, working_dir, admin, false, false)
 }
 
-/// 启动进程，Windows 上不弹控制台窗口
+/// 启动进程并断开 stdin
 ///
 /// 用在输出已经接到日志的命令上：那个窗口本身是空的，脚本里的交互式提问也没人能回答，
 /// 所以 stdin 直接接空设备，`input()` 这类调用会立刻读到 EOF 而不是一直挂着。
+/// 控制台窗口与 [`launch`] 一样不创建。
 ///
 /// 参数含义同 [`launch`]。
 pub fn launch_hidden<P: AsRef<Path>>(
@@ -195,7 +199,7 @@ pub fn launch_hidden_in_group<P: AsRef<Path>>(
 
 /// 启动进程的实现
 ///
-/// - `hidden`: Windows 上是否隐藏控制台窗口并断开 stdin
+/// - `hidden`: 是否断开 stdin；Windows 上控制台窗口始终不创建
 /// - `new_group`: Unix 上是否让子进程自成进程组，停止时可整组结束
 fn launch_inner<P: AsRef<Path>>(
     path: P,
@@ -217,6 +221,12 @@ fn launch_inner<P: AsRef<Path>>(
     cmd.current_dir(working_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        // 启动器是 GUI 进程、自己没有控制台，子进程只要是控制台程序（用户手动选的 java.exe、
+        // 自定义包装器）就会自建一个黑窗。输出已经接到日志，这里一律不建窗口
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
     #[cfg(unix)]
     if new_group {
         cmd.process_group(0);
@@ -226,9 +236,6 @@ fn launch_inner<P: AsRef<Path>>(
         // 空设备在 Windows 上算字符设备，`isatty()` 会返回真，脚本里的 input() 照样会打印提示
         // 并等按键。用管道再把写端关掉，子进程看到的是 EOF，isatty() 才是假
         cmd.stdin(Stdio::piped());
-        // 启动器是 GUI 进程、自己没有控制台，控制台程序会自建一个空窗口出来
-        #[cfg(windows)]
-        cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
     for (key, value) in env {
@@ -509,5 +516,5 @@ where
 }
 
 #[cfg(test)]
-#[path = "../tests/unit/process_helper_tests.rs"]
+#[path = "../../tests/unit/process_helper_tests.rs"]
 mod tests;

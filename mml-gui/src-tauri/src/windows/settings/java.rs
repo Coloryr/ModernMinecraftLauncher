@@ -19,13 +19,16 @@ use crate::listens;
 
 /// 扫描系统已安装的 Java 并持久化到配置
 ///
+/// 注册表查询、`where` 与逐个 `java -version` 探测都是阻塞操作，整段扫描
+/// 放到阻塞线程执行，命令本身不占主线程。
+///
 /// # 返回值
 ///
 /// 扫描后的完整 Java 列表
 #[gui_macros::ipc_group("settings")]
 #[gui_macros::command]
-pub fn settings_scan_java() -> Vec<JavaInfoDto> {
-    mml_jvms::scan_java();
+pub async fn settings_scan_java() -> Vec<JavaInfoDto> {
+    let _ = tauri::async_runtime::spawn_blocking(mml_jvms::scan_java).await;
     java_list()
 }
 
@@ -129,7 +132,13 @@ pub async fn settings_import_java(
 #[gui_macros::ipc_group("settings")]
 #[gui_macros::command]
 pub async fn settings_scan_java_dir(path: String) -> Result<Vec<JavaInfoDto>, String> {
-    let files = mml_jvms::find_all_java_from_path(Path::new(&path));
+    // 递归遍历目录也是阻塞活：用户可能选中整个盘符，不能占着异步 worker
+    let files = tauri::async_runtime::spawn_blocking(move || {
+        mml_jvms::find_all_java_from_path(Path::new(&path))
+    })
+    .await
+    .map_err(|err| err.to_string())?;
+
     if files.is_empty() {
         return Ok(Vec::new());
     }
@@ -198,6 +207,7 @@ fn info_dto(info: &Arc<JavaInfoObj>) -> JavaInfoDto {
         version: info.version.clone(),
         major: info.major_version.max(0),
         java_type: info.java_type.clone(),
+        vendor: info.vendor.clone(),
         arch: info.arch.to_string(),
     }
 }

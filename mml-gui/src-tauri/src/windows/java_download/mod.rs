@@ -375,6 +375,11 @@ where
 {
     let report = Arc::new(report);
 
+    // 文件名缺失时下载目标会退化成下载目录本身，不能把目录当文件写
+    if item.file.file_name().is_none() || item.file.is_dir() {
+        return JavaInstallResult::Failed(err_keys::DOWNLOAD_FAILED.to_string());
+    }
+
     // 下载只负责把 zip 拿到本地，解压单独作为下一段
     report(JavaInstallEvent::Stage(JavaInstallStageDto::Download));
     let Some(handle) =

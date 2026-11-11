@@ -106,7 +106,7 @@ import type {
   ViewMode,
   MenuActionEvent,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, JavaInstallStatus, LaunchError, LaunchState, MenuAction, MinecraftProgress, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, JavaInstallStatus, JavaMissing, LaunchError, LaunchState, MenuAction, MinecraftProgress, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
 
 export interface CreateInstanceOpts {
   /** 加载器 ID，缺省为 `normal` */
@@ -323,13 +323,21 @@ export const api = {
    * - `path`: 待导入的文件夹路径
    * - `name`: 实例名
    * - `group`: 分组 uuid，null = 默认分组
+   * - `dataRoot`: 源目录里 assets / libraries 所在根；null 表示不处理这两块
+   * - `copyData`: 是否把它们合并进启动器自己的 assets / libraries
    *
    * # 返回值
    *
    * 新实例的 uuid
    */
-  async addImportFolder(path: string, name: string, group: string | null): Promise<string> {
-    return commands.add.importFolder(path, name, group);
+  async addImportFolder(
+    path: string,
+    name: string,
+    group: string | null,
+    dataRoot: string | null,
+    copyData: boolean,
+  ): Promise<string> {
+    return commands.add.importFolder(path, name, group, dataRoot, copyData);
   },
 
   /**
@@ -2004,6 +2012,19 @@ export function onMenuAction(cb: (action: string) => void): Promise<UnlistenFn> 
  */
 export function onJavaChange(cb: () => void): Promise<UnlistenFn> {
   return listen(JavaChange, () => cb());
+}
+
+/**
+ * 启动时缺少 Java：订阅这次启动所需的主版本
+ *
+ * - `cb`: 回调，参数为所需 Java 主版本，如 17
+ *
+ * # 返回值
+ *
+ * 退订函数
+ */
+export function onJavaMissing(cb: (java: number) => void): Promise<UnlistenFn> {
+  return listen<number>(JavaMissing, (e) => cb(e.payload));
 }
 
 /**

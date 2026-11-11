@@ -165,39 +165,23 @@ export function useInstanceDrag(deps: DragDeps) {
         dragInsert.value = { groupId, index: dragged >= 0 && dragged < index ? index - 1 : index };
       };
 
-      // 占满模式下组内是网格卡片：按指针落在卡片左 / 右半区算插到它前面还是后面
-      const tile = el?.closest?.(".tile") as HTMLElement | null;
-      if (tile) {
-        if (tile.classList.contains("add-tile")) {
-          setIndex(0);
-          return;
-        }
-        const rect = tile.getBoundingClientRect();
-        const at = Number(tile.dataset.idx ?? 0);
-        setIndex(e.clientX > rect.left + rect.width / 2 ? at + 1 : at);
-        return;
-      }
-      // 落在卡片之间的空隙里：按同一行卡片的水平中线找插入点
-      const tileRow = el?.closest?.(".vrow-tiles") as HTMLElement | null;
-      if (tileRow) {
-        const tiles = [...tileRow.querySelectorAll(".tile[data-idx]")] as HTMLElement[];
-        let index = tiles.length ? Number(tiles[tiles.length - 1].dataset.idx ?? 0) + 1 : 0;
-        for (const item of tiles) {
-          const rect = item.getBoundingClientRect();
-          if (e.clientX < rect.left + rect.width / 2) {
-            index = Number(item.dataset.idx ?? 0);
-            break;
-          }
-        }
-        setIndex(index);
+      // 指针正压在某个实例格上时它自己就是最准的落点：列表行按纵坐标分上下，
+      // 向右占满后的平铺卡按横坐标分左右
+      const hit = (el?.closest?.(".inst-row, .tile") ?? null) as HTMLElement | null;
+      if (hit && hit.dataset.group === groupId && hit.dataset.idx !== undefined) {
+        const rect = hit.getBoundingClientRect();
+        const after = hit.classList.contains("tile")
+          ? e.clientX > rect.left + rect.width / 2
+          : e.clientY > rect.top + rect.height / 2;
+        setIndex(Number(hit.dataset.idx) + (after ? 1 : 0));
         return;
       }
 
-      // 列表模式：行是虚拟滚动的，只渲染视口附近那几行，落点按"压在哪一行、行上半还是下半"
-      // 加该行的 data-idx 算，不能数渲染出来的行数（被藏起来的行没有 DOM）
+      // 指针在空隙里：按渲染出来的格子顺序找最近的一格；虚拟滚动的行没有 DOM，
+      // 所以要用该行的 data-idx，不能数渲染出来的行数
       const rows = listEl
-        ? ([...listEl.querySelectorAll(".inst-row")] as HTMLElement[]).filter(
-          (r) => r.dataset.group === groupId,
+        ? ([...listEl.querySelectorAll(".inst-row, .tile")] as HTMLElement[]).filter(
+          (r) => r.dataset.group === groupId && r.dataset.idx !== undefined,
         )
         : [];
       let index = 0;

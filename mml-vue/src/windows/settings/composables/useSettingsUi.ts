@@ -60,7 +60,7 @@ const SLIDER_COMMIT_DELAY = 250;
  * - `windowMode` / `onModeChange`: 单窗口 / 多窗口，切换后重载界面
  * - `locale` / `onLangChange` / `side` / `onSideChange` / `themeValue` / `onThemeChange`: 语言、侧栏、主题
  * - `startup` / `onStartupChange`: 启动器启动时先显示启动器主页还是项目列表
- * - `view` / `onViewModeChange`: 实例列表按分组 / 平铺 / 列表哪种方式显示
+ * - `view` / `onViewModeChange`: 实例列表按分组 / 列表哪种方式显示
  * - `fonts` / `fontsLoading` / `loadFonts` / `fontPick` / `setFontFamily`: 系统字体
  * - `animations` / `setAnimations` / `accent` / `setAccent` / `customAccent` / `setCustomAccent` / `ACCENTS`: 动画与强调色
  * - `bgImage` / `setBgImage` / `bgLoading` / `bgFileInput` / `bgSourceInput` / `loadBgSource` / `pickBgImage` / `onBgFile`: 背景图加载与清除
@@ -144,7 +144,7 @@ export function useSettingsUi() {
 
   /** 实例列表显示模式：改完落盘，主窗口由后端广播的 gui-view-mode-change 跟着换视图 */
   function onViewModeChange(v: string) {
-    view.value = v === "group" || v === "grid" ? v : DEFAULT_VIEW_MODE;
+    view.value = v === "group" || v === "grid" ? "group" : DEFAULT_VIEW_MODE;
     setViewMode(view.value);
   }
 

@@ -308,6 +308,7 @@ fn add_info_items_keeps_same_version_java_apart() {
         version: "17.0.2".to_string(),
         major_version: 17,
         java_type: "openjdk".to_string(),
+        vendor: "OpenJDK".to_string(),
         arch: ArchEnum::X86_64,
     };
     let exe_in = |home: &str| make_temp_dir(home).join("bin").join(java_file_name());

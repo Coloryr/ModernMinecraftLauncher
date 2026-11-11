@@ -60,6 +60,9 @@ const showTaskIndicators = computed(() => {
   );
 });
 
+/** 下载窗口整页就是下载管理，不挂 Java 安装入口 */
+const showJavaIndicator = computed(() => currentKind.value !== "download");
+
 const emit = defineEmits<{
   /** 返回按钮：单窗口模式下回上一层 */
   (e: "close"): void;
@@ -131,9 +134,9 @@ defineExpose({ bodyEl });
       <ModpackTitleIndicator v-if="showTaskIndicators && !hideModpackIndicator" />
       <DownloadTitleIndicator v-if="showTaskIndicators && !hideDownloadIndicator" />
       <ResourceTitleIndicator />
-      <!-- Java 安装进度：哪个窗口都可能发起安装（设置页的「下载 Java」），
-           所以每个窗口都挂；没有任务时组件自己整块不存在 -->
-      <JavaTitleIndicator />
+      <!-- Java 安装进度：设置页的「下载 Java」会发起安装，多窗口下各窗口都能看到；
+           下载窗口整页是下载管理，不在这里再挂一份入口 -->
+      <JavaTitleIndicator v-if="showJavaIndicator" />
       <!-- 自定义音乐：只有持有播放器的那个窗口会画出来（多窗口模式 = 主窗口） -->
       <MusicTitleIndicator />
 

@@ -86,6 +86,10 @@
   `createCommands`，后者再导出事件名，既有导入路径不变；`custom-main-demo` 直接引用 `mml-ipc`。
   新增命令加 `#[gui_macros::command]`，新增事件加 `#[gui_macros::emit]`；单独重新生成可跑
   `cd mml-gui && cargo check --manifest-path src-tauri/Cargo.toml`（或仓库根 `cargo check -p mml-gui`）。
+- **`mml-ipc` 在 mml-vue 里按路径解析，不建 `node_modules` 链接**：`vite.config.ts` 的 alias 与
+  `tsconfig.json` 的 `paths` 都指向 `../mml-ipc/src/index.ts`。链接存的是绝对路径，
+  仓库目录改名 / 移动后就会悬空，表现为 Vite 报 `Failed to resolve import "mml-ipc"`；
+  别用 `npm link` 去恢复，也别把它写回 `package.json` 的依赖。
 - 扫描与生成逻辑在 `ipc-gen/`（包名 `gui-ipc-gen`，有单测），过程宏在 `ipc-gen/macros/`
   （包名 `gui-macros`）：`src-tauri/build.rs` 只是调用方（算路径、传 `GenConfig`、写文件、
   打 cargo 指令）；改生成规则改那个包，跑 `cd ipc-gen && cargo test` 验证。

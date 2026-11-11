@@ -1,10 +1,10 @@
 <script setup lang="ts">
-// 主窗口侧栏：搜索 / 分组列表（拖拽排序）/ 平铺
+// 主窗口侧栏：搜索 / 分组列表（拖拽排序）
 // 状态与交互全部通过 props / emits 与 MainWindow 联通；
-// 分组 / 平铺 / 列表的切换入口不在这里，在设置窗口「界面 → 主窗口」
+// 分组 / 列表的切换入口不在这里，在设置窗口「界面 → 主窗口」
 //
-// 两种模式的实例列表都走虚拟滚动（components/ui/VirtualList）：实例上百时只渲染视口附近
-// 那几行。行高按行种钉死（分组标题 / 添加 / 实例 / 平铺卡片各一档，见 ROW_H_*），窗口与
+// 实例列表走虚拟滚动（components/ui/VirtualList）：实例上百时只渲染视口附近
+// 那几行。行高按行种钉死（分组标题 / 添加 / 实例各一档，见 ROW_H_*），窗口与
 // 滚动条长度都按常量算，不用渲染出来再量。
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import DragGhost from "../../../components/ui/DragGhost.vue";
@@ -14,20 +14,16 @@ import VirtualList from "../../../components/ui/VirtualList.vue";
 import InstanceIcon from "../../../components/InstanceIcon.vue";
 import { animations } from "../../../lib/appearance";
 import { t } from "../../../lib/i18n";
-import type { InstanceInfoDto, ViewMode } from "../../../lib/bindings";
+import type { InstanceInfoDto } from "../../../lib/bindings";
 import type { DragCandidate, GroupView } from "../types";
 
 const props = defineProps<{
-  /** 当前显示模式：group 分组列表 / grid 平铺 */
-  mode: ViewMode;
   /** 搜索框当前文本，受控 */
   searchText: string;
   /** 全部分组，含空分组；用来区分"一个实例都没有"与"搜索没结果"两种空态 */
   groups: GroupView[];
   /** 过滤后的分组，分组列表实际渲染的就是它 */
   filteredGroups: GroupView[];
-  /** 平铺模式渲染的实例列表 */
-  filteredInstances: InstanceInfoDto[];
   /** 是否正在搜索；搜索时分组强制展开，便于查看命中结果 */
   searching: boolean;
   /** 当前选中实例 */
@@ -204,23 +200,23 @@ function clearGroupAnims() {
 const ROW_H_GROUP = 48;
 /** 实例行 / 添加行 / 实例插入占位的高度，单位 px；与 CSS 的 .vrow-inst 等同源 */
 const ROW_H_INST = 60;
-/** 平铺卡片高度，单位 px；与 CSS 的 .tile height 同源 */
+/** 占满时平铺卡片的高度，单位 px；与 CSS 的 .tile 同源 */
 const TILE_H = 112;
-/** 平铺的行间距，单位 px；与 .vrow-tiles 里多出来的那截同源 */
+/** 平铺卡片之间的行间距，单位 px */
 const TILE_GAP = 8;
-/** 一行平铺卡片的高度，单位 px */
+/** 平铺卡片一行的高度，单位 px */
 const ROW_H_TILE = TILE_H + TILE_GAP;
-/** 平铺卡片的最小宽度，单位 px；未占满时与 CSS 原来的 minmax(96px, 1fr) 同源 */
-const TILE_MIN = 96;
-/** 占满时的最小宽度，单位 px；与原来的 minmax(120px, 1fr) 同源 */
+/** 平铺卡片最小宽度，单位 px；占满时按它算一行放几格 */
 const TILE_MIN_MAX = 120;
-/** 分组收起 / 展开的高度动画时长，单位 ms；沿用旧版 grid 过渡的 0.22s */
+/** 分组收起 / 展开的高度动画时长，单位 ms；沿用旧版过渡的 0.22s */
 const GROUP_ANIM_MS = 220;
 /** 侧栏列表的顶部内边距，单位 px；与 .sidebar-list 的 padding-top 同源 */
 const LIST_PAD_TOP = 2;
 
-/** 平铺模式的一格：添加卡或实例卡；实例卡带组内下标，拖拽落点按它算 */
-type TileCell = { kind: "add" } | { kind: "inst"; inst: InstanceInfoDto; idx: number };
+/** 占满时的一格：添加卡或实例卡 */
+type TileCell =
+  | { kind: "add" }
+  | { kind: "instance"; idx: number; inst: InstanceInfoDto };
 
 /** 虚拟列表的一行 */
 type Row =
@@ -229,33 +225,29 @@ type Row =
   | { kind: "add"; key: string; gi: number; groupId: string }
   | { kind: "inst"; key: string; gi: number; group: GroupView; idx: number; inst: InstanceInfoDto }
   | { kind: "ghost-inst"; key: string; gi: number; groupId: string }
-  | { kind: "tiles"; key: string; gi: number; cells: TileCell[]; groupId: string; lastIdx: number };
+  | { kind: "tiles"; key: string; gi: number; groupId: string; cells: TileCell[] };
 
-/** 滚动容器（VirtualList 的根），量宽度与按行滚动都通过它 */
+/** 滚动容器（VirtualList 的根），按行滚动都通过它 */
 const listRef = ref<{
   el: HTMLElement | null;
   scrollToIndex: (index: number, align?: "nearest" | "center") => void;
 } | null>(null);
 
-/** 滚动容器去掉左右内边距后的宽度，单位 px；平铺的列数按它算 */
+/** 滚动容器去掉左右内边距后的宽度，单位 px；平铺列数按它算 */
 const contentWidth = ref(0);
 
-/** 平铺卡片的最小宽度，单位 px：占满时放宽一档，一排不至于全是小方块 */
-const tileMin = computed(() => (props.maximized ? TILE_MIN_MAX : TILE_MIN));
+/** 平铺每行放几格：与卡片最小宽度、间距同一口径 */
+const columns = computed(() =>
+  Math.max(1, Math.floor((contentWidth.value + TILE_GAP) / (TILE_MIN_MAX + TILE_GAP))),
+);
 
-/** 平铺每行的列数：与 CSS 的 auto-fill 同一口径（宽度减去最小宽度，按间距取整） */
-const columns = computed(() => {
-  const w = contentWidth.value;
-  return Math.max(1, Math.floor((w + TILE_GAP) / (tileMin.value + TILE_GAP)));
-});
-
-/** 平铺一行的网格样式：列数按容器宽度现算，与脚本里切行的口径一致 */
+/** 平铺行的网格样式：列数必须与脚本切行的口径一致 */
 const tileGridStyle = computed(() => ({
-  gridTemplateColumns: "repeat(" + columns.value + ", minmax(0, 1fr))",
-  gap: TILE_GAP + "px",
+  gridTemplateColumns: `repeat(${columns.value}, minmax(0, 1fr))`,
+  gap: `${TILE_GAP}px`,
 }));
 
-/** 量一次滚动容器的内容宽度 */
+/** 量一次滚动容器去掉内边距后的内容宽度 */
 function measureWidth() {
   const el = listRef.value?.el ?? null;
   if (!el) return;
@@ -263,6 +255,9 @@ function measureWidth() {
   const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
   contentWidth.value = Math.max(0, el.clientWidth - pad);
 }
+
+const widthObserver = new ResizeObserver(() => measureWidth());
+onMounted(() => measureWidth());
 
 /** 侧栏列表当前滚动位置，单位 px；只给粘滞头算位置，不做成响应式 */
 let listScrollTop = 0;
@@ -280,22 +275,20 @@ let listEl: HTMLElement | null = null;
  */
 function updateStickyIndex() {
   let next = -1;
-  if (props.mode === "group") {
-    const list = rows.value;
-    const heights = rowHeights.value;
-    if (list.length) {
-      const top = listScrollTop;
-      let y = LIST_PAD_TOP;
-      let active: { gi: number; headerTop: number; collapsed: boolean } | null = null;
-      for (let i = 0; i < list.length; i += 1) {
-        const row = list[i];
-        if (row.kind === "group" && y <= top + 0.5) {
-          active = { gi: row.gi, headerTop: y, collapsed: !isGroupOpen(row.group.id) };
-        }
-        y += heights[i] ?? 0;
+  const list = rows.value;
+  const heights = rowHeights.value;
+  if (list.length) {
+    const top = listScrollTop;
+    let y = LIST_PAD_TOP;
+    let active: { gi: number; headerTop: number; collapsed: boolean } | null = null;
+    for (let i = 0; i < list.length; i += 1) {
+      const row = list[i];
+      if (row.kind === "group" && y <= top + 0.5) {
+        active = { gi: row.gi, headerTop: y, collapsed: !isGroupOpen(row.group.id) };
       }
-      if (active && !active.collapsed && top > active.headerTop + 0.5) next = active.gi;
+      y += heights[i] ?? 0;
     }
+    if (active && !active.collapsed && top > active.headerTop + 0.5) next = active.gi;
   }
   if (stickyIndex.value !== next) stickyIndex.value = next;
 }
@@ -316,94 +309,76 @@ function onStickyWheel(e: WheelEvent) {
   listEl.scrollTop += e.deltaY;
 }
 
-const widthObserver = new ResizeObserver(() => {
-  measureWidth();
-  updateStickyIndex();
-});
-
-onMounted(() => measureWidth());
 onUnmounted(() => {
-  widthObserver.disconnect();
   listEl?.removeEventListener("scroll", onListScroll);
+  widthObserver.disconnect();
   clearGroupAnims();
 });
 
-// 挂载后滚动容器才出现（两种模式共用同一个实例），盯住它量宽度、挂滚动监听
+// 挂载后滚动容器才出现，盯住它挂滚动监听
 watch(
   () => listRef.value?.el ?? null,
   (el) => {
-    widthObserver.disconnect();
     if (listEl) listEl.removeEventListener("scroll", onListScroll);
+    widthObserver.disconnect();
     listEl = el;
     if (!el) return;
-    widthObserver.observe(el);
     el.addEventListener("scroll", onListScroll, { passive: true });
-    listScrollTop = el.scrollTop;
+    widthObserver.observe(el);
     measureWidth();
+    listScrollTop = el.scrollTop;
     updateStickyIndex();
   },
   { flush: "post" },
 );
 
 /**
- * 把一串格子按列数切成若干行
+ * 把一串格子按当前列数切成若干平铺行
  *
- * - `cells`: 这一组（或整个平铺列表）的格子
- * - `key`: 行的 key 前缀，分组 uuid 或 grid
- * - `gi`: 分组下标；平铺模式给 -1
+ * - `cells`: 这一组的格子，添加卡在第一个
+ * - `key`: 行的 key 前缀，用分组 uuid
+ * - `gi`: 分组下标
  *
  * # 返回值
  *
  * 见 [`Row`] 里的 tiles 行
  */
-function chunkTiles(
-  cells: TileCell[],
-  key: string,
-  gi: number,
-  groupId = "",
-  lastIdx = -1,
-): Row[] {
+function chunkTiles(cells: TileCell[], key: string, gi: number): Row[] {
   const out: Row[] = [];
   const cols = Math.max(1, columns.value);
   for (let i = 0; i < cells.length; i += cols) {
     out.push({
       kind: "tiles",
-      key: "t-" + key + "-" + i,
+      key: `t-${key}-${i}`,
       gi,
+      groupId: key,
       cells: cells.slice(i, i + cols),
-      groupId,
-      lastIdx,
     });
   }
   return out;
 }
 
-/** 平铺模式的行表：添加卡 + 全部实例，按列数切行 */
-function gridRows(list: InstanceInfoDto[]): Row[] {
-  const cells: TileCell[] = [];
-  if (!props.multiSelect) cells.push({ kind: "add" });
-  list.forEach((inst, idx) => cells.push({ kind: "inst", inst, idx }));
-  return chunkTiles(cells, "grid", -1);
-}
-
 /**
- * 分组模式的行表：分组标题 + 添加行 + 实例行
+ * 分组列表的行表：分组标题 + 添加行 + 实例行
  *
  * 收起的组只留标题行 —— 组内一行都不渲染，滚起来才省事。
- * 占满时组内改用平铺卡片，与平铺模式同一套格子。
+ * 向右占满时组内改用平铺卡片，一行放多个实例。
  */
 const rows = computed<Row[]>(() => {
-  if (props.mode === "grid") return gridRows(props.filteredInstances);
   const out: Row[] = [];
   props.filteredGroups.forEach((g, gi) => {
     if (props.isGroupInsert(gi)) out.push({ kind: "ghost-group", key: "gg-" + gi, gi });
     out.push({ kind: "group", key: "g-" + g.id, gi, group: g });
     if (!isGroupOpen(g.id)) return;
+    // 占满时整组铺成卡片，按容器宽度一行放多个
     if (props.maximized) {
       const cells: TileCell[] = [];
       if (!props.multiSelect) cells.push({ kind: "add" });
-      g.items.forEach((inst, idx) => cells.push({ kind: "inst", inst, idx }));
-      out.push(...chunkTiles(cells, g.id, gi, g.id, g.items.length - 1));
+      g.items.forEach((inst, idx) => {
+        if (inst.uuid === props.draggingUuid) return;
+        cells.push({ kind: "instance", idx, inst });
+      });
+      out.push(...chunkTiles(cells, g.id, gi));
       return;
     }
     if (!props.multiSelect) out.push({ kind: "add", key: "a-" + g.id, gi, groupId: g.id });
@@ -516,11 +491,6 @@ watch(animations, (on) => {
   if (!on) clearGroupAnims();
 });
 
-watch(
-  () => props.mode,
-  () => clearGroupAnims(),
-);
-
 /** 粘滞分组头对应的分组；下标不变时对象引用也不变 */
 const stickyGroup = computed<GroupView | null>(() => {
   const index = stickyIndex.value;
@@ -528,20 +498,9 @@ const stickyGroup = computed<GroupView | null>(() => {
 });
 
 watch(
-  [rows, rowHeights, collapseState, () => props.mode, () => props.filteredGroups],
+  [rows, rowHeights, collapseState, () => props.filteredGroups],
   () => updateStickyIndex(),
 );
-
-/**
- * 平铺卡按下：只有分组模式（占满）支持拖拽，平铺模式的卡片不拖
- *
- * - `e`: 指针按下事件
- * - `inst`: 被按住的实例
- */
-function onTilePointerDown(e: PointerEvent, inst: InstanceInfoDto) {
-  if (props.mode !== "group") return;
-  props.onDragPointerDown(e, { kind: "instance", instance: inst });
-}
 
 /**
  * 把某个实例滚进视野
@@ -551,13 +510,24 @@ function onTilePointerDown(e: PointerEvent, inst: InstanceInfoDto) {
  * - `uuid`: 实例 uuid；行表里没有（分组收起 / 搜索过滤掉）时什么都不做
  */
 function scrollToInstance(uuid: string) {
-  // 占满时实例在平铺卡片行里，行号要按"这一行里有它"来找
+  // 占满时实例在平铺行里，按"这一行里有它"找行号
   const index = rows.value.findIndex((row) =>
     row.kind === "inst"
       ? row.inst.uuid === uuid
-      : row.kind === "tiles" && row.cells.some((c) => c.kind === "inst" && c.inst.uuid === uuid),
+      : row.kind === "tiles" &&
+      row.cells.some((cell) => cell.kind === "instance" && cell.inst.uuid === uuid),
   );
   if (index >= 0) listRef.value?.scrollToIndex(index, "center");
+}
+
+/**
+ * 平铺卡按下：与实例行一样交给拖拽，多选开关由 useInstanceDrag 自己判断
+ *
+ * - `e`: 指针按下事件
+ * - `inst`: 被按住的实例
+ */
+function onTilePointerDown(e: PointerEvent, inst: InstanceInfoDto) {
+  props.onDragPointerDown(e, { kind: "instance", instance: inst });
 }
 
 defineExpose({ scrollToInstance });
@@ -580,7 +550,7 @@ defineExpose({ scrollToInstance });
         </button>
       </div>
 
-      <!-- 向右占满：把详情区让出来，实例按多列排开；多选时锁死在这一档 -->
+      <!-- 向右占满：把详情区让出来给实例列表；多选时锁死在这一档 -->
       <button class="icon-btn" :class="{ on: maximized }" :disabled="multiSelect"
         v-tip="multiSelect ? t('sidebar.maximizeLocked') : (maximized ? t('sidebar.restore') : t('sidebar.maximize'))"
         :aria-label="maximized ? t('sidebar.restore') : t('sidebar.maximize')" @click="emit('toggle-maximize')">
@@ -594,8 +564,8 @@ defineExpose({ scrollToInstance });
 
     <!-- 虚拟列表外包一层：粘滞分组头绝对定位在列表顶部，不跟着列表滚走 -->
     <div class="sidebar-list-wrap">
-      <!-- 分组 / 平铺共用一张虚拟列表：行表由脚本按模式铺好，这里只按行种画 -->
-      <VirtualList ref="listRef" class="sidebar-list" :class="mode === 'group' ? 'group-list' : 'tile-list'"
+      <!-- 分组列表的虚拟列表：行表由脚本按分组铺好，这里只按行种画 -->
+      <VirtualList ref="listRef" class="sidebar-list group-list"
         :count="rows.length" :heights="rowHeights" :row-gap="0">
         <template #default="{ start, end }">
           <template v-for="row in rows.slice(start, end)" :key="row.key">
@@ -643,9 +613,8 @@ defineExpose({ scrollToInstance });
               </div>
             </div>
 
-            <!-- 平铺卡片行：占满时与平铺模式同一套卡，外观、角标、运行点位置都一致 -->
-            <div v-else-if="row.kind === 'tiles'" class="vrow vrow-tiles" :data-group="row.groupId"
-              :style="rowStyle(row)">
+            <!-- 平铺卡片行：向右占满时一组实例铺成多列，一行放多个 -->
+            <div v-else-if="row.kind === 'tiles'" class="vrow vrow-tiles" :style="rowStyle(row)">
               <div class="tile-grid" :style="tileGridStyle">
                 <template v-for="(cell, ci) in row.cells" :key="ci">
                   <div v-if="cell.kind === 'add'" class="tile add-tile" @click="emit('add-instance')">
@@ -654,16 +623,13 @@ defineExpose({ scrollToInstance });
                     </span>
                     <span class="tile-name">{{ t("group.add") }}</span>
                   </div>
-                  <div v-else class="tile" :data-uuid="cell.inst.uuid" :data-idx="cell.idx" :class="{
-                    active: selected?.uuid === cell.inst.uuid,
-                    'multi-checked': multiSelect && selectedIds.has(cell.inst.uuid),
-                    dragging: cell.inst.uuid === draggingUuid,
-                    'drop-before': dragActive?.kind === 'instance' && cell.inst.uuid !== draggingUuid
-                      && isInstInsert(row.groupId, cell.idx),
-                    'drop-after': dragActive?.kind === 'instance' && cell.inst.uuid !== draggingUuid
-                      && cell.idx === row.lastIdx && isInstInsertEnd(row.groupId),
-                  }" @pointerdown="onTilePointerDown($event, cell.inst)" @click="onInstClick(cell.inst, $event)"
-                    @contextmenu.prevent="onInstContext($event, cell.inst)">
+                  <div v-else class="tile" :data-uuid="cell.inst.uuid" :data-idx="cell.idx"
+                    :data-group="row.groupId" :class="{
+                      active: selected?.uuid === cell.inst.uuid,
+                      'multi-checked': multiSelect && selectedIds.has(cell.inst.uuid),
+                      running: cell.inst.running,
+                    }" @pointerdown="onTilePointerDown($event, cell.inst)"
+                    @click="onInstClick(cell.inst, $event)" @contextmenu.prevent="onInstContext($event, cell.inst)">
                     <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(cell.inst.uuid) }">
                       <GlyphIcon name="check" :size="12" :weight="2.6" />
                     </span>
@@ -702,16 +668,13 @@ defineExpose({ scrollToInstance });
           </template>
 
           <!-- 空态与「添加分组」跟在最后一行后面，不参与窗口计算 -->
-          <template v-if="mode === 'group'">
-            <div v-if="groups.length === 0" class="empty-tip">{{ t("list.empty") }}</div>
-            <div v-else-if="filteredGroups.length === 0" class="empty-tip">{{ t("search.empty") }}</div>
-            <button class="add-row-btn add-group-row" :disabled="dragActive?.kind === 'instance'"
-              @click="emit('add-group')">
-              <GlyphIcon name="plus" :size="14" />
-              <span>{{ t("group.addGroup") }}</span>
-            </button>
-          </template>
-          <div v-else-if="filteredInstances.length === 0" class="empty-tip tile-empty">{{ t("search.empty") }}</div>
+          <div v-if="groups.length === 0" class="empty-tip">{{ t("list.empty") }}</div>
+          <div v-else-if="filteredGroups.length === 0" class="empty-tip">{{ t("search.empty") }}</div>
+          <button class="add-row-btn add-group-row" :disabled="dragActive?.kind === 'instance'"
+            @click="emit('add-group')">
+            <GlyphIcon name="plus" :size="14" />
+            <span>{{ t("group.addGroup") }}</span>
+          </button>
         </template>
       </VirtualList>
 
@@ -754,8 +717,8 @@ defineExpose({ scrollToInstance });
   display: flex;
   flex-direction: column;
   min-height: 0;
-  /* 侧栏左右内边距：搜索行、分组列表、平铺网格共用一处 ——
-     三处各写一个数时搜索框 / 收起按钮与下面的实例对不齐。
+  /* 侧栏左右内边距：搜索行与分组列表共用一处 ——
+     两处各写一个数时搜索框 / 收起按钮与下面的实例对不齐。
      取值以顶部那一行为准（收起按钮到右边的距离） */
   --side-pad-x: 12px;
 }
@@ -855,7 +818,7 @@ defineExpose({ scrollToInstance });
   cursor: default;
 }
 
-/* ----- 虚拟列表（分组 / 平铺共用） ----- */
+/* ----- 虚拟列表 ----- */
 
 /* 虚拟列表外包一层：粘滞分组头相对它定位，列表自己滚 */
 .sidebar-list-wrap {
@@ -893,10 +856,6 @@ defineExpose({ scrollToInstance });
   z-index: 2;
 }
 
-.tile-list {
-  padding-top: 6px;
-}
-
 /* 每种虚拟行的高度都钉死：窗口与滚动条长度按这些常量算，改这里要同时改脚本的 ROW_H_* */
 .vrow {
   flex-shrink: 0;
@@ -922,7 +881,7 @@ defineExpose({ scrollToInstance });
   height: 56px;
 }
 
-/* 平铺卡片行：112 的卡 + 8 的行距 */
+/* 平铺卡片行：112 的卡 + 8 的行距；列数由脚本内联给 */
 .vrow-tiles {
   height: 120px;
 }
@@ -1113,117 +1072,6 @@ defineExpose({ scrollToInstance });
   flex: 1;
 }
 
-/* ----- 平铺卡片 ----- */
-
-/* 高度钉死：一行平铺卡片的高度按它算（脚本的 TILE_H），名字一两行都占同样高 */
-.tile {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  height: 112px;
-  padding: 16px 8px 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.tile:hover {
-  background: var(--bg-hover);
-  transform: translateY(-2px);
-}
-
-.tile.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-/* 拖拽中的卡片留在原位并压暗：网格不像行列表那样能给插入占位，抽走会让整片重排 */
-.tile.dragging {
-  opacity: 0.35;
-}
-
-/* 卡片落点：贴左 / 右缘画一条强调色竖线，悬出卡片 5px 才看得见 */
-.tile.drop-before::before,
-.tile.drop-after::after {
-  content: "";
-  position: absolute;
-  top: 6px;
-  bottom: 6px;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--accent);
-}
-
-.tile.drop-before::before {
-  left: -5px;
-}
-
-.tile.drop-after::after {
-  right: -5px;
-}
-
-.tile.add-tile {
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  justify-content: center;
-}
-
-.tile.add-tile:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.add-plus {
-  font-size: 26px;
-  line-height: 1;
-  color: var(--text-dim);
-}
-
-.tile.add-tile:hover .add-plus {
-  color: var(--accent);
-}
-
-.add-tile .tile-name {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.tile-empty {
-  grid-column: 1 / -1;
-}
-
-.loader-corner {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-}
-
-/* 多选勾选圈也钉在左上角：加载器角标往右让一格，两个不叠在一起 */
-.tile .row-check~.loader-corner {
-  left: 30px;
-}
-
-.tile-name {
-  font-size: 12px;
-  text-align: center;
-  line-height: 1.3;
-  word-break: break-all;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.tile .run-dot {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-}
 
 /* 运行中的绿点：贴行右缘并**脱离文档流**。
    留在流里它会占一格（名字可用宽度跟着缩），行高也随它参与计算 */
@@ -1255,12 +1103,98 @@ defineExpose({ scrollToInstance });
   outline-offset: -1px;
 }
 
+/* ----- 向右占满时的平铺卡片 ----- */
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 112px;
+  padding: 16px 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tile:hover {
+  background: var(--bg-hover);
+  transform: translateY(-2px);
+}
+
+.tile.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.tile.multi-checked {
+  background: var(--accent-soft);
+  outline: 1px solid var(--accent-border);
+  outline-offset: -1px;
+}
+
+.tile.add-tile {
+  justify-content: center;
+}
+
+.tile.add-tile:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.add-plus {
+  font-size: 26px;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.tile.add-tile:hover .add-plus {
+  color: var(--accent);
+}
+
+.add-tile .tile-name {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 加载器角标钉在左上角；多选勾选圈也在左上，两个错开 */
+.loader-corner {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+
+.tile .row-check ~ .loader-corner {
+  left: 30px;
+}
+
+.tile-name {
+  font-size: 12px;
+  text-align: center;
+  line-height: 1.3;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tile .run-dot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
 .loader-text {
   font-size: 10px;
   padding: 1px 7px;
   border-radius: 8px;
   /* 实心色（同账户窗口的「当前」角标）：选中态用的是**淡**强调色底 --accent-soft，
-     角标若也用淡底，平铺模式下就和"已选中"混在一起分不出来了。
+     角标若也用淡底，就和"已选中"的行底色混在一起分不出来了。
      底色由下面的 per-loader 类给；这里是兜底（未知加载器） */
   background: var(--accent);
   color: var(--on-accent);

@@ -50,7 +50,7 @@ pub enum SidebarSide {
 }
 
 /// 主窗口实例列表显示模式；wire 名小写，与前端一致
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ViewMode {
     /// 列表，默认
@@ -58,8 +58,20 @@ pub enum ViewMode {
     List,
     /// 分组
     Group,
-    /// 平铺
-    Grid,
+}
+
+impl<'de> Deserialize<'de> for ViewMode {
+    /// 旧配置里的 grid 是已删除的平铺模式，并入分组；其余无法识别的值按默认列表
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = String::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "group" | "grid" => ViewMode::Group,
+            _ => ViewMode::List,
+        })
+    }
 }
 
 /// 启动器启动时主窗口先显示哪一屏；serde 按变体名序列化，与前端同名
@@ -194,7 +206,7 @@ pub struct MainWindowConfig {
     pub sidebar_side: SidebarSide,
     /// 侧栏是否收起
     pub sidebar_collapsed: bool,
-    /// 实例列表显示模式：list / group / grid，默认 list
+    /// 实例列表显示模式：list / group，默认 list；旧的 grid 读入时并入 group
     pub view_mode: ViewMode,
     /// 启动时先显示哪一屏：Home / List，默认 Home
     pub startup_page: StartupPage,

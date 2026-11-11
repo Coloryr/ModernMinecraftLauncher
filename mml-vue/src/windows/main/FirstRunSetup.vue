@@ -18,10 +18,9 @@ import { isTauri } from "../../lib/util";
 
 const emit = defineEmits<{ (e: "close"): void }>();
 
-/** 主页面样式的候选：分组 / 平铺 / 列表 */
-const MODES: { value: ViewMode; icon: "folder" | "grid" | "list"; label: string; desc: string }[] = [
+/** 主页面样式的候选：分组 / 列表 */
+const MODES: { value: ViewMode; icon: "folder" | "list"; label: string; desc: string }[] = [
   { value: "group", icon: "folder", label: "mode.group", desc: "firstRun.modeGroupDesc" },
-  { value: "grid", icon: "grid", label: "mode.grid", desc: "firstRun.modeGridDesc" },
   { value: "list", icon: "list", label: "mode.list", desc: "firstRun.modeListDesc" },
 ];
 
@@ -59,7 +58,7 @@ onMounted(async () => {
 /**
  * 换主页面样式：写配置并广播，主窗口立刻换布局
  *
- * - `v`: 分组 / 平铺 / 列表
+ * - `v`: 分组 / 列表
  */
 function pickMode(v: ViewMode) {
   setViewMode(v);
@@ -103,7 +102,7 @@ function clearImage() {
   <!-- 右上角不画 ✕：关闭入口只留底部「完成」 -->
   <BaseModal v-if="visible" :title="t('firstRun.title')" :width="560" :closable="false" @close="emit('close')">
     <div class="first-run">
-      <!-- 主页面样式：三张卡并排，选中即生效 -->
+      <!-- 主页面样式：两张卡并排，选中即生效 -->
       <section class="run-sec">
         <h4 class="run-title">{{ t("firstRun.modeTitle") }}</h4>
         <div class="mode-grid">
@@ -175,10 +174,10 @@ function clearImage() {
   color: var(--text-dim);
 }
 
-/* 主页面样式：三张等宽卡，图标在上、名字与说明在下 */
+/* 主页面样式：两张等宽卡，图标在上、名字与说明在下 */
 .mode-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 

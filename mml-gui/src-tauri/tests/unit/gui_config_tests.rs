@@ -1,5 +1,20 @@
 use super::*;
 
+/// 删掉的「平铺」模式不能让旧配置读不出来：grid 并入 group，认不出的值落回 list
+#[test]
+fn view_mode_reads_legacy_grid_as_group() {
+    for (raw, want) in [
+        ("list", ViewMode::List),
+        ("group", ViewMode::Group),
+        ("grid", ViewMode::Group),
+        ("whatever", ViewMode::List),
+    ] {
+        let cfg: MainWindowConfig =
+            serde_json::from_str(&format!("{{\"ViewMode\":\"{raw}\"}}")).expect("旧配置要能读");
+        assert_eq!(cfg.view_mode, want, "raw={raw}");
+    }
+}
+
 /// 删掉的材质选项要收口，别让设置页那个下拉落到不存在的值上
 #[test]
 fn window_effect_normalizes_removed_options() {

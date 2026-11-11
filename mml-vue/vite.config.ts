@@ -1,9 +1,17 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  resolve: {
+    alias: {
+      // mml-ipc 是仓库内的本地包，没发到 npm：直接按路径取源码，不经过 node_modules。
+      // 那里的链接存的是绝对路径，仓库目录改名或挪位置后会悬空，界面整个起不来
+      "mml-ipc": fileURLToPath(new URL("../mml-ipc/src/index.ts", import.meta.url)),
+    },
+  },
   server: {
     // 与 mml-gui 里 Tauri 的 devUrl 保持一致；不使用 Tauri 时可自行修改
     port: 1420,

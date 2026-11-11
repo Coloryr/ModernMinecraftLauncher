@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 主窗口：实例列表（分组 / 平铺 / 搜索）、实例详情与设置、启动流程与日志、启动器主页
+// 主窗口：实例列表（分组 / 搜索）、实例详情与设置、启动流程与日志、启动器主页
 // 子组件在 topbar / sidebar / ctxmenu/；拖拽、多选、文件拖放逻辑在 composables/
 // 显示模式的切换入口不在这里，在设置窗口「界面 → 主窗口」
 import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, watch } from "vue";
@@ -14,6 +14,7 @@ import {
   onGuiViewModeChange,
   onInstanceChange,
   onJavaChange,
+  onJavaMissing,
   onLaunchError,
   onLaunchState,
   onMenuAction,
@@ -79,6 +80,8 @@ import { useInstanceStats } from "./composables/useInstanceStats";
 import type { CtxMenuState, FeatureId, GroupView, InstMenuAction } from "./types";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
+import RowMenu from "../../components/ui/RowMenu.vue";
+import type { RowMenuItem } from "../../components/ui/RowMenu.vue";
 import WindowControls from "../../components/ui/WindowControls.vue";
 import CollapsePanel from "../../components/ui/CollapsePanel.vue";
 import { detectOs, titleBarStyle, onTitleBarPointerDown, useWindowTitle } from "../../lib/titlebar";
@@ -1623,6 +1626,9 @@ async function subscribeEvents() {
       // 状态行只在运行中显示，退出之后界面上什么都不剩：非正常退出得说出来
       if (e.code !== 0) showToast(t("launch.exitedCode", { code: e.code }));
     }),
+    onJavaMissing((java) => {
+      javaMissing.value = java;
+    }),
     onLaunchError((e) => {
       if (e.uuid) {
         clearLaunching(e.uuid);
@@ -2104,6 +2110,64 @@ async function launch(kind: "renderdoc" | "nsight" | null = null, jvmDebug: numb
   }
 }
 
+/** 启动按钮右侧的下拉菜单：目前只有「调试启动」一项 */
+const launchMenuOpen = ref(false);
+/** 下拉菜单相对视口的位置，打开时按按钮矩形算 */
+const launchMenuPos = ref({ x: 0, y: 0 });
+
+/** 调试启动是否可用：与启动按钮同口径，运行中 / 启动中 / 离线限制都按住 */
+const canDebugLaunch = computed(
+  () => !!selected.value && !selected.value.running && !offlineLaunchBlocked.value && !isLaunching.value,
+);
+
+/** 下拉菜单项：只放调试启动，具体选项交给 DebuggerLaunchModal */
+const launchMenuItems = computed<RowMenuItem[]>(() => [
+  {
+    id: "debug",
+    label: t("debugger.debugLaunch"),
+    tip: t("debugger.entryTip"),
+    disabled: !canDebugLaunch.value,
+  },
+]);
+
+/**
+ * 打开启动方式下拉
+ *
+ * - `event`: 下拉按钮的点击事件，用它的矩形把菜单贴到右下角
+ */
+function openLaunchMenu(event: MouseEvent) {
+  if (!renderdocSupported || !canDebugLaunch.value) return;
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  // 菜单最小宽 150px，按右边缘对齐；越界由 RowMenu 自己夹回视口
+  launchMenuPos.value = { x: rect.right - 150, y: rect.bottom + 6 };
+  launchMenuOpen.value = true;
+}
+
+/**
+ * 下拉菜单选中
+ *
+ * - `id`: 菜单项 id
+ */
+function onLaunchMenuPick(id: string) {
+  launchMenuOpen.value = false;
+  if (id === "debug") launchDebugger();
+}
+
+/** 启动时缺少的 Java 主版本；非 null 时弹出「下载 Java」提示 */
+const javaMissing = ref<number | null>(null);
+
+/**
+ * 从缺失 Java 提示直接去下载对应版本
+ *
+ * 关掉提示，打开 Java 下载窗口并把所需主版本带过去，窗口加载候选后会自动选中这一版。
+ */
+function downloadMissingJava() {
+  const java = javaMissing.value;
+  if (java === null) return;
+  javaMissing.value = null;
+  openWindow("java_download", { javaMajor: java });
+}
+
 /** 调试器弹窗是否打开：选哪个调试器，或只生成启动指令 */
 const debuggerAsk = ref(false);
 
@@ -2114,7 +2178,7 @@ const hasNsight = computed(() => !!nsightInstall.value);
 
 /** 右键菜单 / 按钮的调试器入口；非 Windows 不提供。选择交给弹窗，见 DebuggerLaunchModal */
 function launchDebugger() {
-  if (!renderdocSupported || !selected.value || selected.value.running) return;
+  if (!renderdocSupported || !canDebugLaunch.value) return;
   debuggerAsk.value = true;
 }
 
@@ -2421,38 +2485,47 @@ onMounted(async () => {
               <!-- 启动按钮一行、次级操作一行方形图标键，两块宽度不同、整块居中不撑满，
                    见 main-window.css .launch-actions -->
               <div class="launch-actions">
-                <BaseButton variant="primary" size="lg" class="launch-main-btn" :class="{ running: selected?.running }"
-                  :disabled="!selected || (!selected.running && offlineLaunchBlocked)" @click="onLaunchAction">
-                  <!-- 启动中：按钮里是阶段 + 进度；运行中：运行中。悬停两者都换成取消 / 关闭动作 -->
-                  <span v-if="selected?.running" class="launch-busy">
-                    <LaunchProgress v-if="isLaunching" :text="launchStageText" :percent="launchPct" />
-                    <span v-else class="launch-running">{{ t("launch.running") }}</span>
-                    <span class="launch-hover">
-                      <GlyphIcon :name="isLaunching ? 'close' : 'power'" :size="14" />
-                      {{ launchActionText }}
+                <div class="launch-row">
+                  <BaseButton variant="primary" size="lg" class="launch-main-btn" :class="{ running: selected?.running }"
+                    :disabled="!selected || (!selected.running && offlineLaunchBlocked)" @click="onLaunchAction">
+                    <!-- 启动中：按钮里是阶段 + 进度；运行中：运行中。悬停两者都换成取消 / 关闭动作 -->
+                    <span v-if="selected?.running" class="launch-busy">
+                      <LaunchProgress v-if="isLaunching" :text="launchStageText" :percent="launchPct" />
+                      <span v-else class="launch-running">{{ t("launch.running") }}</span>
+                      <span class="launch-hover">
+                        <GlyphIcon :name="isLaunching ? 'close' : 'power'" :size="14" />
+                        {{ launchActionText }}
+                      </span>
                     </span>
-                  </span>
-                  <template v-else>
-                    <GlyphIcon name="play" :size="15" /> {{ t("launch.play") }}
-                  </template>
-                </BaseButton>
+                    <template v-else>
+                      <GlyphIcon name="play" :size="15" /> {{ t("launch.play") }}
+                    </template>
+                  </BaseButton>
+                  <!-- 启动方式下拉：只装「调试启动」，具体选项交给 DebuggerLaunchModal -->
+                  <button v-if="renderdocSupported" type="button" class="launch-drop-toggle"
+                    :disabled="!canDebugLaunch" v-tip="t('debugger.entry')" :aria-label="t('debugger.entry')"
+                    :aria-expanded="launchMenuOpen" @click="openLaunchMenu">
+                    <GlyphIcon name="chevron-down" :size="14" :weight="2.2" />
+                  </button>
+                  <RowMenu v-if="launchMenuOpen" :x="launchMenuPos.x" :y="launchMenuPos.y"
+                    :items="launchMenuItems" @pick="onLaunchMenuPick" @close="launchMenuOpen = false" />
+                </div>
                 <div class="launch-sub-actions">
                   <!-- 实例设置：含启动参数（与分组模式下的设置面板一致）。带文字：这两项是常用入口 -->
                   <BaseButton size="sm" class="has-text" :aria-label="t('detail.settings')" :disabled="!selected"
                     @click="toggleSettings">
                     <GlyphIcon name="gear" :size="15" :weight="1.8" /> {{ t("detail.settings") }}
                   </BaseButton>
-                  <!-- 资源管理：分组 / 平铺模式的右侧详情面板里有这个入口，而列表模式没有详情面板，
+                  <!-- 资源管理：分组模式的右侧详情面板里有这个入口，而列表模式没有详情面板，
                        这里不补一个就进不去资源管理窗口 -->
                   <BaseButton size="sm" class="has-text" :aria-label="t('actions.manageResource')" :disabled="!selected"
                     @click="onAction('manageResource')">
                     <GlyphIcon name="package" :size="15" :weight="1.8" /> {{ t("actions.manageResource") }}
                   </BaseButton>
-                  <!-- 调试器启动：JVM 调试 + 渲染调试都在弹窗里；RenderDoc 首次会下载 -->
-                  <BaseButton v-if="renderdocSupported" size="sm" class="icon-btn-head"
-                    v-tip="t('debugger.entryTip')" :aria-label="t('debugger.entry')"
-                    :disabled="!selected || offlineLaunchBlocked || isLaunching" @click="launchDebugger">
-                    <GlyphIcon name="bug" :size="15" :weight="1.8" />
+                  <!-- 打开实例文件夹：调试启动已挪到启动按钮右侧的下拉里 -->
+                  <BaseButton size="sm" class="icon-btn-head" v-tip="t('actions.openFolder')"
+                    :aria-label="t('actions.openFolder')" :disabled="!selected" @click="onAction('openFolder')">
+                    <GlyphIcon name="folder" :size="15" :weight="1.8" />
                   </BaseButton>
                   <!-- 实例日志：主页面不展示日志内容，直接开独立日志窗口 -->
                   <BaseButton size="sm" class="icon-btn-head" v-tip="t('detail.logs')" :aria-label="t('detail.logs')"
@@ -2479,12 +2552,12 @@ onMounted(async () => {
           </Transition>
         </template>
 
-        <!-- 模式：游戏分组 / 平铺；列表模式已在上面的分支处理，这里兜底 -->
+        <!-- 模式：游戏分组；列表模式已在上面的分支处理，这里兜底 -->
         <template v-else>
           <!-- 侧栏槽位：宽度在展开 300px / 收起 24px 之间过渡，动画期间内容被裁掉而不被压扁 -->
           <div class="sidebar-slot" :class="{ collapsed: sidebarCollapsed }">
-            <MainSidebar ref="sidebarRef" :mode="effectiveMode" :search-text="searchText" :groups="groups"
-              :filtered-groups="filteredGroups" :filtered-instances="filteredInstances" :searching="searching"
+            <MainSidebar ref="sidebarRef" :search-text="searchText" :groups="groups"
+              :filtered-groups="filteredGroups" :searching="searching"
               :selected="selected" :multi-select="multiSelect" :selected-ids="selectedIds" :drag-active="dragActive"
               :maximized="paneMaximized" @toggle-maximize="togglePaneMaximize" :dragging-uuid="draggingUuid"
               :ghost="instanceGhost" :is-collapsed="isCollapsed" :on-drag-pointer-down="onDragPointerDown"
@@ -2539,20 +2612,31 @@ onMounted(async () => {
                       </div>
                       <!-- 右侧：启动游戏用大按钮，添加 / 管理资源用小按钮 -->
                       <div class="detail-side">
-                        <BaseButton variant="primary" size="lg" class="play-btn" :class="{ running: selected.running }"
-                          :disabled="!selected.running && offlineLaunchBlocked" @click="onLaunchAction">
-                          <span v-if="selected.running" class="launch-busy">
-                            <LaunchProgress v-if="isLaunching" :text="launchStageText" :percent="launchPct" />
-                            <span v-else class="launch-running">{{ t("launch.running") }}</span>
-                            <span class="launch-hover">
-                              <GlyphIcon :name="isLaunching ? 'close' : 'power'" :size="14" />
-                              {{ launchActionText }}
+                        <div class="launch-row">
+                          <BaseButton variant="primary" size="lg" class="play-btn" :class="{ running: selected.running }"
+                            :disabled="!selected.running && offlineLaunchBlocked" @click="onLaunchAction">
+                            <span v-if="selected.running" class="launch-busy">
+                              <LaunchProgress v-if="isLaunching" :text="launchStageText" :percent="launchPct" />
+                              <span v-else class="launch-running">{{ t("launch.running") }}</span>
+                              <span class="launch-hover">
+                                <GlyphIcon :name="isLaunching ? 'close' : 'power'" :size="14" />
+                                {{ launchActionText }}
+                              </span>
                             </span>
-                          </span>
-                          <template v-else>
-                            <GlyphIcon name="play" :size="15" /> {{ t("launch.play") }}
-                          </template>
-                        </BaseButton>
+                            <template v-else>
+                              <GlyphIcon name="play" :size="15" /> {{ t("launch.play") }}
+                            </template>
+                          </BaseButton>
+                          <!-- 启动方式下拉：与列表模式同一颗按钮，右侧一块点开只有「调试启动」 -->
+                          <button v-if="renderdocSupported" type="button" class="launch-drop-toggle"
+                            :disabled="!canDebugLaunch" v-tip="t('debugger.entry')"
+                            :aria-label="t('debugger.entry')" :aria-expanded="launchMenuOpen"
+                            @click="openLaunchMenu">
+                            <GlyphIcon name="chevron-down" :size="14" :weight="2.2" />
+                          </button>
+                          <RowMenu v-if="launchMenuOpen" :x="launchMenuPos.x" :y="launchMenuPos.y"
+                            :items="launchMenuItems" @pick="onLaunchMenuPick" @close="launchMenuOpen = false" />
+                        </div>
                         <div class="side-row">
                           <BaseButton size="sm" variant="accent" @click="onAction('addResource')">{{
                             t("actions.addResource") }}</BaseButton>
@@ -2820,6 +2904,18 @@ onMounted(async () => {
         <BaseButton :disabled="multiDeleteBusy" @click="showMultiDelete = false">{{ t("add.cancel") }}</BaseButton>
         <BaseButton variant="danger" :disabled="multiDeleteBusy" @click="doMultiDelete">
           {{ multiDeleteBusy ? t("actions.deleting") : t("multi.delete") }}
+        </BaseButton>
+      </div>
+    </BaseModal>
+
+    <!-- ===== 启动缺 Java：先提示，确认后去下载对应版本 ===== -->
+    <BaseModal v-if="javaMissing !== null" :title="t('launch.javaMissingTitle')" :width="440"
+      :closable="false" @close="javaMissing = null">
+      <p class="modal-text">{{ t("launch.javaMissingText", { java: javaMissing }) }}</p>
+      <div class="modal-actions">
+        <BaseButton @click="javaMissing = null">{{ t("actions.cancel") }}</BaseButton>
+        <BaseButton variant="accent" @click="downloadMissingJava">
+          {{ t("launch.javaMissingDownload", { java: javaMissing }) }}
         </BaseButton>
       </div>
     </BaseModal>

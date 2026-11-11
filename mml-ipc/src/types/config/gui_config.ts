@@ -6,7 +6,7 @@ export type WindowMode = "Multi" | "Single";
 
 export type SidebarSide = "Left" | "Right";
 
-export type ViewMode = "list" | "group" | "grid";
+export type ViewMode = "list" | "group";
 
 export type StartupPage = "Home" | "List";
 

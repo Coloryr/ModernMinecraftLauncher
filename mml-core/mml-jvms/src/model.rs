@@ -13,8 +13,10 @@ pub struct JavaInfoObj {
     pub version: String,
     /// Java 主版本号，如 8、11、17、21；占位条目为 -1 表示不可用
     pub major_version: i32,
-    /// Java 发行版类型，如 "OpenJDK"、"Oracle"
+    /// Java 启动器首词，取自版本行，如 "openjdk"、"java"
     pub java_type: String,
+    /// 发行商，如 Oracle / Zulu / Temurin；认不出时回落为 OpenJDK / Java
+    pub vendor: String,
     /// CPU 架构，与系统架构一致才会被版本匹配选中
     pub arch: ArchEnum,
 }

@@ -289,7 +289,6 @@ function toggleCustomPage(on: boolean) {
     <label class="field-label">{{ t("winSettings.viewMode") }}</label>
     <SegmentedTabs :model-value="view" :options="[
       { value: 'group', label: t('mode.group') },
-      { value: 'grid', label: t('mode.grid') },
       { value: 'list', label: t('mode.list') },
     ]" @update:model-value="onViewModeChange" />
     <p class="field-desc">{{ t("winSettings.viewModeDesc") }}</p>

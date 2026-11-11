@@ -40,6 +40,7 @@ fn java_info(name: &str, major: i32, arch: ArchEnum) -> JavaInfoObj {
         version: format!("{major}.0.0"),
         major_version: major,
         java_type: "OpenJDK".to_string(),
+        vendor: "OpenJDK".to_string(),
         arch,
     }
 }

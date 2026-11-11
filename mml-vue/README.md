@@ -48,6 +48,10 @@ http://localhost:1420/?window=settings
 cd ../mml-gui && cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
+- `mml-ipc` 是仓库内的本地包，没有发到 npm。`vite.config.ts` 的 `resolve.alias` 与
+  `tsconfig.json` 的 `paths` 都直接指向 `../mml-ipc/src/index.ts`，**不经过 `node_modules` 链接**：
+  链接里存的是绝对路径，仓库目录改名或挪位置后就会悬空，界面整个解析失败。
+  因此不需要为它跑 `npm link`，移动仓库后也不用重装依赖。
 - `src/lib/api.ts` 是**手写**的便捷包装层，其中的类型一律 `import` 自 `./bindings`；
   不要在这里另写一套类型（下次生成会被覆盖，也与 Rust 侧脱节）。
 - 命令名 = 函数名 = `窗口名_方法名`（如 `main_get_instances`）；事件名由 `emit_xxx_yyy`

@@ -291,6 +291,20 @@ let folderScanSeq = 0;
 const folderScanError = ref("");
 /** 待确认"是否允许读取"的目录（非空 = 确认框打开着） */
 const scanAsk = ref("");
+/** 导入前询问：源目录里有 assets / libraries，是否合并到启动器自己的目录 */
+const folderDataAsk = ref<{ root: string; assets: boolean; libraries: boolean } | null>(null);
+/** 用户对"复制资源与运行库"的选择；null = 还没问过 */
+const copyFolderData = ref<boolean | null>(null);
+/** 选中的源数据根；null = 这次没有需要处理的 assets / libraries */
+const folderDataRoot = ref<string | null>(null);
+
+/** 询问文案：按实际有的文件夹切换 */
+const folderDataText = computed(() => {
+  const ask = folderDataAsk.value;
+  if (!ask) return "";
+  if (ask.assets && ask.libraries) return t("add.folderDataBoth");
+  return ask.assets ? t("add.folderDataAssets") : t("add.folderDataLibraries");
+});
 
 const {
   tree: folderTree,
@@ -370,6 +384,66 @@ async function scanFolder() {
     // 旧的一次扫描不能把新一次扫描的"扫描中"提前清掉
     if (seq === folderScanSeq) folderScanning.value = false;
   }
+}
+
+/**
+ * 取上一级目录，兼容 Windows 与 POSIX 分隔符
+ *
+ * - `path`: 目录路径
+ *
+ * # 返回值
+ *
+ * 上一级路径；已经是根时为空串
+ */
+function parentDir(path: string): string {
+  const trimmed = path.replace(/[\\/]+$/, "");
+  const index = Math.max(trimmed.lastIndexOf("\\"), trimmed.lastIndexOf("/"));
+  return index > 0 ? trimmed.slice(0, index) : "";
+}
+
+/**
+ * 找出源目录里 assets / libraries 所在的根
+ *
+ * 选中的可能是整目录（.minecraft），也可能是 versions/<版本>；后者往上找两级。
+ *
+ * - `paths`: 本次要导入的实例目录
+ *
+ * # 返回值
+ *
+ * 找到时给出根目录与存在情况；都没有返回 null
+ */
+async function findFolderData(
+  paths: string[],
+): Promise<{ root: string; assets: boolean; libraries: boolean } | null> {
+  const roots = new Set<string>();
+  for (const path of paths) {
+    let current = path;
+    for (let depth = 0; depth < 3 && current; depth += 1) {
+      roots.add(current);
+      current = parentDir(current);
+    }
+  }
+  for (const root of roots) {
+    const entries = await commands.add.listDir(root).catch(() => []);
+    const assets = entries.some((entry) => entry.isDir && entry.name === "assets");
+    const libraries = entries.some((entry) => entry.isDir && entry.name === "libraries");
+    if (assets || libraries) return { root, assets, libraries };
+  }
+  return null;
+}
+
+/**
+ * 回答"是否复制资源与运行库"并继续导入
+ *
+ * - `copy`: true = 合并进启动器自己的 assets / libraries
+ */
+function resolveFolderData(copy: boolean) {
+  const ask = folderDataAsk.value;
+  if (!ask) return;
+  folderDataRoot.value = ask.root;
+  copyFolderData.value = copy;
+  folderDataAsk.value = null;
+  void create();
 }
 
 /** 勾选 / 取消某个扫到的实例 */
@@ -688,6 +762,9 @@ watch(addFolderPath, (path) => {
   folderFound.value = [];
   folderPicked.value = new Set();
   folderScanError.value = "";
+  folderDataAsk.value = null;
+  copyFolderData.value = null;
+  folderDataRoot.value = null;
 });
 watch(addUrl, () => clearFieldError("url"));
 
@@ -739,6 +816,19 @@ async function create() {
     return failField("url", t("add.urlArchiveNotAllowed"));
   }
 
+  // 文件夹里带 assets / libraries：导入前问一次，是否合并到启动器自己的目录
+  if (addMode.value === "folder" && copyFolderData.value === null) {
+    const targets = scanned
+      ? folderFound.value.filter((item) => folderPicked.value.has(item.path))
+      : [{ path: addFolderPath.value.trim() }];
+    const data = await findFolderData(targets.map((item) => item.path));
+    if (data) {
+      folderDataAsk.value = data;
+      return;
+    }
+    copyFolderData.value = false;
+  }
+
   // 在线实例：先让玩家挑这次要下载的可选模组，取消就什么都不建
   let onlineSkip: string[] = [];
   if (addMode.value === "online") {
@@ -785,16 +875,26 @@ async function create() {
         unselected.length ? unselected : null,
       );
     } else if (addMode.value === "folder") {
+      const dataRoot = folderDataRoot.value;
+      const copyData = copyFolderData.value === true;
       if (scanned) {
-        // 逐个导入：每个扫到的实例各建一个，名字取它自己的目录名
+        // 逐个导入：每个扫到的实例各建一个，名字取它自己的目录名；
+        // 共用数据只在第一个实例上合并一次，后面几个不再重复拷
         const targets = folderFound.value.filter((item) => folderPicked.value.has(item.path));
         uuid = "";
-        for (const item of targets) {
-          uuid = await api.addImportFolder(item.path, item.name, groupId);
+        for (let i = 0; i < targets.length; i += 1) {
+          const item = targets[i];
+          uuid = await api.addImportFolder(item.path, item.name, groupId, dataRoot, copyData && i === 0);
         }
         doneName = t("add.folderImported", { n: targets.length });
       } else {
-        uuid = await api.addImportFolder(addFolderPath.value.trim(), name, groupId);
+        uuid = await api.addImportFolder(
+          addFolderPath.value.trim(),
+          name,
+          groupId,
+          dataRoot,
+          copyData,
+        );
       }
     } else {
       // 在线实例：按服务器包清单（server.json）登记，压缩包地址已在上面拦掉
@@ -1075,6 +1175,16 @@ onUnmounted(() => {
       <div class="modal-actions">
         <BaseButton variant="accent" @click="scanAsk = ''">{{ t("actions.cancel") }}</BaseButton>
         <BaseButton variant="primary" @click="confirmScan">{{ t("add.folderAllow") }}</BaseButton>
+      </div>
+    </BaseModal>
+
+    <!-- 导入文件夹前：源目录带 assets / libraries，问是否合并进启动器自己的目录 -->
+    <BaseModal v-if="folderDataAsk" :title="t('add.folderDataTitle')" :closable="false"
+      @close="folderDataAsk = null">
+      <p class="confirm-text">{{ folderDataText }}</p>
+      <div class="modal-actions">
+        <BaseButton @click="resolveFolderData(false)">{{ t("add.folderDataSkip") }}</BaseButton>
+        <BaseButton variant="primary" @click="resolveFolderData(true)">{{ t("add.folderDataCopy") }}</BaseButton>
       </div>
     </BaseModal>
 

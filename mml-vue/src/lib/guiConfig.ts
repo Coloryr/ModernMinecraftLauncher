@@ -15,7 +15,7 @@ export type WindowMode = "Multi" | "Single";
 /** 侧栏在左还是在右 */
 export type SidebarSide = "Left" | "Right";
 /** 实例列表显示模式：默认 list，用户改过后用用户的值 */
-export type ViewMode = "list" | "group" | "grid";
+export type ViewMode = "list" | "group";
 /** 启动器启动时主窗口先显示哪一屏：枚举值即 Rust 变体名 */
 export type StartupPage = "Home" | "List";
 /** 皮肤显示模式：账户界面皮肤预览形态，枚举值即 Rust 变体名 */
@@ -89,10 +89,10 @@ export function normalizeCapeDisplay(value: string | null | undefined): CapeDisp
  *
  * # 返回值
  *
- * 合法模式，非法 / 缺省时回落 `list`
+ * 合法模式，非法 / 缺省时回落 `list`；旧的 `grid` 是已删除的平铺模式，并入 `group`
  */
 export function normalizeViewMode(value: string | null | undefined): ViewMode {
-  return value === "group" || value === "grid" ? value : "list";
+  return value === "group" || value === "grid" ? "group" : "list";
 }
 
 /**

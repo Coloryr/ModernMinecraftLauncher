@@ -172,10 +172,30 @@ export const accounts = {
 };
 
 export const javaList = [
-  { name: "Java 17", path: "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe", version: "17.0.12", major: 17, javaType: "JDK", arch: "x86_64" },
-  { name: "Java 21", path: "C:\\Program Files\\Java\\jdk-21\\bin\\java.exe", version: "21.0.4", major: 21, javaType: "JDK", arch: "x86_64" },
-  { name: "Java 8", path: "C:\\Program Files\\Java\\jre-8\\bin\\java.exe", version: "1.8.0_421", major: 8, javaType: "JRE", arch: "x86_64" },
+  { name: "Java 17", path: "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe", version: "17.0.12", major: 17, javaType: "openjdk", vendor: "Temurin", arch: "x86_64" },
+  { name: "Java 21", path: "C:\\Program Files\\Java\\jdk-21\\bin\\java.exe", version: "21.0.4", major: 21, javaType: "java", vendor: "Oracle", arch: "x86_64" },
+  { name: "Java 8", path: "C:\\Program Files\\Java\\jre-8\\bin\\java.exe", version: "1.8.0_421", major: 8, javaType: "openjdk", vendor: "OpenJDK", arch: "x86_64" },
 ];
+
+/** 首次启动 · 探测到的 ColorMC 工作目录 */
+export const colorMcInfo = {
+  path: "D:\\ColorMC\\.minecraft",
+  from: "run",
+  instances: 6,
+  entries: ["instances", "config", "resources", "schemas", "servers.dat", "options.txt"],
+  authPath: "D:\\ColorMC\\auth.json",
+};
+
+/** 首次启动 · 探测到的官方 .minecraft */
+export const minecraftInfo = {
+  path: "C:\\Users\\Steve\\AppData\\Roaming\\.minecraft",
+  versions: [
+    { id: "1.21.4", known: true, loader: "neoforge" },
+    { id: "1.20.1", known: true, loader: "forge" },
+    { id: "1.19.2", known: true, loader: "fabric" },
+    { id: "1.16.5", known: true, loader: "normal" },
+  ],
+};
 
 export const news = [
   {
@@ -906,8 +926,14 @@ export function moreCommands(extra = {}) {
     collect_remove_items: null,
     collect_add_group: null,
     collect_remove_group: null,
-    java_download_get_types: javaOptions.types,
-    java_download_get_options: javaOptions,
+    // 搜索源是四个下载源；get_options 的 types 是包类型 jdk / jre，别混用
+    java_download_get_types: ["adoptium", "zulu", "openj9", "foojay"],
+    java_download_get_options: {
+      types: ["jdk", "jre"],
+      majors: javaOptions.majors,
+      systems: javaOptions.systems,
+      archs: javaOptions.archs,
+    },
     java_download_get_list: [],
     block_get_groups: blockGroups,
     block_set_groups: null,
@@ -1000,6 +1026,8 @@ export function commonCommands(extra = {}) {
     main_get_news: news,
     main_get_system_memory: { total: 32768, free: 16384 },
     main_load_state: { ok: true, error: null },
+    // 主窗口挂载时会探测调试器；返回没装，避免截图报告里记一条未 mock
+    main_detect_debuggers: { nsight: null },
     main_get_instance_args: instanceArgs,
     main_get_instance_langs: [
       { code: "zh_cn", name: "简体中文" },

@@ -17,7 +17,7 @@ fn parses_worker_lines() {
 /// 预览最小尺寸必须和启动器窗口注册表一致
 #[test]
 fn min_sizes_match_launcher_registry() {
-    const SPEC: &str = include_str!("../../../../mml-gui/src-tauri/src/windows/registry/spec.rs");
+    const SPEC: &str = include_str!("../../../../mml-gui/src-tauri/src/windows/common/registry/spec.rs");
 
     fn value(source: &str, name: &str) -> f64 {
         let marker = format!("const {name}: f64 = ");

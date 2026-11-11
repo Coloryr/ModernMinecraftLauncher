@@ -20,8 +20,8 @@ const {
   inTauri,
   javaList,
   javaGroups,
-  toggleType,
-  typeOpen,
+  toggleVendor,
+  vendorOpen,
   scanning,
   scanningDir,
   newJavaName,
@@ -100,15 +100,15 @@ useModalKeys((e) => {
       </div>
 
       <div v-if="javaList.length === 0" class="java-empty">{{ t("winSettings.javaNone") }}</div>
-      <!-- 按发行类型（JDK / JRE）分组：头行是一条面板条，展开后该类型的 Java 在面板里平铺 -->
-      <div v-for="g in javaGroups" :key="g.type" class="java-type" :class="{ 'is-open': typeOpen(g.type) }">
-        <button class="collapse-head" :aria-expanded="typeOpen(g.type)" @click="toggleType(g.type)">
-          <span class="java-type-name">{{ g.type }}</span>
+      <!-- 按发行商分组：头行是一条面板条，展开后该发行商的 Java 在面板里平铺 -->
+      <div v-for="g in javaGroups" :key="g.vendor" class="java-type" :class="{ 'is-open': vendorOpen(g.vendor) }">
+        <button class="collapse-head" :aria-expanded="vendorOpen(g.vendor)" @click="toggleVendor(g.vendor)">
+          <span class="java-type-name">{{ g.vendor }}</span>
           <span class="java-count">{{ g.items.length }}</span>
-          <GlyphIcon class="collapse-chevron" :class="{ flip: typeOpen(g.type) }" name="chevron-down" :size="11"
+          <GlyphIcon class="collapse-chevron" :class="{ flip: vendorOpen(g.vendor) }" name="chevron-down" :size="11"
             :weight="2.4" />
         </button>
-        <CollapsePanel :open="typeOpen(g.type)">
+        <CollapsePanel :open="vendorOpen(g.vendor)">
           <div class="java-grid">
             <div v-for="j in g.items" :key="j.name" class="java-card">
               <div class="java-card-top">

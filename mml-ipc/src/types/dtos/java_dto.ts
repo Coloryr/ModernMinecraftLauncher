@@ -6,6 +6,7 @@ export type JavaInfoDto = {
   version: string,
   major: number,
   javaType: string,
+  vendor: string,
   arch: string,
 };
 

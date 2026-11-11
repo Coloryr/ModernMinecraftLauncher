@@ -292,6 +292,7 @@ pub(crate) fn java_list() -> Vec<JavaInfoDto> {
             // 遗留占位条目即 Java 失效的，主版本号为 -1，前端用 0 表示未知
             major: j.major_version.max(0),
             java_type: j.java_type.clone(),
+            vendor: j.vendor.clone(),
             arch: j.arch.to_string(),
         })
         .collect()

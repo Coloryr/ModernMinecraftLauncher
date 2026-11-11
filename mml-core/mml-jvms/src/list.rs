@@ -290,6 +290,7 @@ fn add_list(list: &Vec<JvmConfigObj>) {
                         version: String::new(),
                         major_version: -1,
                         java_type: String::new(),
+                        vendor: String::new(),
                         arch: ArchEnum::Unknown,
                     }),
                 );

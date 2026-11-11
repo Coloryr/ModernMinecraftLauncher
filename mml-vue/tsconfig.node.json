@@ -4,7 +4,9 @@
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    /* vite.config.ts 用 node:url 算 mml-ipc 的绝对路径，只给这个项目开 Node 类型 */
+    "types": ["node"]
   },
   "include": ["vite.config.ts"]
 }

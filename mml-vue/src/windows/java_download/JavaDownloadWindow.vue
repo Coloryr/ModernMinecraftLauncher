@@ -17,7 +17,7 @@ import {
   type JavaDownloadOptionsDto,
   type JavaTypes,
 } from "../../lib/bindings";
-import { isTauri } from "../windowManager";
+import { isTauri, javaMajorFromUrl, multiWindow, windowParams } from "../windowManager";
 import { detectOs } from "../../lib/titlebar";
 import { isRunning, javaTasks } from "../../lib/javaTasks";
 
@@ -185,6 +185,23 @@ useWindowRefresh(loadSources);
 /** 候选请求代次：F5 / 连续切源只让最新一发写回下拉并继续拉列表 */
 let optionsSeq = 0;
 
+/**
+ * 本次打开要预选的 Java 主版本
+ *
+ * 启动缺 Java 时从提示弹窗带过来；单窗口模式下读完就清掉，避免之后刷新筛选又跳回去。
+ *
+ * # 返回值
+ *
+ * 目标主版本；不是从缺 Java 提示打开时为 null
+ */
+function wantedJavaMajor(): number | null {
+  const wanted = multiWindow.value ? javaMajorFromUrl() : windowParams.value.javaMajor;
+  if (!multiWindow.value && windowParams.value.javaMajor !== null) {
+    windowParams.value = { ...windowParams.value, javaMajor: null };
+  }
+  return wanted;
+}
+
 /** 拉当前源的四个下拉候选，默认选本机对应的系统与架构，再按默认筛选拉一次列表 */
 async function loadOptions() {
   const mine = ++optionsSeq;
@@ -197,9 +214,14 @@ async function loadOptions() {
     const data = await commands.javaDownload.getOptions(source.value);
     if (mine !== optionsSeq) return;
     options.value = data;
-    // 类型 / 主版本选第一项；系统 / 架构自动选本机对应的项
+    // 类型选第一项；主版本优先用启动缺 Java 时带过来的那一版，没有就选第一项
     javaType.value = data.types[0] ?? "";
-    major.value = data.majors[0] ?? null;
+    const wanted = wantedJavaMajor();
+    major.value =
+      wanted !== null && data.majors.includes(wanted) ? wanted : data.majors[0] ?? null;
+    if (wanted !== null && !data.majors.includes(wanted)) {
+      showToast(t("winJavaDownload.majorMissing", { java: wanted }));
+    }
     const osCands = OS_CANDIDATES[detectOs()] ?? [];
     system.value = pickMatch(data.systems, osCands) ?? data.systems[0] ?? "";
     const archDetected = await detectArch();

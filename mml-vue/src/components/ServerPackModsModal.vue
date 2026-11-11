@@ -102,7 +102,7 @@ function apply() {
             </span>
           </span>
           <span class="mods-path">{{ item.path }}</span>
-          <span v-if="item.text" class="mods-text">{{ item.text }}</span>
+          <span v-if="item.text" class="mods-text" :title="item.text">{{ item.text }}</span>
         </span>
       </label>
     </div>
