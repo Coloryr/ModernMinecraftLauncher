@@ -243,8 +243,8 @@ const closeAskButton = computed(() =>
     <div v-if="bgImage" class="app-bg" :style="bgLayerStyle" />
     <!-- 单窗口模式的页面切换动画：多窗口模式下每个窗口是独立 webview、组件不会变，
        这里平时不动。动画只作用在内容区（base.css 的 .win-page-*），标题栏与窗口按钮
-       不参与；根元素自身不产生过渡、Vue 推断不出时长，所以显式给 160ms。 -->
-    <Transition name="win-page" mode="out-in" :duration="160">
+       不参与；根元素自身不产生过渡、Vue 推断不出时长，所以显式给 180ms（与 base.css 同档）。 -->
+    <Transition name="win-page" mode="out-in" :duration="180">
       <KeepAlive>
         <component :is="currentWindow" :key="currentKind" @close="closeWindow" />
       </KeepAlive>

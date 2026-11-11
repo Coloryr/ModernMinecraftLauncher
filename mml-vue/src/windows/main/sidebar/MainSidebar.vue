@@ -213,10 +213,11 @@ const GROUP_ANIM_MS = 220;
 /** 侧栏列表的顶部内边距，单位 px；与 .sidebar-list 的 padding-top 同源 */
 const LIST_PAD_TOP = 2;
 
-/** 占满时的一格：添加卡或实例卡 */
+/** 占满时的一格：添加卡、实例卡、拖拽落点占位 */
 type TileCell =
   | { kind: "add" }
-  | { kind: "instance"; idx: number; inst: InstanceInfoDto };
+  | { kind: "instance"; idx: number; inst: InstanceInfoDto }
+  | { kind: "ghost" };
 
 /** 虚拟列表的一行 */
 type Row =
@@ -376,8 +377,11 @@ const rows = computed<Row[]>(() => {
       if (!props.multiSelect) cells.push({ kind: "add" });
       g.items.forEach((inst, idx) => {
         if (inst.uuid === props.draggingUuid) return;
+        // 与普通行同一口径：占位落在第 idx 个实例之前，末尾单独判一次
+        if (props.isInstInsert(g.id, idx)) cells.push({ kind: "ghost" });
         cells.push({ kind: "instance", idx, inst });
       });
+      if (props.isInstInsertEnd(g.id)) cells.push({ kind: "ghost" });
       out.push(...chunkTiles(cells, g.id, gi));
       return;
     }
@@ -622,6 +626,12 @@ defineExpose({ scrollToInstance });
                       <GlyphIcon name="plus" :size="24" :weight="1.8" />
                     </span>
                     <span class="tile-name">{{ t("group.add") }}</span>
+                  </div>
+                  <!-- 落点占位：与卡片同尺寸，拖动时显示将插入的位置 -->
+                  <div v-else-if="cell.kind === 'ghost'" class="tile tile-ghost">
+                    <InstanceIcon :name="dragActive?.instance?.name ?? ''"
+                      :uuid="dragActive?.instance?.uuid ?? '0'" :size="44" />
+                    <span class="tile-name">{{ dragActive?.instance?.name ?? "" }}</span>
                   </div>
                   <div v-else class="tile" :data-uuid="cell.inst.uuid" :data-idx="cell.idx"
                     :data-group="row.groupId" :class="{
@@ -1123,6 +1133,17 @@ defineExpose({ scrollToInstance });
 .tile:hover {
   background: var(--bg-hover);
   transform: translateY(-2px);
+}
+
+/* 拖动落点占位：虚线框 + 淡化内容，与列表模式的 .drop-ghost-row 同一套口径。
+   pointer-events: none：落点靠指针下方的真实元素算，占位自己不能接事件 */
+.tile-ghost {
+  border: 1.5px dashed var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--text-dim);
+  opacity: 0.75;
+  cursor: grabbing;
+  pointer-events: none;
 }
 
 .tile.active {

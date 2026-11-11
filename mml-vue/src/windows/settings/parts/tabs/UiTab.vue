@@ -53,6 +53,8 @@ const {
   setAccent,
   customAccent,
   setCustomAccent,
+  gradientMode,
+  setGradientMode,
   ACCENTS,
   bgImage,
   setBgImage,
@@ -71,6 +73,8 @@ const {
   setBgOpacity,
   bgBlur,
   setBgBlur,
+  bgFrosted,
+  setBgFrosted,
 } = props.settings;
 
 /** 窗口材质（云母 / 亚克力）只有 Windows 提供；macOS / Linux 没有对应实现，整块藏掉 */
@@ -139,15 +143,6 @@ function toggleCustomPage(on: boolean) {
     </div>
     <p class="field-desc">{{ t("winSettings.fontDesc") }}</p>
     <p v-if="fontsLoading" class="hint">{{ t("winSettings.fontLoading") }}</p>
-
-    <!-- 界面动画开关 -->
-    <div class="switch-row">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("winSettings.animations") }}</span>
-        <span class="switch-state">{{ t("winSettings.animationsDesc") }}</span>
-      </div>
-      <BaseSwitch :model-value="animations" @update:model-value="setAnimations" />
-    </div>
   </SettingsGroup>
 
   <SettingsGroup v-if="!locked" id="theme" title-key="winSettings.secTheme" :flash="flashGroup === 'theme'">
@@ -182,6 +177,7 @@ function toggleCustomPage(on: boolean) {
         <input type="color" :value="customAccent" @input="setCustomAccent(($event.target as HTMLInputElement).value)" />
       </label>
     </div>
+
   </SettingsGroup>
 
   <SettingsGroup v-if="!locked" id="customCss" title-key="winSettings.secCustomCss" :flash="flashGroup === 'customCss'">
@@ -255,6 +251,33 @@ function toggleCustomPage(on: boolean) {
       { value: 'Multi', label: t('winSettings.multi') },
     ]" @update:model-value="onModeChange" />
     <p v-if="inTauri" class="hint">{{ t("winSettings.windowModeRestart") }}</p>
+
+    <!-- 界面动画开关 -->
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.animations") }}</span>
+        <span class="switch-state">{{ t("winSettings.animationsDesc") }}</span>
+      </div>
+      <BaseSwitch :model-value="animations" @update:model-value="setAnimations" />
+    </div>
+
+    <!-- 渐变色模式：关掉后强调色与实例图标改用纯色 -->
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.gradient") }}</span>
+        <span class="switch-state">{{ t("winSettings.gradientDesc") }}</span>
+      </div>
+      <BaseSwitch :model-value="gradientMode" @update:model-value="setGradientMode" />
+    </div>
+
+    <!-- 透明高斯模糊：叠在背景图上的表面改用背景模糊；没设背景图时置灰 -->
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.bgFrosted") }}</span>
+        <span class="switch-state">{{ t("winSettings.bgFrostedDesc") }}</span>
+      </div>
+      <BaseSwitch :model-value="bgFrosted" :disabled="!bgImage" @update:model-value="setBgFrosted" />
+    </div>
   </SettingsGroup>
 
   <!-- 窗口外观：材质由系统在窗口背后合成（Rust 侧 windows/effects.rs），落 gui_config.client.windowEffect -->

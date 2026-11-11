@@ -770,7 +770,14 @@ onBeforeUnmount(() => {
           v-tip="launching ? t('launch.cancel') : t('logWindow.testLaunch')"
           :aria-label="launching ? t('launch.cancel') : t('logWindow.testLaunch')"
           @click="launching ? cancelLaunch() : testLaunch()">
-          <LaunchProgress v-if="launching" :text="stageText" :percent="stagePct" />
+          <!-- 启动中：平时是阶段 + 进度，悬停换成「取消启动」（同主窗口的启动键） -->
+          <span v-if="launching" class="launch-busy">
+            <LaunchProgress :text="stageText" :percent="stagePct" />
+            <span class="launch-hover">
+              <GlyphIcon name="close" :size="14" />
+              {{ t("launch.cancel") }}
+            </span>
+          </span>
           <GlyphIcon v-else name="play" :size="15" />
         </BaseButton>
       </div>
@@ -897,6 +904,48 @@ onBeforeUnmount(() => {
 }
 
 /* 按钮不缩、图标键方正化、chip 可压、下拉宽度与省略号：都在 styles/titlebar.css 的标题栏标准里 */
+
+/* 启动中悬停换成「取消启动」：进度与动作叠在同一位置，只切透明度，按钮宽度不变 */
+.launch-busy {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.launch-busy .launch-in {
+  transition: opacity 0.12s;
+}
+
+.launch-hover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  /* 点击交给按钮本身 */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.ui-btn:hover .launch-hover {
+  opacity: 1;
+}
+
+.ui-btn:hover .launch-busy .launch-in {
+  opacity: 0;
+}
+
+/* 取消是危险动作：悬停整颗转红底红字，与主窗口启动键一致 */
+.frame-head .ui-btn.launch-live:hover {
+  background: color-mix(in srgb, var(--red) 20%, var(--bg-card));
+  color: var(--red);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--red) 28%, transparent);
+}
 
 /* 开关 + 文案：文案跟着开关走，点哪都算切换 */
 .sw {

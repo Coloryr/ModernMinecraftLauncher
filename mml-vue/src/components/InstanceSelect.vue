@@ -25,6 +25,8 @@ const ITEM_META_H = 48;
 const EDGE = 8;
 /** 浮层与触发按钮之间的缝隙，单位 px */
 const GAP = 4;
+/** 向下弹出至少要有的可用高度，单位 px；比这还窄才改向上 */
+const DROP_MIN = 180;
 
 /** 下拉里的一行：分组标题或一个实例 */
 interface GroupRow {
@@ -204,8 +206,11 @@ function moveActive(delta: number) {
 /**
  * 按触发按钮的位置算浮层坐标
  *
- * 先按"不限高"量一次整高，再决定朝下还是朝上；朝上时用 bottom 定位，
- * 窗口高度一变也不会只剩一条缝。左右同样夹进窗口内 —— 浮层挂在 body 上，没有父级帮忙裁。
+ * 先按"不限高"量一次整高。卡片档（主窗口列表模式）**跨过触发按钮**、上下都用：
+ * 只放一侧时实例一多就只能在下面挤一条。字段档放在一侧，默认朝下；整高几乎总是超过
+ * 任何一侧，若按"放不放得下"比大小，按钮只要比窗口中线低一点就永远向上弹，
+ * 所以只有下面窄到放不下一段可用高度、且上面确实更宽时才向上。
+ * 左右都夹进窗口内 —— 浮层挂在 body 上，没有父级帮忙裁。
  */
 function place() {
   const btn = btnEl.value;
@@ -219,14 +224,35 @@ function place() {
   const natural = menu.offsetHeight + hidden;
   if (natural <= 0) return;
 
-  const below = window.innerHeight - rect.bottom - GAP - EDGE;
-  const above = rect.top - GAP - EDGE;
-  const up = natural > below && (natural <= above || above > below);
-  const maxHeight = Math.max(160, Math.min(natural, up ? above : below));
-
   let left = rect.left;
   if (left + width > window.innerWidth - EDGE) left = rect.right - width;
   left = Math.max(EDGE, Math.min(left, window.innerWidth - width - EDGE));
+
+  // 卡片档：以按钮中心为锚点上下对半分，盖住触发按钮；列表再长也能占满整窗高度。
+  // 贴着窗口上下边缘时把整块夹回来，超高就封顶后由列表自己滚。
+  if (props.variant === "card") {
+    const maxHeight = Math.max(160, Math.min(natural, window.innerHeight - EDGE * 2));
+    const top = Math.max(
+      EDGE,
+      Math.min(
+        rect.top + rect.height / 2 - maxHeight / 2,
+        window.innerHeight - EDGE - maxHeight,
+      ),
+    );
+    menuStyle.value = {
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${width}px`,
+      maxHeight: `${maxHeight}px`,
+    };
+    return;
+  }
+
+  const below = window.innerHeight - rect.bottom - GAP - EDGE;
+  const above = rect.top - GAP - EDGE;
+  // 下面还能露出 DROP_MIN 就不往上翻：整高放不下时向下滚动，比跳到按钮上方更符合预期
+  const up = below < DROP_MIN && above > below;
+  const maxHeight = Math.max(160, Math.min(natural, up ? above : below));
 
   menuStyle.value = {
     left: `${left}px`,

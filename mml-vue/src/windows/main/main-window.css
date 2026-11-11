@@ -25,7 +25,7 @@
   height: 100%;
   border-radius: 3px;
   background: var(--accent);
-  transition: width 0.25s ease;
+  transition: width 0.3s var(--ease-out);
 }
 
 /* 滚动动画条：单实例删除，整目录挪回收站拿不到真实进度 */
@@ -113,11 +113,18 @@
 }
 
 .main.sidebar-anim .sidebar-slot {
-  transition: width 0.22s ease;
+  transition: width 0.3s var(--ease-out);
 }
 
 .sidebar-slot.collapsed {
   width: 24px;
+}
+
+/* 收起后把侧栏内容藏起来：展开把手在背景图模式下半透明，靠它盖住只会透出
+   搜索框 / 分组行的一截（收起动画走完再隐藏，内容不会在收起的瞬间凭空消失） */
+.sidebar-slot.collapsed .sidebar {
+  visibility: hidden;
+  transition: visibility 0s linear 0.3s;
 }
 
 /* 侧栏向右占满：槽位吃掉整行，右侧详情区收起。两者一起过渡，
@@ -195,7 +202,7 @@
    淡入淡出 + 轻微上收（out-in 保证同一时刻只有一个子节点，避免 flex:1 的两者叠在一起） */
 .view-swap-enter-active,
 .view-swap-leave-active {
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
 }
 
 .view-swap-enter-from,

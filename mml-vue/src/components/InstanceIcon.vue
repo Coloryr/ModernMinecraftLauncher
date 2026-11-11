@@ -3,7 +3,8 @@
 // 按 uuid 取色的渐变底 + 实例名首字母
 import { computed, onUnmounted, ref, watch } from "vue";
 import { getImageBaseUrl, onInstanceChange } from "../lib/api";
-import { instanceGradient } from "../lib/instanceColor";
+import { instanceColor, instanceGradient } from "../lib/instanceColor";
+import { gradientMode } from "../lib/theme";
 
 const props = withDefaults(
   defineProps<{
@@ -17,8 +18,11 @@ const props = withDefaults(
   { size: 48 },
 );
 
-// 取色在 lib/instanceColor：统计窗口的单日饼图用同一套，颜色才能和图标对上
-const palette = computed(() => instanceGradient(props.uuid));
+// 取色在 lib/instanceColor：统计窗口的单日饼图用同一套，颜色才能和图标对上；
+// 纯色模式直接用色组首色，与饼图色块同色
+const palette = computed(() =>
+  gradientMode.value ? instanceGradient(props.uuid) : instanceColor(props.uuid),
+);
 
 const char = computed(() => props.name.trim().charAt(0).toUpperCase() || "M");
 

@@ -48,6 +48,9 @@ export const bgOpacity = ref(readNumber(KEYS.bgOpacity, 100));
 /** 背景模糊，单位 px */
 export const bgBlur = ref(readNumber(KEYS.bgBlur, 0));
 
+/** 透明高斯模糊：叠在背景图上的表面用背景模糊代替单纯的半透明 */
+export const bgFrosted = ref(readFlag(KEYS.bgFrosted, true));
+
 /** 原始分辨率，单位 %，范围 10–100：后端把源图缩放到源图的百分之多少 */
 export const bgNativeSize = ref(100);
 
@@ -64,6 +67,8 @@ interface BgInfo {
   opacity: number;
   /** 模糊半径，单位 px */
   blur: number;
+  /** 是否使用透明高斯模糊 */
+  frosted: boolean;
   /** 原始分辨率，单位 % */
   nativeSize: number;
 }
@@ -74,6 +79,7 @@ function applyBgInfo(info: BgInfo) {
   bgImage.value = info.dataUrl;
   bgOpacity.value = info.opacity;
   bgBlur.value = info.blur;
+  bgFrosted.value = info.frosted;
   bgNativeSize.value = info.nativeSize;
   // 缓存一份 dataURL：下次启动挂载时立即有背景，不闪底色。
   // dataURL 很大，配额写满时会静默失败，仅当次会话生效，见 storage.writeRaw
@@ -218,6 +224,17 @@ export function setBgBlur(v: number) {
 }
 
 /**
+ * 设置透明高斯模糊
+ *
+ * - `v`: 是否启用
+ */
+export function setBgFrosted(v: boolean) {
+  bgFrosted.value = v;
+  writeFlag(KEYS.bgFrosted, v);
+  void saveGuiConfig({ bgFrosted: v });
+}
+
+/**
  * 背景图层的内联样式，App.vue 的 .app-bg 绑定用
  *
  * 始终铺满窗口并居中；标题栏与各表面一样半透明透出这层，见 themes.css 的 has-bg。
@@ -231,10 +248,15 @@ export const bgLayerStyle = computed(() => {
   };
 });
 
-// 有背景图时给 <html> 挂 has-bg：themes.css 里的半透明表面变量生效
-watch(bgImage, (v) => {
-  document.documentElement.classList.toggle("has-bg", !!v);
-}, { immediate: true });
+// 有背景图时给 <html> 挂 has-bg（themes.css 里的半透明表面变量生效），
+// 开了透明高斯模糊再加 bg-frosted（叠层改用背景模糊）
+function applyBgClasses() {
+  const has = !!bgImage.value;
+  document.documentElement.classList.toggle("has-bg", has);
+  document.documentElement.classList.toggle("bg-frosted", has && bgFrosted.value);
+}
+
+watch([bgImage, bgFrosted], applyBgClasses, { immediate: true });
 
 // 背景图变更（设置窗口改动 / 清除）时所有窗口统一向后端取最新状态
 if (isTauri()) {

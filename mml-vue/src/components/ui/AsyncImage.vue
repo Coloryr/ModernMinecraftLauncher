@@ -71,7 +71,7 @@ watch(
   height: 100%;
   object-fit: cover;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.18s var(--ease-out);
 }
 
 .async-img img.show {

@@ -19,7 +19,7 @@ defineProps<{
 .collapse {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 0.22s ease;
+  transition: grid-template-rows 0.22s var(--ease-out);
 }
 
 .collapse.open {

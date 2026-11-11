@@ -1,6 +1,6 @@
 // 主题管理：暗色 / 亮色 + 强调色预设，状态持久化到 gui_config.json
 import { ref } from "vue";
-import { KEYS, readString, writeString, onStorageChange } from "./storage";
+import { KEYS, readFlag, readString, writeFlag, writeString, onStorageChange } from "./storage";
 import { saveGuiConfig, type Theme } from "./guiConfig";
 import { onGuiThemeChange } from "./api";
 export type { Theme } from "./guiConfig";
@@ -75,6 +75,9 @@ export const accent = ref<AccentId>(
 /** 自定义强调色（#rrggbb）：accent === "custom" 时生效 */
 export const customAccent = ref(readString(KEYS.accentCustom, "#4f8cff"));
 
+/** 渐变色模式：关掉后强调色渐变与实例图标渐变换成纯色 */
+export const gradientMode = ref(readFlag(KEYS.gradient, true));
+
 // ---------- 自定义强调色的派生色计算 ----------
 
 /** #rrggbb → [r, g, b] */
@@ -105,8 +108,11 @@ function applyCustomAccentVars(hex: string) {
   const root = document.documentElement;
   root.style.setProperty("--accent", hex);
   root.style.setProperty("--accent-hover", shade(hex, -0.14));
-  // 渐变第二段往亮偏一点，观感接近预设的双色渐变
-  root.style.setProperty("--accent-grad", `linear-gradient(120deg, ${shade(hex, -0.08)}, ${shade(hex, 0.14)})`);
+  // 渐变第二段往亮偏一点，观感接近预设的双色渐变；纯色模式下直接给强调色
+  root.style.setProperty(
+    "--accent-grad",
+    gradientMode.value ? `linear-gradient(120deg, ${shade(hex, -0.08)}, ${shade(hex, 0.14)})` : hex,
+  );
   const [r, g, b] = hexToRgb(hex);
   root.style.setProperty("--accent-soft", `rgba(${r}, ${g}, ${b}, 0.14)`);
   root.style.setProperty("--accent-border", `rgba(${r}, ${g}, ${b}, 0.4)`);
@@ -134,6 +140,8 @@ export function resolvedTheme(): Theme {
 /** 把当前主题与强调色写到根元素，CSS 变量按 Dark / Light 定义 */
 export function applyTheme() {
   const root = document.documentElement;
+  // 纯色模式：CSS 把 --accent-grad 折回 --accent（自定义色走下面的内联变量）
+  root.classList.toggle("no-gradient", !gradientMode.value);
   // CSS 变量按 Dark / Light 定义，System 在这里解析成具体值
   root.dataset.theme = resolvedTheme();
   // 强调色：blue 是默认，theme.css 基础块已定义；其余通过 data-accent 覆盖；
@@ -220,9 +228,36 @@ export function restoreAccent(id: string, custom: string) {
   applyTheme();
 }
 
+/**
+ * 设置渐变色模式
+ *
+ * - `v`: 是否启用；关掉后强调色渐变与实例图标渐变换成纯色
+ */
+export function setGradientMode(v: boolean) {
+  gradientMode.value = v;
+  writeFlag(KEYS.gradient, v);
+  applyTheme();
+  void saveGuiConfig({ gradient: v });
+}
+
+/**
+ * 用配置里的渐变色模式初始化（启动引导用）
+ *
+ * 只同步内存状态与首绘，不回写配置。
+ *
+ * - `v`: 配置里的开关
+ */
+export function restoreGradientMode(v: boolean) {
+  gradientMode.value = v;
+  writeFlag(KEYS.gradient, v);
+  applyTheme();
+}
+
 // 多窗口同步：设置窗口改完由壳层广播；浏览器预览没有 IPC，靠下面的 storage 事件兜底
 void onGuiThemeChange((d) => {
   theme.value = d.theme;
+  gradientMode.value = d.gradient;
+  writeFlag(KEYS.gradient, d.gradient);
   customAccent.value = d.customAccent;
   accent.value =
     d.accent === "custom" || ACCENTS.some((a) => a.id === d.accent)

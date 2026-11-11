@@ -86,6 +86,7 @@ export type LaunchCheckConfigDto = {
 
 export type GuiConfigDto = {
   theme: Theme,
+  gradient: boolean,
   accent: string,
   customAccent: string,
   locale: "zh_cn" | "en_us",
@@ -102,12 +103,14 @@ export type GuiConfigDto = {
   bgSource: string,
   bgOpacity: number,
   bgBlur: number,
+  bgFrosted: boolean,
   bgNativeSize: number,
   fresh: boolean,
 };
 
 export type GuiThemeDto = {
   theme: Theme,
+  gradient: boolean,
   accent: string,
   customAccent: string,
 };

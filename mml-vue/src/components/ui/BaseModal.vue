@@ -48,24 +48,52 @@ const active = usePageActive();
 <template>
   <Teleport to="body">
     <!-- 点遮罩空白处**不关**：误触一下就把弹窗收掉太容易丢东西，关它走右上角 ✕ 或弹窗自己的按钮 -->
-    <div v-if="active" class="modal-mask" :class="{ 'below-titlebar': props.belowTitlebar }">
-      <div class="modal" :class="{ 'fixed-h': !!props.fixedHeight }"
-        :style="{ width: width + 'px', height: props.fixedHeight || undefined }">
-        <div v-if="title" class="modal-head">
-          <h3>{{ title }}</h3>
-          <button v-if="closable" class="modal-x" :disabled="closeDisabled" @click="emit('close')">
-            <GlyphIcon name="close" :size="14" :weight="2.2" />
-          </button>
-        </div>
-        <div class="modal-body">
-          <slot />
+    <Transition name="modal">
+      <div v-if="active" class="modal-mask" :class="{ 'below-titlebar': props.belowTitlebar }">
+        <div class="modal" :class="{ 'fixed-h': !!props.fixedHeight }"
+          :style="{ width: width + 'px', height: props.fixedHeight || undefined }">
+          <div v-if="title" class="modal-head">
+            <h3>{{ title }}</h3>
+            <button v-if="closable" class="modal-x" :disabled="closeDisabled" @click="emit('close')">
+              <GlyphIcon name="close" :size="14" :weight="2.2" />
+            </button>
+          </div>
+          <div class="modal-body">
+            <slot />
+          </div>
         </div>
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>
 
 <style scoped>
+/* 弹窗进出：遮罩淡入淡出，面板轻微缩放。只动 opacity / transform，不触发布局 */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.18s var(--ease-out);
+}
+
+.modal-enter-active .modal,
+.modal-leave-active .modal {
+  transition: transform 0.18s var(--ease-out);
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+/* 退场这 180ms 里遮罩还在，别让它继续接点击 */
+.modal-leave-active {
+  pointer-events: none;
+}
+
+.modal-enter-from .modal,
+.modal-leave-to .modal {
+  transform: scale(0.96);
+}
+
 .modal-mask {
   position: fixed;
   inset: 0;

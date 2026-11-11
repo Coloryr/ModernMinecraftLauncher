@@ -48,7 +48,7 @@ import { dismissToast, toasts } from "../../lib/toast";
 
 .toast-enter-active,
 .toast-leave-active {
-  transition: opacity 0.2s, transform 0.2s;
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
 }
 
 .toast-enter-from,

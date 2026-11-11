@@ -106,6 +106,8 @@ pub struct BgInfoDto {
     pub opacity: u32,
     /// 模糊，单位 px
     pub blur: u32,
+    /// 是否使用透明高斯模糊
+    pub frosted: bool,
     /// 原始分辨率，百分比
     pub native_size: u32,
 }

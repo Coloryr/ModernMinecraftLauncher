@@ -491,6 +491,7 @@ pub fn settings_get_bg() -> Result<Option<BgInfoDto>, String> {
         data_url: format!("data:{mime};base64,{}", BASE64.encode(bytes)),
         opacity: config.bg_opacity,
         blur: config.bg_blur,
+        frosted: config.bg_frosted,
         native_size: config.bg_native_size,
     }))
 }

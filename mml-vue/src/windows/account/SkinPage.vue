@@ -89,6 +89,24 @@ const listLoading = ref(false);
 /** 待上传的本地皮肤文件路径，空表示无；选中后选型号直传，须在下方 immediate watch 之前声明 */
 const uploadFile = ref("");
 
+/** 预览加载超时，单位 ms：协议请求没有回音时 img 的 load / error 都不会触发，
+    不能让转圈一直挂着 */
+const LOAD_TIMEOUT_MS = 12000;
+let loadingTimer: number | null = null;
+
+// 转圈最多挂这么久：图片请求得不到响应时（贴图回源卡住等）也要退出加载态
+watch(loading, (now) => {
+  if (loadingTimer !== null) {
+    clearTimeout(loadingTimer);
+    loadingTimer = null;
+  }
+  if (!now) return;
+  loadingTimer = window.setTimeout(() => {
+    loadingTimer = null;
+    loading.value = false;
+  }, LOAD_TIMEOUT_MS);
+});
+
 /**
  * 目标账户由入口传进来：账户条目上的「查看皮肤」按钮点的是哪一条就预览哪一条
  *
@@ -219,9 +237,10 @@ function modelLabel(model: string): string {
   return model === "slim" ? t("winSkin.skinSlim") : t("winSkin.skinClassic");
 }
 
-/** 列表缩略图：型号跟随条目声明，纤细皮肤不渲染成经典版型 */
+/** 列表缩略图：型号跟随条目声明，纤细皮肤不渲染成经典版型；
+    其余交给自动检测——1.7 的 64x32 贴图按新版版面渲染会越界，缩略图整张空白 */
 function skinThumbUrl(item: TextureItemDto): string {
-  return `${base.value}/skin/${item.sha1}/${item.model === "slim" ? "slim" : "new"}`;
+  return `${base.value}/skin/${item.sha1}/${item.model === "slim" ? "slim" : "auto"}`;
 }
 
 /** 披风列表缩略图，档位跟随"披风显示"配置 */
@@ -331,11 +350,13 @@ function destroyViewer() {
   viewer = null;
 }
 
-/** 皮肤类型转 skinview3d 模型：auto 优先按服务器标记的纤细型号，比贴图像素检测可靠 */
+/** 皮肤类型转 skinview3d 模型：auto 优先按服务器标记的纤细型号，比贴图像素检测可靠；
+    1.7 旧版只有经典手臂，固定按经典 */
 const modelOpt = computed(() => {
   switch (skinType.value) {
     case "slim":
       return "slim" as const;
+    case "old":
     case "new":
       return "default" as const;
     default:
@@ -343,11 +364,66 @@ const modelOpt = computed(() => {
   }
 });
 
+/** 3D 重建代次：旧版贴图要先异步裁图，晚到的结果不能盖掉新一次重建 */
+let viewerSeq = 0;
+
+/**
+ * 1.7 旧版贴图：裁出左上 64x32 交给 skinview3d
+ *
+ * skinview3d 只认 1.8 版面，遇到 64x32 的图会自己按旧版镜像补齐；
+ * 对 64x64 的图想按 1.7 预览，得先裁成 64x32 再交给他，否则会当成 1.8 渲染。
+ *
+ * - `url`: 原始贴图地址
+ *
+ * # 返回值
+ *
+ * 64x32 的画布；取图失败时 reject
+ */
+function legacySkinImage(url: string): Promise<HTMLCanvasElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 32;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("canvas"));
+        return;
+      }
+      ctx.drawImage(image, 0, 0, 64, 32, 0, 0, 64, 32);
+      resolve(canvas);
+    };
+    image.onerror = () => reject(new Error("image"));
+    image.src = url;
+  });
+}
+
 /** 按当前模式与贴图重建 3D 观察器 */
-function setupViewer() {
+async function setupViewer() {
+  const seq = ++viewerSeq;
   destroyViewer();
   noSkin.value = false;
-  if (mode.value !== "3d" || !canvas.value || !stage.value || !skinrawUrl.value) return;
+  // 这里提前返回时不渲染任何东西，不能把上一次的加载指示留在屏幕上
+  if (mode.value !== "3d" || !canvas.value || !stage.value || !skinrawUrl.value) {
+    loading.value = false;
+    return;
+  }
+
+  // 1.7 旧版：先裁成 64x32 的旧版版面再交给他转换
+  let source: string | HTMLCanvasElement = skinrawUrl.value;
+  if (skinType.value === "old") {
+    loading.value = true;
+    const legacy = await legacySkinImage(skinrawUrl.value).catch(() => null);
+    if (seq !== viewerSeq) return;
+    if (!legacy) {
+      noSkin.value = true;
+      loading.value = false;
+      return;
+    }
+    source = legacy;
+  }
 
   viewer = new skinview3d.SkinViewer({
     canvas: canvas.value,
@@ -372,11 +448,12 @@ function setupViewer() {
   // loadSkin 必须显式传 model：不传时默认按贴图自动检测，纤细皮肤贴图版面
   // 与经典相同，检测结果恒为经典，会覆盖构造时传的 model 选项
   loading.value = true;
-  const skinP = viewer
-    .loadSkin(skinrawUrl.value, { model: modelOpt.value })
-    .catch(() => {
-      noSkin.value = true;
-    });
+  // loadSkin 传画布时同步执行，包一层 async 才能同时接住同步异常与异步失败
+  const skinP = (async () => {
+    await viewer?.loadSkin(source, { model: modelOpt.value });
+  })().catch(() => {
+    noSkin.value = true;
+  });
   // 没有披风的账户加载失败是正常的，静默忽略
   const capeP =
     showCape.value && caperawUrl.value
@@ -397,7 +474,8 @@ function applyAnim() {
   viewer.animation = animType.value === "none" ? null : ANIM_FACTORY[animType.value]();
 }
 
-watch([mode, skinrawUrl, modelOpt], () => setupViewer());
+// skinType 也进依赖：1.7 旧版要换贴图版面（裁成 64x32），模型名可能没变
+watch([mode, skinrawUrl, modelOpt, skinType], () => void setupViewer());
 
 // 披风开关 / 切换预览披风：不重建观察器，直接挂载 / 卸载（皮肤不跟着重载）
 watch([caperawUrl, showCape], () => {
@@ -500,10 +578,13 @@ watch([mode, skin2dUrl], resetView);
 onMounted(async () => {
   // 浏览器预览取不到协议前缀，按空串处理并继续走占位图
   base.value = await getImageBaseUrl().catch(() => "");
-  setupViewer();
+  void setupViewer();
 });
 
-onBeforeUnmount(destroyViewer);
+onBeforeUnmount(() => {
+  destroyViewer();
+  if (loadingTimer !== null) clearTimeout(loadingTimer);
+});
 </script>
 
 <template>

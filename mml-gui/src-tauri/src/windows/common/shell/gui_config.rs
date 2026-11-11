@@ -136,8 +136,10 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
         old.theme != new_config.theme
             || old.accent != new_config.accent
             || old.custom_accent != new_config.custom_accent
+            || old.gradient != new_config.gradient
     };
     let new_theme = new_config.theme;
+    let new_gradient = new_config.gradient;
     let new_accent = new_config.accent.clone();
     let new_custom_accent = new_config.custom_accent.clone();
     let new_client = new_config.client.clone();
@@ -174,7 +176,7 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
         crate::windows::settings::bg::emit_bg_change(&app);
     }
     if theme_changed {
-        emit_gui_theme_change(&app, new_theme, new_accent, new_custom_accent);
+        emit_gui_theme_change(&app, new_theme, new_accent, new_custom_accent, new_gradient);
     }
     if locale_changed {
         // 托盘是原生菜单，前端切语言带不动它，只能在这里重建一遍
@@ -221,17 +223,20 @@ fn emit_gui_view_mode_change(app: &AppHandle, mode: crate::gui_config::ViewMode)
 /// - `theme`: 变更后的主题
 /// - `accent`: 变更后的强调色 id，或 `custom`
 /// - `custom_accent`: 自定义强调色，`#rrggbb`
+/// - `gradient`: 是否启用渐变色模式
 #[gui_macros::emit]
 fn emit_gui_theme_change(
     app: &AppHandle,
     theme: crate::gui_config::Theme,
     accent: String,
     custom_accent: String,
+    gradient: bool,
 ) {
     let _ = app.emit(
         listens::GUI_THEME_CHANGE,
         crate::dtos::GuiThemeDto {
             theme,
+            gradient,
             accent,
             custom_accent,
         },

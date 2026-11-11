@@ -7,7 +7,7 @@ import App from "./App.vue";
 import { loadGuiConfig } from "./lib/guiConfig";
 import { initCustomUi, startCustomCss } from "./lib/customUi";
 import { initCustomHome } from "./lib/customHomeUi";
-import { applyTheme, restoreAccent, theme } from "./lib/theme";
+import { applyTheme, restoreAccent, restoreGradientMode, theme } from "./lib/theme";
 import { applyLocale, locale } from "./lib/i18n";
 import { applyMonacoNls } from "./lib/monacoNls";
 import { loadAccounts } from "./lib/accountStore";
@@ -113,6 +113,7 @@ async function bootstrap() {
   const cfg = await loadGuiConfig();
   if (cfg) {
     theme.value = cfg.theme;
+    restoreGradientMode(cfg.gradient);
     applyWindowAlpha(cfg.client.windowOpacity);
     applyWindowMaterial(cfg.client.windowEffect);
     restoreAccent(cfg.accent, cfg.customAccent);

@@ -399,6 +399,8 @@ impl Default for LaunchCheckConfig {
 pub struct GuiConfig {
     /// 主题：System / Light / Dark
     pub theme: Theme,
+    /// 渐变色模式：关掉后强调色渐变与实例图标渐变换成纯色
+    pub gradient: bool,
     /// 强调色：预设 id（blue / green / …）或 custom
     pub accent: String,
     /// 自定义强调色，`#rrggbb`；`accent` 为 custom 时生效
@@ -431,6 +433,8 @@ pub struct GuiConfig {
     pub bg_opacity: u32,
     /// 背景图模糊半径，单位像素，取值 0 到 40
     pub bg_blur: u32,
+    /// 背景图模式下的透明高斯模糊：叠在背景图上的表面用背景模糊代替单纯的半透明
+    pub bg_frosted: bool,
     /// 背景图原始分辨率，单位百分比，取值 10 到 100；后端按此把源图缩放后落盘
     pub bg_native_size: u32,
     /// 添加资源 / 下载整合包两个窗口的浏览偏好
@@ -444,6 +448,7 @@ impl Default for GuiConfig {
     fn default() -> Self {
         Self {
             theme: Default::default(),
+            gradient: true,
             accent: "blue".to_string(),
             custom_accent: "#4f8cff".to_string(),
             locale: Lang::zh_cn,
@@ -460,6 +465,7 @@ impl Default for GuiConfig {
             bg_source: String::new(),
             bg_opacity: 100,
             bg_blur: 0,
+            bg_frosted: true,
             bg_native_size: 100,
             resource_window: Default::default(),
             config_window: Default::default(),

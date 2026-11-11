@@ -12,6 +12,7 @@ import {
   animations,
   setAnimations,
   bgBlur,
+  bgFrosted,
   bgImage,
   bgLoading,
   bgNativeSize,
@@ -19,6 +20,7 @@ import {
   bgSource,
   copyBgSource,
   setBgBlur,
+  setBgFrosted,
   setBgImage,
   setBgImageFromOriginal,
   setBgOpacity,
@@ -29,8 +31,10 @@ import {
   ACCENTS,
   accent,
   customAccent,
+  gradientMode,
   setAccent,
   setCustomAccent,
+  setGradientMode,
   setTheme,
   theme,
   type Theme,
@@ -288,7 +292,6 @@ export function useSettingsUi() {
     switch (id) {
       case "general":
         setLocale(DEFAULT_LOCALE);
-        setAnimations(true);
         setFontFamily("");
         fontPick.value = "";
         return true;
@@ -300,6 +303,9 @@ export function useSettingsUi() {
         return true;
       case "window":
         // 与开关走同一条路：模式真变了就一起重启，否则会出现"设置显示多窗口、实际还是单窗口"
+        setAnimations(true);
+        setGradientMode(true);
+        setBgFrosted(true);
         await onModeChange("Multi");
         return true;
       case "mainWindow":
@@ -346,6 +352,8 @@ export function useSettingsUi() {
     setAccent,
     customAccent,
     setCustomAccent,
+    gradientMode,
+    setGradientMode,
     ACCENTS,
     bgImage,
     setBgImage,
@@ -364,6 +372,8 @@ export function useSettingsUi() {
     setBgOpacity: (v: number) => (opacityDraft.value = v),
     bgBlur: blurDraft,
     setBgBlur: (v: number) => (blurDraft.value = v),
+    bgFrosted,
+    setBgFrosted,
     resetGroup,
   };
 }

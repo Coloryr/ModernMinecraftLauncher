@@ -66,7 +66,7 @@ const SETTINGS_INDEX: IndexEntry[] = [
   // ---- 界面 ----
   { tab: "ui", group: "general", labelKey: "winSettings.language", extra: ["language", "语言"] },
   { tab: "ui", group: "general", labelKey: "winSettings.font", extra: ["font", "字体"] },
-  { tab: "ui", group: "general", labelKey: "winSettings.animations", extra: ["animation", "动画"] },
+  { tab: "ui", group: "window", labelKey: "winSettings.animations", extra: ["animation", "动画"] },
   { tab: "ui", group: "theme", labelKey: "winSettings.theme", extra: ["theme", "dark", "light", "深色", "浅色"] },
   { tab: "ui", group: "theme", labelKey: "winSettings.accent", extra: ["accent", "color", "强调色", "主题色"] },
   { tab: "ui", group: "customCss", labelKey: "winSettings.customCssOn", extra: ["custom css", "style pack", "样式包", "自定义界面", "css", "样式", "换肤"] },
@@ -94,9 +94,11 @@ const SETTINGS_INDEX: IndexEntry[] = [
     extra: ["view mode", "group", "list", "分组", "列表", "显示模式"],
   },
   { tab: "ui", group: "mainWindow", labelKey: "winSettings.sidebar", extra: ["sidebar", "侧栏"] },
+  { tab: "ui", group: "window", labelKey: "winSettings.gradient", extra: ["gradient", "solid", "渐变", "纯色"] },
   { tab: "ui", group: "bgImage", labelKey: "winSettings.bgImage", extra: ["background", "壁纸", "背景"] },
   { tab: "ui", group: "bgImage", labelKey: "winSettings.bgOpacity", extra: ["opacity", "不透明度"] },
   { tab: "ui", group: "bgImage", labelKey: "winSettings.bgBlur", extra: ["blur", "模糊"] },
+  { tab: "ui", group: "window", labelKey: "winSettings.bgFrosted", extra: ["frosted", "glass", "高斯", "磨砂"] },
   { tab: "ui", group: "bgImage", labelKey: "winSettings.bgNativeSize", extra: ["resolution", "分辨率"] },
 
   // ---- 皮肤与头像 ----

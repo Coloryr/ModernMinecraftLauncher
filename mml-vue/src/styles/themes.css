@@ -523,6 +523,39 @@ html.has-bg .tab-content {
   background: var(--bg);
 }
 
+/* 透明高斯模糊（设置 → 界面 → 背景图里的开关，html.bg-frosted 由 lib/appearance.ts 维护）：
+   叠在背景图上的成块表面改用「半透明底 + 背景模糊」，文字不再被图上的细节干扰。
+   只给本身有底色的表面加：透明按钮 / 列表行加了会在文字背后糊出一块方斑。
+   逐元素 backdrop-filter 比重绘整窗贵，所以只收成块的表面，别扩散到每一行。 */
+html.has-bg.bg-frosted .frame-head,
+html.has-bg.bg-frosted .topbar,
+html.has-bg.bg-frosted .sidebar,
+html.has-bg.bg-frosted .collapse-head,
+html.has-bg.bg-frosted .meta-panel,
+html.has-bg.bg-frosted .args-panel,
+html.has-bg.bg-frosted .server-config,
+html.has-bg.bg-frosted .motd-card,
+html.has-bg.bg-frosted .last-card,
+html.has-bg.bg-frosted .entry-card,
+html.has-bg.bg-frosted .news-panel,
+html.has-bg.bg-frosted .icon-btn,
+html.has-bg.bg-frosted .build-notice,
+html.has-bg.bg-frosted .empty-block,
+html.has-bg.bg-frosted .page-back,
+html.has-bg.bg-frosted .ui-btn.v-plain,
+html.has-bg.bg-frosted .ui-btn.v-accent,
+html.has-bg.bg-frosted .ui-btn.v-danger {
+  backdrop-filter: blur(14px) saturate(1.06);
+}
+
+/* 纯色模式（html.no-gradient，lib/theme.ts 维护）：强调色渐变折回单色，
+   实例图标由 InstanceIcon 自己换成纯色。预设色的 --accent-grad 定义在 data-accent 块里，
+   这里按同样的特异性覆盖；蓝色没有 data-accent，靠顺序压过 base 块 */
+html.no-gradient,
+html.no-gradient[data-accent] {
+  --accent-grad: var(--accent);
+}
+
 /* ============================================================
    系统材质模式（<html class="has-material">，lib/appearance.ts 维护）：
    云母 / 亚克力 / 模糊是 DWM 在窗口背后合成的，窗口底色必须让给它 ——

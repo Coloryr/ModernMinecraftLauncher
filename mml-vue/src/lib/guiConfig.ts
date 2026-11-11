@@ -256,6 +256,8 @@ export interface LaunchCheckConfig {
 export interface GuiConfig {
   /** Dark / Light / System */
   theme: Theme;
+  /** 渐变色模式：关掉后强调色渐变与实例图标渐变换成纯色 */
+  gradient: boolean;
   /** 强调色：预设 id（blue / green / …）或 custom */
   accent: string;
   /** 自定义强调色，#rrggbb */
@@ -284,6 +286,8 @@ export interface GuiConfig {
   bgOpacity: number;
   /** 背景图模糊，单位 px，取值 0–40 */
   bgBlur: number;
+  /** 背景图模式下的透明高斯模糊 */
+  bgFrosted: boolean;
   /** 背景图原始分辨率，单位 %，取值 10–100 */
   bgNativeSize: number;
   /** 是否首次启动（运行目录里还没有 gui_config.json）；只读，前端据此走首启向导 */
@@ -354,6 +358,7 @@ export interface GuiConfigPatch {
   experimental?: Partial<ExperimentalConfig>;
   launchCheck?: Partial<LaunchCheckConfig>;
   font?: string;
+  gradient?: boolean;
   accent?: string;
   customAccent?: string;
   skin?: Partial<SkinConfig>;
@@ -361,6 +366,7 @@ export interface GuiConfigPatch {
   bgSource?: string;
   bgOpacity?: number;
   bgBlur?: number;
+  bgFrosted?: boolean;
   bgNativeSize?: number;
 }
 
@@ -439,6 +445,7 @@ export function defaultConfig(): GuiConfig {
           ? "Dark"
           : "Light",
     // 与 theme.ts 的首绘兜底一致：没读到就用默认强调色
+    gradient: readFlag(KEYS.gradient, true),
     accent: readString(KEYS.accent) || "blue",
     customAccent: readString(KEYS.accentCustom, "#4f8cff"),
     locale: readString(KEYS.locale) === "en_us" ? "en_us" : "zh_cn",
@@ -520,6 +527,7 @@ export function defaultConfig(): GuiConfig {
     bgSource: "",
     bgOpacity: readNumber(KEYS.bgOpacity, 100),
     bgBlur: readNumber(KEYS.bgBlur, 0),
+    bgFrosted: readFlag(KEYS.bgFrosted, true),
     bgNativeSize: 100,
     // 浏览器预览没有首启向导：只有后端知道运行目录里有没有配置文件
     fresh: false,

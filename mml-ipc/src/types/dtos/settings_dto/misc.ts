@@ -45,6 +45,7 @@ export type BgInfoDto = {
   dataUrl: string,
   opacity: number,
   blur: number,
+  frosted: boolean,
   nativeSize: number,
 };
 

@@ -45,6 +45,10 @@ export const KEYS = {
   bgOpacity: "mml.bgOpacity",
   /** 背景模糊 px */
   bgBlur: "mml.bgBlur",
+  /** 渐变色模式（"0" = 关，改用纯色） */
+  gradient: "mml.gradient",
+  /** 透明高斯模糊（"0" = 关） */
+  bgFrosted: "mml.bgFrosted",
 
   // ---- 窗口 / 主界面 ----
   /** 多窗口 / 单窗口：Single 之外都算 Multi */

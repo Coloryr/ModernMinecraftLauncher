@@ -324,6 +324,8 @@ pub struct LaunchCheckConfigDto {
 pub struct GuiConfigDto {
     /// 主题：System / Light / Dark
     pub theme: Theme,
+    /// 渐变色模式：关掉后强调色渐变与实例图标渐变换成纯色
+    pub gradient: bool,
     /// 强调色：预设 id（blue / green / …）或 custom
     pub accent: String,
     /// 自定义强调色，`#rrggbb`
@@ -356,6 +358,8 @@ pub struct GuiConfigDto {
     pub bg_opacity: u32,
     /// 背景图模糊，单位 px，取值 0–40
     pub bg_blur: u32,
+    /// 背景图模式下的透明高斯模糊：叠在背景图上的表面用背景模糊代替单纯的半透明
+    pub bg_frosted: bool,
     /// 背景图原始分辨率，单位 %，取值 10–100
     pub bg_native_size: u32,
     /// 是否首次启动（运行目录里还没有 gui_config.json）；只读，前端据此决定要不要走首启向导
@@ -370,6 +374,8 @@ pub struct GuiConfigDto {
 pub struct GuiThemeDto {
     /// 主题：System / Light / Dark
     pub theme: Theme,
+    /// 渐变色模式：关掉后强调色渐变与实例图标渐变换成纯色
+    pub gradient: bool,
     /// 强调色：预设 id（blue / green / …）或 custom
     pub accent: String,
     /// 自定义强调色，`#rrggbb`
@@ -387,6 +393,7 @@ impl From<GuiConfig> for GuiConfigDto {
     fn from(c: GuiConfig) -> Self {
         Self {
             theme: c.theme,
+            gradient: c.gradient,
             accent: c.accent,
             custom_accent: c.custom_accent,
             locale: c.locale,
@@ -457,6 +464,7 @@ impl From<GuiConfig> for GuiConfigDto {
             bg_source: c.bg_source,
             bg_opacity: c.bg_opacity,
             bg_blur: c.bg_blur,
+            bg_frosted: c.bg_frosted,
             bg_native_size: c.bg_native_size,
             // 只读标记，真实值由 window_get_gui_config 填，转回磁盘配置时丢弃
             fresh: false,
@@ -475,6 +483,7 @@ impl From<GuiConfigDto> for GuiConfig {
     fn from(d: GuiConfigDto) -> Self {
         Self {
             theme: d.theme,
+            gradient: d.gradient,
             accent: d.accent,
             custom_accent: d.custom_accent,
             locale: d.locale,
@@ -544,6 +553,7 @@ impl From<GuiConfigDto> for GuiConfig {
             bg_source: d.bg_source,
             bg_opacity: d.bg_opacity,
             bg_blur: d.bg_blur,
+            bg_frosted: d.bg_frosted,
             bg_native_size: d.bg_native_size,
             // 不属于设置页，由各自的命令维护；保存设置时从旧配置整份带回来
             resource_window: Default::default(),

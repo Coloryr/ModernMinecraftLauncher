@@ -1,3 +1,12 @@
+/* ---------------- 动效曲线 ----------------
+   时长仍按 §16.6 的四档写在各自容器上，这里只统一缓动：
+   进入 / 展开用先快后慢的 ease-out，来回切换用 ease-in-out。
+   各窗口不要再自写 cubic-bezier，否则同一动作在不同窗口速度感不一样 */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
 /* ---------------- 基础重置 ---------------- */
 
 * {
@@ -62,7 +71,7 @@ html:not(.has-material):not(.has-bg) body {
    各浮层按自身对齐方向在组件内覆盖 transform-origin（如 top right / top left）。 */
 .drop-enter-active,
 .drop-leave-active {
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
   transform-origin: top;
 }
 
@@ -99,7 +108,7 @@ html.no-anim *::after {
 .window-frame.win-page-leave-active>.frame-body,
 .main-window.win-page-enter-active>.main,
 .main-window.win-page-leave-active>.main {
-  transition: opacity 0.16s ease, transform 0.16s ease;
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
 }
 
 .window-frame.win-page-enter-from>.frame-body,
