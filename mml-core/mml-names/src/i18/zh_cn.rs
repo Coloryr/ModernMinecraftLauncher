@@ -198,6 +198,12 @@ impl I18Lang for ZhCn {
                 path.display(),
                 root.display()
             ),
+            ErrorType::PathMoveError(data) => format!(
+                "文件搬运失败：{} → {}：{}",
+                data.input.display(),
+                data.output.display(),
+                data.error
+            ),
             ErrorType::MoveToTrashError(data) => format!(
                 "把 {} 移到回收站失败，返回码 0x{:X}",
                 data.path.display().to_string(),

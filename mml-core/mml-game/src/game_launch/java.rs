@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use mml_names::i18_items::error_type::ErrorType;
+use mml_names::{i18_items::error_type::ErrorType, names};
 
 use crate::{
     game_arg::GameLaunchObj, game_log::GameLog, gui_hook::LaunchGui,
@@ -207,10 +207,10 @@ pub(super) fn java_major_of(java: &std::path::Path) -> Option<i32> {
 /// 26 起 JVM 不再认识它，所以其它版本（以及取不到版本时）一律不带。
 pub(super) fn fix_zgc_args(args: &mut Vec<String>, major: Option<i32>) {
     // 先摘掉：23 起它是默认、已废弃，26 起 JVM 直接不认；取不到版本时也按不加处理
-    args.retain(|arg| arg != "-XX:+ZGenerational");
+    args.retain(|arg| arg != names::ZGC);
     if major.is_some_and(|major| (21..23).contains(&major))
         && args.iter().any(|arg| arg == "-XX:+UseZGC")
     {
-        args.push("-XX:+ZGenerational".to_string());
+        args.push(names::ZGC.to_string());
     }
 }

@@ -8,7 +8,7 @@ use std::path::Path;
 
 use tokio::fs as tfs;
 
-use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType};
+use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType, PathMoveErrorData};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 
 use super::fs_error;
@@ -75,7 +75,12 @@ pub fn move_file<P: AsRef<Path>>(input: P, output: P) -> CoreResult<()> {
                 delete(&input)?;
                 return Ok(());
             }
-            return Err(fs_error(input.as_ref(), err));
+            // 只报源路径时看不出是哪个名字不合法（Windows 的 os error 123），目标也带上
+            return Err(ErrorType::PathMoveError(PathMoveErrorData {
+                input: input.as_ref().to_path_buf(),
+                output: output.as_ref().to_path_buf(),
+                error: err.to_string(),
+            }));
         }
     }
 }
@@ -101,7 +106,12 @@ pub async fn move_file_async<P: AsRef<Path>>(input: P, output: P) -> CoreResult<
                 delete(&input)?;
                 return Ok(());
             }
-            return Err(fs_error(input.as_ref(), err));
+            // 只报源路径时看不出是哪个名字不合法（Windows 的 os error 123），目标也带上
+            return Err(ErrorType::PathMoveError(PathMoveErrorData {
+                input: input.as_ref().to_path_buf(),
+                output: output.as_ref().to_path_buf(),
+                error: err.to_string(),
+            }));
         }
     }
 }

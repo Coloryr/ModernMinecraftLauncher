@@ -43,7 +43,9 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 ///
 /// 已配好隐藏标志的命令，调用方继续加参数 / 配 stdio
 pub fn hidden_command<P: AsRef<std::ffi::OsStr>>(path: P) -> Command {
-    let mut cmd = Command::new(path);
+    let cmd = Command::new(path);
+    #[cfg(windows)]
+    let mut cmd = cmd;
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
     cmd

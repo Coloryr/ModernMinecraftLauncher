@@ -249,6 +249,7 @@ pub const G1GC: [&str; 8] = [
 /// 该选项已废弃，26 起直接不认。等选好实际要跑的 Java 再按版本补，
 /// 见 `game_launch` 的 ZGC 分代修正。
 pub const GCZGC: [&str; 1] = ["-XX:+UseZGC"];
+pub const ZGC: &str = "-XX:+ZGenerational";
 
 pub const LANG_ZH_CN: &str = "zh_CN";
 pub const LANG_EN_US: &str = "en_US";

@@ -64,8 +64,15 @@ export function preloadInstanceIcons(uuids: string[]) {
 export function cacheIconBlob(link: string) {
   if (!link || iconObjectUrls.has(link)) return;
   fetch(link)
-    .then((response) => response.blob())
+    .then((response) => {
+      // 没有图标的实例回的是 400：这种响应体是空的，存成 Blob 也画不出图，
+      // 下次重建却会拿它当 src，白多一次失败请求
+      const type = response.headers.get("content-type") ?? "";
+      if (!response.ok || !type.startsWith("image/")) return null;
+      return response.blob();
+    })
     .then((blob) => {
+      if (!blob || blob.size === 0) return;
       if (!iconObjectUrls.has(link)) iconObjectUrls.set(link, URL.createObjectURL(blob));
     })
     .catch(() => {

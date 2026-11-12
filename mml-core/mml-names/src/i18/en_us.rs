@@ -211,6 +211,12 @@ impl I18Lang for EnUs {
                 path.display(),
                 root.display()
             ),
+            ErrorType::PathMoveError(data) => format!(
+                "Failed to move {} to {}: {}",
+                data.input.display(),
+                data.output.display(),
+                data.error
+            ),
             ErrorType::MoveToTrashError(data) => format!(
                 "Failed to move {} to trash, code 0x{:X}",
                 data.path.display().to_string(),

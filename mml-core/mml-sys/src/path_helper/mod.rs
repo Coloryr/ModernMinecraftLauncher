@@ -42,7 +42,7 @@ pub(super) fn fs_error(path: &Path, err: impl std::fmt::Display) -> ErrorType {
 
 pub use self::io_op::*;
 pub use self::link::{FileId, file_id, link_count};
-pub use self::name::{replace_file_name, replace_path_name};
+pub use self::name::{replace_file_name, replace_path_name, sanitize_file_name};
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 pub use self::perm::{chmod, per_java_chmod};
 pub use self::scan::{

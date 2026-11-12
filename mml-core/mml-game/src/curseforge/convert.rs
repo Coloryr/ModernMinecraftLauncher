@@ -1,6 +1,7 @@
 //! CurseForge 版本信息到下载项、在线文件信息的转换
 
 use super::*;
+use mml_sys::path_helper::sanitize_file_name;
 
 /// 排序编号
 pub enum CurseForgeSortField {
@@ -74,7 +75,7 @@ pub fn make_file_item_obj<P: AsRef<Path>>(obj: &mut CurseForgeFileDataObj, path:
     FileItemObj {
         url: obj.download_url.clone().unwrap(),
         name: obj.display_name.clone(),
-        file: path.as_ref().join(&obj.file_name),
+        file: path.as_ref().join(sanitize_file_name(&obj.file_name)),
         hash: FileHash::Sha1(obj.sha1_hash()),
         later: LaterRun::None,
     }
@@ -94,7 +95,7 @@ pub fn make_file_online_info_obj(obj: &mut CurseForgeFileDataObj, path: &str) ->
     OnlineInfoObj {
         path: path.to_string(),
         name: obj.display_name.clone(),
-        file: obj.file_name.clone(),
+        file: sanitize_file_name(&obj.file_name),
         sha1: obj.sha1_hash(),
         url: obj.download_url.clone().unwrap_or_default(),
         modid: obj.mod_id.to_string(),

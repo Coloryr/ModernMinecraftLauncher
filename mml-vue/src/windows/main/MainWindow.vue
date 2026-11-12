@@ -2755,8 +2755,8 @@ onMounted(async () => {
                     </div>
 
                     <!-- 自定义执行 -->
-                    <div class="args-section">
-                      <button class="collapse-head args-toggle" :class="{ merged: execOpen }"
+                    <div class="args-section collapse-card">
+                      <button class="collapse-head" :class="{ merged: execOpen }"
                         @click="execOpen = !execOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("exec.title") }}
@@ -2772,8 +2772,8 @@ onMounted(async () => {
                     </div>
 
                     <!-- 自定义启动配置（json/ 目录）：与 ColorMC 游戏编辑窗口 tab1 同一张表 -->
-                    <div class="args-section">
-                      <button class="collapse-head args-toggle" :class="{ merged: jsonOpen }"
+                    <div class="args-section collapse-card">
+                      <button class="collapse-head" :class="{ merged: jsonOpen }"
                         @click="jsonOpen = !jsonOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("customJson.title") }}
@@ -2789,8 +2789,8 @@ onMounted(async () => {
                     </div>
 
                     <!-- 自定义服务器（自动加入 + MOTD 展示） -->
-                    <div class="args-section">
-                      <button class="collapse-head args-toggle" :class="{ merged: serverOpen }"
+                    <div class="args-section collapse-card">
+                      <button class="collapse-head" :class="{ merged: serverOpen }"
                         @click="serverOpen = !serverOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("server.title") }}
@@ -2824,8 +2824,8 @@ onMounted(async () => {
                     </div>
 
                     <!-- 游戏内代理 -->
-                    <div class="args-section">
-                      <button class="collapse-head args-toggle" :class="{ merged: proxyOpen }"
+                    <div class="args-section collapse-card">
+                      <button class="collapse-head" :class="{ merged: proxyOpen }"
                         @click="proxyOpen = !proxyOpen">
                         <span>
                           <GlyphIcon name="gear" :size="14" :weight="1.8" /> {{ t("proxy.title") }}

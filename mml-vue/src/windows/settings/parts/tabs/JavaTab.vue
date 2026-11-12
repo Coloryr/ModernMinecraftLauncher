@@ -100,28 +100,32 @@ useModalKeys((e) => {
       </div>
 
       <div v-if="javaList.length === 0" class="java-empty">{{ t("winSettings.javaNone") }}</div>
-      <!-- 按发行商分组：头行是一条面板条，展开后该发行商的 Java 在面板里平铺 -->
-      <div v-for="g in javaGroups" :key="g.vendor" class="java-type" :class="{ 'is-open': vendorOpen(g.vendor) }">
-        <button class="collapse-head" :aria-expanded="vendorOpen(g.vendor)" @click="toggleVendor(g.vendor)">
-          <span class="java-type-name">{{ g.vendor }}</span>
-          <span class="java-count">{{ g.items.length }}</span>
-          <GlyphIcon class="collapse-chevron" :class="{ flip: vendorOpen(g.vendor) }" name="chevron-down" :size="11"
-            :weight="2.4" />
-        </button>
-        <CollapsePanel :open="vendorOpen(g.vendor)">
-          <div class="java-grid">
-            <div v-for="j in g.items" :key="j.name" class="java-card">
-              <div class="java-card-top">
-                <span class="java-name" v-tip="j.name">{{ j.name }}</span>
-                <BaseButton size="sm" variant="danger" :disabled="scanning || scanningDir" @click="removeJava(j.name)">
-                  {{ t("winSettings.javaRemove") }}
-                </BaseButton>
+      <!-- 按发行商分组：整份列表收在一个白底面板里，每组是一条与实例设置同款的折叠卡片 -->
+      <div v-else class="java-list">
+        <div v-for="g in javaGroups" :key="g.vendor" class="java-type collapse-card">
+          <button class="collapse-head" :class="{ merged: vendorOpen(g.vendor) }"
+            :aria-expanded="vendorOpen(g.vendor)" @click="toggleVendor(g.vendor)">
+            <span class="java-type-name">{{ g.vendor }}</span>
+            <span class="java-count">{{ g.items.length }}</span>
+            <GlyphIcon class="collapse-chevron" :class="{ flip: vendorOpen(g.vendor) }" name="chevron-down"
+              :size="11" :weight="2.4" />
+          </button>
+          <CollapsePanel :open="vendorOpen(g.vendor)">
+            <div class="java-grid">
+              <div v-for="j in g.items" :key="j.name" class="java-card">
+                <div class="java-card-top">
+                  <span class="java-name" v-tip="j.name">{{ j.name }}</span>
+                  <BaseButton size="sm" variant="danger" :disabled="scanning || scanningDir"
+                    @click="removeJava(j.name)">
+                    {{ t("winSettings.javaRemove") }}
+                  </BaseButton>
+                </div>
+                <span class="java-meta">{{ j.version }} · {{ j.arch }}</span>
+                <span class="java-path" v-tip="j.path">{{ j.path }}</span>
               </div>
-              <span class="java-meta">{{ j.version }} · {{ j.arch }}</span>
-              <span class="java-path" v-tip="j.path">{{ j.path }}</span>
             </div>
-          </div>
-        </CollapsePanel>
+          </CollapsePanel>
+        </div>
       </div>
     </SettingsGroup>
 

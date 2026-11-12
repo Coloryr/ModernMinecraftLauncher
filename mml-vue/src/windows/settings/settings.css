@@ -692,9 +692,20 @@
 
 /* ---------- Java 页 ---------- */
 
-/* 分组头走全局 .collapse-head（与实例设置的折叠头同一副外观）；
-   展开后的 Java 卡片自己成网格，不再套一层面板。组间距交给 .setting-group 的
-   "块 ↔ 块 16px"节奏，这里不再另加外边距 */
+/* 整份列表收在一个白底面板里：分组之间靠面板底色与 10px 间距分开，
+   不再是"每条头行各自浮在页面底色上" */
+.settings-layout .java-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+/* 分组头走全局 .collapse-head，展开后内容与头拼成一整块卡片（.collapse-card，
+   与实例设置的自定义段同一副外观） */
 .settings-layout .java-type {
   display: flex;
   flex-direction: column;
@@ -715,14 +726,18 @@
   padding: 1px 8px;
 }
 
+/* 展开内容与头拼成一张卡：上缘由 .collapse-card 抹平，下缘自己收圆 */
 .settings-layout .java-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 8px;
-  padding: 8px 0 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 0 0 12px 12px;
+  background: var(--bg-card);
 }
 
-/* 卡片与头行同色，靠描边和展开后的 8px 间距区分 */
+/* 卡片压在面板的白底上：用窗口底色而不是白色，两套主题下都还能看出是一张卡 */
 .settings-layout .java-card {
   display: flex;
   flex-direction: column;
@@ -730,7 +745,7 @@
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--bg-card);
+  background: var(--bg);
   min-width: 0;
 }
 

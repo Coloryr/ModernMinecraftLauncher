@@ -34,21 +34,34 @@ const palette = computed(() =>
 
 const char = computed(() => props.name.trim().charAt(0).toUpperCase() || "M");
 
-
-
-/** 容器样式：真图加载成功后不再画占位底色，原因见 loaded */
-const iconStyle = computed(() => ({
-  width: props.size + "px",
-  height: props.size + "px",
-  background: loaded.value ? "transparent" : palette.value,
+/**
+ * 容器样式：真图加载成功后不再画占位底色，原因见 loaded
+ *
+ * 底色与背景图必须分开写（backgroundColor / backgroundImage），不能用 `background` 简写：
+ * 简写会先把渐变写进 background-image，随后 Vue 把 backgroundImage 置空（等于移除该
+ * 长写属性），渐变随之被抹掉，占位图就只剩一个透明方块 —— 没设图标的实例全变成"透明色"。
+ */
+const iconStyle = computed(() => {
+  const style: Record<string, string> = {
+    width: props.size + "px",
+    height: props.size + "px",
+    backgroundColor: "transparent",
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    fontSize: Math.round(props.size * 0.42) + "px",
+    borderRadius: Math.round(props.size * 0.24) + "px",
+  };
   // 已加载过的图标同时铺一层背景：重建时即使 <img> 还没触发 load，
   // 也能直接从浏览器缓存画出原图，不再先露出字母占位
-  backgroundImage: loaded.value && src.value ? `url("${src.value}")` : undefined,
-  backgroundSize: "cover",
-  backgroundPosition: "center",
-  fontSize: Math.round(props.size * 0.42) + "px",
-  borderRadius: Math.round(props.size * 0.24) + "px",
-}));
+  if (loaded.value && src.value) {
+    style.backgroundImage = `url("${src.value}")`;
+  } else if (gradientMode.value) {
+    style.backgroundImage = palette.value;
+  } else {
+    style.backgroundColor = palette.value;
+  }
+  return style;
+});
 
 // ---------- 真实图标加载 ----------
 

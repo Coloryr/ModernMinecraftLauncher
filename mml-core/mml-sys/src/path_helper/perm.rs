@@ -3,6 +3,10 @@
 //! Unix 下给文件加可执行位，Java 运行文件单独处理。
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
+use std::io;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use std::path::Path;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 use std::process::{Command, Stdio};
 
 /// 提升权限

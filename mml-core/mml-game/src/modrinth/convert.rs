@@ -1,6 +1,7 @@
 //! Modrinth 版本信息到下载项、在线文件信息的转换
 
 use super::*;
+use mml_sys::path_helper::sanitize_file_name;
 
 /// 转换为 Modrinth 的加载器 ID
 ///
@@ -37,7 +38,7 @@ pub fn make_download_obj<P: AsRef<Path>>(obj: &ModrinthVersionObj, path: P) -> F
         .unwrap_or(&obj.files[0]);
     FileItemObj {
         name: obj.name.clone(),
-        file: path.as_ref().join(&file.filename),
+        file: path.as_ref().join(sanitize_file_name(&file.filename)),
         url: file.url.clone(),
         hash: FileHash::Sha1Sha512(file.hashes.sha1.clone(), file.hashes.sha512.clone()),
         later: LaterRun::None,
@@ -80,7 +81,7 @@ pub fn make_file_online_obj(obj: &ModrinthVersionObj, path: &str) -> OnlineInfoO
     OnlineInfoObj {
         path: path.to_string(),
         name: obj.name.clone(),
-        file: file.filename.clone(),
+        file: sanitize_file_name(&file.filename),
         sha1: file.hashes.sha1.clone(),
         url: file.url.clone(),
         modid: obj.project_id.clone(),

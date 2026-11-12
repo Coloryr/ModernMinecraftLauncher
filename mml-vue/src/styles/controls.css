@@ -463,6 +463,21 @@ select.field-select {
   transform: rotate(180deg);
 }
 
+/* ---------- 折叠卡片：标题 + 展开内容拼成整块 ----------
+ * 实例设置的自定义段与设置窗口的 Java 分组共用：展开时标题只抹平下缘两个角，
+ * 四边描边都留着（悬停时那圈强调色才是闭合的矩形），分界线由标题的底边承担；
+ * 内容首子元素抹平上缘、上边改成透明让位，否则标题底边 + 内容上边会叠成 2px。
+ * 展开态的 .merged 由模板绑在标题上 —— CSS 选不到前面的兄弟，所以不用 :has */
+.collapse-card > .collapse-head.merged {
+  border-radius: 12px 12px 0 0;
+}
+
+.collapse-card > .collapse.open > .collapse-inner > *:first-child {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top-color: transparent;
+}
+
 /* 图标按钮：方形、无边框，悬停才出底 */
 .ui-btn-icon {
   display: inline-flex;

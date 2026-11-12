@@ -4,10 +4,8 @@
 
 #[cfg(any(target_os = "linux", test))]
 use std::env;
-#[cfg(any(not(windows), test))]
+#[cfg(any(target_os = "macos", test))]
 use std::process::Command;
-#[cfg(not(windows))]
-use std::process::Stdio;
 #[cfg(any(target_os = "linux", test))]
 use std::time::UNIX_EPOCH;
 
@@ -18,7 +16,9 @@ use std::fs;
 #[cfg(any(not(windows), test))]
 use std::path::PathBuf;
 
-use mml_names::i18_items::error_type::{CoreResult, ErrorType};
+use mml_names::i18_items::error_type::CoreResult;
+#[cfg(any(target_os = "windows", target_os = "macos", test))]
+use mml_names::i18_items::error_type::ErrorType;
 
 #[cfg(any(not(windows), test))]
 use super::fs_error;
@@ -91,7 +91,7 @@ pub fn move_to_trash<P: AsRef<Path>>(dir: P) -> CoreResult<()> {
 
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     {
-        use mml_names::i18_items::error_type::MoveToTrashErrorData;
+        use mml_names::i18_items::error_type::{ErrorType, MoveToTrashErrorData};
 
         Err(ErrorType::MoveToTrashError(MoveToTrashErrorData {
             path: dir.as_ref().to_path_buf(),

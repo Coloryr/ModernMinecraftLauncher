@@ -67,6 +67,18 @@ pub struct FileSystemErrorData {
     pub error: String,
 }
 
+/// 文件搬运失败的数据：源与目标都带上，Windows 的 os error 123 只报“名字不正确”，
+/// 不给出目标路径就看不出是哪个名字有问题
+#[derive(Clone, Debug)]
+pub struct PathMoveErrorData {
+    /// 源路径
+    pub input: PathBuf,
+    /// 目标路径
+    pub output: PathBuf,
+    /// 错误描述
+    pub error: String,
+}
+
 /// 移动到回收站失败的数据
 #[derive(Clone, Debug)]
 pub struct MoveToTrashErrorData {
@@ -268,6 +280,8 @@ pub enum ErrorType {
         /// 被拒绝的路径
         path: PathBuf,
     },
+    /// 文件搬运失败，源与目标都记下来
+    PathMoveError(PathMoveErrorData),
     /// 移动到回收站失败
     MoveToTrashError(MoveToTrashErrorData),
     /// 文件获取错误

@@ -45,6 +45,7 @@ export { default as CompResourcePopup } from "../components/ResourcePopup.vue";
 export { default as CompResourceTitleIndicator } from "../components/ResourceTitleIndicator.vue";
 export { default as CompServerPackModsModal } from "../components/ServerPackModsModal.vue";
 export { default as CompServerPackUpdateModal } from "../components/ServerPackUpdateModal.vue";
+export { default as CompTaskProgressPopup } from "../components/TaskProgressPopup.vue";
 export { default as CompUpgradeOverlay } from "../components/UpgradeOverlay.vue";
 export { default as CompUiAppToast } from "../components/ui/AppToast.vue";
 export { default as CompUiAsyncImage } from "../components/ui/AsyncImage.vue";

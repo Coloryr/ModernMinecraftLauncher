@@ -318,6 +318,21 @@ fn test_replace_file_name() {
     assert_eq!(replace_file_name("中文.txt"), "中文.txt");
 }
 
+/// sanitize_file_name：冒号这类非法字符、结尾点 / 空格与保留名都换成可落盘的名字
+#[test]
+fn test_sanitize_file_name() {
+    assert_eq!(
+        sanitize_file_name("Yet Another Bingo: Ultimate-2.15.1.mrpack"),
+        "Yet Another Bingo_ Ultimate-2.15.1.mrpack"
+    );
+    assert_eq!(sanitize_file_name("name."), "name");
+    assert_eq!(sanitize_file_name("name  "), "name");
+    assert_eq!(sanitize_file_name("CON"), "_CON");
+    assert_eq!(sanitize_file_name("con.jar"), "_con.jar");
+    assert_eq!(sanitize_file_name("..."), "download");
+    assert_eq!(sanitize_file_name("plain.jar"), "plain.jar");
+}
+
 /// replace_path_name 平台差异
 #[test]
 fn test_replace_path_name() {
