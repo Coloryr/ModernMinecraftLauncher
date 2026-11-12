@@ -3,7 +3,7 @@
 //
 // 图标走 GlyphIcon（几何在 glyphs.ts），不再在这里维护一份 v-html 的 path 表 ——
 // 同一枚 folder / grid / list 在别处也画，两套定义迟早会漂移。
-import { computed } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import GlyphIcon from "./GlyphIcon.vue";
 import { isGlyphName } from "./glyphs";
 
@@ -39,10 +39,68 @@ const items = computed(() =>
     glyph: opt.icon && isGlyphName(opt.icon) ? opt.icon : null,
   })),
 );
+
+/** 轨道容器，用来量当前选中按钮的位置与宽度 */
+const rootEl = ref<HTMLElement | null>(null);
+/** 蓝条的内联位置；宽度与位移都按真实按钮算，文案长短不同也能对齐 */
+const thumbStyle = ref<Record<string, string>>({ width: "0px", transform: "translateX(0px)" });
+/** 首次量完再显示蓝条，避免从 0 宽滑到选中项那一下 */
+const thumbReady = ref(false);
+let resizeObserver: ResizeObserver | null = null;
+
+/** 把蓝条移到当前选中项下面 */
+function updateThumb() {
+  const root = rootEl.value;
+  if (!root) return;
+  const index = props.options.findIndex((opt) => opt.value === props.modelValue);
+  const button = root.querySelectorAll<HTMLElement>(".seg-btn")[index];
+  if (!button) {
+    thumbReady.value = false;
+    return;
+  }
+  thumbStyle.value = {
+    width: `${button.offsetWidth}px`,
+    transform: `translateX(${button.offsetLeft}px)`,
+  };
+  if (!thumbReady.value) {
+    // 先让带 transition:none 的初始帧落进 DOM，下一帧再开启过渡
+    requestAnimationFrame(() => {
+      thumbReady.value = true;
+    });
+  }
+}
+
+watch(
+  () => props.modelValue,
+  () => {
+    void nextTick(updateThumb);
+  },
+);
+watch(
+  () => props.options,
+  () => {
+    void nextTick(updateThumb);
+  },
+  { deep: true },
+);
+
+onMounted(() => {
+  void nextTick(updateThumb);
+  if (typeof ResizeObserver !== "undefined" && rootEl.value) {
+    resizeObserver = new ResizeObserver(() => updateThumb());
+    resizeObserver.observe(rootEl.value);
+  }
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
 </script>
 
 <template>
-  <div class="seg-tabs">
+  <div ref="rootEl" class="seg-tabs" :class="{ ready: thumbReady, disabled: props.disabled }">
+    <span class="seg-thumb" :style="thumbStyle" aria-hidden="true"></span>
     <button v-for="opt in items" :key="opt.value" class="seg-btn"
       :class="{ active: modelValue === opt.value, 'icon-only': props.iconOnly }" :disabled="props.disabled"
       :aria-label="opt.label" v-tip="opt.label" @click="emit('update:modelValue', opt.value)">
@@ -55,6 +113,7 @@ const items = computed(() =>
 <style scoped>
 .seg-tabs {
   /* inline-flex：轨道背景只包住选项内容，不撑满父容器宽度 */
+  position: relative;
   display: inline-flex;
   gap: 4px;
   background: var(--bg-card);
@@ -63,7 +122,34 @@ const items = computed(() =>
   padding: 2px;
 }
 
+/* 蓝色选中条：位置和宽度由脚本按当前按钮量出来，切换时左右滑过去 */
+.seg-thumb {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  z-index: 0;
+  height: calc(var(--ctl-h) - 6px);
+  border-radius: var(--ctl-radius);
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+
+.seg-tabs.ready .seg-thumb {
+  opacity: 1;
+  transition:
+    transform 0.18s var(--ease-out),
+    width 0.18s var(--ease-out);
+}
+
+.seg-tabs.disabled .seg-thumb {
+  opacity: 0.55;
+}
+
 .seg-btn {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -76,7 +162,7 @@ const items = computed(() =>
   padding: 0 12px;
   border-radius: var(--ctl-radius);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.12s, background 0.12s;
   font-family: inherit;
   white-space: nowrap;
 }
@@ -86,9 +172,13 @@ const items = computed(() =>
 }
 
 .seg-btn.active {
-  background: var(--accent);
   color: var(--on-accent);
   font-weight: 600;
+}
+
+/* 第一次量完之前没有蓝条，给选中项一个背景兜底 */
+.seg-tabs:not(.ready) .seg-btn.active {
+  background: var(--accent);
 }
 
 .seg-icon {

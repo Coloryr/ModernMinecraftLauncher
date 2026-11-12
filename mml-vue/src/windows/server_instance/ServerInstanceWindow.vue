@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { provide } from "vue";
+import { computed, provide, ref } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
@@ -12,6 +12,8 @@ import PacksPanel from "./parts/PacksPanel.vue";
 import ConfigsPanel from "./parts/ConfigsPanel.vue";
 import StartPanel from "./parts/StartPanel.vue";
 import { useServerInstance } from "./useServerInstance";
+import { useSlidingThumb } from "../../composables/useSlidingThumb";
+import { useStaggerEnter } from "../../composables/useStaggerEnter";
 import { ServerInstanceKey } from "./context";
 
 /** 关闭窗口 */
@@ -21,6 +23,19 @@ const instance = useServerInstance();
 provide(ServerInstanceKey, instance);
 
 const { instances, currentUuid, busy, loading, section, sections, pickInstance, openGuide } = instance;
+
+/** 左侧分页容器与选中项色块 */
+const railEl = ref<HTMLElement | null>(null);
+const activeIndex = computed(() => sections.value.findIndex((item) => item.id === section.value));
+const { thumbStyle, thumbReady } = useSlidingThumb(
+  railEl,
+  ".si-rail-item",
+  () => activeIndex.value,
+);
+/** 右侧分页：标题只渐变、不位移；面板里的字段按顺序落下 */
+const { enter: enterPage, leave: leavePage } = useStaggerEnter(".si-section > *", {
+  fade: ".si-head",
+});
 </script>
 <template>
   <WindowFrame :title="t('winTitle.serverInstance')" body-fill body-flush @close="emit('close')">
@@ -39,7 +54,8 @@ const { instances, currentUuid, busy, loading, section, sections, pickInstance, 
 
     <div class="si-layout">
       <!-- 左侧分页 -->
-      <nav class="si-rail">
+      <nav ref="railEl" class="si-rail" :class="{ ready: thumbReady }">
+        <span class="si-thumb" :style="thumbStyle" aria-hidden="true"></span>
         <button v-for="item in sections" :key="item.id" class="si-rail-item" :class="{ active: section === item.id }"
           :disabled="loading || (busy && item.id === 'start')" @click="section = item.id">
           <span class="si-rail-icon">
@@ -53,22 +69,27 @@ const { instances, currentUuid, busy, loading, section, sections, pickInstance, 
       </nav>
 
       <div class="si-content" :inert="loading">
-        <!-- 当前页大标题 + 说明，与设置窗口同款 -->
-        <header class="si-head">
-          <h2 class="si-title">{{ t(`serverInstance.tab.${section}`) }}</h2>
-          <p class="si-sub">{{ t(`serverInstance.tabDesc.${section}`) }}</p>
-        </header>
-
-        <p v-if="!instances.length" class="empty-tip">{{ t("serverInstance.noInstance") }}</p>
-
-        <template v-else>
+        <Transition :css="false" mode="out-in" @enter="enterPage" @leave="leavePage">
+          <div v-if="!instances.length" key="__empty" class="si-page">
+            <header class="si-head">
+              <h2 class="si-title">{{ t(`serverInstance.tab.${section}`) }}</h2>
+              <p class="si-sub">{{ t(`serverInstance.tabDesc.${section}`) }}</p>
+            </header>
+            <p class="empty-tip">{{ t("serverInstance.noInstance") }}</p>
+          </div>
+          <div v-else :key="section" class="si-page">
+            <header class="si-head">
+              <h2 class="si-title">{{ t(`serverInstance.tab.${section}`) }}</h2>
+              <p class="si-sub">{{ t(`serverInstance.tabDesc.${section}`) }}</p>
+            </header>
             <GeneralPanel v-if="section === 'general'" />
             <BasePanel v-else-if="section === 'base'" />
             <ModsPanel v-else-if="section === 'mods'" />
             <PacksPanel v-else-if="section === 'packs'" />
             <ConfigsPanel v-else-if="section === 'configs'" />
             <StartPanel v-else />
-        </template>
+          </div>
+        </Transition>
 
         <div v-if="loading" class="si-loading">
           <span class="si-spinner" />

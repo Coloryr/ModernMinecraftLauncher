@@ -6,6 +6,7 @@
 }
 
 .si-rail {
+  position: relative;
   width: 176px;
   flex-shrink: 0;
   display: flex;
@@ -17,7 +18,30 @@
   overflow-y: auto;
 }
 
+/* 选中色块：分页切换时在导航里上下滑动 */
+.si-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+
+.si-rail.ready .si-thumb {
+  opacity: 1;
+  transition:
+    transform 0.18s var(--ease-out),
+    width 0.18s var(--ease-out),
+    height 0.18s var(--ease-out);
+}
+
 .si-rail-item {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -32,14 +56,19 @@
   transition: background 0.12s, color 0.12s;
 }
 
-.si-rail-item:hover {
+.si-rail-item:hover:not(.active) {
   background: var(--bg-card);
   color: var(--text);
 }
 
 .si-rail-item.active {
-  background: var(--accent-soft);
+  background: transparent;
   color: var(--accent);
+}
+
+/* 第一次量完之前没有色块，给选中项一个背景兜底 */
+.si-rail:not(.ready) .si-rail-item.active {
+  background: var(--accent-soft);
 }
 
 .si-rail-item:disabled {
@@ -80,6 +109,14 @@
 /* 右侧内容：每页自己滚。
    右侧**不留内边距**：滚动条是子元素（.si-section）画的，只有让它贴着内容区右缘，
    滚动条才贴着窗口右边；留白改由下面两条按"26px - 9px 槽位"补回来 */
+/* 分页面包层：让面板继续以 flex 列铺满剩余高度 */
+.si-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .si-content {
   position: relative;
   flex: 1;

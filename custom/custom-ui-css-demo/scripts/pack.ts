@@ -63,6 +63,28 @@ const SKIP = new Set([
   "package-lock.json", "README.md", ".gitignore", "vite.config.ts",
 ]);
 
+/** 各系统的目录标记与缩略图缓存：不打包 */
+const JUNK_NAMES = new Set([
+  ".ds_store", ".localized", ".apdisk", ".directory",
+  "thumbs.db", "ehthumbs.db", "desktop.ini",
+  ".spotlight-v100", ".trashes", ".fseventsd", ".temporaryitems",
+  "$recycle.bin", "system volume information", "lost+found",
+]);
+const JUNK_PREFIXES = ["._", ".trash-"];
+
+/** 名字是不是系统垃圾，大小写不敏感 */
+function isJunk(name: string): boolean {
+  const lower = name.toLowerCase();
+  return JUNK_NAMES.has(lower) || JUNK_PREFIXES.some((prefix) => lower.startsWith(prefix)) || name === "Icon\r";
+}
+
+/** bsdtar 的排除参数：包内子目录里的系统垃圾也一并挡掉 */
+const JUNK_EXCLUDES = [
+  ".DS_Store", "._*", "Thumbs.db", "ehthumbs.db", "desktop.ini",
+  ".directory", ".localized", ".Spotlight-V100", ".Trashes", ".fseventsd",
+  ".TemporaryItems", "$RECYCLE.BIN", "System Volume Information", "lost+found", ".Trash-*",
+].flatMap((pattern) => ["--exclude", pattern]);
+
 if (!buildEntry()) {
   cleanupEntry();
   process.exit(1);
@@ -75,7 +97,9 @@ if (!existsSync(MANIFEST_SRC)) {
 }
 copyFileSync(MANIFEST_SRC, MANIFEST);
 
-const entries = readdirSync(root).filter((name) => !SKIP.has(name) && !name.endsWith(".zip"));
+const entries = readdirSync(root).filter(
+  (name) => !SKIP.has(name) && !isJunk(name) && !name.endsWith(".zip"),
+);
 if (!entries.includes("custom.css")) {
   console.error("✗ 根目录没有 custom.css，打出来的包启动器认不了");
   cleanupManifest();
@@ -101,7 +125,7 @@ function isRunnable(cmd: string, probeArgs: string[]): boolean {
 
 /** 用 bsdtar 打包；返回是否成功 */
 function packWithTar(bin: string): boolean {
-  return run(bin, ["-a", "-c", "-f", zipPath, "-C", root, ...entries]);
+  return run(bin, ["-a", "-c", "-f", zipPath, ...JUNK_EXCLUDES, "-C", root, ...entries]);
 }
 
 /** PowerShell 单引号字符串转义 */

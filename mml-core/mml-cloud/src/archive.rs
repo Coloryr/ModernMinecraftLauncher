@@ -86,9 +86,43 @@ pub fn scan(root: &Path) -> Result<Manifest> {
     Ok(files)
 }
 
+/// 同步与打差异包时跳过的系统垃圾文件名，大小写不敏感
+///
+/// 与 `mml-base::archives` 的压缩清单保持一致：macOS 的目录标记、Windows 的缩略图缓存、
+/// Linux 的桌面配置都不该跟着存档到处跑。
+fn is_junk_name(name: &str) -> bool {
+    const NAMES: &[&str] = &[
+        ".DS_Store",
+        ".localized",
+        ".apdisk",
+        ".directory",
+        "Thumbs.db",
+        "ehthumbs.db",
+        "desktop.ini",
+        ".Spotlight-V100",
+        ".Trashes",
+        ".fseventsd",
+        ".TemporaryItems",
+        "$RECYCLE.BIN",
+        "System Volume Information",
+        "lost+found",
+    ];
+    const PREFIXES: &[&str] = &["._", ".Trash-"];
+    if name == "Icon\r" {
+        return true;
+    }
+    let lower = name.to_ascii_lowercase();
+    NAMES.iter().any(|junk| lower == junk.to_ascii_lowercase())
+        || PREFIXES.iter().any(|prefix| lower.starts_with(prefix))
+}
+
 fn scan_dir(root: &Path, dir: &Path, files: &mut Manifest, total: &mut u64) -> Result<()> {
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
+        // 系统垃圾文件不同步，也不会被写进差异包
+        if is_junk_name(&entry.file_name().to_string_lossy()) {
+            continue;
+        }
         let meta = fs::symlink_metadata(entry.path())?;
         if meta.file_type().is_symlink() {
             return Err(Error::new("err.cloudPath"));

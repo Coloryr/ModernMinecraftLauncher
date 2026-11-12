@@ -107,6 +107,10 @@ impl ZipReader {
                 }
             }
 
+            if archives::is_junk_path(path.strip_prefix(root_path).unwrap_or(&path)) {
+                continue;
+            }
+
             if !path.is_dir() {
                 let mut buffer = path_helper::open_read(&path)?;
 
@@ -346,6 +350,9 @@ impl ArchiveHandle for ZipReader {
         let mut zip = ZipWriter::new_append(file).map_err(|err| open_error(&self.path, err))?;
 
         for file in files {
+            if archives::is_junk_path(&file.dest) {
+                continue;
+            }
             let internal_path = file.dest.to_string_lossy();
             let mut reader = path_helper::open_read(&file.src)?;
 
@@ -381,6 +388,9 @@ impl ArchiveHandle for ZipReader {
         for (index, item) in files.iter().enumerate() {
             if gui.as_ref().is_some_and(|gui| gui.cancelled()) {
                 return Err(ErrorType::TaskCancel);
+            }
+            if archives::is_junk_path(&item.dest) {
+                continue;
             }
             let internal_path = item.dest.to_string_lossy();
             if let Some(gui) = gui {

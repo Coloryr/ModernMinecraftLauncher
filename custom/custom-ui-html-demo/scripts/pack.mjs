@@ -30,6 +30,33 @@ for (const name of ["index.html", "theme.json"]) {
   }
 }
 
+/** 各系统的目录标记与缩略图缓存：不打包，也不在包里留目录 */
+const JUNK_NAMES = new Set([
+  ".ds_store", ".localized", ".apdisk", ".directory",
+  "thumbs.db", "ehthumbs.db", "desktop.ini",
+  ".spotlight-v100", ".trashes", ".fseventsd", ".temporaryitems",
+  "$recycle.bin", "system volume information", "lost+found",
+]);
+const JUNK_PREFIXES = ["._", ".trash-"];
+
+/** 名字是不是系统垃圾，大小写不敏感 */
+function isJunk(name) {
+  const lower = name.toLowerCase();
+  return JUNK_NAMES.has(lower) || JUNK_PREFIXES.some((prefix) => lower.startsWith(prefix)) || name === "Icon\r";
+}
+
+/** 递归删掉系统垃圾，PowerShell 兜底打包时也不会带上 */
+function stripJunk(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (isJunk(entry.name)) {
+      rmSync(path, { recursive: entry.isDirectory(), force: true });
+    } else if (entry.isDirectory()) {
+      stripJunk(path);
+    }
+  }
+}
+
 const manifest = JSON.parse(readFileSync(join(src, "theme.json"), "utf8"));
 if (manifest.type !== "page") {
   console.error("✗ src/theme.json 的 type 是 " + manifest.type + "，整页包必须是 page");
@@ -40,7 +67,9 @@ if (manifest.type !== "page") {
 rmSync(stage, { recursive: true, force: true });
 cpSync(src, stage, { recursive: true });
 
-const entries = readdirSync(stage).filter((name) => name !== "__MACOSX");
+// 系统垃圾不进包
+stripJunk(stage);
+const entries = readdirSync(stage).filter((name) => name !== "__MACOSX" && !isJunk(name));
 rmSync(zipPath, { force: true });
 
 function run(cmd, args) {
@@ -55,7 +84,7 @@ function isRunnable(cmd, probeArgs) {
 }
 
 function packWithTar(bin) {
-  return run(bin, ["-a", "-c", "-f", zipPath, "-C", stage, ...entries]);
+  return run(bin, ["-a", "-c", "-f", zipPath, "--exclude=.DS_Store", "-C", stage, ...entries]);
 }
 
 function psQuote(text) {

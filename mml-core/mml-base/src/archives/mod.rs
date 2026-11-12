@@ -422,6 +422,81 @@ fn normalize_path(path: &Path) -> String {
     path.to_string_lossy().to_string().replace('\\', "/")
 }
 
+/// 压缩时跳过的系统垃圾文件名，大小写不敏感；macOS / Windows / Linux 各有一批
+pub const JUNK_FILE_NAMES: &[&str] = &[
+    ".DS_Store",
+    ".localized",
+    ".apdisk",
+    ".directory",
+    "Thumbs.db",
+    "ehthumbs.db",
+    "desktop.ini",
+];
+
+/// 压缩时跳过的系统垃圾目录名，大小写不敏感
+pub const JUNK_DIR_NAMES: &[&str] = &[
+    ".Spotlight-V100",
+    ".Trashes",
+    ".fseventsd",
+    ".TemporaryItems",
+    "$RECYCLE.BIN",
+    "System Volume Information",
+    "lost+found",
+];
+
+/// 压缩时跳过的系统垃圾名前缀：macOS 在非 HFS 卷上给每个文件配一份 `._同名`，
+/// Linux 的挂载盘回收站是 `.Trash-<uid>`
+pub const JUNK_NAME_PREFIXES: &[&str] = &["._", ".Trash-"];
+
+/// 判断单个文件名是不是系统垃圾，大小写不敏感
+///
+/// - `name`: 文件或目录名，不带路径
+///
+/// # 返回值
+///
+/// 命中垃圾清单时为 true
+pub fn is_junk_name(name: &str) -> bool {
+    // macOS 自定义文件夹图标的文件名是 "Icon" 再加一个回车字符
+    if name == "Icon\r" {
+        return true;
+    }
+    let lower = name.to_ascii_lowercase();
+    JUNK_FILE_NAMES
+        .iter()
+        .chain(JUNK_DIR_NAMES)
+        .any(|junk| lower == junk.to_ascii_lowercase())
+        || JUNK_NAME_PREFIXES
+            .iter()
+            .any(|prefix| lower.starts_with(prefix))
+}
+
+/// 判断路径的文件名是不是系统垃圾
+///
+/// - `path`: 待打包的文件或包内路径
+///
+/// # 返回值
+///
+/// 文件名命中垃圾清单时为 true
+pub fn is_junk_entry(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(is_junk_name)
+}
+
+/// 判断路径里是否有任一段是系统垃圾；目录级的垃圾靠它连带跳过整个子树
+///
+/// - `path`: 相对打包根的路径或包内路径
+///
+/// # 返回值
+///
+/// 任一段命中垃圾清单时为 true
+pub fn is_junk_path(path: &Path) -> bool {
+    path.components().any(|component| match component {
+        std::path::Component::Normal(name) => name.to_str().is_some_and(is_junk_name),
+        _ => false,
+    })
+}
+
 /// 检查路径是否匹配任一排除规则
 ///
 /// - `path`: 待检查的文件路径

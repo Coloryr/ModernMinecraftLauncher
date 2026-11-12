@@ -485,3 +485,63 @@ fn add_files_data_inplace() {
 
     fs::remove_dir_all(file).ok();
 }
+
+/// 压缩与追加都跳过各系统的目录标记与缩略图缓存，根目录与子目录都不例外
+#[test]
+fn compress_and_add_skip_system_junk() {
+    let dir = mml_testutil::temp_path(format!("mml-arch-junk-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    let source = dir.join("src");
+    fs::create_dir_all(source.join("sub")).unwrap();
+    fs::write(source.join("keep.txt"), b"keep").unwrap();
+    fs::write(source.join("sub/keep.txt"), b"nested").unwrap();
+    // macOS / Windows / Linux 各来一份
+    fs::write(source.join(".DS_Store"), b"junk").unwrap();
+    fs::write(source.join("sub/.DS_Store"), b"junk").unwrap();
+    fs::write(source.join("Thumbs.db"), b"junk").unwrap();
+    fs::write(source.join("desktop.ini"), b"junk").unwrap();
+    fs::write(source.join("._keep.txt"), b"junk").unwrap();
+    fs::create_dir_all(source.join(".Trashes")).unwrap();
+    fs::write(source.join(".Trashes/old.bin"), b"junk").unwrap();
+
+    let arc = dir.join("out.zip");
+    BaseArchive::compress(ArchiveType::Zip, &arc, &source, Some(&source), &None, None).unwrap();
+
+    let out = dir.join("out");
+    BaseArchive::decompress(ArchiveType::Zip, &arc, &out, None).unwrap();
+    assert!(!out.join(".DS_Store").exists());
+    assert!(!out.join("sub/.DS_Store").exists());
+    assert!(!out.join("Thumbs.db").exists());
+    assert!(!out.join("desktop.ini").exists());
+    assert!(!out.join("._keep.txt").exists());
+    assert!(!out.join(".Trashes").exists());
+    assert_eq!(fs::read(out.join("keep.txt")).unwrap(), b"keep");
+    assert_eq!(fs::read(out.join("sub/keep.txt")).unwrap(), b"nested");
+
+    // tar 走同一个遍历口径
+    let tar_arc = dir.join("out.tar");
+    BaseArchive::compress(ArchiveType::Tar, &tar_arc, &source, Some(&source), &None, None).unwrap();
+    let tar_out = dir.join("tar_out");
+    BaseArchive::decompress(ArchiveType::Tar, &tar_arc, &tar_out, None).unwrap();
+    assert!(!tar_out.join(".DS_Store").exists());
+    assert!(!tar_out.join("sub/.DS_Store").exists());
+    assert!(!tar_out.join("Thumbs.db").exists());
+    assert!(!tar_out.join(".Trashes").exists());
+    assert_eq!(fs::read(tar_out.join("sub/keep.txt")).unwrap(), b"nested");
+
+    // 显式追加同名的系统垃圾文件也不落进包里
+    let junk = dir.join("junk.txt");
+    fs::write(&junk, b"junk").unwrap();
+    let mut base = BaseArchive::open(&arc).unwrap();
+    base.add_files(
+        &[ArchiveAddFile {
+            src: junk,
+            dest: PathBuf::from("sub/.DS_Store"),
+        }],
+        None,
+    )
+    .unwrap();
+    assert!(base.read("sub/.DS_Store").is_err());
+
+    let _ = fs::remove_dir_all(&dir);
+}

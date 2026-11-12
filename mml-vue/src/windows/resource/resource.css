@@ -27,6 +27,7 @@
 /* ---------- 左侧分类栏 ---------- */
 
 .resource-layout .cat-nav {
+  position: relative;
   width: var(--rail-w);
   min-width: var(--rail-w);
   display: flex;
@@ -34,7 +35,30 @@
   gap: 4px;
 }
 
+/* 选中色块：分类切换时在栏内上下滑动 */
+.resource-layout .cat-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+
+.resource-layout .cat-nav.ready .cat-thumb {
+  opacity: 1;
+  transition:
+    transform 0.18s var(--ease-out),
+    width 0.18s var(--ease-out),
+    height 0.18s var(--ease-out);
+}
+
 .resource-layout .cat-item {
+  position: relative;
+  z-index: 1;
   text-align: left;
   padding: 10px 12px;
   border: none;
@@ -51,15 +75,20 @@
   gap: 9px;
 }
 
-.resource-layout .cat-item:hover {
+.resource-layout .cat-item:hover:not(.active) {
   background: var(--bg-hover);
   color: var(--text);
 }
 
 .resource-layout .cat-item.active {
-  background: var(--accent-soft);
+  background: transparent;
   color: var(--accent);
   font-weight: 600;
+}
+
+/* 第一次量完之前没有色块，给选中项一个背景兜底 */
+.resource-layout .cat-nav:not(.ready) .cat-item.active {
+  background: var(--accent-soft);
 }
 
 /* 正被拖的分类：留在原位但淡下去（顺序由下面那条插入线表达） */

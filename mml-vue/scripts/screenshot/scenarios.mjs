@@ -611,10 +611,10 @@ export const scenarios = [
   /* ---------------- 账户 ---------------- */
   { id: "account-loaded", kind: "account", label: "mml-account", size: [1000, 700], commands: base() },
   { id: "account-empty", kind: "account", label: "mml-account", size: [1000, 700], commands: base({ account_get_accounts: { accounts: [], currentUuid: null, locked: false } }) },
-  { id: "account-list", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-tabs .seg-btn:nth-child(2)"), after: 450 }] },
-  { id: "account-detail", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-tabs .seg-btn:nth-child(3)"), after: 450 }] },
-  { id: "account-list-no-match", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-tabs .seg-btn:nth-child(2)"), after: 300 }, { eval: setInput(".search-box .sb-input", "zzz"), after: 450 }] },
-  { id: "account-detail-no-match", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-tabs .seg-btn:nth-child(3)"), after: 300 }, { eval: setInput(".search-box .sb-input", "zzz"), after: 450 }] },
+  { id: "account-list", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-tabs .seg-btn:nth-of-type(2)"), after: 450 }] },
+  { id: "account-detail", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-tabs .seg-btn:nth-of-type(3)"), after: 450 }] },
+  { id: "account-list-no-match", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-tabs .seg-btn:nth-of-type(2)"), after: 300 }, { eval: setInput(".search-box .sb-input", "zzz"), after: 450 }] },
+  { id: "account-detail-no-match", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".head-tabs .seg-btn:nth-of-type(3)"), after: 300 }, { eval: setInput(".search-box .sb-input", "zzz"), after: 450 }] },
   { id: "account-add", kind: "account", label: "mml-account", size: [1000, 700], commands: base(), actions: [{ eval: click(".icon-btn-head"), after: 450 }] },
   {
     id: "account-add-microsoft",

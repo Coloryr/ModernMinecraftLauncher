@@ -110,10 +110,24 @@
   width: 300px;
   /* 与 MainSidebar 的 .sidebar 同宽 */
   overflow: hidden;
+  /* 占满 / 收回都会改 flex-grow，常开也不会在启动时播（初始值不变） */
+  transition: flex-grow 0.3s var(--ease-out);
 }
 
 .main.sidebar-anim .sidebar-slot {
-  transition: width 0.3s var(--ease-out);
+  transition:
+    width 0.3s var(--ease-out),
+    flex-grow 0.3s var(--ease-out);
+}
+
+/* 占满 / 收回时详情区的宽度、内边距与透明度一起过渡；
+   不能再用 display:none，否则右侧是"啪"地消失 */
+.main.sidebar-anim .detail {
+  transition:
+    max-width 0.3s var(--ease-out),
+    flex-grow 0.3s var(--ease-out),
+    padding 0.3s var(--ease-out),
+    opacity 0.2s var(--ease-out);
 }
 
 .sidebar-slot.collapsed {
@@ -127,15 +141,20 @@
   transition: visibility 0s linear 0.3s;
 }
 
-/* 侧栏向右占满：槽位吃掉整行，右侧详情区收起。两者一起过渡，
-   不然详情是"啪"地消失、槽位却还在滑 */
+/* 侧栏向右占满：槽位吃掉整行，右侧详情区收到 0 宽 */
 .main.pane-max .sidebar-slot {
-  width: auto;
-  flex: 1;
+  width: 300px;
+  flex: 1 1 auto;
 }
 
 .main.pane-max .detail {
-  display: none;
+  flex: 0 1 0;
+  min-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* 侧栏贴右时，让侧栏钉在槽位右缘，收窄时从左侧裁掉（视觉上向右滑出） */
@@ -185,6 +204,12 @@
 
 .detail {
   flex: 1;
+  max-width: 100%;
+  /* 占满时详情的 flex-grow 从 1 变 0，收回时再变回来 */
+  transition:
+    flex-grow 0.3s var(--ease-out),
+    padding 0.3s var(--ease-out),
+    opacity 0.2s var(--ease-out);
   display: flex;
   flex-direction: column;
   /* 上内边距比别处紧一档：这一屏顶部就是工具栏 / 实例信息，不用再留 22px */

@@ -25,6 +25,10 @@ pub(crate) fn files_under(root: &Path) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();
     for entry in fs::read_dir(root).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
+        // macOS 的目录标记文件不进包，也不进勾选列表
+        if mml_base::archives::is_junk_entry(&entry.path()) {
+            continue;
+        }
         let meta = reject_link(&entry.path())?;
         if meta.is_dir() {
             files.extend(files_under(&entry.path())?);
@@ -138,6 +142,10 @@ pub(crate) fn write_zip(
         }
         let mut index = 0;
         for (name, path) in files {
+            // 勾选列表可能带着系统垃圾，按包内路径再看一遍，目录级的也不会漏
+            if mml_base::archives::is_junk_path(Path::new(name)) {
+                continue;
+            }
             // 每写一个文件看一次取消：一个文件内部的复制无法打断
             if cancel.load(Ordering::Relaxed) {
                 return Err(err_keys::CANCELLED.to_string());

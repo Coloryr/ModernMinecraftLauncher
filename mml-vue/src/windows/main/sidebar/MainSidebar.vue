@@ -200,21 +200,17 @@ function clearGroupAnims() {
 const ROW_H_GROUP = 48;
 /** 实例行 / 添加行 / 实例插入占位的高度，单位 px；与 CSS 的 .vrow-inst 等同源 */
 const ROW_H_INST = 60;
-/** 占满时平铺卡片的高度，单位 px；与 CSS 的 .tile 同源 */
-const TILE_H = 112;
-/** 平铺卡片之间的行间距，单位 px */
-const TILE_GAP = 8;
-/** 平铺卡片一行的高度，单位 px */
-const ROW_H_TILE = TILE_H + TILE_GAP;
-/** 平铺卡片最小宽度，单位 px；占满时按它算一行放几格 */
-const TILE_MIN_MAX = 120;
+/** 占满时一行里实例行之间的水平间距，单位 px */
+const GRID_GAP = 8;
+/** 占满时每列的最小宽度，单位 px；沿用未占满时一行的宽度，一行能放几个就放几个 */
+const GRID_MIN = 300;
 /** 分组收起 / 展开的高度动画时长，单位 ms；沿用旧版过渡的 0.22s */
 const GROUP_ANIM_MS = 220;
 /** 侧栏列表的顶部内边距，单位 px；与 .sidebar-list 的 padding-top 同源 */
 const LIST_PAD_TOP = 2;
 
-/** 占满时的一格：添加卡、实例卡、拖拽落点占位 */
-type TileCell =
+/** 占满时的一格：添加行、实例行、拖拽落点占位 */
+type GridCell =
   | { kind: "add" }
   | { kind: "instance"; idx: number; inst: InstanceInfoDto }
   | { kind: "ghost" };
@@ -226,7 +222,7 @@ type Row =
   | { kind: "add"; key: string; gi: number; groupId: string }
   | { kind: "inst"; key: string; gi: number; group: GroupView; idx: number; inst: InstanceInfoDto }
   | { kind: "ghost-inst"; key: string; gi: number; groupId: string }
-  | { kind: "tiles"; key: string; gi: number; groupId: string; cells: TileCell[] };
+  | { kind: "grid"; key: string; gi: number; groupId: string; cells: GridCell[] };
 
 /** 滚动容器（VirtualList 的根），按行滚动都通过它 */
 const listRef = ref<{
@@ -234,18 +230,18 @@ const listRef = ref<{
   scrollToIndex: (index: number, align?: "nearest" | "center") => void;
 } | null>(null);
 
-/** 滚动容器去掉左右内边距后的宽度，单位 px；平铺列数按它算 */
+/** 滚动容器去掉左右内边距后的宽度，单位 px；占满时的列数按它算 */
 const contentWidth = ref(0);
 
-/** 平铺每行放几格：与卡片最小宽度、间距同一口径 */
+/** 占满时每行放几列：按未占满时一行约 300px 的宽度切 */
 const columns = computed(() =>
-  Math.max(1, Math.floor((contentWidth.value + TILE_GAP) / (TILE_MIN_MAX + TILE_GAP))),
+  Math.max(1, Math.floor((contentWidth.value + GRID_GAP) / (GRID_MIN + GRID_GAP))),
 );
 
-/** 平铺行的网格样式：列数必须与脚本切行的口径一致 */
-const tileGridStyle = computed(() => ({
+/** 占满时多列行的网格样式：列数必须与脚本切行的口径一致 */
+const gridStyle = computed(() => ({
   gridTemplateColumns: `repeat(${columns.value}, minmax(0, 1fr))`,
-  gap: `${TILE_GAP}px`,
+  gap: `${GRID_GAP}px`,
 }));
 
 /** 量一次滚动容器去掉内边距后的内容宽度 */
@@ -334,23 +330,23 @@ watch(
 );
 
 /**
- * 把一串格子按当前列数切成若干平铺行
+ * 把一串格子按当前列数切成若干多列行
  *
- * - `cells`: 这一组的格子，添加卡在第一个
+ * - `cells`: 这一组的格子，添加行在第一个
  * - `key`: 行的 key 前缀，用分组 uuid
  * - `gi`: 分组下标
  *
  * # 返回值
  *
- * 见 [`Row`] 里的 tiles 行
+ * 见 [`Row`] 里的 grid 行
  */
-function chunkTiles(cells: TileCell[], key: string, gi: number): Row[] {
+function chunkGridCells(cells: GridCell[], key: string, gi: number): Row[] {
   const out: Row[] = [];
   const cols = Math.max(1, columns.value);
   for (let i = 0; i < cells.length; i += cols) {
     out.push({
-      kind: "tiles",
-      key: `t-${key}-${i}`,
+      kind: "grid",
+      key: `r-${key}-${i}`,
       gi,
       groupId: key,
       cells: cells.slice(i, i + cols),
@@ -363,7 +359,7 @@ function chunkTiles(cells: TileCell[], key: string, gi: number): Row[] {
  * 分组列表的行表：分组标题 + 添加行 + 实例行
  *
  * 收起的组只留标题行 —— 组内一行都不渲染，滚起来才省事。
- * 向右占满时组内改用平铺卡片，一行放多个实例。
+ * 向右占满时组内仍是原来的实例行，只是按容器宽度一行排多个。
  */
 const rows = computed<Row[]>(() => {
   const out: Row[] = [];
@@ -371,9 +367,9 @@ const rows = computed<Row[]>(() => {
     if (props.isGroupInsert(gi)) out.push({ kind: "ghost-group", key: "gg-" + gi, gi });
     out.push({ kind: "group", key: "g-" + g.id, gi, group: g });
     if (!isGroupOpen(g.id)) return;
-    // 占满时整组铺成卡片，按容器宽度一行放多个
+    // 占满时整组按容器宽度切成多列行，每列仍是原来的实例行
     if (props.maximized) {
-      const cells: TileCell[] = [];
+      const cells: GridCell[] = [];
       if (!props.multiSelect) cells.push({ kind: "add" });
       g.items.forEach((inst, idx) => {
         if (inst.uuid === props.draggingUuid) return;
@@ -382,7 +378,7 @@ const rows = computed<Row[]>(() => {
         cells.push({ kind: "instance", idx, inst });
       });
       if (props.isInstInsertEnd(g.id)) cells.push({ kind: "ghost" });
-      out.push(...chunkTiles(cells, g.id, gi));
+      out.push(...chunkGridCells(cells, g.id, gi));
       return;
     }
     if (!props.multiSelect) out.push({ kind: "add", key: "a-" + g.id, gi, groupId: g.id });
@@ -414,7 +410,7 @@ const rows = computed<Row[]>(() => {
  * 与 CSS 里该行种的固定高度一致
  */
 function baseRowHeight(row: Row): number {
-  if (row.kind === "tiles") return ROW_H_TILE;
+  if (row.kind === "grid") return ROW_H_INST;
   if (row.kind === "group" || row.kind === "ghost-group") return ROW_H_GROUP;
   return ROW_H_INST;
 }
@@ -514,23 +510,23 @@ watch(
  * - `uuid`: 实例 uuid；行表里没有（分组收起 / 搜索过滤掉）时什么都不做
  */
 function scrollToInstance(uuid: string) {
-  // 占满时实例在平铺行里，按"这一行里有它"找行号
+  // 占满时实例在多列行里，按"这一行里有它"找行号
   const index = rows.value.findIndex((row) =>
     row.kind === "inst"
       ? row.inst.uuid === uuid
-      : row.kind === "tiles" &&
+      : row.kind === "grid" &&
       row.cells.some((cell) => cell.kind === "instance" && cell.inst.uuid === uuid),
   );
   if (index >= 0) listRef.value?.scrollToIndex(index, "center");
 }
 
 /**
- * 平铺卡按下：与实例行一样交给拖拽，多选开关由 useInstanceDrag 自己判断
+ * 多列行里的实例按下：与普通实例行一样交给拖拽，多选开关由 useInstanceDrag 自己判断
  *
  * - `e`: 指针按下事件
  * - `inst`: 被按住的实例
  */
-function onTilePointerDown(e: PointerEvent, inst: InstanceInfoDto) {
+function onGridPointerDown(e: PointerEvent, inst: InstanceInfoDto) {
   props.onDragPointerDown(e, { kind: "instance", instance: inst });
 }
 
@@ -617,36 +613,37 @@ defineExpose({ scrollToInstance });
               </div>
             </div>
 
-            <!-- 平铺卡片行：向右占满时一组实例铺成多列，一行放多个 -->
-            <div v-else-if="row.kind === 'tiles'" class="vrow vrow-tiles" :style="rowStyle(row)">
-              <div class="tile-grid" :style="tileGridStyle">
+            <!-- 多列行：向右占满时一组实例仍用原来的行外观，一行排多个 -->
+            <div v-else-if="row.kind === 'grid'" class="vrow vrow-grid" :style="rowStyle(row)">
+              <div class="inst-grid" :style="gridStyle">
                 <template v-for="(cell, ci) in row.cells" :key="ci">
-                  <div v-if="cell.kind === 'add'" class="tile add-tile" @click="emit('add-instance')">
-                    <span class="add-plus">
-                      <GlyphIcon name="plus" :size="24" :weight="1.8" />
+                  <button v-if="cell.kind === 'add'" class="add-inst-row"
+                    :disabled="dragActive?.kind === 'instance'" @click="emit('add-instance')">
+                    <span class="add-inst-icon">
+                      <GlyphIcon name="plus" :size="18" />
                     </span>
-                    <span class="tile-name">{{ t("group.add") }}</span>
-                  </div>
-                  <!-- 落点占位：与卡片同尺寸，拖动时显示将插入的位置 -->
-                  <div v-else-if="cell.kind === 'ghost'" class="tile tile-ghost">
+                    <span class="add-inst-text">{{ t("list.add") }}</span>
+                  </button>
+                  <!-- 落点占位：与实例行同尺寸，拖动时显示将插入的位置 -->
+                  <div v-else-if="cell.kind === 'ghost'" class="drop-ghost-row">
                     <InstanceIcon :name="dragActive?.instance?.name ?? ''"
-                      :uuid="dragActive?.instance?.uuid ?? '0'" :size="44" />
-                    <span class="tile-name">{{ dragActive?.instance?.name ?? "" }}</span>
+                      :uuid="dragActive?.instance?.uuid ?? '0'" :size="38" />
+                    <span class="inst-name">{{ dragActive?.instance?.name ?? "" }}</span>
                   </div>
-                  <div v-else class="tile" :data-uuid="cell.inst.uuid" :data-idx="cell.idx"
+                  <div v-else class="inst-row" :data-uuid="cell.inst.uuid" :data-idx="cell.idx"
                     :data-group="row.groupId" :class="{
                       active: selected?.uuid === cell.inst.uuid,
                       'multi-checked': multiSelect && selectedIds.has(cell.inst.uuid),
                       running: cell.inst.running,
-                    }" @pointerdown="onTilePointerDown($event, cell.inst)"
+                    }" @pointerdown="onGridPointerDown($event, cell.inst)"
                     @click="onInstClick(cell.inst, $event)" @contextmenu.prevent="onInstContext($event, cell.inst)">
                     <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(cell.inst.uuid) }">
                       <GlyphIcon name="check" :size="12" :weight="2.6" />
                     </span>
-                    <InstanceIcon :name="cell.inst.name" :uuid="cell.inst.uuid" :size="44" />
-                    <span v-if="cell.inst.loader !== 'normal'" class="loader-corner loader-text"
+                    <InstanceIcon :name="cell.inst.name" :uuid="cell.inst.uuid" :size="38" />
+                    <span v-if="cell.inst.loader !== 'normal'" class="loader-text"
                       :class="`loader-${cell.inst.loader}`">{{ t(`add.loader.${cell.inst.loader}`) }}</span>
-                    <span class="tile-name">
+                    <span class="inst-name">
                       <HighlightText :text="cell.inst.name" :query="searchText" />
                     </span>
                     <span v-if="cell.inst.running" class="run-dot" v-tip="t('launch.running')"></span>
@@ -720,8 +717,10 @@ defineExpose({ scrollToInstance });
 
 <style scoped>
 .sidebar {
-  width: 300px;
-  min-width: 300px;
+  /* 宽度始终跟着槽位走：占满时槽位是 flex 增长的，收起时也能连续缩回去，
+     不会在 .is-max 被摘掉的瞬间把内容从整宽拍回 300px */
+  width: 100%;
+  min-width: 0;
   background: var(--bg-side);
   border-right: 1px solid var(--border);
   display: flex;
@@ -735,8 +734,6 @@ defineExpose({ scrollToInstance });
 
 /* 占满：宽度跟着槽位走，两侧边框都不要 —— 这时它已经铺到窗口边缘 */
 .sidebar.is-max {
-  width: 100%;
-  min-width: 0;
   border-right: none;
   border-left: none;
 }
@@ -891,14 +888,23 @@ defineExpose({ scrollToInstance });
   height: 56px;
 }
 
-/* 平铺卡片行：112 的卡 + 8 的行距；列数由脚本内联给 */
-.vrow-tiles {
-  height: 120px;
+/* 多列行：占满时一行排多个，每个仍是原来的实例行 */
+.vrow-grid {
+  height: 60px;
 }
 
-.tile-grid {
+.inst-grid {
   display: grid;
-  align-content: start;
+  align-items: stretch;
+  width: 100%;
+}
+
+.inst-grid .inst-row,
+.inst-grid .add-inst-row,
+.inst-grid .drop-ghost-row {
+  width: 100%;
+  min-width: 0;
+  height: 56px;
 }
 
 .group-title-row {

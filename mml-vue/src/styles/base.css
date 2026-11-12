@@ -69,16 +69,29 @@ html:not(.has-material):not(.has-bg) body {
 /* ---------------- 下拉浮层动效：<Transition name="drop"> ----------------
    锚在触发按钮下方、向下"展开"：以顶边为原点纵向拉伸 + 轻微下移。
    各浮层按自身对齐方向在组件内覆盖 transform-origin（如 top right / top left）。 */
-.drop-enter-active,
-.drop-leave-active {
+.drop-enter-active {
   transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
   transform-origin: top;
 }
 
-.drop-enter-from,
+/* 收起不是把展开倒放：先快速缩回触发框，末尾再淡出，避免整块菜单往上"飞" */
+.drop-leave-active {
+  transition:
+    opacity 0.08s linear 0.06s,
+    transform 0.14s var(--ease-in-out);
+  transform-origin: top;
+}
+
+/* 从触发按钮下方"落"出来：明显的向下位移 + 纵向展开，不能只剩淡入 */
+.drop-enter-from {
+  opacity: 0;
+  transform: translateY(-10px) scaleY(0.86);
+}
+
+/* 收起时只缩回一小段，位置几乎留在原地；透明度延后到后半段再消失 */
 .drop-leave-to {
   opacity: 0;
-  transform: translateY(-4px) scaleY(0.94);
+  transform: translateY(-4px) scaleY(0.9);
 }
 
 /* ---------------- 关闭动画：开关在设置里，见 lib/appearance.ts ----------------

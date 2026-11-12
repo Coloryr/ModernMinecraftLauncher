@@ -23,6 +23,7 @@ import InstallModal from "./parts/InstallModal.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { useInstanceChange } from "../../composables/useInstanceChange";
 import { useCollectDrag } from "../../composables/useCollectDrag";
+import { useStaggerEnter } from "../../composables/useStaggerEnter";
 import { api, onCollectChange } from "../../lib/api";
 import { commands } from "../../lib/bindings";
 import { t, tErr } from "../../lib/i18n";
@@ -43,6 +44,11 @@ defineEmits<{
   /** 请求关闭本窗口，由标题栏关闭按钮与 Esc 触发 */
   (e: "close"): void;
 }>();
+
+/** 分组切换：卡片按顺序落下 */
+const { enter: enterCards, leave: leaveCards } = useStaggerEnter(
+  ".collect-card, .collect-empty",
+);
 
 const items = ref<CollectItemDto[]>([]);
 const groups = ref<Record<string, string[]>>({});
@@ -1081,6 +1087,8 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
             width="100%" />
 
           <div class="collect-scroll">
+            <Transition :css="false" mode="out-in" @enter="enterCards" @leave="leaveCards">
+              <div :key="activeGroup" class="collect-pane">
             <!-- 当前分组是空的：搜索没命中与"这一组确实没收藏"分开说 -->
             <p v-if="!activeItems.length" class="empty-tip collect-empty">
               {{ keyword.trim() ? t("collect.searchEmpty") : t("collect.emptyGroup") }}
@@ -1129,6 +1137,8 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
                 </span>
               </div>
             </div>
+              </div>
+            </Transition>
           </div>
 
           <!-- 去挑资源收藏：放在滚动区外面，右边缘与上面的搜索框对齐 -->

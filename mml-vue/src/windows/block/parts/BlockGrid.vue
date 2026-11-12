@@ -35,6 +35,8 @@ const props = defineProps<{
   selectMode?: boolean;
   /** 某个方块当前是否被勾选 */
   isSelected?: (id: string) => boolean;
+  /** 分类刚切换：让虚拟网格里后来补渲染的格子也一起播放入场动画 */
+  enter?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -276,10 +278,10 @@ function onCellKey(e: KeyboardEvent, i: number) {
 <template>
   <div ref="scroller" class="grid-scroll" @scroll.passive="onScroll">
     <div v-if="items.length" class="grid-pad" :style="{ height: totalH + BOTTOM_SPACE + 'px' }">
-      <div ref="gridEl" class="block-grid" :style="gridStyle">
+      <div ref="gridEl" class="block-grid" :class="{ 'stagger-in': enter }" :style="gridStyle">
         <button v-for="(b, k) in visible" :key="b.id" type="button" class="block-cell"
           :class="{ on: b.id === activeId, 'multi-checked': selectMode && isSelected?.(b.id) }"
-          :data-idx="startIndex + k" :tabindex="startIndex + k === tabbableIndex ? 0 : -1"
+          :style="{ '--stagger-i': k }" :data-idx="startIndex + k" :tabindex="startIndex + k === tabbableIndex ? 0 : -1"
           @click="onCellClick(b, $event)" @focus="focusIndex = startIndex + k"
           @keydown="onCellKey($event, startIndex + k)" @contextmenu.prevent="onCellMenu($event, b)">
           <!-- 多选模式：每格左上角一枚方形勾选圈，与资源收藏卡片的勾选框同一套 -->
@@ -367,6 +369,20 @@ function onCellKey(e: KeyboardEvent, i: number) {
      列数按这个更窄的宽度算，见 script 里的 gridW */
   right: 16px;
   display: grid;
+}
+
+/* 分类切换的入场：虚拟网格先只渲染出一两块，量完尺寸后其余格子才补上来，
+   所以动画挂在格子上而不是在切换那一刻一次性查 DOM —— 后补的格子也能错峰落下 */
+.block-grid.stagger-in .block-cell {
+  animation: block-cell-in 0.32s var(--ease-out) both;
+  animation-delay: calc(var(--stagger-i, 0) * 45ms);
+}
+
+@keyframes block-cell-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
 }
 
 /* 收藏角标：左上角，外观与资源窗口的星标一致 —— 透明底，未收藏是描边星，

@@ -38,6 +38,10 @@ const emit = defineEmits<{
   (e: "update:multi-select", on: boolean): void;
 }>();
 
+/** 分类切换后的短时间内给网格挂 stagger；虚拟网格后补渲染的格子也能落下来 */
+const gridAnim = ref(false);
+let gridAnimTimer: number | undefined;
+
 const {
   status,
   blocks,
@@ -64,6 +68,18 @@ const {
   setIcon,
   addSkin,
 } = props.settings;
+
+watch(
+  () => cat.value,
+  () => {
+    gridAnim.value = true;
+    window.clearTimeout(gridAnimTimer);
+    gridAnimTimer = window.setTimeout(() => {
+      gridAnim.value = false;
+    }, 900);
+  },
+  { immediate: true },
+);
 
 const {
   orderedKeys,
@@ -539,10 +555,10 @@ async function onDetailRemove() {
           </BaseButton>
         </div>
 
-        <BlockGrid :items="filtered" :keyword="keyword" :size="size" :active-id="detail?.id ?? null"
-          :skin-cat="SKIN_CAT" :filtered="isFiltered" :is-favorite="isFavorite" :toggle-favorite="toggleFavorite"
-          :select-mode="multiSelect" :is-selected="(id) => selectedIds.has(id)" @open="openDetail"
-          @remove-skin="removeSkin" @clear-filters="clearFilters" @item-menu="openBlockMenu"
+        <BlockGrid :key="cat" :enter="gridAnim" :items="filtered" :keyword="keyword" :size="size"
+          :active-id="detail?.id ?? null" :skin-cat="SKIN_CAT" :filtered="isFiltered" :is-favorite="isFavorite"
+          :toggle-favorite="toggleFavorite" :select-mode="multiSelect" :is-selected="(id) => selectedIds.has(id)"
+          @open="openDetail" @remove-skin="removeSkin" @clear-filters="clearFilters" @item-menu="openBlockMenu"
           @toggle-select="(p) => toggleSelect(p.item, p.event)" />
       </div>
     </div>

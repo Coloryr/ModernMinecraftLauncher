@@ -10,6 +10,14 @@ fn native_archive_contains_all_files_and_current_instance_snapshot() {
     fs::write(root.join(".minecraft/config/中文.toml"), "enabled = true").unwrap();
     fs::write(root.join("notes.txt"), "user notes").unwrap();
     fs::write(root.join(mml_names::names::GAME_FILE), "stale config").unwrap();
+    // 各系统的目录标记与缩略图缓存都不许进包
+    fs::write(root.join(".DS_Store"), "junk").unwrap();
+    fs::write(root.join(".minecraft/config/.DS_Store"), "junk").unwrap();
+    fs::write(root.join("Thumbs.db"), "junk").unwrap();
+    fs::write(root.join("desktop.ini"), "junk").unwrap();
+    fs::write(root.join("._notes.txt"), "junk").unwrap();
+    fs::create_dir_all(root.join(".Trashes")).unwrap();
+    fs::write(root.join(".Trashes/old.bin"), "junk").unwrap();
     let game =
         serde_json::from_value(serde_json::json!({"Name":"当前实例", "Version":"1.21.1"}))
             .unwrap();
@@ -28,6 +36,14 @@ fn native_archive_contains_all_files_and_current_instance_snapshot() {
     assert_eq!(json["Name"], "当前实例");
     assert_eq!(json["Version"], "1.21.1");
     assert!(zip.file_names().all(|name| !name.unwrap().contains('\\')));
+    assert!(zip.file_names().all(|name| {
+        let name = name.unwrap_or_default();
+        !name.ends_with(".DS_Store")
+            && !name.ends_with("Thumbs.db")
+            && !name.ends_with("desktop.ini")
+            && !name.contains("._")
+            && !name.contains(".Trashes")
+    }));
     drop(zip);
     crate::test_support::cleanup(&[&dir]);
 }

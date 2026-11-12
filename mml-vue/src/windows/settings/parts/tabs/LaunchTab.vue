@@ -13,7 +13,6 @@ import MemoryHint from "../../../../components/MemoryHint.vue";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SegmentedTabs from "../../../../components/ui/SegmentedTabs.vue";
 import SettingsGroup from "../SettingsGroup.vue";
-import SaveStateText from "../SaveStateText.vue";
 import type { useSettingsLaunch } from "../../composables/useSettingsLaunch";
 import type { useSettingsClient } from "../../composables/useSettingsClient";
 
@@ -38,7 +37,6 @@ const {
   commitEnvLines,
   addEnvLine,
   removeEnvLine,
-  saveState,
 } = props.settings;
 
 const { client, applyClient, launchCheck, applyLaunchCheck } = props.look;
@@ -194,9 +192,6 @@ watch(memoryConflict, async (bad) => {
       <MemoryHint class="mem-line" />
       <!-- 冲突时明确说清"没保存"，避免用户以为改上了 -->
       <p v-if="memoryConflict" class="lock-server-hint">{{ t("winSettings.memoryConflict") }}</p>
-      <div class="set-save-row right">
-        <SaveStateText :state="saveState" />
-      </div>
     </SettingsGroup>
 
     <SettingsGroup v-if="!locked" id="jvm" title-key="winSettings.secJvm" :flash="flashGroup === 'jvm'">

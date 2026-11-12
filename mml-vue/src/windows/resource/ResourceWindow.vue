@@ -20,6 +20,7 @@ import { commands, type ModItemDto } from "../../lib/bindings";
 import { useFileDrop } from "../../composables/useFileDrop";
 import type { FileDropPayload } from "../../composables/useFileDrop";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
+import { useStaggerEnter } from "../../composables/useStaggerEnter";
 import { useResourceStatus } from "../../lib/resourceTasks";
 import { clearTargetCategory, openWindow, targetCategory } from "../windowManager";
 import { useModDeps } from "./composables/useModDeps";
@@ -51,6 +52,11 @@ defineEmits<{
   /** 窗口要关掉，由外壳真正执行 */
   (e: "close"): void;
 }>();
+
+/** 切换分类：内容标题只渐变、不位移；列表行按顺序落下 */
+const { enter: enterPane, leave: leavePane } = useStaggerEnter(".item-row", {
+  fade: ".content-head",
+});
 
 /**
  * 视图偏好：分类顺序 / 上次打开的类别 / 模组展示方式
@@ -323,7 +329,7 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
           但里面的 `.pane-swap` 要**复刻**「顶栏 + 列表」之间的纵向间距（gap 12px），
           否则包一层后间距会丢；主窗口的 .detail-instance 也是这么处理的。
         -->
-        <Transition name="pane-swap" mode="out-in">
+        <Transition :css="false" mode="out-in" @enter="enterPane" @leave="leavePane">
           <!-- 没有选中实例：只给这一条引导，不再顺带铺一个空列表，原先两段会同时出现 -->
           <div v-if="!instance" key="__no-instance" class="empty-tip">
             {{ t("resource.notSelected") }}

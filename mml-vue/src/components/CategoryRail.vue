@@ -7,8 +7,9 @@
 // 松手把新顺序抛给上层落盘。拖动期间列表里那一项原地淡出，另有一份跟着指针的浮起副本。
 //
 // 投放高亮（`dropKey`）：别的窗口把条目拖到分组上时，给对应那一项描一道虚线框。
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
+import { useSlidingThumb } from "../composables/useSlidingThumb";
 
 /** 左栏的一项 */
 export interface CatItem {
@@ -62,6 +63,19 @@ const emit = defineEmits<{
 // ---------- 拖动排序 ----------
 
 const navEl = ref<HTMLElement | null>(null);
+/** 当前选中项下标：「全部」固定第 0 项，其余按传进来的顺序 */
+const activeIndex = computed(() => {
+  if (props.active === "") return 0;
+  const index = props.items.findIndex((item) => item.id === props.active);
+  return index < 0 ? -1 : index + 1;
+});
+const { thumbStyle, thumbReady, refresh: refreshThumb } = useSlidingThumb(
+  navEl,
+  ".cat-item",
+  () => activeIndex.value,
+);
+watch(() => props.items, refreshThumb, { deep: true });
+
 /** 开始拖拽的位移阈值（与其它拖拽一致） */
 const DRAG_THRESHOLD = 5;
 
@@ -73,6 +87,8 @@ const dragging = ref<string | null>(null);
 const insertAt = ref<number | null>(null);
 /** 跟着指针走的浮起副本位置，视口坐标 */
 const ghost = ref({ x: 0, y: 0 });
+// 拖拽时插入线会占位，选中色块要跟着重量
+watch([dragging, insertAt], refreshThumb);
 
 let pointerId: number | null = null;
 let startX = 0;
@@ -184,7 +200,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <aside ref="navEl" class="cat-rail" :class="{ flush }" role="tablist" aria-orientation="vertical">
+  <aside ref="navEl" class="cat-rail" :class="{ flush, ready: thumbReady }" role="tablist"
+    aria-orientation="vertical">
+    <span class="cat-thumb" :style="thumbStyle" aria-hidden="true"></span>
     <!-- 全部：不参与排序，也不给右键 -->
     <button type="button" role="tab" class="cat-item" :class="{ on: active === '' }" :aria-selected="active === ''"
       @click="onClick('')">
@@ -229,6 +247,7 @@ onUnmounted(() => {
 
 <style scoped>
 .cat-rail {
+  position: relative;
   width: var(--rail-w);
   min-width: var(--rail-w);
   display: flex;
@@ -249,7 +268,30 @@ onUnmounted(() => {
   padding-bottom: 0;
 }
 
+/* 选中色块：分类切换时在栏内上下滑动 */
+.cat-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border-radius: var(--ctl-radius);
+  background: var(--accent-soft);
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+
+.cat-rail.ready .cat-thumb {
+  opacity: 1;
+  transition:
+    transform 0.18s var(--ease-out),
+    width 0.18s var(--ease-out),
+    height 0.18s var(--ease-out);
+}
+
 .cat-item {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -266,7 +308,7 @@ onUnmounted(() => {
   transition: background 0.12s, color 0.12s;
 }
 
-.cat-item:hover {
+.cat-item:hover:not(.on) {
   background: var(--bg-hover);
 }
 
@@ -276,9 +318,14 @@ onUnmounted(() => {
 }
 
 .cat-item.on {
-  background: var(--accent-soft);
+  background: transparent;
   color: var(--accent);
   font-weight: 600;
+}
+
+/* 第一次量完之前没有色块，给选中项一个背景兜底 */
+.cat-rail:not(.ready) .cat-item.on {
+  background: var(--accent-soft);
 }
 
 /* 正被拖的分类：留在原位淡下去（顺序由插入线表达） */

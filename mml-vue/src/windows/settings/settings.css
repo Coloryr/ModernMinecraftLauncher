@@ -585,7 +585,8 @@
 }
 
 /* 保存状态文字：保存中 / 保存失败 / 有未保存的改动（"已保存"不再显示） */
-.settings-layout .save-state {
+.settings-layout .save-state,
+.frame-head .save-state {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -593,15 +594,24 @@
   color: var(--text-dim);
 }
 
-.settings-layout .save-state.ok {
+/* 标题栏里紧挨搜索框：留一点间距，不参与标题栏的拖拽命中 */
+.frame-head .save-state {
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.settings-layout .save-state.ok,
+.frame-head .save-state.ok {
   color: var(--green);
 }
 
-.settings-layout .save-state.err {
+.settings-layout .save-state.err,
+.frame-head .save-state.err {
   color: var(--red);
 }
 
-.settings-layout .save-state.pending {
+.settings-layout .save-state.pending,
+.frame-head .save-state.pending {
   color: var(--yellow);
 }
 

@@ -11,6 +11,7 @@ import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import SettingsRail from "./parts/SettingsRail.vue";
 import SettingsSearch from "./parts/SettingsSearch.vue";
+import SaveStateText from "./parts/SaveStateText.vue";
 import UiTab from "./parts/tabs/UiTab.vue";
 import JavaTab from "./parts/tabs/JavaTab.vue";
 import NetworkTab from "./parts/tabs/NetworkTab.vue";
@@ -32,6 +33,7 @@ import { useSettingsJava } from "./composables/useSettingsJava";
 import { useSettingsClient } from "./composables/useSettingsClient";
 import { useSettingsLocalFiles } from "./composables/useSettingsLocalFiles";
 import { useSettingsGamepad } from "./composables/useSettingsGamepad";
+import { useStaggerEnter } from "../../composables/useStaggerEnter";
 import { isSettingsTab, SETTINGS_TABS, type SettingsTab } from "./types";
 import { groupsOfTab, RESETTABLE_GROUPS, type SettingsHit } from "./search";
 import "./settings.css";
@@ -57,6 +59,11 @@ function storedTab(): SettingsTab {
 
 const tab = ref<SettingsTab>(storedTab());
 
+/** 右侧换页：标题只渐变、不位移；各分组按顺序落下 */
+const { enter: enterPage, leave: leavePage } = useStaggerEnter(".setting-group", {
+  fade: ".set-content-head",
+});
+
 watch(tab, (v) => {
   writeString(KEYS.settingsTab, v);
 });
@@ -73,6 +80,16 @@ const client = useSettingsClient();
 const files = useSettingsLocalFiles();
 // 手柄编辑状态放在这一层：切标签时 GamepadTab 会被卸载，未保存内容不能跟着丢
 const gamepad = useSettingsGamepad();
+
+/** 当前页的保存状态：放到标题栏搜索框左边 */
+const headerSave = computed(() => {
+  if (tab.value === "network") {
+    return { state: network.saveState.value, pending: network.proxyDirty.value };
+  }
+  if (tab.value === "launch") return { state: launch.saveState.value };
+  if (tab.value === "client") return { state: client.saveState.value };
+  return null;
+});
 
 // ================= 锁定客户端设置 =================
 
@@ -226,10 +243,16 @@ async function onSearchSelect(hit: SettingsHit) {
     return;
   }
   tab.value = hit.tab;
-  // 目标标签页是 v-if 挂上来的：等它渲染完再找锚点
-  await nextTick();
-  const el = document.getElementById(`set-${hit.group}`);
-  el?.scrollIntoView({ block: "start", behavior: "smooth" });
+  // 右侧有 out-in 过渡：新面板要等旧面板退场后才挂上，轮询等它出现再找锚点
+  for (let i = 0; i < 12; i += 1) {
+    await nextTick();
+    const el = document.getElementById(`set-${hit.group}`);
+    if (el) {
+      el.scrollIntoView({ block: "start", behavior: "smooth" });
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  }
   flash(hit.group);
 }
 
@@ -307,6 +330,8 @@ function onKeyDown(e: KeyboardEvent) {
   <WindowFrame :title="t('features.settings')" body-fill body-flush @close="emit('close')">
     <!-- 设置项搜索放在标题栏：全局可用，切哪个标签都在，且不随内容区滚动 -->
     <template #head-right>
+      <SaveStateText v-if="headerSave" class="head-save-state" :state="headerSave.state"
+        :pending="headerSave.pending" />
       <SettingsSearch @select="onSearchSelect" />
     </template>
 
@@ -315,6 +340,8 @@ function onKeyDown(e: KeyboardEvent) {
 
       <!-- 右侧内容区：每个标签一个面板，独立滚动 -->
       <div class="tab-content">
+        <Transition :css="false" mode="out-in" @enter="enterPage" @leave="leavePage">
+          <div :key="tab" class="set-page">
         <!-- 当前页大标题 + 恢复本页默认（整页只保留这一个重置入口） -->
         <header class="set-content-head">
           <div>
@@ -341,6 +368,8 @@ function onKeyDown(e: KeyboardEvent) {
           <ExperimentalTab v-else :settings="client" :client-unlocked="clientUnlocked" :flash-group="flashGroup"
             @unlock="openUnlock()" />
         </section>
+          </div>
+        </Transition>
       </div>
     </div>
 

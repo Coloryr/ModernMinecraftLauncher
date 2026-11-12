@@ -8,6 +8,7 @@ import DropOverlay from "../../components/ui/DropOverlay.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
+import { useStaggerEnter } from "../../composables/useStaggerEnter";
 import { useFileDrop } from "../../composables/useFileDrop";
 import { useUnlisteners } from "../../composables/useUnlisteners";
 import type { FileDropPayload } from "../../composables/useFileDrop";
@@ -48,6 +49,11 @@ const SkinPage = defineAsyncComponent(() => import("./SkinPage.vue"));
 // 第二遍时 currentKind 已经回到 main，于是"返回"变成退出应用
 /** 请求关闭本窗口 */
 defineEmits<{ (e: "close"): void }>();
+
+/** 平铺 / 列表 / 详情切换：卡片、行或详情块按顺序落下 */
+const { enter: enterView, leave: leaveView } = useStaggerEnter(
+  ".acc-card, .acc-row, .acc-detail tbody tr",
+);
 
 /** 皮肤预览子页面是否打开 */
 const showSkin = ref(false);
@@ -788,6 +794,7 @@ function tokenLabel(acc: AccountStoreDto): string {
 
     <!-- 视图：平铺 / 列表 / 详情 / 皮肤子页面（见 views/ 目录）；详情与皮肤子页面由自己管理滚动 -->
     <div class="view-area" :class="{ fill: view === 'detail' || showSkin || filtered.length === 0 }">
+      <Transition :css="false" mode="out-in" @enter="enterView" @leave="leaveView">
       <SkinPage v-if="showSkin" :account="skinTarget" />
       <AccountGrid v-else-if="view === 'grid'" :accounts="filtered" :filtering="filtering"
         :current-uuid="currentAccount?.uuid ?? ''" :query="searchText" @menu="openAccountMenu" :token-label="tokenLabel"
@@ -801,6 +808,7 @@ function tokenLabel(acc: AccountStoreDto): string {
         :query="searchText" @menu="openAccountMenu" :token-label="tokenLabel" @switch="switchAccount"
         @refresh="refreshToken" @view-skin="viewSkin" @refresh-skin="refreshSkin" @relogin="relogin" @edit="openEdit"
         @delete="deleteTarget = $event" @add="openAdd" />
+      </Transition>
     </div>
 
     <!-- 添加账户弹窗（按类型显示不同输入框）：不遮标题栏 -->

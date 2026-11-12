@@ -140,8 +140,8 @@ select.field-select {
     /* display / overlay 是离散属性，必须 allow-discrete，
        否则隐藏瞬间生效、退场动画放不出来 */
     transition:
-      opacity 0.18s ease,
-      transform 0.18s ease,
+      opacity 0.18s var(--ease-out),
+      transform 0.18s var(--ease-out),
       display 0.18s allow-discrete,
       overlay 0.18s allow-discrete;
     opacity: 1;
@@ -150,14 +150,20 @@ select.field-select {
 
   select.field-select:not(:open)::picker(select) {
     opacity: 0;
-    transform: translateY(-4px) scaleY(0.94);
+    transform: translateY(-4px) scaleY(0.9);
+    /* 收起沿用 .drop 的口径：先缩回，末尾再淡出 */
+    transition:
+      opacity 0.08s linear 0.06s,
+      transform 0.14s var(--ease-in-out),
+      display 0.14s allow-discrete,
+      overlay 0.14s allow-discrete;
   }
 
   /* 入场动画的起始帧 */
   @starting-style {
     select.field-select:open::picker(select) {
       opacity: 0;
-      transform: translateY(-4px) scaleY(0.94);
+      transform: translateY(-10px) scaleY(0.86);
     }
   }
 

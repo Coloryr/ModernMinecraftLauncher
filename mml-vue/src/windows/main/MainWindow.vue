@@ -285,6 +285,15 @@ let sidebarAnimTimer: number | undefined;
 /** 收起 / 展开后保持过渡开关的时间，单位 ms；须长于 .sidebar-slot 的宽度过渡 */
 const SIDEBAR_ANIM_MS = 300;
 
+/** 打开一次侧栏 / 详情区的过渡，到时自动关掉 */
+function animateSidebar() {
+  sidebarAnim.value = true;
+  window.clearTimeout(sidebarAnimTimer);
+  sidebarAnimTimer = window.setTimeout(() => {
+    sidebarAnim.value = false;
+  }, SIDEBAR_ANIM_MS);
+}
+
 /** 用户主动收起 / 展开侧栏（唯一会播放动画的入口） */
 function collapseSidebar(collapsed: boolean) {
   // 收起时一定先收回占满：占满态下槽位吃掉整行，收起按钮就没意义了
@@ -313,7 +322,12 @@ function togglePaneMaximize() {
   if (multiSelect.value) return;
   paneMaximized.value = !paneMaximized.value;
   // 占满时侧栏必须是展开的，否则只剩一条窄槽
-  if (paneMaximized.value && sidebarCollapsed.value) collapseSidebar(false);
+  if (paneMaximized.value && sidebarCollapsed.value) {
+    collapseSidebar(false);
+    return;
+  }
+  // 占满 / 收回的宽度过渡只在用户主动切换时打开，启动恢复不播
+  animateSidebar();
 }
 
 // ================= 启动器主页 =================
@@ -591,6 +605,7 @@ const {
 
 // 多选固定占满，退出时回到进来之前那一档
 watch(multiSelect, (on) => {
+  animateSidebar();
   if (on) {
     maximizedBeforeMulti = paneMaximized.value;
     paneMaximized.value = true;
@@ -2574,7 +2589,7 @@ onMounted(async () => {
           </div>
 
           <!-- 右侧内容区：实例详情 / 启动器主页（进出都走动画） -->
-          <section ref="detailEl" class="detail">
+          <section ref="detailEl" class="detail" :inert="paneMaximized">
             <!-- 自定义主页面走自己的 flex 布局：.detail 带 padding 且可滚动，直接塞 iframe 时
                  height:100% 解析不出高度（父元素没有确定高度），会把页面压扁；这里单独包一层
                  去掉 padding 的撑满容器，让 iframe 铺满整个内容区 -->

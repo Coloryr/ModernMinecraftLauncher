@@ -31,9 +31,18 @@ fn delta_roundtrip_includes_deletions_and_keeps_backup() {
     fs::write(source.join("level.dat"), b"new").unwrap();
     fs::write(source.join("region/r.0.0.mca"), b"region").unwrap();
     fs::write(source.join("session.lock"), b"volatile").unwrap();
+    // 系统垃圾既不进清单，也不进差异包
+    fs::write(source.join(".DS_Store"), b"junk").unwrap();
+    fs::write(source.join("region/.DS_Store"), b"junk").unwrap();
+    fs::write(source.join("Thumbs.db"), b"junk").unwrap();
+    fs::write(source.join("._level.dat"), b"junk").unwrap();
     fs::write(target.join("level.dat"), b"old").unwrap();
     fs::write(target.join("removed.dat"), b"remove").unwrap();
     let local = archive::scan(&source).unwrap();
+    assert!(!local.contains_key(".DS_Store"));
+    assert!(!local.contains_key("region/.DS_Store"));
+    assert!(!local.contains_key("Thumbs.db"));
+    assert!(!local.contains_key("._level.dat"));
     let bytes = archive::delta(&source, &local, &archive::scan(&target).unwrap())
         .unwrap()
         .unwrap();
@@ -44,6 +53,10 @@ fn delta_roundtrip_includes_deletions_and_keeps_backup() {
     assert_eq!(fs::read(backup.join("level.dat")).unwrap(), b"old");
     assert!(!target.join("removed.dat").exists());
     assert!(!target.join("session.lock").exists());
+    assert!(!target.join(".DS_Store").exists());
+    assert!(!target.join("region/.DS_Store").exists());
+    assert!(!target.join("Thumbs.db").exists());
+    assert!(!target.join("._level.dat").exists());
     assert!(archive::delta(&source, &local, &local).unwrap().is_none());
 }
 

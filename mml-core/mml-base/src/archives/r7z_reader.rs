@@ -136,6 +136,10 @@ impl R7zReader {
                 }
             }
 
+            if archives::is_junk_path(path.strip_prefix(root_path).unwrap_or(&path)) {
+                continue;
+            }
+
             let buffer = path_helper::open_read(&path)?;
 
             let relative_path = path.strip_prefix(root_path).unwrap();

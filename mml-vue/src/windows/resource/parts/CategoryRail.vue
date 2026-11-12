@@ -5,9 +5,10 @@
 // 不用 HTML5 draggable，WebView2 里会出现"禁止"光标且投放不可靠；
 // 按下记候选 → 移动超阈值才开始拖 → 按指针位置算插到第几个 → 松手写回。
 // 这一列是**一维顺序**，没有"投放到哪个容器"的问题，所以只需要一个插入位置。
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { t } from "../../../lib/i18n";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
+import { useSlidingThumb } from "../../../composables/useSlidingThumb";
 import { RESOURCE_CATEGORIES, type CategoryId } from "../types";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceView } from "../composables/useResourceView";
@@ -37,6 +38,15 @@ const items = computed(() =>
 /** 分类列表容器；算插入位置时只在本组件范围内查，不用全局选择器 */
 const navEl = ref<HTMLElement | null>(null);
 
+/** 当前分类在顺序里的下标 */
+const activeIndex = computed(() => items.value.findIndex((item) => item.id === category.value));
+const { thumbStyle, thumbReady, refresh: refreshThumb } = useSlidingThumb(
+  navEl,
+  ".cat-item",
+  () => activeIndex.value,
+);
+watch(items, refreshThumb, { deep: true });
+
 /** 开始拖拽的位移阈值（与实例 / 收藏拖拽一致） */
 const DRAG_THRESHOLD = 5;
 
@@ -49,6 +59,8 @@ const insertAt = ref<number | null>(null);
 
 /** 跟着指针走的浮起副本位置，视口坐标 */
 const ghost = ref({ x: 0, y: 0 });
+// 拖拽时插入线会占位，选中色块要跟着重量
+watch([dragging, insertAt], refreshThumb);
 
 /** 正在拖的那个分类；没在拖时是 `null` */
 const dragged = computed(() => items.value.find((c) => c.id === dragging.value) ?? null);
@@ -151,7 +163,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <aside ref="navEl" class="cat-nav">
+  <aside ref="navEl" class="cat-nav" :class="{ ready: thumbReady }">
+    <span class="cat-thumb" :style="thumbStyle" aria-hidden="true"></span>
     <template v-for="(c, idx) in items" :key="c.id">
       <!-- 插入线：松手后这一项会落到这里 -->
       <div v-if="showLine(idx) && dragged" class="cat-insert">

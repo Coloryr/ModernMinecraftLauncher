@@ -12,7 +12,6 @@ import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import InstanceSelect from "../../../../components/InstanceSelect.vue";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SettingsGroup from "../SettingsGroup.vue";
-import SaveStateText from "../SaveStateText.vue";
 import { selectedInstance } from "../../../../lib/settings";
 import { openWindow } from "../../../../windows/windowManager";
 import type { useSettingsClient } from "../../composables/useSettingsClient";
@@ -71,7 +70,6 @@ const {
   customHomeState,
   importCustomHome,
   removeCustomHome,
-  saveState,
   setClientLock,
   clearClientLock,
 } = props.settings;
@@ -185,9 +183,6 @@ watch(lockServerError, async (msg) => {
       <NumberStepper v-model="client.motdInterval" :min="5" :max="600" @update:model-value="applyClient" />
     </div>
 
-    <div class="set-save-row right">
-      <SaveStateText :state="saveState" />
-    </div>
   </SettingsGroup>
 
   <SettingsGroup id="loginLock" title-key="winSettings.secLoginLock" :flash="flashGroup === 'loginLock'">
@@ -269,9 +264,6 @@ watch(lockServerError, async (msg) => {
     </div>
     <p class="field-desc">{{ t("winSettings.musicSourceDesc") }}</p>
 
-    <div class="set-save-row right">
-      <SaveStateText :state="saveState" />
-    </div>
   </SettingsGroup>
 
   <SettingsGroup id="customHome" title-key="winSettings.secCustomHome" :flash="flashGroup === 'customHome'">

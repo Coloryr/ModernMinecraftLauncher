@@ -9,7 +9,6 @@ import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SegmentedTabs from "../../../../components/ui/SegmentedTabs.vue";
 import SettingsGroup from "../SettingsGroup.vue";
-import SaveStateText from "../SaveStateText.vue";
 import type { useSettingsNetwork } from "../../composables/useSettingsNetwork";
 
 const props = defineProps<{
@@ -25,7 +24,6 @@ const {
   dnsKeys,
   proxy,
   proxyDetailVisible,
-  proxyDirty,
   sourceOptions,
   proxyModeOptions,
   proxyTypeOptions,
@@ -35,7 +33,6 @@ const {
   setDnsLine,
   removeDnsLine,
   addDnsLine,
-  saveState,
 } = props.settings;
 </script>
 
@@ -114,7 +111,6 @@ const {
 
       <!-- 代理字段较多，保留显式保存按钮（其余网络设置即改即存） -->
       <div class="set-save-row right">
-        <SaveStateText :state="saveState" :pending="proxyDirty" />
         <BaseButton variant="accent" size="sm" @click="saveProxy">{{ t("winSettings.save") }}</BaseButton>
       </div>
     </SettingsGroup>

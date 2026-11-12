@@ -6,6 +6,7 @@
 // 全局兜底只是把 <img> 换成一张灰底占位图，够用且覆盖所有直接写 <img> 的地方；
 // 走本组件的地方加载中有流光、失败还能抛出 error 让调用方重试，也不留破图痕迹。
 import { ref, watch } from "vue";
+import { loadedAsyncImages } from "../../lib/asyncImageCache";
 
 const props = defineProps<{
   /** 图片地址 */
@@ -22,7 +23,7 @@ const emit = defineEmits<{
 }>();
 
 /** 图片是否已经加载出来，用来收掉流光占位 */
-const loaded = ref(false);
+const loaded = ref(loadedAsyncImages.has(props.src));
 /** 是否加载失败，失败后换成灰底图标占位 */
 const failed = ref(false);
 
@@ -32,11 +33,17 @@ function onError() {
   emit("error");
 }
 
+/** 图片加载完成：记住地址，重建时不再显示占位 */
+function onLoad() {
+  loadedAsyncImages.add(props.src);
+  loaded.value = true;
+}
+
 // 换图（如版本筛选刷新截图）时回到占位状态
 watch(
   () => props.src,
-  () => {
-    loaded.value = false;
+  (src) => {
+    loaded.value = loadedAsyncImages.has(src);
     failed.value = false;
   },
 );
@@ -45,7 +52,7 @@ watch(
 <template>
   <span class="async-img">
     <img v-if="!failed" :src="src" :alt="alt ?? ''" v-tip="title" loading="lazy" :class="{ show: loaded }"
-      @load="loaded = true" @error="onError" />
+      @load="onLoad" @error="onError" />
     <span v-if="!loaded && !failed" class="async-shimmer"></span>
     <!-- 加载失败：换成"灰底 + 图片图标"的占位，别留破图图标 -->
     <span v-else-if="failed" class="async-fail" aria-hidden="true">

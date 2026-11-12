@@ -48,13 +48,15 @@ function pick(name: string) {
     <input :value="modelValue" class="field-input" :placeholder="t('add.groupPlaceholder')" spellcheck="false"
       autocomplete="off" role="combobox" aria-autocomplete="list" :aria-expanded="open" @input="onInput"
       @focus="emit('update:open', true)" @blur="emit('update:open', false)" />
-    <div v-if="open" class="group-drop" role="listbox">
-      <button v-for="g in matched" :key="g.uuid" type="button" class="group-opt" role="option"
-        :aria-selected="modelValue === g.name" @mousedown.prevent @click="pick(g.name)">
-        {{ g.name }}
-      </button>
-      <div v-if="!matched.length" class="empty-tip">{{ t("add.groupNone") }}</div>
-    </div>
+    <Transition name="drop">
+      <div v-if="open" class="group-drop" role="listbox">
+        <button v-for="g in matched" :key="g.uuid" type="button" class="group-opt" role="option"
+          :aria-selected="modelValue === g.name" @mousedown.prevent @click="pick(g.name)">
+          {{ g.name }}
+        </button>
+        <div v-if="!matched.length" class="empty-tip">{{ t("add.groupNone") }}</div>
+      </div>
+    </Transition>
   </div>
 </template>
 

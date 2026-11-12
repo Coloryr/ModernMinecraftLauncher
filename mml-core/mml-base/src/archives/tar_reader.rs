@@ -178,6 +178,10 @@ impl TarReader {
                 }
             }
 
+            if archives::is_junk_path(path.strip_prefix(root_path).unwrap_or(&path)) {
+                continue;
+            }
+
             let relative_path = path.strip_prefix(root_path).unwrap();
             let archive_path = archives::normalize_path(relative_path);
 
@@ -415,6 +419,9 @@ impl ArchiveHandle for TarReader {
 
         let mut builder = Builder::new(file);
         for file in files {
+            if archives::is_junk_path(&file.dest) {
+                continue;
+            }
             let internal_path = file.dest.to_string_lossy();
             let mut reader = path_helper::open_read(&file.src)?;
 
