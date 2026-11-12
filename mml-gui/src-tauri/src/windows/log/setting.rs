@@ -98,16 +98,10 @@ pub fn log_set_auto_show(uuid: String, auto_show: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// 上传行数上限：只发日志尾部这么多行
-///
-/// 整份日志动辄几千行，前面绝大部分是加载过程，贴给谁看都得先翻到底；尾部才是出错那段。
-/// 顺带避开对方对体积的限制。
-const UPLOAD_MAX_LINES: usize = 1000;
-
 /// 把日志上传到 mclo.gs，返回可分享的网址
 ///
-/// 上传的是日志**尾部 [`UPLOAD_MAX_LINES`] 行**，不是界面上筛过的那几行：
-/// 筛选是视图状态，上传要的是完整上下文。`file` 为空表示当前运行日志。
+/// 上传的是**整份日志**而不是界面上筛过的那几行：日志上传就是给他人排查用的，
+/// 少一行都可能正好少掉关键那行。`file` 为空表示当前运行日志。
 ///
 /// - `uuid`: 实例 uuid
 /// - `file`: 日志文件绝对路径，取自 `log_get_files`；`None` 表示实时运行日志
@@ -132,14 +126,10 @@ pub async fn log_upload(uuid: String, file: Option<String>) -> Result<String, St
                 }
                 let runtime = InstanceRuntimeLog::from_file(&path, game.encoding);
                 let logs = runtime.logs.read().unwrap();
-                let start = logs.len().saturating_sub(UPLOAD_MAX_LINES);
-                join_log_lines(logs.iter().skip(start))
+                join_log_lines(logs.iter())
             }
             None => match game.get_runtime_log() {
-                Some(runtime) => {
-                    let start = runtime.len().saturating_sub(UPLOAD_MAX_LINES);
-                    join_log_lines(runtime.iter().skip(start))
-                }
+                Some(runtime) => join_log_lines(runtime.iter()),
                 None => String::new(),
             },
         }

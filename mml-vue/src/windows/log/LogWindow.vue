@@ -515,7 +515,7 @@ const uploading = ref(false);
 /** 上传成功后的分享地址，非空即弹结果框 */
 const uploadUrl = ref("");
 
-/** 上传的是当前来源的最后 1000 行（后端截取），不是界面上筛过的那几行 */
+/** 上传的是**整份日志**（当前来源），不是界面上筛过的那几行 */
 async function doUpload() {
   if (uploading.value) return;
   uploading.value = true;

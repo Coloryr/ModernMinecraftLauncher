@@ -11,10 +11,6 @@ import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import { t, tErr, locale } from "../../lib/i18n";
 import { api } from "../../lib/api";
 import { ISSUES_URL, QQ_GROUP, REPO_URL } from "../../lib/links";
-import { selectedInstance } from "../../lib/settings";
-import { useInstanceChange } from "../../composables/useInstanceChange";
-import { openWindow } from "../windowManager";
-import type { InstanceInfoDto } from "../../lib/bindings";
 import { commands } from "../../lib/bindings";
 import { copyText } from "../../lib/clipboard";
 import { showToast } from "../../lib/toast";
@@ -75,40 +71,37 @@ async function loadExeInfo() {
 onMounted(() => {
   void loadBuildInfo();
   void loadExeInfo();
-  void loadInstances();
 });
 
-// ---------------- 打开日志 ----------------
+// ---------------- 启动器日志 ----------------
+// 这里说的是启动器自己的 logs.log（panic、前端错误、下载与渲染记录），
+// 不是日志窗口里那份实例运行日志 —— 后者整份上传，见 log_upload
 
-/** 实例列表：日志窗口按实例开，这里只用来挑一个能开的目标 */
-const instances = ref<InstanceInfoDto[]>([]);
-
-/** 重拉实例列表；读不到就当作没有实例，日志按钮跟着灰掉 */
-async function loadInstances() {
+/** 用系统默认程序打开日志文件；没有日志文件时后端回 err.fileNotFound */
+async function openLog() {
   try {
-    instances.value = await api.getInstances();
-  } catch {
-    instances.value = [];
+    await api.openLauncherLog();
+  } catch (e) {
+    showToast(tErr(e));
   }
 }
 
-// 实例在别处被增删时同步：列表空着时按钮是灰的，别让用户点了没反应
-useInstanceChange(loadInstances);
+/** 上传中：避免连点 */
+const uploading = ref(false);
 
-/** 日志按钮的目标：上次选中的那个实例还在就用它，否则退回第一个 */
-const logUuid = computed(() =>
-  instances.value.some((inst) => inst.uuid === selectedInstance.value)
-    ? selectedInstance.value
-    : (instances.value[0]?.uuid ?? ""),
-);
-
-/** 打开该实例的日志窗口：默认停在「运行日志」，要反馈问题时先看这里 */
-function openLog() {
-  if (!logUuid.value) {
-    showToast(t("winHelp.noInstance"));
-    return;
+/** 上传最后 1000 行并复制链接：体积太大才截，尾部就是出事那段 */
+async function uploadLog() {
+  if (uploading.value) return;
+  uploading.value = true;
+  try {
+    const url = await api.uploadLauncherLog();
+    await copyText(url);
+    showToast(t("winHelp.uploadOk"));
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    uploading.value = false;
   }
-  openWindow("log", { uuid: logUuid.value });
 }
 
 /** 当前语言的 FAQ 列表，文案在 lib/i18n/locales 里 */
@@ -222,12 +215,18 @@ async function copyQq() {
         </div>
       </div>
 
-      <!-- 打开日志 / 仓库 / 问题反馈：跟介绍信息同一张卡，贴右上角，正文行数不用再挪 -->
+      <!-- 打开日志 / 上传日志 / 仓库 / 问题反馈：跟介绍信息同一张卡，贴右上角，正文行数不用再挪 -->
       <div class="about-actions">
-        <!-- 反馈问题前先看日志：没有实例时日志窗口无处栖身，提示改由 tip / toast 给出 -->
-        <button class="ui-btn-icon" v-tip="logUuid ? t('winHelp.openLog') : t('winHelp.noInstance')"
-          :aria-label="t('winHelp.openLog')" @click="openLog">
+        <!-- 反馈问题前先看日志：打开的是启动器自己的 logs.log，不是实例运行日志 -->
+        <button class="ui-btn-icon" v-tip="t('winHelp.openLog')" :aria-label="t('winHelp.openLog')"
+          @click="openLog">
           <GlyphIcon name="log" :size="16" />
+        </button>
+        <!-- 日志太大贴不进 issue：传最后 1000 行到 mclo.gs，链接直接进剪贴板 -->
+        <button class="ui-btn-icon" :disabled="uploading"
+          v-tip="uploading ? t('winHelp.uploading') : t('winHelp.uploadLog')"
+          :aria-label="t('winHelp.uploadLog')" @click="uploadLog">
+          <GlyphIcon name="export" :size="16" />
         </button>
         <button class="ui-btn-icon" v-tip="t('winHelp.repo')" :aria-label="t('winHelp.repo')"
           @click="openUrl(REPO_URL)">

@@ -33,6 +33,7 @@ export function createCommands(invoke: Invoke) {
       logFrontend: (window: string, message: string) => invoke<void>("window_log_frontend", { window, message }),
       minimize: () => invoke<void>("window_minimize"),
       openDevtools: () => invoke<void>("window_open_devtools"),
+      openLauncherLog: () => invoke<void>("window_open_launcher_log"),
       openWindow: (kind: string, instance: string | null, query: string | null) => invoke<void>("window_open_window", { kind, instance, query }),
       probeDrop: (path: string) => invoke<DropPathDto>("window_probe_drop", { path }),
       reopenWindow: (kind: string, instance: string | null, query: string | null) => invoke<void>("window_reopen_window", { kind, instance, query }),
@@ -43,6 +44,7 @@ export function createCommands(invoke: Invoke) {
       startDragging: () => invoke<void>("window_start_dragging"),
       toggleMaximize: () => invoke<boolean>("window_toggle_maximize"),
       upgradeStatus: () => invoke<UpgradeStatusDto>("window_upgrade_status"),
+      uploadLauncherLog: () => invoke<string>("window_upload_launcher_log"),
       urlOfText: (text: string) => invoke<string>("window_url_of_text", { text }),
     },
     account: {

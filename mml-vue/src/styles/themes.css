@@ -525,26 +525,45 @@ html.has-bg .tab-content {
 
 /* 透明高斯模糊（设置 → 界面 → 背景图里的开关，html.bg-frosted 由 lib/appearance.ts 维护）：
    叠在背景图上的成块表面改用「半透明底 + 背景模糊」，文字不再被图上的细节干扰。
-   只给本身有底色的表面加：透明按钮 / 列表行加了会在文字背后糊出一块方斑。
-   逐元素 backdrop-filter 比重绘整窗贵，所以只收成块的表面，别扩散到每一行。 */
-html.has-bg.bg-frosted .frame-head,
-html.has-bg.bg-frosted .topbar,
-html.has-bg.bg-frosted .sidebar,
-html.has-bg.bg-frosted .collapse-head,
-html.has-bg.bg-frosted .meta-panel,
-html.has-bg.bg-frosted .args-panel,
-html.has-bg.bg-frosted .server-config,
-html.has-bg.bg-frosted .motd-card,
-html.has-bg.bg-frosted .last-card,
-html.has-bg.bg-frosted .entry-card,
-html.has-bg.bg-frosted .icon-btn,
-html.has-bg.bg-frosted .build-notice,
-html.has-bg.bg-frosted .empty-block,
-html.has-bg.bg-frosted .collect-empty-box,
-html.has-bg.bg-frosted .page-back,
-html.has-bg.bg-frosted .ui-btn.v-plain,
-html.has-bg.bg-frosted .ui-btn.v-accent,
-html.has-bg.bg-frosted .ui-btn.v-danger {
+
+   **新界面加卡片 / 面板时，把类名补进下面这张表**：漏了的那一块就是「半透明但没模糊」，
+   同屏摆着其它卡片一眼就能看出来对不上。只收本身有底色的表面 —— 透明元素加了会在文字
+   背后糊出一块方斑；弹窗内部的卡片不用加，弹窗底色不透明，模糊看不出来。
+   数量不必太担心：列表都由虚拟列表撑着，同时参与合成的只有视口里那几行。 */
+html.has-bg.bg-frosted :is(
+  /* 外壳：标题栏、左侧栏、各类导航栏 */
+  .frame-head, .topbar, .sidebar, .boot-head, .tab-rail, .cat-rail, .si-rail,
+  /* 通用控件与卡片 */
+  .collapse-head, .icon-btn, .seg-tabs, .tab-btn,
+  .ui-btn.v-plain, .ui-btn.v-accent, .ui-btn.v-danger,
+  /* 主窗口 */
+  .last-card, .entry-card, .empty-block, .page-back, .motd-card, .motd-refresh,
+  .meta-panel, .args-panel, .server-config, .exec-panel, .json-panel, .proxy-panel,
+  .news-item, .build-notice, .sidebar-expand,
+  /* 设置 */
+  .settings-layout .row-card, .sample-box, .java-grid, .program-icon-preview,
+  .gp-test, .ap-chip, .ap-key, .pk-chip, .pad-extra-key,
+  /* 统计 / 帮助 */
+  .summary-card, .play-panel, .stats-table,
+  .about, .faq-item, .footer-note, .lic-block,
+  /* 方块列表 */
+  .block-prompt, .block-progress, .block-cell, .size-dock,
+  /* 资源收藏 / 资源管理 */
+  .collect-empty-box, .collect-card, .collect-empty,
+  .mod-table-panel, .mod-search, .mod-tr, .mod-group-body, .shot-cell, .detail-icon, .detail-shot,
+  /* 添加实例 / 整合包 / 资源 */
+  .add-card, .probe-card, .modpack-top, .res-top, .save-row, .dep-row,
+  .pack-item, .pack-icon, .group-drop, .dep-node, .multi-bar,
+  /* 账户 */
+  .acc-card, .acc-row, .table-card, .acc-images, .tex-item, .preview, .acc-empty, .skin-float,
+  .oauth-code, .oauth-url,
+  /* 服务器实例 */
+  .si-list, .si-table-card, .si-summary, .si-result, .si-config-head, .si-config-group-row,
+  /* 下载 / Java / 导出 / 配置文件 / 联机大厅 */
+  .overview, .task-item, .thread-item, .item-card, .pack-card, .mod-head, .cfg-list, .panel,
+  /* 骨架行 */
+  .sk-row
+) {
   backdrop-filter: blur(14px) saturate(1.06);
 }
 

@@ -1351,6 +1351,26 @@ export const api = {
   },
 
   /**
+   * 用系统默认程序打开启动器自身的日志（运行目录根的 `logs.log`）
+   *
+   * 和实例日志不是一回事：这份是启动器自己的记录，见 `windows/common/shell/launcher_log.rs`
+   */
+  async openLauncherLog(): Promise<void> {
+    return commands.windows.openLauncherLog();
+  },
+
+  /**
+   * 把启动器日志的最后 1000 行上传到 mclo.gs
+   *
+   * # 返回值
+   *
+   * 可分享的网址；日志为空或上传失败时抛错
+   */
+  async uploadLauncherLog(): Promise<string> {
+    return commands.windows.uploadLauncherLog();
+  },
+
+  /**
    * 获取实例导出信息
    *
    * - `uuid`: 实例 uuid
