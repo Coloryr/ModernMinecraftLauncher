@@ -41,6 +41,20 @@ pub enum IconSpec {
     Skip,
 }
 
+/// 方块的创造分组，即 itemGroup lang 键尾段；不在表里返回 None
+///
+/// - `id`: 方块 ID，`minecraft:stone` 或裸 ID `stone`
+///
+/// # 返回值
+///
+/// 分类名，如 `buildingBlocks`；表里没有这个 ID 时返回 `None`
+pub(crate) fn block_cat(id: &str) -> Option<&'static str> {
+    BLOCK_ICONS
+        .iter()
+        .find(|(name, _, _)| *name == id || name.strip_prefix("minecraft:") == Some(id))
+        .map(|(_, cat, _)| *cat)
+}
+
 /// 方块表是否已为该ID渲染图标，非Skip条目即算已渲染；
 /// 物品渲染据此跳过block已有的ID，避免同一图标出两份
 /// Form形态ID非真实方块名，不算
@@ -1314,7 +1328,7 @@ pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
     ),
     (
         "minecraft:creeper_head",
-        "functional",
+        "playerSkin",
         IconSpec::Head("entity/creeper/creeper", false),
     ),
     (
@@ -3642,7 +3656,7 @@ pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
     // 玩家头取不到皮肤缓存，离线环境，用默认皮肤
     (
         "minecraft:player_head",
-        "functional",
+        "playerSkin",
         IconSpec::Head("entity/player/wide/steve", true),
     ),
     (
@@ -4368,7 +4382,7 @@ pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
     ("minecraft:shulker_box", "coloredBlocks", IconSpec::Skip),
     (
         "minecraft:skeleton_skull",
-        "functional",
+        "playerSkin",
         IconSpec::Head("entity/skeleton/skeleton", false),
     ),
     (
@@ -5675,7 +5689,7 @@ pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
     ),
     (
         "minecraft:wither_skeleton_skull",
-        "functional",
+        "playerSkin",
         IconSpec::Head("entity/skeleton/wither_skeleton", false),
     ),
     ("minecraft:yellow_banner", "coloredBlocks", IconSpec::Skip),
@@ -5744,7 +5758,7 @@ pub const BLOCK_ICONS: &[(&str, &str, IconSpec)] = &[
     ),
     (
         "minecraft:zombie_head",
-        "functional",
+        "playerSkin",
         IconSpec::Head("entity/zombie/zombie", true),
     ),
     // ---- 特殊形态：对应SpecialForm，ID = 基础ID + "_" + 形态后缀，非真实方块名 ----

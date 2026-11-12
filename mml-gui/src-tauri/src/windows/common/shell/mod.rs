@@ -8,6 +8,7 @@ pub(crate) mod chrome;
 pub(crate) mod drop;
 pub(crate) mod drop_probe;
 pub(crate) mod events;
+pub(crate) mod frontend_log;
 pub(crate) mod gui_config;
 pub(crate) mod lifecycle;
 pub(crate) mod open;

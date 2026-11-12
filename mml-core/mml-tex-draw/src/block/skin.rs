@@ -12,7 +12,9 @@ use mml_sys::path_helper;
 
 use crate::gpu::GpuCtx;
 
-/// 皮肤方块在 block.json 里的分组值，是独立于 itemGroup lang 键的一套分组
+/// 头颅在左栏的分组值：玩家皮肤 / 添加进来的头颅，加上原版怪物头颅与原版皮肤头
+///
+/// 是独立于 itemGroup lang 键的一套分组，显示名由前端 i18n 给（`blocks.cat.playerSkin`）
 pub const SKIN_CAT: &str = "playerSkin";
 
 /// 皮肤方块的 ID 前缀，ID = 前缀 + 名字，图标文件名同样把 ':' 换成 '_'

@@ -443,13 +443,8 @@ impl InstanceSettingObj {
             let files = path_helper::get_files(&dir);
             // `spawn_blocking` 要 `'static`，借用进不去，收成 `String`
             let lang = lang.to_string();
-            let config = if let Ok(data) = self.get_options() {
-                let def = String::from("[]");
-                let data = data.get("resourcePacks").unwrap_or(&def);
-                serde_json::from_str::<Vec<String>>(data).unwrap_or_default()
-            } else {
-                Vec::new()
-            };
+            // 启用状态记在 options.txt 的 `resourcePacks` 里，不是 OptiFine 那份配置
+            let config = self.resourcepack_selection().unwrap_or_default();
 
             tokio::task::spawn_blocking(move || {
                 let list = Mutex::new(Vec::new());
@@ -519,27 +514,12 @@ impl InstanceSettingObj {
     ///
     /// 写 options.txt 失败时返回对应错误
     pub fn enable_resourcepacks(&self, pack: &ResourcepackObj) -> CoreResult<()> {
-        let mut opt = self.get_options().unwrap_or_default();
-
-        let mut config = if let Some(data) = opt.get("resourcePacks") {
-            serde_json::from_str::<Vec<String>>(data).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
-
+        let mut config = self.resourcepack_selection()?;
         config.push(format!(
             "file/{}",
             pack.path.file_name().unwrap_or_default().to_string_lossy()
         ));
-
-        opt.insert(
-            String::from("resourcePacks"),
-            serialize_tools::json_to_string(&config).unwrap_or(String::from("[]")),
-        );
-
-        self.save_options(&opt, None)?;
-
-        Ok(())
+        self.set_resourcepack_selection(&config)
     }
 
     /// 禁用材质包
@@ -550,29 +530,41 @@ impl InstanceSettingObj {
     ///
     /// 写 options.txt 失败时返回对应错误
     pub fn disable_resourcepacks(&self, pack: &ResourcepackObj) -> CoreResult<()> {
-        let mut opt = self.get_options().unwrap_or_default();
-
-        let mut config = if let Some(data) = opt.get("resourcePacks") {
-            serde_json::from_str::<Vec<String>>(data).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
-
+        let mut config = self.resourcepack_selection()?;
         config.retain(|data| {
             data != &format!(
                 "file/{}",
                 pack.path.file_name().unwrap_or_default().to_string_lossy()
             )
         });
+        self.set_resourcepack_selection(&config)
+    }
 
-        opt.insert(
-            String::from("resourcePacks"),
-            serialize_tools::json_to_string(&config).unwrap_or(String::from("[]")),
-        );
+    /// 读 options.txt 里的 `resourcePacks` 列表
+    ///
+    /// # 返回值
+    ///
+    /// 已启用的资源包条目，形如 `file/xxx.zip`；没有这一行或读不出来时是空表
+    fn resourcepack_selection(&self) -> CoreResult<Vec<String>> {
+        let opt = self.get_minecraft_options()?;
+        Ok(opt
+            .get("resourcePacks")
+            .and_then(|data| serde_json::from_str::<Vec<String>>(data).ok())
+            .unwrap_or_default())
+    }
 
-        self.save_options(&opt, None)?;
-
-        Ok(())
+    /// 写回 `resourcePacks`
+    ///
+    /// 只改这一行：整表重写会把带 `#` 的行截断、顺序也打乱，见 `set_minecraft_option`。
+    ///
+    /// - `config`: 新的启用列表，元素形如 `file/xxx.zip`
+    ///
+    /// # 返回值
+    ///
+    /// 写入失败返回对应错误
+    fn set_resourcepack_selection(&self, config: &[String]) -> CoreResult<()> {
+        let text = serialize_tools::json_to_string(&config).unwrap_or(String::from("[]"));
+        self.set_minecraft_option("resourcePacks", Some(&text))
     }
 }
 

@@ -378,8 +378,9 @@ function leaveHomePage(_el: Element, done: () => void) {
 }
 const newsLoading = ref(false);
 
-/** 打开 / 关闭启动器主页（保留选中实例） */
+/** 打开 / 关闭启动器主页（保留选中实例）；没有实例时主页是唯一内容，点了不切 */
 function toggleNews() {
+  if (homeLocked.value) return;
   newsActive.value = !newsActive.value;
 }
 
@@ -1506,6 +1507,16 @@ const lockActive = computed(
 );
 /** 实例列表是否已加载过：区分「还在加载」与「确实没有这个实例」，避免启动瞬间闪错误页 */
 const instancesLoaded = ref(false);
+/**
+ * 没有实例：内容区只剩启动器主页（见模板的空实例分支），主页因此关不掉
+ *
+ * 要等列表加载完再判：启动瞬间 instances 还是空的，按它锁会把"启动页 = 实例列表"顶成主页
+ */
+const homeLocked = computed(() => instancesLoaded.value && instances.value.length === 0);
+// 空实例时强制停在主页：删掉最后一个实例、或启动页设成列表，都回落到这里
+watch(homeLocked, (locked) => {
+  if (locked) newsActive.value = true;
+}, { immediate: true });
 /** 锁定的实例已不存在，例如整合包作者的实例目录被删 / 改名：主窗口整块换成错误页 */
 const lockMissing = computed(
   () =>
@@ -2438,7 +2449,8 @@ onMounted(async () => {
 
     <!-- 主界面顶栏：加载完成后才出现；加载期间上面那条只给关闭按钮 -->
     <MainTopbar v-else :features="features" :news-active="newsActive" :current-account="currentAccount"
-      :accounts="visibleAccounts" @toggle-news="toggleNews" @feature="openWindow" @update:account="onAccountChange" />
+      :accounts="visibleAccounts" :home-locked="homeLocked" @toggle-news="toggleNews" @feature="openWindow"
+      @update:account="onAccountChange" />
 
     <!-- ===== 启动画面 / 初始化失败错误页（SplashScreen 组件） ===== -->
     <SplashScreen v-if="splashVisible || splashError" :splash-visible="splashVisible" :splash-error="splashError"

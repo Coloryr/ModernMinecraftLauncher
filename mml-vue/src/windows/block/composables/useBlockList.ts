@@ -19,13 +19,14 @@ import {
   blockSkinAdd,
   blockSkinRemove,
   getBlockList,
+  getBlockSkinCat,
   getBlockStatus,
   onBlockRender,
   onDownloadTask,
 } from "../../../lib/api";
 import { openWindow } from "../../windowManager";
 import type { BlockItemDto, BlockStatusDto } from "../../../lib/bindings";
-import { isBlockSize, type BlockSize } from "../types";
+import { SKIN_CAT, isBlockSize, type BlockSize } from "../types";
 
 /** 上次的浏览上下文，存本地存储 */
 interface ViewPref {
@@ -126,6 +127,11 @@ export function useBlockList(hooks?: BlockListHooks) {
   let lastError: string | null = null;
 
   onMounted(async () => {
+    try {
+      skinCatUuid.value = await getBlockSkinCat();
+    } catch {
+      skinCatUuid.value = "";
+    }
     try {
       status.value = await getBlockStatus();
     } catch {
@@ -238,6 +244,14 @@ export function useBlockList(hooks?: BlockListHooks) {
 
   // ---------- 分类与过滤 ----------
 
+  /**
+   * 玩家皮肤（头颅）分类的左栏键，来自后端
+   *
+   * 这一栏没有皮肤方块时也要留在左栏：「添加玩家皮肤」的入口在它里面，
+   * 分类跟着条目一起消失的话就再也加不回来了。取不到时空着，退回"有皮肤才出现"。
+   */
+  const skinCatUuid = ref("");
+
   /** 出现过的游戏分类（保持后端顺序）；键是固定 uuid，显示名与语言无关地存一份 */
   const cats = computed<BlockCat[]>(() => {
     const map = new Map<string, BlockCat>();
@@ -245,6 +259,10 @@ export function useBlockList(hooks?: BlockListHooks) {
       // 没有创造分类的条目（catId 为空）只出现在「全部」里
       if (!b.catUuid || !b.catId || map.has(b.catUuid)) continue;
       map.set(b.catUuid, { uuid: b.catUuid, id: b.catId, label: b.cat });
+    }
+    // 玩家皮肤分类常驻：有皮肤方块时它已经在表里（同一个 uuid），没有时补一条
+    if (skinCatUuid.value && !map.has(skinCatUuid.value)) {
+      map.set(skinCatUuid.value, { uuid: skinCatUuid.value, id: SKIN_CAT, label: SKIN_CAT });
     }
     return [...map.values()];
   });
@@ -258,7 +276,7 @@ export function useBlockList(hooks?: BlockListHooks) {
     return map;
   });
 
-  // 当前分类消失时回到「全部」：重渲染换版本，或删掉最后一个玩家皮肤。
+  // 当前分类消失时回到「全部」：重渲染换了版本。玩家皮肤分类常驻、不会消失，
   // 自建分组的键不在这份游戏分类里，删组时由上层自己清（见 BlockPanel）
   watch(cats, (list) => {
     if (!cat.value || hooks?.isCustomGroup?.(cat.value)) return;

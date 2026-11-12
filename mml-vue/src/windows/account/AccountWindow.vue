@@ -764,7 +764,7 @@ function tokenLabel(acc: AccountStoreDto): string {
 </script>
 
 <template>
-  <WindowFrame :title="showSkin ? t('account.viewSkin') : t('account.manage')"
+  <WindowFrame enter=":scope > *" :title="showSkin ? t('account.viewSkin') : t('account.manage')"
     :body-fill="view === 'detail' || showSkin || filtered.length === 0" :body-flush="showSkin" body-gutter
     :back="showSkin ? t('winCommon.back') : undefined" @back="showSkin = false" @close="$emit('close')">
     <!-- 工具栏：类型筛选 + 搜索 + 视图切换 + 添加账户。高度必须压在 --titlebar-h 内，

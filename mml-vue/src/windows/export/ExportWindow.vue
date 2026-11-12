@@ -901,7 +901,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <WindowFrame body-fill :title="t(serverPack ? 'winTitle.serverPack' : 'winExport.title')" @close="askClose">
+  <WindowFrame enter=":scope > *" body-fill :title="t(serverPack ? 'winTitle.serverPack' : 'winExport.title')" @close="askClose">
     <!-- 实例选择放进标题栏：不占内容区高度，也不随选项卡滚动 -->
     <template #head-right>
       <!-- 实例多时靠搜索 / 分组找，见 components/InstanceSelect：标题栏里位置窄，

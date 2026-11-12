@@ -310,7 +310,7 @@ async function loadList() {
 </script>
 
 <template>
-  <WindowFrame :title="t('winJavaDownload.title')" @close="$emit('close')">
+  <WindowFrame enter=":scope > *" :title="t('winJavaDownload.title')" @close="$emit('close')">
     <div class="java-download-body">
       <div class="field-row">
         <div class="field">

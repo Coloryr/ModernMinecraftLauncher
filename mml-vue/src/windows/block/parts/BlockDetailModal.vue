@@ -139,7 +139,7 @@ async function copyId() {
 </script>
 
 <template>
-  <BaseModal :title="block.name" :width="470" :closable="false" @close="emit('close')">
+  <BaseModal :title="block.name" :width="500" :closable="false" @close="emit('close')">
     <div class="detail-body">
       <div class="detail-stage-col">
         <div class="detail-stage">
@@ -155,44 +155,48 @@ async function copyId() {
           :options="faceOptions.map((each) => ({ value: each.value, label: each.label }))"
           @update:model-value="face = $event" />
       </div>
-      <div class="detail-info">
-        <div class="detail-row">
-          <span class="detail-label">{{ t("blocks.detailId") }}</span>
-          <div class="detail-id">
-            <code class="detail-code"><HighlightText :text="block.id" :query="keyword" /></code>
-            <BaseButton size="sm" variant="ghost" v-tip="t('blocks.copyId')" @click="copyId">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="12" height="12" rx="2" />
-                <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
-              </svg>
-            </BaseButton>
+      <!-- 右列只在预览图那块高度里居中：有没有 3D / 2D 切换都停在同一个位置 -->
+      <div class="detail-info-slot">
+        <div class="detail-info">
+          <div class="detail-row">
+            <span class="field-label">{{ t("blocks.detailId") }}</span>
+            <div class="detail-id">
+              <code class="detail-code"><HighlightText :text="block.id" :query="keyword" /></code>
+              <BaseButton class="detail-copy" size="sm" variant="ghost" v-tip="t('blocks.copyId')"
+                @click="copyId">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="12" height="12" rx="2" />
+                  <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+                </svg>
+              </BaseButton>
+            </div>
           </div>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">{{ t("blocks.detailCat") }}</span>
-          <span class="cat-chip">{{ category }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">{{ t("blocks.detailGroups") }}</span>
-          <select class="field-select" :value="group ?? ''"
-            @change="emit('set-group', ($event.target as HTMLSelectElement).value || null)">
-            <option value="">{{ t("blocks.groupNone") }}</option>
-            <option v-for="g in groups" :key="g.uuid" :value="g.uuid">{{ g.name }}</option>
-          </select>
-          <p v-if="!groups.length" class="detail-group-empty">{{ t("blocks.groupEmpty") }}</p>
+          <div class="detail-row">
+            <span class="field-label">{{ t("blocks.detailCat") }}</span>
+            <span class="cat-chip">{{ category }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="field-label">{{ t("blocks.detailGroups") }}</span>
+            <select class="field-select" :value="group ?? ''"
+              @change="emit('set-group', ($event.target as HTMLSelectElement).value || null)">
+              <option value="">{{ t("blocks.groupNone") }}</option>
+              <option v-for="g in groups" :key="g.uuid" :value="g.uuid">{{ g.name }}</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="modal-actions">
-      <BaseButton v-if="removable" variant="danger" @click="emit('remove')">
-        {{ t("blocks.skinRemove") }}
+      <!-- 删除单独靠左：它是危险操作，不能和「关闭 / 设为实例图标」挤在一起 -->
+      <BaseButton v-if="removable" class="detail-remove" variant="danger" @click="emit('remove')">
+        {{ t("blocks.remove") }}
       </BaseButton>
-      <BaseButton @click="emit('close')">{{ t("blocks.close") }}</BaseButton>
       <BaseButton variant="primary" :disabled="busy" @click="emit('set-icon', iconFace())">
         {{ t("blocks.setIcon") }}
       </BaseButton>
+      <BaseButton @click="emit('close')">{{ t("blocks.close") }}</BaseButton>
     </div>
   </BaseModal>
 </template>
@@ -202,6 +206,8 @@ async function copyId() {
   display: flex;
   gap: 16px;
   align-items: flex-start;
+  /* 预览图边长，右列的居中高度与它对齐用同一个值 */
+  --detail-stage: 160px;
 }
 
 /* 预览图 + 3D/2D 切换：切换贴着图放，换完立刻能看出差别 */
@@ -215,8 +221,8 @@ async function copyId() {
 
 .detail-stage {
   flex-shrink: 0;
-  width: 160px;
-  height: 160px;
+  width: var(--detail-stage);
+  height: var(--detail-stage);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -232,10 +238,13 @@ async function copyId() {
      不要 pixelated，最近邻会把方块斜边采成锯齿 */
 }
 
-.detail-group-empty {
-  margin: 0;
-  font-size: 11.5px;
-  color: var(--text-dim);
+/* 右列的居中容器：高度锚在预览图上，下面有没有 3D / 2D 切换都不改变表单的位置 */
+.detail-info-slot {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--detail-stage);
+  display: flex;
+  align-items: center;
 }
 
 .detail-info {
@@ -243,23 +252,33 @@ async function copyId() {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-top: 4px;
+  gap: 10px;
 }
 
+/* 表单行：标签定宽占左列，值占剩下的宽度 —— 三行的控件左缘才对得齐 */
 .detail-row {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 10px;
 }
 
-.detail-label {
-  font-size: 11.5px;
-  color: var(--text-dim);
+.detail-row .field-label {
+  margin: 0;
+  flex: none;
+  width: 56px;
+  white-space: nowrap;
+}
+
+/* 下拉吃掉剩下的宽度：全局 .field-select 是 width: 100%，在 flex 行里要显式让它可以收缩 */
+.detail-row .field-select {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ID 行：代码块 + 复制按钮 */
 .detail-id {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -268,7 +287,11 @@ async function copyId() {
 .detail-code {
   flex: 1;
   min-width: 0;
-  padding: 4px 8px;
+  /* 与同一行的下拉 / 按钮同高；ID 太长换行时跟着长高，不裁字 */
+  min-height: var(--ctl-h);
+  display: flex;
+  align-items: center;
+  padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-side);
@@ -278,8 +301,17 @@ async function copyId() {
   word-break: break-all;
 }
 
+/* 复制键：跟框同一档高度，框变长时不跟着拉宽 */
+.detail-copy {
+  flex: none;
+}
+
+/* 删除靠左：`.modal-actions` 是右对齐的一行，这里把后面的按钮整体推回右边 */
+.detail-remove {
+  margin-right: auto;
+}
+
 .cat-chip {
-  align-self: flex-start;
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--accent-soft);

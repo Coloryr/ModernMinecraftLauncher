@@ -44,6 +44,8 @@ const shellProps = computed(() =>
       hideDownloadIndicator: true,
       // 多窗口模式下两段列表都没有自己的高度约束，滚的是内容区本身，样式见 styles/scrollbar.css
       bodyGutter: true,
+      // 打开窗口时的分层入场；单窗口模式下这里是弹窗（BaseModal），不传
+      enter: ":scope > *",
     }
     : {
       title: t("features.download"),

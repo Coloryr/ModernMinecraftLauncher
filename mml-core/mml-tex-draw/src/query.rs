@@ -295,7 +295,7 @@ pub fn get_item_path(id: &str) -> Option<PathBuf> {
     Some(dir.join(file))
 }
 
-/// 获取方块创造分组，值为 itemGroup lang 键尾段，翻译经 `get_lang`
+/// 获取方块创造分组，值为 itemGroup lang 键尾段（头颅是启动器自己的 `playerSkin`），翻译经 `get_lang`
 ///
 /// - `id`: 方块 ID
 ///
@@ -303,6 +303,11 @@ pub fn get_item_path(id: &str) -> Option<PathBuf> {
 ///
 /// 分组键尾段；ID 不在表里或没有分组返回 `None`
 pub fn block_cat(id: &str) -> Option<String> {
+    // 分类以**图标表**为准：那是编译期数据，改分类不必让用户重渲染一遍贴图；
+    // 表里没有的（玩家皮肤这类自定义方块）才读渲染结果里登记的分类
+    if let Some(cat) = block::icons::block_cat(id) {
+        return Some(cat.to_string());
+    }
     BLOCKS.read().unwrap().cat.get(id).cloned()
 }
 
@@ -314,6 +319,9 @@ pub fn block_cat(id: &str) -> Option<String> {
 ///
 /// 与 `block_cat` 同一套的分组键尾段；ID 不在表里或没有分组返回 `None`
 pub fn item_cat(id: &str) -> Option<String> {
+    if let Some(cat) = crate::item::icons::item_cat(id) {
+        return Some(cat.to_string());
+    }
     ITEMS.read().unwrap().cat.get(id).cloned()
 }
 

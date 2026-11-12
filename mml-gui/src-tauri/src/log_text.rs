@@ -724,6 +724,22 @@ pub enum LogText {
         /// 失败原因
         error: String,
     },
+    /// 前端（webview）报上来的错误
+    FrontendError {
+        /// 出错的窗口 kind；拿不到时是空串
+        window: String,
+        /// 前端拼好的错误文本，已带模块前缀
+        message: String,
+    },
+    /// Rust 侧 panic
+    Panic {
+        /// 出事的线程名，无名线程是 `unnamed`
+        thread: String,
+        /// panic 载荷里的文本
+        message: String,
+        /// 出事位置，形如 `src/x.rs:12:3`；取不到时是空串
+        location: String,
+    },
 }
 
 impl LogText {
@@ -1109,6 +1125,16 @@ impl LogText {
             }
             LogText::NotificationRegisterFailed { error } => {
                 format!("[notify] 登记系统通知身份失败：{error}")
+            }
+            LogText::FrontendError { window, message } => {
+                format!("[ui] 前端错误（{window}）：{message}")
+            }
+            LogText::Panic {
+                thread,
+                message,
+                location,
+            } => {
+                format!("[panic] 线程 {thread} 崩溃：{message}（{location}）")
             }
         }
     }
@@ -1511,6 +1537,16 @@ impl LogText {
             LogText::NotificationRegisterFailed { error } => format!(
                 "[notify] failed to register the notification identity: {error}"
             ),
+            LogText::FrontendError { window, message } => {
+                format!("[ui] frontend error ({window}): {message}")
+            }
+            LogText::Panic {
+                thread,
+                message,
+                location,
+            } => {
+                format!("[panic] thread {thread} panicked: {message} ({location})")
+            }
         }
     }
 }

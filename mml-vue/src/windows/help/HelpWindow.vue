@@ -11,6 +11,10 @@ import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import { t, tErr, locale } from "../../lib/i18n";
 import { api } from "../../lib/api";
 import { ISSUES_URL, QQ_GROUP, REPO_URL } from "../../lib/links";
+import { selectedInstance } from "../../lib/settings";
+import { useInstanceChange } from "../../composables/useInstanceChange";
+import { openWindow } from "../windowManager";
+import type { InstanceInfoDto } from "../../lib/bindings";
 import { commands } from "../../lib/bindings";
 import { copyText } from "../../lib/clipboard";
 import { showToast } from "../../lib/toast";
@@ -71,7 +75,41 @@ async function loadExeInfo() {
 onMounted(() => {
   void loadBuildInfo();
   void loadExeInfo();
+  void loadInstances();
 });
+
+// ---------------- 打开日志 ----------------
+
+/** 实例列表：日志窗口按实例开，这里只用来挑一个能开的目标 */
+const instances = ref<InstanceInfoDto[]>([]);
+
+/** 重拉实例列表；读不到就当作没有实例，日志按钮跟着灰掉 */
+async function loadInstances() {
+  try {
+    instances.value = await api.getInstances();
+  } catch {
+    instances.value = [];
+  }
+}
+
+// 实例在别处被增删时同步：列表空着时按钮是灰的，别让用户点了没反应
+useInstanceChange(loadInstances);
+
+/** 日志按钮的目标：上次选中的那个实例还在就用它，否则退回第一个 */
+const logUuid = computed(() =>
+  instances.value.some((inst) => inst.uuid === selectedInstance.value)
+    ? selectedInstance.value
+    : (instances.value[0]?.uuid ?? ""),
+);
+
+/** 打开该实例的日志窗口：默认停在「运行日志」，要反馈问题时先看这里 */
+function openLog() {
+  if (!logUuid.value) {
+    showToast(t("winHelp.noInstance"));
+    return;
+  }
+  openWindow("log", { uuid: logUuid.value });
+}
 
 /** 当前语言的 FAQ 列表，文案在 lib/i18n/locales 里 */
 const faqs = computed(() => (locale.value === "en_us" ? enFaqs : zhFaqs));
@@ -150,7 +188,7 @@ async function copyQq() {
 </script>
 
 <template>
-  <WindowFrame :title="t('features.help')" body-gutter @close="$emit('close')">
+  <WindowFrame enter=":scope > *" :title="t('features.help')" body-gutter @close="$emit('close')">
     <!-- 启动器信息：图标、名称、版本、作者与这份 exe 的 SHA1，放在 FAQ 之前 -->
     <section class="about">
       <img class="about-icon" :src="appIcon" alt="" />
@@ -184,8 +222,13 @@ async function copyQq() {
         </div>
       </div>
 
-      <!-- 仓库与问题反馈：跟介绍信息同一张卡，贴右上角，正文行数不用再挪 -->
+      <!-- 打开日志 / 仓库 / 问题反馈：跟介绍信息同一张卡，贴右上角，正文行数不用再挪 -->
       <div class="about-actions">
+        <!-- 反馈问题前先看日志：没有实例时日志窗口无处栖身，提示改由 tip / toast 给出 -->
+        <button class="ui-btn-icon" v-tip="logUuid ? t('winHelp.openLog') : t('winHelp.noInstance')"
+          :aria-label="t('winHelp.openLog')" @click="openLog">
+          <GlyphIcon name="log" :size="16" />
+        </button>
         <button class="ui-btn-icon" v-tip="t('winHelp.repo')" :aria-label="t('winHelp.repo')"
           @click="openUrl(REPO_URL)">
           <GlyphIcon name="github" :size="16" />
@@ -318,7 +361,7 @@ async function copyQq() {
   gap: 4px;
 }
 
-/* 仓库 / 反馈两枚图标按钮：贴卡片右上角，不另占正文的一行 */
+/* 打开日志 / 仓库 / 反馈三枚图标按钮：贴卡片右上角，不另占正文的一行 */
 .about-actions {
   display: flex;
   gap: 4px;

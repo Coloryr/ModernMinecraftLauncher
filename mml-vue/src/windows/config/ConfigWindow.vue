@@ -601,7 +601,7 @@ useWindowRefresh(() => {
 </script>
 
 <template>
-  <WindowFrame :title="t('config.title')" body-fill body-flush @close="emit('close')">
+  <WindowFrame enter=":scope > *" :title="t('config.title')" body-fill body-flush @close="emit('close')">
     <!-- 标题栏右侧：实例名 + 来源下拉 + 刷新 + 保存状态 + 保存键。
          当前文件由左侧树的选中行表示，标题栏不再重复文件名 -->
     <template #head-right>

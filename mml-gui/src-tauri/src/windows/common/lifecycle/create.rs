@@ -34,20 +34,39 @@ use crate::windows::registry::{
 ///
 /// # 返回值
 ///
-/// 取 GTK 窗口失败时返回错误文案
+/// 排进主线程失败时返回错误文案；GTK 操作本身失败只记日志
 #[cfg(target_os = "linux")]
 fn force_client_side_decoration(window: &WebviewWindow) -> Result<(), String> {
-    use gtk::prelude::*;
+    let win = window.clone();
+    // GTK 只能在主线程调用，而建窗命令跑在 tokio worker 上；主窗口又是在 setup 的主线程里建的，
+    // 所以只排队、不等待。显示发生在之后前端的 activate 命令里，这一步排在它前面
+    window.run_on_main_thread(move || {
+        use gtk::prelude::*;
 
-    let gtk_window = window.gtk_window().map_err(|error| error.to_string())?;
-    let header = gtk::HeaderBar::new();
-    header.set_show_close_button(false);
-    // show_all 不能把它放出来
-    header.set_no_show_all(true);
-    header.hide();
-    gtk_window.set_titlebar(Some(&header));
-    gtk_window.set_decorated(false);
-    Ok(())
+        let result = win
+            .gtk_window()
+            .map_err(|error| error.to_string())
+            .and_then(|gtk_window| {
+                let header = gtk::HeaderBar::new();
+                header.set_show_close_button(false);
+                // show_all 不能把它放出来
+                header.set_no_show_all(true);
+                header.hide();
+                gtk_window.set_titlebar(Some(&header));
+                gtk_window.set_decorated(false);
+                Ok(())
+            });
+        if let Err(error) = result {
+            mml_log::error(
+                LogText::LinuxDecorationSwitchFailed {
+                    label: win.label().to_string(),
+                    error,
+                }
+                .text(),
+            );
+        }
+    })
+    .map_err(|error| error.to_string())
 }
 
 /// 窗口内允许导航的地址：启动器自身页面与本地自定义协议

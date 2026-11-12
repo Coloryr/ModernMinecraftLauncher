@@ -599,7 +599,7 @@ async function onDetailRemove() {
 
     <!-- 方块详情：打开选实例弹窗时先让位，避免两层遮罩叠着 -->
     <BlockDetailModal v-if="detail && !iconTarget" :block="detail" :category="catLabel(detail.catUuid)"
-      :keyword="keyword" :removable="detail.catId === SKIN_CAT" :busy="iconBusy"
+      :keyword="keyword" :removable="detail.catId === SKIN_CAT && detail.id.startsWith('custom:')" :busy="iconBusy"
       :groups="groupList" :group="groupOf(detail.id)" @close="closeDetail" @remove="onDetailRemove"
       @set-icon="openDetailIconPick" @set-group="onDetailSetGroup" />
 

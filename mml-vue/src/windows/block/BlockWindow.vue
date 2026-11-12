@@ -82,7 +82,7 @@ async function confirmCloseRender() {
 </script>
 
 <template>
-  <WindowFrame body-fill :title="t('home.blocks')" @close="emit('close')">
+  <WindowFrame enter=":scope > *" body-fill :title="t('home.blocks')" @close="emit('close')">
     <BlockPanel :settings="list" :groups="groups" :current-instance="currentInstance" :multi-select="multiSelect"
       @update:multi-select="multiSelect = $event" />
 

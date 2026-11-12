@@ -17,6 +17,7 @@ import { showToast } from "../../lib/toast";
 import { KEYS, readNumber, writeNumber } from "../../lib/storage";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
+import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import IconCropStage from "./IconCropStage.vue";
 
 const props = defineProps<{
@@ -33,6 +34,9 @@ const emit = defineEmits<{ (e: "close"): void }>();
 
 /** 可选输出边长，单位 px：图标最大显示 84px，256 已足够；大档给需要高清图标的场合 */
 const SIZES = [64, 128, 256, 512];
+
+/** 分段切换的选项：值是字符串，选中后转回数字 */
+const SIZE_OPTIONS = SIZES.map((px) => ({ value: String(px), label: px + "px" }));
 
 /**
  * 读回上次选的边长
@@ -128,15 +132,11 @@ async function apply() {
         <IconCropStage :src="src" :width="imgW" :height="imgH" @change="area = $event" />
       </div>
 
-      <!-- 输出分辨率：写盘的 icon.png 边长 -->
+      <!-- 输出分辨率：写盘的 icon.png 边长；用统一的分段控件，选中块有滑动动画 -->
       <div class="pick-size">
         <span class="pick-size-label">{{ t("iconPick.size") }}</span>
-        <div class="pick-size-opts">
-          <button v-for="s in SIZES" :key="s" class="pick-size-opt" :class="{ active: s === size }" :disabled="applying"
-            @click="setSize(s)">
-            {{ s }}px
-          </button>
-        </div>
+        <SegmentedTabs :model-value="String(size)" :options="SIZE_OPTIONS" :disabled="applying"
+          @update:model-value="setSize(Number($event))" />
       </div>
     </template>
 
@@ -165,7 +165,7 @@ async function apply() {
   text-align: center;
 }
 
-/* 输出分辨率：与 SegmentedTabs 同一套视觉（本弹窗只此一处，不额外引组件） */
+/* 输出分辨率：标签在左，分段控件在右 */
 .pick-size {
   display: flex;
   align-items: center;
@@ -179,43 +179,4 @@ async function apply() {
   color: var(--text-dim);
 }
 
-/* 轨道用 --bg-side：弹窗底色就是 --bg-card，同色会看不出轨道 */
-.pick-size-opts {
-  display: inline-flex;
-  gap: 4px;
-  background: var(--bg-side);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 2px;
-}
-
-.pick-size-opt {
-  /* 与 SegmentedTabs 同一口径：内胆 = --ctl-h − 轨道 2×2 − 边框 1×2 */
-  height: calc(var(--ctl-h) - 6px);
-  padding: 0 12px;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-
-.pick-size-opt:hover:not(:disabled) {
-  color: var(--text);
-}
-
-.pick-size-opt.active {
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 600;
-}
-
-.pick-size-opt:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
 </style>

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use mml_core::CoreInitObj;
-use mml_gui_lib::{block_groups, collect_utils, err_box, gui_config, image_manager, windows};
+use mml_gui_lib::{block_groups, collect_utils, err_box, gui_config, image_manager, log_text::LogText, windows};
 use mml_names::names;
 use mml_sys::path_helper;
 
@@ -94,6 +94,10 @@ fn main() {
         err_box::fatal_error(&run_path, e);
     }
 
+    // 日志已就绪：把 panic 也写进 logs.log。默认 handler 只打 stderr，
+    // 正式包没有控制台，用户那边只能看到"窗口没了"
+    install_panic_log();
+
     // 手柄：内核 crate 负责读映射、监听手柄并把输入转发给运行中的游戏实例
     mml_gamepad::init(&run_path);
 
@@ -103,6 +107,47 @@ fn main() {
     image_manager::init();
 
     mml_gui_lib::run()
+}
+
+/// 把 panic 记进日志
+///
+/// 默认 panic handler 只往 stderr 打：正式包没有控制台，tokio 工作线程里的一次
+/// `unwrap` 到 `None` 就只剩"功能没反应"，日志里一个字都没有。
+/// 这里在默认 handler 之前补一条 Error 日志（线程 / 消息 / 文件:行:列），再照常交给它。
+fn install_panic_log() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let thread = std::thread::current();
+        let thread = thread.name().unwrap_or("unnamed").to_string();
+        let message = panic_message(info);
+        let location = info
+            .location()
+            .map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()))
+            .unwrap_or_default();
+        // 日志系统万一已经关掉，写日志本身会 panic；钩子里不能再往外展开
+        let _ = std::panic::catch_unwind(|| {
+            mml_log::error(LogText::Panic { thread, message, location }.text());
+        });
+        default_hook(info);
+    }));
+}
+
+/// 取 panic 载荷里的文本
+///
+/// - `info`: panic 钩子给的上下文
+///
+/// # 返回值
+///
+/// 载荷是 `&str` / `String` 时取其内容，其它类型给一句占位说明
+fn panic_message(info: &std::panic::PanicHookInfo<'_>) -> String {
+    let payload = info.payload();
+    if let Some(text) = payload.downcast_ref::<&'static str>() {
+        return (*text).to_string();
+    }
+    if let Some(text) = payload.downcast_ref::<String>() {
+        return text.clone();
+    }
+    String::from("non-string panic payload")
 }
 
 /// 占住端口文件

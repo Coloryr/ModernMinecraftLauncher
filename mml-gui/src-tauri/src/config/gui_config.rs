@@ -448,7 +448,7 @@ impl Default for GuiConfig {
     fn default() -> Self {
         Self {
             theme: Default::default(),
-            gradient: true,
+            gradient: false,
             accent: "blue".to_string(),
             custom_accent: "#4f8cff".to_string(),
             locale: Lang::zh_cn,

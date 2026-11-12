@@ -1031,7 +1031,21 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
 </script>
 
 <template>
-  <WindowFrame :title="t('winTitle.collect')" body-fill @close="$emit('close')">
+  <WindowFrame enter=":scope > *" :title="t('winTitle.collect')" body-fill @close="$emit('close')">
+    <!-- 已经有收藏时，两个"去挑收藏"的入口收进标题栏：内容区留给卡片，
+         空状态下它们仍在占位框里（那里是引导，需要文字） -->
+    <template #head-right>
+      <template v-if="!isEmpty">
+        <BaseButton size="sm" variant="ghost" class="icon-btn-head" v-tip="t('collect.addModpack')"
+          :aria-label="t('collect.addModpack')" @click="openWindow('add_modpack')">
+          <GlyphIcon name="package" :size="15" :weight="1.8" />
+        </BaseButton>
+        <BaseButton size="sm" variant="ghost" class="icon-btn-head" v-tip="t('collect.addResource')"
+          :aria-label="t('collect.addResource')" @click="openAddResource">
+          <GlyphIcon name="puzzle" :size="15" :weight="1.8" />
+        </BaseButton>
+      </template>
+    </template>
     <!-- 一个收藏都没有：左栏与搜索全部收起，两个入口放进占满窗口的占位框 -->
     <div v-if="isEmpty" class="collect-empty-box">
       <div class="empty-mark">
@@ -1043,7 +1057,7 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
       <p class="empty-title">{{ t("collect.emptyTitle") }}</p>
       <p class="empty-hint">{{ t("collect.empty") }}</p>
       <div class="collect-empty-actions">
-        <BaseButton variant="primary" @click="openWindow('add_modpack')">
+        <BaseButton variant="accent" @click="openWindow('add_modpack')">
           {{ t("collect.addModpack") }}
         </BaseButton>
         <BaseButton variant="accent" @click="openAddResource">
@@ -1077,7 +1091,7 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
       <!-- 左栏：全部 + 默认分组 + 自建分组，与方块窗口同一个分类栏 -->
       <div class="collect-main">
         <CategoryRail flush :all-label="t('collect.all')" :all-count="shownCount" :items="railItems"
-          :active="activeGroup" :drop-key="dropGroup" :new-label="t('collect.addGroup')" sortable
+          :active="activeGroup" :drop-key="dropGroup" :new-label="t('collect.addGroup')" new-style="button" sortable
           @pick="activeGroup = $event" @reorder="onGroupReorder" @group-menu="openGroupMenu"
           @new-group="showAddGroup = true" />
 
@@ -1141,15 +1155,6 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
             </Transition>
           </div>
 
-          <!-- 去挑资源收藏：放在滚动区外面，右边缘与上面的搜索框对齐 -->
-          <div class="collect-acts-row">
-            <button class="add-row-btn add-group-row" @click="openWindow('add_modpack')">
-              {{ t("collect.addModpack") }}
-            </button>
-            <button class="add-row-btn add-group-row" @click.stop="openAddResource">
-              {{ t("collect.addResource") }}
-            </button>
-          </div>
 
           <!-- 跟手浮起副本：手里抓着的那一项，跟着指针走 -->
           <DragGhost v-if="collectGhost && collectDragItem" :x="collectGhost.x" :y="collectGhost.y">

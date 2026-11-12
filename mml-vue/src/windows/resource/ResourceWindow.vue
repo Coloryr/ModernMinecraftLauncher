@@ -296,7 +296,7 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
 </script>
 
 <template>
-  <WindowFrame :title="depTitle" :back="depItem ? t('actions.back') : ''" :body-flush="!!depItem"
+  <WindowFrame enter=":scope > *" :title="depTitle" :back="depItem ? t('actions.back') : ''" :body-flush="!!depItem"
     @back="depItem = null" @close="$emit('close')">
     <!-- 依赖图子页面：整块内容换成画布，标题与返回键在窗口标题栏上 -->
     <ModDepsPage v-if="depItem" ref="depPage" :item="depItem" :load-tree="deps.depTreeOf"

@@ -173,7 +173,7 @@ pub const ITEM_ICONS: &[(&str, &str)] = &[
     ("crafter", "redstone"),
     ("crafting_table", "functional"),
     ("creeper_banner_pattern", "ingredients"),
-    ("creeper_head", "functional"),
+    ("creeper_head", "playerSkin"),
     ("crimson_fungus", "natural"),
     ("crimson_hanging_sign", "functional"),
     ("crimson_nylium", "natural"),
@@ -248,7 +248,7 @@ pub const ITEM_ICONS: &[(&str, &str)] = &[
     ("dispenser", "redstone"),
     ("dragon_breath", "ingredients"),
     ("dragon_egg", "functional"),
-    ("dragon_head", "functional"),
+    ("dragon_head", "playerSkin"),
     ("dried_ghast", "natural"),
     ("dried_kelp_block", "natural"),
     ("dripstone_block", "natural"),
@@ -561,7 +561,7 @@ pub const ITEM_ICONS: &[(&str, &str)] = &[
     ("peony", "natural"),
     ("phantom_membrane", "ingredients"),
     ("piglin_banner_pattern", "ingredients"),
-    ("piglin_head", "functional"),
+    ("piglin_head", "playerSkin"),
     ("pink_bundle", "tools"),
     ("pink_concrete_slab", "coloredBlocks"),
     ("pink_concrete_stairs", "coloredBlocks"),
@@ -575,7 +575,7 @@ pub const ITEM_ICONS: &[(&str, &str)] = &[
     ("piston", "redstone"),
     ("pitcher_plant", "natural"),
     ("pitcher_pod", "natural"),
-    ("player_head", "functional"),
+    ("player_head", "playerSkin"),
     ("plenty_pottery_sherd", "ingredients"),
     ("podzol", "natural"),
     ("pointed_dripstone", "natural"),
@@ -678,7 +678,7 @@ pub const ITEM_ICONS: &[(&str, &str)] = &[
     ("shroomlight", "natural"),
     ("shulker_shell", "ingredients"),
     ("silence_armor_trim_smithing_template", "ingredients"),
-    ("skeleton_skull", "functional"),
+    ("skeleton_skull", "playerSkin"),
     ("skull_banner_pattern", "ingredients"),
     ("skull_pottery_sherd", "ingredients"),
     ("slime_ball", "ingredients"),
@@ -789,7 +789,7 @@ pub const ITEM_ICONS: &[(&str, &str)] = &[
     ("wildflowers", "natural"),
     ("wind_charge", "tools"),
     ("wither_rose", "natural"),
-    ("wither_skeleton_skull", "functional"),
+    ("wither_skeleton_skull", "playerSkin"),
     ("wolf_armor", "combat"),
     ("wooden_axe", "tools"),
     ("wooden_hoe", "tools"),
@@ -807,15 +807,16 @@ pub const ITEM_ICONS: &[(&str, &str)] = &[
     ("yellow_poplar_leaves", "natural"),
     ("yellow_wool_slab", "coloredBlocks"),
     ("yellow_wool_stairs", "coloredBlocks"),
-    ("zombie_head", "functional"),
+    ("zombie_head", "playerSkin"),
 ];
 
 /// 物品的创造分组，即itemGroup lang键尾段；不在任何分组的物品返回None
 ///
-/// - `id`: 物品ID，不带命名空间
+/// - `id`: 物品 ID，`minecraft:stone` 或裸 ID `stone`
 pub(crate) fn item_cat(id: &str) -> Option<&'static str> {
+    let bare = id.strip_prefix("minecraft:").unwrap_or(id);
     ITEM_ICONS
         .iter()
-        .find(|(name, _)| *name == id)
+        .find(|(name, _)| *name == bare)
         .map(|(_, cat)| *cat)
 }

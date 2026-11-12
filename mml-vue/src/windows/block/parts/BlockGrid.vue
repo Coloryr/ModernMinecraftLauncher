@@ -52,6 +52,16 @@ const emit = defineEmits<{
   (e: "toggle-select", payload: { item: BlockItemDto; event: MouseEvent }): void;
 }>();
 
+/**
+ * 这一格能不能删
+ *
+ * 只有自己添加的玩家皮肤能删：同一分类里还有原版头颅（僵尸头、玩家头、苦力怕头…），
+ * 它们不是皮肤文件，删不掉也不该给删除角标。
+ */
+function isRemovableSkin(b: BlockItemDto): boolean {
+  return b.catId === props.skinCat && b.id.startsWith("custom:");
+}
+
 /** 点击格子：多选模式下只切换勾选，否则打开详情 */
 function onCellClick(b: BlockItemDto, event: MouseEvent) {
   if (props.selectMode) emit("toggle-select", { item: b, event });
@@ -295,7 +305,7 @@ function onCellKey(e: KeyboardEvent, i: number) {
             <GlyphIcon name="star" :size="13" :weight="2" />
           </span>
           <!-- 玩家皮肤：悬停角标删除；多选时同样让位 -->
-          <span v-if="!selectMode && b.catId === skinCat" class="block-del" v-tip="t('blocks.skinRemove')"
+          <span v-if="!selectMode && isRemovableSkin(b)" class="block-del" v-tip="t('blocks.skinRemove')"
             @click.stop="emit('remove-skin', b)">
             <GlyphIcon name="close" :size="11" :weight="2.6" />
           </span>

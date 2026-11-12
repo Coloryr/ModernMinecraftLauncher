@@ -2316,6 +2316,20 @@ export function getBlockList(lang: string): Promise<BlockItemDto[]> {
 }
 
 /**
+ * 取玩家皮肤（头颅）分类的左栏键
+ *
+ * 这一栏没有皮肤方块时也要出现在左栏，所以键由后端按分类顺序算好给前端，
+ * 前端不能自己拼。
+ *
+ * # 返回值
+ *
+ * 分类 uuid
+ */
+export function getBlockSkinCat(): Promise<string> {
+  return commands.block.skinCat();
+}
+
+/**
  * 获取方块贴图渲染状态
  *
  * # 返回值

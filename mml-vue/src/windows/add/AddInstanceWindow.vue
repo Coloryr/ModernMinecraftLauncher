@@ -1091,7 +1091,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <WindowFrame :title="t('add.title')" :body-fill="addMode === 'archive' || addMode === 'folder'" body-gutter
+  <WindowFrame enter=":scope > *" :title="t('add.title')" :body-fill="addMode === 'archive' || addMode === 'folder'" body-gutter
     @close="$emit('close')">
     <!-- 内容区：撑满窗口，底部按钮靠 margin-top:auto 钉在右下角 -->
     <div class="add-body">

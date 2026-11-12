@@ -100,8 +100,8 @@ useModalKeys((e) => {
       </div>
 
       <div v-if="javaList.length === 0" class="java-empty">{{ t("winSettings.javaNone") }}</div>
-      <!-- 按发行商分组：整份列表收在一个白底面板里，每组是一条与实例设置同款的折叠卡片 -->
-      <div v-else class="java-list">
+      <!-- 按发行商分组：每组是一条与实例设置同款的折叠卡片，不再套一层白底面板 -->
+      <template v-else>
         <div v-for="g in javaGroups" :key="g.vendor" class="java-type collapse-card">
           <button class="collapse-head" :class="{ merged: vendorOpen(g.vendor) }"
             :aria-expanded="vendorOpen(g.vendor)" @click="toggleVendor(g.vendor)">
@@ -126,7 +126,7 @@ useModalKeys((e) => {
             </div>
           </CollapsePanel>
         </div>
-      </div>
+      </template>
     </SettingsGroup>
 
     <!-- 删除全部确认 -->

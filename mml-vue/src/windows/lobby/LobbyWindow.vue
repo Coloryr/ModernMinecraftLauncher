@@ -175,7 +175,7 @@ onBeforeUnmount(deactivate);
 </script>
 
 <template>
-  <WindowFrame :title="t('winTitle.lobby')" body-gutter @close="$emit('close')">
+  <WindowFrame enter=":scope > *" :title="t('winTitle.lobby')" body-gutter @close="$emit('close')">
     <div class="lobby-page">
       <p v-if="loading" role="status">{{ t('lobby.verifying') }}</p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>

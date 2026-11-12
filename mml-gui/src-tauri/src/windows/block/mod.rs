@@ -239,6 +239,19 @@ pub fn block_list(lang: String) -> Vec<BlockItemDto> {
         .collect()
 }
 
+/// 玩家皮肤（头颅）分类的左栏键
+///
+/// 这一栏在没有皮肤方块时也要留着：「添加玩家皮肤」的入口在它里面，
+/// 而分类键是后端按 [`mml_tex_draw::order::CAT_ORDER`] 派生的 uuid，前端不重复这套规则。
+///
+/// # 返回值
+///
+/// 形如 `00000000-0000-0000-0000-000000000011` 的 uuid 串
+#[gui_macros::command]
+pub fn block_skin_cat() -> String {
+    cat_uuid(mml_tex_draw::SKIN_CAT)
+}
+
 /// 取方块窗口的用户数据：左栏顺序 / 自建分组 / 收藏
 ///
 /// # 返回值

@@ -77,6 +77,12 @@
   margin-top: 0;
 }
 
+/* Java 分组是一串同类的折叠卡片，组间跟实例设置里那一串的口径走（10px）；
+   16px 会把同一份列表的各个发行商拉成一堆互不相干的块 */
+.settings-layout .setting-group>.java-type+.java-type {
+  margin-top: 10px;
+}
+
 /* 自定义强调色上的对勾：白勾压在彩色块上要一点描边阴影才看得清 */
 .settings-layout .accent-check {
   filter: drop-shadow(0 0 2px var(--shadow-text));
@@ -692,20 +698,9 @@
 
 /* ---------- Java 页 ---------- */
 
-/* 整份列表收在一个白底面板里：分组之间靠面板底色与 10px 间距分开，
-   不再是"每条头行各自浮在页面底色上" */
-.settings-layout .java-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-card);
-}
-
 /* 分组头走全局 .collapse-head，展开后内容与头拼成一整块卡片（.collapse-card，
-   与实例设置的自定义段同一副外观） */
+   与实例设置的自定义段同一副外观）；组间距按实例设置那一串的口径，见上面节奏节的例外，
+   外面不再套白底面板 */
 .settings-layout .java-type {
   display: flex;
   flex-direction: column;

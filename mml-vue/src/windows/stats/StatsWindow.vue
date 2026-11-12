@@ -15,6 +15,7 @@ import { api } from "../../lib/api";
 import { t } from "../../lib/i18n";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
 import { createListScroll, useVirtualRows } from "../../composables/useVirtualRows";
+import { useStaggerEnter } from "../../composables/useStaggerEnter";
 import type { StatsDataDto, StatsInstanceDto, StatsPlaytimeDto } from "../../lib/bindings";
 import type { InstanceOption } from "../../lib/instancePicker";
 
@@ -26,6 +27,12 @@ defineEmits<{ (e: "close"): void }>();
 
 /** 窗口框架：拿它的内容区当行虚拟化的滚动容器 */
 const frame = ref<{ bodyEl: HTMLElement | null } | null>(null);
+
+/** 打开窗口时的分层入场：摘要卡 → 图表面板 → 汇总表 → 脚注，见 useStaggerEnter */
+const { enter: statsEnter } = useStaggerEnter(
+  ".summary-card, .play-panel, .stats-table, .foot-note",
+  { duration: 280, step: 50, offset: 12 },
+);
 /** 行容器的根元素 */
 const rowsEl = ref<HTMLElement | null>(null);
 
@@ -201,6 +208,11 @@ const MERGE_OVER_DAYS = 90;
 /** 合并后的柱子数量档位，从密到疏 */
 const MERGE_BUCKETS = [90, 60, 30] as const;
 
+/** 加载骨架：柱状图的占位高度，百分比；只是撑出"有数据的长相"，不代表真实比例 */
+const SKELETON_BARS = [34, 58, 42, 76, 50, 28, 64, 86, 40, 55, 70, 46] as const;
+/** 加载骨架：饼图图例的占位行宽度，百分比 */
+const SKELETON_LEGEND = [72, 54, 64, 46] as const;
+
 /** 这次画多少根柱子：不超过 90 天一天一根，再长就从 90 / 60 / 30 里挑一档 */
 const barCount = computed(() => {
   const days = dayCount.value;
@@ -255,6 +267,16 @@ const dayRows = computed(() => playtime.value?.byInstance ?? []);
 
 /** 图表形态：`bars` 柱状图 / `pie` 饼图；只选一天时固定用饼图 */
 const chartMode = ref("bars");
+
+/**
+ * 图表的过滤标识：实例与时间段一变就换 key
+ *
+ * 柱子与环的入场动画挂在元素上，key 不变时 Vue 复用元素、动画不会重播；
+ * 5 秒轮询只改数值、不换 key，所以不会每轮都放一遍
+ */
+const chartKey = computed(() =>
+  [selectedUuid.value, customRange.value ? fromDate.value + "~" + toDate.value : range.value].join("|"),
+);
 
 /** 当前是否画饼图：单日固定饼图，多日按用户选的 */
 const showPie = computed(() => isSingleDay.value || chartMode.value === "pie");
@@ -373,6 +395,9 @@ function stopTimer() {
 onMounted(async () => {
   // 滚动容器是窗口框架的内容区：表格行在整页滚动里虚拟化，不另起一个滚动条
   listScroll.attach(frame.value?.bodyEl ?? null);
+  // 入场与读数据并行：先把卡片 / 面板 / 表格放出来，数字随后填上，不必等 IPC
+  const body = frame.value?.bodyEl;
+  if (body) statsEnter(body, () => { });
   await refreshAll();
   startTimer();
 });
@@ -619,13 +644,15 @@ function instanceLabel(inst: StatsInstanceDto): string {
             <SegmentedTabs v-if="!customRange" v-model="range" :options="rangeOptions" />
           </div>
           <!-- 自定义时间段：日期框跟在开关后面，缩窄后与第一行同排；窄窗才整组换行 -->
-          <div v-if="customRange" class="range-row">
-            <BaseDatePicker v-model="fromDate" class="range-date" :min="minDate" :max="toDate || maxDate || todayDate"
-              :aria-label="t('winStats.dateFrom')" />
-            <span class="range-sep">–</span>
-            <BaseDatePicker v-model="toDate" class="range-date" :min="fromDate || minDate" :max="maxDate || todayDate"
-              :aria-label="t('winStats.dateTo')" />
-          </div>
+          <Transition name="range-in">
+            <div v-if="customRange" class="range-row">
+              <BaseDatePicker v-model="fromDate" class="range-date" :min="minDate" :max="toDate || maxDate || todayDate"
+                :aria-label="t('winStats.dateFrom')" />
+              <span class="range-sep">–</span>
+              <BaseDatePicker v-model="toDate" class="range-date" :min="fromDate || minDate" :max="maxDate || todayDate"
+                :aria-label="t('winStats.dateTo')" />
+            </div>
+          </Transition>
           <!-- 形态切换：单日固定饼图，不给切。只画图标，文案进提示与读屏名 -->
           <SegmentedTabs v-if="!isSingleDay" v-model="chartMode" class="chart-mode" :options="chartModeOptions"
             icon-only />
@@ -652,7 +679,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
       <!-- 图表区：只选一天时换成饼图看实例占比，多天时是柱状图。
            零记录与还没读到时各给一句说明，不留空框 -->
       <div v-if="showPie && dayRows.length > 0" class="day-share">
-        <div class="ring-row">
+        <div :key="chartKey" class="ring-row">
           <DaySharePie :items="dayRows.map((r) => ({ uuid: r.uuid, name: r.name, value: r.seconds }))"
             :title="t('winStats.colHours')" kind="hours" />
           <DaySharePie :items="dayRows.map((r) => ({ uuid: r.uuid, name: r.name, value: r.count }))"
@@ -668,7 +695,8 @@ function instanceLabel(inst: StatsInstanceDto): string {
             <span>{{ t("winStats.colCount") }}</span>
             <span>{{ t("winStats.colFailed") }}</span>
           </div>
-          <div v-for="row in dayRows" :key="row.uuid" class="legend-item">
+          <div v-for="(row, index) in dayRows" :key="row.uuid" class="legend-item"
+            :style="{ animationDelay: Math.min(index * 12, 180) + 'ms' }">
             <span class="legend-name">
               <span class="legend-dot" :style="{ background: instanceColor(row.uuid) }"></span>
               <span class="legend-text" :title="row.name">{{ row.name }}</span>
@@ -692,11 +720,12 @@ function instanceLabel(inst: StatsInstanceDto): string {
               <span></span>
               <span></span>
             </div>
-            <div class="chart-bars" :style="{ gridTemplateColumns: chartColumns, gap: chartGap }">
-              <div v-for="bar in chartBars" :key="bar.from" class="chart-slot">
-                <div class="chart-bar" :class="{ empty: bar.seconds === 0 }"
-                  :style="{ height: bar.seconds > 0 ? barHeight(bar.seconds) : undefined }" v-tip="barTip(bar)"
-                  @dblclick="pickRange(bar.from, bar.to)">
+            <div :key="chartKey" class="chart-bars" :style="{ gridTemplateColumns: chartColumns, gap: chartGap }">
+              <div v-for="(bar, index) in chartBars" :key="bar.from" class="chart-slot">
+                <div class="chart-bar" :class="{ empty: bar.seconds === 0 }" :style="{
+                  height: bar.seconds > 0 ? barHeight(bar.seconds) : undefined,
+                  animationDelay: Math.min(index * 6, 360) + 'ms',
+                }" v-tip="barTip(bar)" @dblclick="pickRange(bar.from, bar.to)">
                   <span v-if="bar.failed > 0" class="chart-bar-fail" :style="{ height: failHeight(bar) }"></span>
                 </div>
               </div>
@@ -709,7 +738,31 @@ function instanceLabel(inst: StatsInstanceDto): string {
           </div>
         </div>
       </div>
-      <div v-else-if="!playtimeLoaded" class="chart-empty">{{ t("winStats.loading") }}</div>
+      <!-- 加载中：按当前形态给一份骨架，形状与真图一致，数据到了原地换成真图，版式不跳 -->
+      <div v-else-if="!playtimeLoaded && showPie" class="day-share-sk" role="status"
+        :aria-label="t('winStats.loading')">
+        <div class="ring-row">
+          <span v-for="i in 3" :key="i" class="sk sk-ring"></span>
+        </div>
+        <div class="sk-legend">
+          <span v-for="(width, i) in SKELETON_LEGEND" :key="i" class="sk sk-line"
+            :style="{ width: width + '%' }"></span>
+        </div>
+      </div>
+      <div v-else-if="!playtimeLoaded" class="chart" role="status" :aria-label="t('winStats.loading')">
+        <div class="chart-y">
+          <span v-for="i in 3" :key="i" class="sk sk-tick"></span>
+        </div>
+        <div class="chart-main">
+          <div class="sk-bars">
+            <span v-for="(height, i) in SKELETON_BARS" :key="i" class="sk sk-bar"
+              :style="{ height: height + '%' }"></span>
+          </div>
+          <div class="sk-x">
+            <span v-for="i in 6" :key="i" class="sk sk-tick"></span>
+          </div>
+        </div>
+      </div>
       <div v-else class="chart-empty">{{ t("winStats.chartEmpty") }}</div>
 
       <!-- 双击是隐藏操作，给一句话提示；单日已经是饼图，不用再说 -->
@@ -802,6 +855,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
   color: var(--accent);
   /* 数字每 5 秒刷新一次，等宽数字才不会让卡片跟着抖 */
   font-variant-numeric: tabular-nums;
+  transition: color 0.12s;
 }
 
 /* 有失败时把这一个数字标红，扫一眼就知道统计里有失败 */
@@ -894,6 +948,18 @@ function instanceLabel(inst: StatsInstanceDto): string {
 
 .range-sep {
   color: var(--text-dim);
+}
+
+/* 自定义日期行：开关打开时淡入并轻微下落，收起时快速淡出 */
+.range-in-enter-active,
+.range-in-leave-active {
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
+}
+
+.range-in-enter-from,
+.range-in-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 /* 实例下拉吃掉第一行的剩余宽度：原生 <select> 的宽度由最长选项文字决定，
@@ -1003,7 +1069,11 @@ function instanceLabel(inst: StatsInstanceDto): string {
   max-width: 34px;
   border-radius: 3px 3px 0 0;
   background: var(--accent);
-  transition: height 0.3s, background-color 0.12s;
+  /* 从底部长出来：换实例 / 换时间段时柱子重挂载，动画跟着重播；
+     5 秒轮询只改 height，走上面的过渡而不是重播动画 */
+  transform-origin: bottom center;
+  animation: stats-bar-rise 0.3s var(--ease-out) backwards;
+  transition: height 0.3s var(--ease-out), background-color 0.12s;
   overflow: hidden;
 }
 
@@ -1081,6 +1151,19 @@ function instanceLabel(inst: StatsInstanceDto): string {
   padding: 4px 0;
 }
 
+/* 三个环错开淡入：同一实例在三个环里的颜色一样，一起出现会糊成一片 */
+.ring-row>* {
+  animation: stats-ring-in 0.3s var(--ease-out) backwards;
+}
+
+.ring-row>*:nth-child(2) {
+  animation-delay: 60ms;
+}
+
+.ring-row>*:nth-child(3) {
+  animation-delay: 120ms;
+}
+
 .day-legend {
   display: flex;
   flex-direction: column;
@@ -1110,6 +1193,7 @@ function instanceLabel(inst: StatsInstanceDto): string {
 
 .legend-item {
   font-variant-numeric: tabular-nums;
+  animation: stats-fade-in 0.18s var(--ease-out) backwards;
 }
 
 .legend-name {
@@ -1152,6 +1236,69 @@ function instanceLabel(inst: StatsInstanceDto): string {
   border-radius: 10px;
   color: var(--text-dim);
   font-size: 12.5px;
+}
+
+/* ---------- 图表加载骨架 ----------
+ * 形状照真图摆：柱状图是「左纵轴刻度 + 一排柱子 + 横轴日期」，饼图是「三个环 + 图例」。
+ * 占位块复用全局 .sk 的呼吸动画，数据到了原地替换，面板高度不会先塌再撑开。
+ */
+
+/* 柱状图骨架：与真图同一套网格与底线，柱子从底部对齐 */
+.sk-bars {
+  height: var(--chart-h);
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 2px;
+  align-items: end;
+}
+
+.sk-bar {
+  width: 100%;
+  max-width: 34px;
+  justify-self: center;
+  border-radius: 3px 3px 0 0;
+}
+
+/* 刻度占位：纵轴三条、横轴六个，高度与真图的文字行一致 */
+.sk-tick {
+  display: block;
+  width: 22px;
+  height: 10px;
+  border-radius: 4px;
+}
+
+.sk-x {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  height: 15px;
+}
+
+/* 饼图骨架：三个圆环 + 图例占位行 */
+.day-share-sk {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sk-ring {
+  display: block;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: transparent;
+  border: 16px solid var(--bg-hover);
+  /* 环是 .ring-row 的子元素，那条规则只给了淡入（动画属性会被覆盖），
+     这里把淡入与 .sk 的呼吸一起写：先落位，再开始呼吸 */
+  animation:
+    stats-ring-in 0.3s var(--ease-out) backwards,
+    sk-pulse 1.2s ease-in-out 0.3s infinite;
+}
+
+.sk-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 /* ---------- 每实例汇总表（行虚拟化） ---------- */
@@ -1265,5 +1412,46 @@ function instanceLabel(inst: StatsInstanceDto): string {
   font-size: 11.5px;
   color: var(--text-dim);
   margin-top: 10px;
+}
+
+/* ---------- 动效 ----------
+ * 只管"这个窗口自己的反馈"：进场分层见 useStaggerEnter，柱子 / 环 / 图例在下面几个类上。
+ * 关掉「界面动画」时由 base.css 的 html.no-anim 统一禁用，这里不写判断。
+ */
+
+/* 柱子从底部长出来 */
+@keyframes stats-bar-rise {
+  from {
+    transform: scaleY(0);
+    opacity: 0.4;
+  }
+
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* 环与图例的淡入 */
+@keyframes stats-ring-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes stats-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 </style>

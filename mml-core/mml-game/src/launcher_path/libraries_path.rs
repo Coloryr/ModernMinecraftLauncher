@@ -278,11 +278,14 @@ pub fn get_optifine_file(mc: &str, version: &str) -> PathBuf {
 impl InstanceSettingObj {
     /// 获取本实例的 OptiFine 安装包路径
     ///
+    /// `loader_version` 缺省时给空版本，路径自然不存在：导入进来的半成品实例、
+    /// 或只是把加载器标成 OptiFine 的实例都会这样，不能为此 panic
+    ///
     /// # 返回值
     ///
-    /// 返回 OptiFine 安装包路径；`loader_version` 缺省时 panic
+    /// 返回 OptiFine 安装包路径
     pub fn get_optifine_file(&self) -> PathBuf {
-        get_optifine_file(&self.version, self.loader_version.as_ref().unwrap())
+        get_optifine_file(&self.version, self.loader_version.as_deref().unwrap_or_default())
     }
 
     /// 获取本实例的游戏核心路径

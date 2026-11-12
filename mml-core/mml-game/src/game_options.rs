@@ -80,7 +80,10 @@ pub fn read_options<R: Read>(buffer: R, sp: Option<char>) -> CoreResult<Instance
 }
 
 impl InstanceSettingObj {
-    /// 读取配置文件
+    /// 读取 **OptiFine** 那份配置
+    ///
+    /// 游戏自己的 `options.txt` 走 [`Self::get_minecraft_options`]：资源包、语言这些都不在这条路径上，
+    /// 以前资源包页误用了这个接口，读的是一个不存在的文件（实例没有 OptiFine 版本号时还会 panic）
     ///
     /// # 返回值
     ///
@@ -95,7 +98,7 @@ impl InstanceSettingObj {
         }
     }
 
-    /// 保存配置文件
+    /// 保存 **OptiFine** 那份配置；游戏自己的 options.txt 用 [`Self::set_minecraft_option`]
     ///
     /// - `list`: 配置选项
     /// - `sp`: 键值分隔符；`None` 时取 `:`

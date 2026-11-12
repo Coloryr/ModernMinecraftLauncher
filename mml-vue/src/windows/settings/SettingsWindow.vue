@@ -327,7 +327,7 @@ function onKeyDown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <WindowFrame :title="t('features.settings')" body-fill body-flush @close="emit('close')">
+  <WindowFrame enter=":scope > *" :title="t('features.settings')" body-fill body-flush @close="emit('close')">
     <!-- 设置项搜索放在标题栏：全局可用，切哪个标签都在，且不随内容区滚动 -->
     <template #head-right>
       <SaveStateText v-if="headerSave" class="head-save-state" :state="headerSave.state"

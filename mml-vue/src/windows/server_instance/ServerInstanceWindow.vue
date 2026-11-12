@@ -38,7 +38,7 @@ const { enter: enterPage, leave: leavePage } = useStaggerEnter(".si-section > *"
 });
 </script>
 <template>
-  <WindowFrame :title="t('winTitle.serverInstance')" body-fill body-flush @close="emit('close')">
+  <WindowFrame enter=":scope > *" :title="t('winTitle.serverInstance')" body-fill body-flush @close="emit('close')">
     <!-- 实例放标题栏：换实例不用回到总体设定 -->
     <template #head-right>
       <div class="si-head-actions">

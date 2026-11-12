@@ -30,6 +30,7 @@ import {
 import { restoreMultiWindow } from "./windows/windowManager";
 import { restoreFontFamily } from "./lib/fonts";
 import { installImageFallback } from "./lib/imageFallback";
+import { installFrontendErrorLog } from "./lib/frontendLog";
 import { buildChannel, loadBuildInfo } from "./lib/buildInfo";
 import { vTip } from "./lib/tip";
 import { initSelectDirection } from "./lib/selectDirection";
@@ -39,6 +40,9 @@ import { initSelectDirection } from "./lib/selectDirection";
 
 // 图片加载失败的统一兜底：装上要趁早，免得启动过程中先加载的那批图漏掉
 installImageFallback();
+
+// 前端错误转发进 logs.log：装上要趁早，启动阶段的错误也要能记上
+installFrontendErrorLog();
 
 // 下拉方向：窗口底部的 <select> 打开前改成向上，避免弹层被截掉
 initSelectDirection();

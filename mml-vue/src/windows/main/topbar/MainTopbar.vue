@@ -26,6 +26,8 @@ defineProps<{
   currentAccount: AccountStoreDto | null;
   /** 可切换的账户列表，来自共享存储 */
   accounts: AccountStoreDto[];
+  /** 没有实例时启动器主页是唯一内容，主页键固定按下且不可再切换 */
+  homeLocked?: boolean;
 }>();
 
 // 下载 / 整合包两个进度指示器默认挂在下载整合包窗口，那个窗口关着时才回到这里。
@@ -82,8 +84,8 @@ const emit = defineEmits<{
       <JavaTitleIndicator />
 
       <!-- 启动器主页（切换按钮） -->
-      <button class="topbar-icon-btn" :class="{ pressed: newsActive }" v-tip="t('home.entry')"
-        @click="emit('toggle-news')">
+      <button class="topbar-icon-btn" :class="{ pressed: newsActive || homeLocked }" :disabled="homeLocked"
+        v-tip="homeLocked ? t('home.locked') : t('home.entry')" @click="emit('toggle-news')">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V10z" />
@@ -229,6 +231,23 @@ const emit = defineEmits<{
 }
 
 .topbar-icon-btn.pressed {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+/* 空实例时主页键不可用：保留"按下"态（主页正显示着），去掉悬停反馈，免得看着还能点 */
+.topbar-icon-btn:disabled {
+  cursor: default;
+}
+
+.topbar-icon-btn:disabled:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+}
+
+.topbar-icon-btn:disabled.pressed:hover {
   background: var(--accent-soft);
   border-color: var(--accent-border);
   color: var(--accent);

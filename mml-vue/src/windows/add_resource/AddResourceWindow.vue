@@ -817,7 +817,7 @@ onActivated(async () => {
 </script>
 
 <template>
-  <WindowFrame :title="t('winTitle.addResource')" :back="detailOpen ? t('winCommon.back') : ''" body-gutter
+  <WindowFrame enter=":scope > *" :title="t('winTitle.addResource')" :back="detailOpen ? t('winCommon.back') : ''" body-gutter
     @close="$emit('close')" @back="closeDetail()">
     <!-- 标题栏：目标实例。本窗口是"装进哪个实例"的上下文，没实例就直说 -->
     <template #head-right>

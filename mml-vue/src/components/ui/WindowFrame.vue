@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 子窗口通用框架：标题（兼作自绘标题栏）+ 内容区
 // 头部整条可拖动，两端按平台样式放窗口按钮；「返回主页面」按钮只在单窗口模式下显示。
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { t } from "../../lib/i18n";
 import { currentKind, multiWindow } from "../../windows/windowManager";
 import WindowControls from "./WindowControls.vue";
@@ -13,6 +13,7 @@ import MusicTitleIndicator from "../MusicTitleIndicator.vue";
 import { detectOs, onTitleBarPointerDown, titleBarStyle, useWindowTitle } from "../../lib/titlebar";
 import { useWindowFullscreen } from "../../lib/useWindowFullscreen";
 import { useWindowDecoration } from "../../lib/useWindowDecoration";
+import { useStaggerEnter } from "../../composables/useStaggerEnter";
 
 const props = defineProps<{
   /** 标题栏文案，同时作为原生窗口标题 */
@@ -38,6 +39,13 @@ const props = defineProps<{
   hideModpackIndicator?: boolean;
   /** 是否显示下载进度指示（默认显示）。下载窗口整页就是下载管理，同样关掉 */
   hideDownloadIndicator?: boolean;
+  /**
+   * 打开窗口时的分层入场：内容区里要参与动画的元素选择器，相对内容区
+   *
+   * 不传则不做。统计窗口自己有一套开场（它在 onMounted 里自己调 useStaggerEnter），
+   * 那边不要再传，否则同一批元素会被套两遍
+   */
+  enter?: string;
 }>();
 
 /**
@@ -96,6 +104,15 @@ const pluginControls = computed(() => isMac && titleBarStyle === "macos");
 // 表格只渲染视口附近那几行，页面整体滚动的行为不变
 const bodyEl = ref<HTMLElement | null>(null);
 defineExpose({ bodyEl });
+
+// 窗口打开时的分层入场：与主窗口 / 设置页同一套"标题以下逐个落下"
+const bodyEnter = props.enter
+  ? useStaggerEnter(props.enter, { duration: 280, step: 50, offset: 12 })
+  : null;
+onMounted(() => {
+  const el = bodyEl.value;
+  if (bodyEnter && el) bodyEnter.enter(el, () => { });
+});
 </script>
 
 <template>

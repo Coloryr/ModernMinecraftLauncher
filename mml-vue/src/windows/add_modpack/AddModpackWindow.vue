@@ -76,7 +76,7 @@ onMounted(async () => {
 <template>
   <!-- 安装进度走标题栏指示器 + 弹窗（ModpackTitleIndicator / ModpackPopup），与资源下载同一套，
        所以不传 hide-modpack-indicator，内容区也不内嵌进度卡片 -->
-  <WindowFrame :title="t('winTitle.addModpack')" :back="detailOpen ? t('modpack.back') : ''" body-gutter
+  <WindowFrame enter=":scope > *" :title="t('winTitle.addModpack')" :back="detailOpen ? t('modpack.back') : ''" body-gutter
     @back="modeRef?.closeDetail()" @close="$emit('close')">
     <div class="modpack-body">
       <ModpackMode ref="modeRef" :group="group" :groups="groups" :status="modpackStatus" @update:group="group = $event"

@@ -100,22 +100,6 @@
   padding-bottom: 2px;
 }
 
-/* 底部那一行：两个"去挑资源"入口，等宽的整行按钮 */
-.collect-acts-row {
-  display: flex;
-  gap: 8px;
-  /* 与上面那排卡片 / 空态提示拉开距离（卡片区的 gap 管不到这里） */
-  margin-top: 12px;
-}
-
-/* 整行添加键均分宽度：外观走全局 .add-row-btn，这里只管 flex 布局；
-   min-width 0 让窄窗时能一起缩，谁都不单独溢出 */
-.add-group-row {
-  flex: 1 1 0;
-  width: auto;
-  min-width: 0;
-}
-
 /* 卡片上的勾选框：原生样式在暗色主题下偏灰、各平台大小也不一致，统一自己画一个。
    勾由 GlyphIcon 的 check 画，并用 flex 居中，不依赖手算坐标。
    绝对定位压在图标左上角：放进流里会挤掉项目 ID 那一行，卡片尺寸也就跟着变了 */

@@ -9,6 +9,7 @@
 // 投放高亮（`dropKey`）：别的窗口把条目拖到分组上时，给对应那一项描一道虚线框。
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
+import BaseButton from "./ui/BaseButton.vue";
 import { useSlidingThumb } from "../composables/useSlidingThumb";
 
 /** 左栏的一项 */
@@ -43,10 +44,12 @@ const props = withDefaults(
     dropKey?: string | null;
     /** 栏底「新建分组」的文案；空串则不显示这一行 */
     newLabel?: string;
+    /** 栏底入口的外观：`row` 是整行虚线添加条（默认），`button` 是工具条同档的强调色按钮 */
+    newStyle?: "row" | "button";
     /** 去掉上下留白：由父级自己安排（父级内容区不滚动时用） */
     flush?: boolean;
   }>(),
-  { sortable: false, dropKey: null, newLabel: "", flush: false },
+  { sortable: false, dropKey: null, newLabel: "", newStyle: "row", flush: false },
 );
 
 const emit = defineEmits<{
@@ -229,8 +232,13 @@ onUnmounted(() => {
       <span class="cat-num">{{ dragged?.count }}</span>
     </div>
 
-    <!-- 新建分组：与其它窗口同一套整行添加外观 -->
-    <button v-if="newLabel" type="button" class="add-row-btn cat-new" @click="emit('new-group')">
+    <!-- 新建分组：默认与其它窗口同一套整行添加外观；`button` 档换成工具条同档的强调色按钮 -->
+    <BaseButton v-if="newLabel && newStyle === 'button'" size="sm" variant="accent" block class="cat-new-btn"
+      @click="emit('new-group')">
+      <GlyphIcon name="plus" :size="14" :weight="2.2" />
+      {{ newLabel }}
+    </BaseButton>
+    <button v-else-if="newLabel" type="button" class="add-row-btn cat-new" @click="emit('new-group')">
       <GlyphIcon name="plus" :size="14" />
       <span class="cat-name">{{ newLabel }}</span>
     </button>
@@ -376,6 +384,12 @@ onUnmounted(() => {
 
 .cat-item.on .cat-num {
   color: var(--accent);
+}
+
+/* 栏底「新建分组」的按钮档：与上一行分组拉开一点，别贴在一起 */
+.cat-new-btn {
+  flex-shrink: 0;
+  margin-top: 6px;
 }
 
 /* 跟手浮起的那一份：底色 + 强调色描边 + 大阴影做出"被拿起来"的观感。
