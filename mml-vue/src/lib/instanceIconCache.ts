@@ -35,6 +35,31 @@ export function loadImageBase(): Promise<string> {
   return basePromise;
 }
 
+/**
+ * 预取一组实例图标
+ *
+ * 折叠分组里的实例行还没挂载，先按 uuid 把图取进浏览器缓存；
+ * 第一次展开时 InstanceIcon 直接命中已加载状态，不会先闪占位。
+ *
+ * - `uuids`: 实例 uuid 列表
+ */
+export function preloadInstanceIcons(uuids: string[]) {
+  void loadImageBase().then((base) => {
+    if (!base) return;
+    for (const uuid of uuids) {
+      const link = `${base}/instance/${uuid}?v=0`;
+      if (loadedIconUrls.has(link) || iconObjectUrls.has(link)) continue;
+      const image = new Image();
+      image.onload = () => {
+        loadedIconUrls.add(link);
+        loadedIconUuids.add(uuid);
+        cacheIconBlob(link);
+      };
+      image.src = link;
+    }
+  });
+}
+
 /** 把协议地址取成 Blob URL，供下一次重建直接使用 */
 export function cacheIconBlob(link: string) {
   if (!link || iconObjectUrls.has(link)) return;

@@ -13,6 +13,7 @@ import HighlightText from "../../../components/ui/HighlightText.vue";
 import VirtualList from "../../../components/ui/VirtualList.vue";
 import InstanceIcon from "../../../components/InstanceIcon.vue";
 import { animations } from "../../../lib/appearance";
+import { preloadInstanceIcons } from "../../../lib/instanceIconCache";
 import { t } from "../../../lib/i18n";
 import type { InstanceInfoDto } from "../../../lib/bindings";
 import type { DragCandidate, GroupView } from "../types";
@@ -202,8 +203,8 @@ const ROW_H_GROUP = 48;
 const ROW_H_INST = 60;
 /** 占满时一行里实例行之间的水平间距，单位 px */
 const GRID_GAP = 8;
-/** 占满时每列的最小宽度，单位 px；沿用未占满时一行的宽度，一行能放几个就放几个 */
-const GRID_MIN = 300;
+/** 占满时每列的最小宽度，单位 px；921px 宽的窗口也要能排下三列 */
+const GRID_MIN = 280;
 /** 分组收起 / 展开的高度动画时长，单位 ms；沿用旧版过渡的 0.22s */
 const GROUP_ANIM_MS = 220;
 /** 侧栏列表的顶部内边距，单位 px；与 .sidebar-list 的 padding-top 同源 */
@@ -255,6 +256,24 @@ function measureWidth() {
 
 const widthObserver = new ResizeObserver(() => measureWidth());
 onMounted(() => measureWidth());
+
+/** 分组拖拽浮层的左缘：贴列表内容区，而不是以指针为中心 */
+const groupGhostX = computed(() => {
+  const el = listRef.value?.el;
+  if (!el) return 0;
+  const padding = parseFloat(getComputedStyle(el).paddingLeft) || 0;
+  return el.getBoundingClientRect().left + padding;
+});
+
+// 折叠分组里的实例行还没挂载，先把图标取进缓存；
+// 第一次展开时直接命中，不再先闪一下字母占位
+watch(
+  () => props.groups,
+  (groups) => {
+    preloadInstanceIcons(groups.flatMap((group) => group.items.map((item) => item.uuid)));
+  },
+  { immediate: true },
+);
 
 /** 侧栏列表当前滚动位置，单位 px；只给粘滞头算位置，不做成响应式 */
 let listScrollTop = 0;
@@ -703,7 +722,8 @@ defineExpose({ scrollToInstance });
     </div>
 
     <!-- 跟手浮起副本：被抓住的实例 / 分组，跟着指针走 -->
-    <DragGhost v-if="ghost" :x="ghost.x" :y="ghost.y">
+    <DragGhost v-if="ghost" :x="ghost.item.kind === 'group' ? groupGhostX : ghost.x"
+      :y="ghost.y" :width="ghost.item.kind === 'group' ? contentWidth || 300 : undefined">
       <InstanceIcon v-if="ghost.item.kind === 'instance'" :name="ghost.item.instance?.name ?? ''"
         :uuid="ghost.item.instance?.uuid ?? '0'" :size="32" />
       <GlyphIcon v-else name="folder" :size="16" />
@@ -1058,6 +1078,8 @@ defineExpose({ scrollToInstance });
 }
 
 .drop-ghost-group {
+  width: 100%;
+  box-sizing: border-box;
   /* 同上：减掉边框宽度，分组名与实例行的内容左缘对齐 */
   padding: 7.5px 10.5px;
   border: 1.5px dashed var(--accent-border);

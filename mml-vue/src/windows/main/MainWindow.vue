@@ -30,6 +30,7 @@ import { isArchivePath } from "../../lib/archiveFile";
 import { isServerPackStage, stateText } from "../../lib/launchState";
 import { askLaunchCancel } from "../../lib/launchCancelAsk";
 import { useDownloadProgress } from "../../composables/useDownloadProgress";
+import { useStaggerEnter } from "../../composables/useStaggerEnter";
 import { useRefreshKey } from "../../composables/useRefreshKey";
 import { KEYS, onStorageChange, readJson, writeJson } from "../../lib/storage";
 import { multiWindow, openWindow } from "../windowManager";
@@ -282,6 +283,23 @@ function toggleGroup(id: string) {
 const sidebarAnim = ref(false);
 let sidebarAnimTimer: number | undefined;
 
+/** 占满 / 收回期间把右侧详情钉在原来的宽度上，只做淡入淡出，避免控件跟着缩放宽窄 */
+const paneAbsolute = ref(false);
+let paneAbsoluteTimer: number | undefined;
+function lockPaneGeometry(keep: boolean) {
+  paneAbsolute.value = true;
+  window.clearTimeout(paneAbsoluteTimer);
+  // 占满后详情一直钉在右侧外面；收回时等侧栏完全回到 300px 再解除，
+  // 早一帧解除都会让 flex 重新按"还在变窄的侧栏"算一次宽度
+  if (!keep) {
+    paneAbsoluteTimer = window.setTimeout(() => {
+      paneAbsolute.value = false;
+    }, 600);
+  }
+}
+
+
+
 /** 收起 / 展开后保持过渡开关的时间，单位 ms；须长于 .sidebar-slot 的宽度过渡 */
 const SIDEBAR_ANIM_MS = 300;
 
@@ -323,11 +341,13 @@ function togglePaneMaximize() {
   paneMaximized.value = !paneMaximized.value;
   // 占满时侧栏必须是展开的，否则只剩一条窄槽
   if (paneMaximized.value && sidebarCollapsed.value) {
+    lockPaneGeometry(true);
     collapseSidebar(false);
     return;
   }
   // 占满 / 收回的宽度过渡只在用户主动切换时打开，启动恢复不播
   animateSidebar();
+  lockPaneGeometry(paneMaximized.value);
 }
 
 // ================= 启动器主页 =================
@@ -335,6 +355,27 @@ function togglePaneMaximize() {
 // 启动时先落到主页还是项目列表，由设置窗口「主窗口 → 启动页」决定；
 // main.ts 的 bootstrap 在挂载前已把 gui_config 恢复进 startupPage，这里读到的就是最终值
 const newsActive = ref(startupPage.value === "Home");
+
+/** 启动器主页 / 实例列表切换：与设置页同一套标题渐变 + 内容错峰 */
+const homeStagger = useStaggerEnter(".page-head, .last-card, .entry-cards, .news-panel", {
+  fade: ".page-head",
+});
+const listStagger = useStaggerEnter(":scope > *");
+const detailStagger = useStaggerEnter(".detail-instance > *");
+
+function enterHomePage(el: Element, done: () => void) {
+  if (el.classList.contains("list-mode")) {
+    listStagger.enter(el, done);
+  } else if (el.classList.contains("detail-content")) {
+    detailStagger.enter(el, done);
+  } else {
+    homeStagger.enter(el, done);
+  }
+}
+
+function leaveHomePage(_el: Element, done: () => void) {
+  done();
+}
 const newsLoading = ref(false);
 
 /** 打开 / 关闭启动器主页（保留选中实例） */
@@ -606,6 +647,7 @@ const {
 // 多选固定占满，退出时回到进来之前那一档
 watch(multiSelect, (on) => {
   animateSidebar();
+  lockPaneGeometry(on);
   if (on) {
     maximizedBeforeMulti = paneMaximized.value;
     paneMaximized.value = true;
@@ -2434,7 +2476,8 @@ onMounted(async () => {
 
       <!-- 主体 -->
       <main class="main"
-        :class="{ 'side-right': sidebarSide === 'Right', 'sidebar-anim': sidebarAnim, 'pane-max': paneMaximized }">
+        :class="{ 'side-right': sidebarSide === 'Right', 'sidebar-anim': sidebarAnim, 'pane-max': paneMaximized, 'pane-absolute': paneAbsolute,
+          'sidebar-collapsed': sidebarCollapsed, 'home-active': newsActive }">
         <!-- 锁定的实例已不存在，例如整合包作者的实例被删 / 改名：整块换成错误页，顶部栏保留 -->
         <template v-if="lockMissing">
           <section class="lock-error">
@@ -2459,7 +2502,7 @@ onMounted(async () => {
         <!-- 列表模式：启动器主页 ↔ 实例列表。两者布局角色一致（flex:1 纵向），
              直接作为进出动画的两个子节点，内容不用包一层 -->
         <template v-else-if="effectiveMode === 'list'">
-          <Transition name="view-swap" mode="out-in">
+          <Transition :css="false" mode="out-in" @enter="enterHomePage" @leave="leaveHomePage">
             <!-- 自定义主页面：与列表模式一样铺满内容区（自己滚动，不留内边距） -->
             <section v-if="newsActive && useCustomHome" key="custom-home" class="custom-home-page">
               <CustomHomePage :entry-url="customHome?.entryUrl ?? ''" />
@@ -2593,7 +2636,7 @@ onMounted(async () => {
             <!-- 自定义主页面走自己的 flex 布局：.detail 带 padding 且可滚动，直接塞 iframe 时
                  height:100% 解析不出高度（父元素没有确定高度），会把页面压扁；这里单独包一层
                  去掉 padding 的撑满容器，让 iframe 铺满整个内容区 -->
-            <Transition name="view-swap" mode="out-in">
+            <Transition :css="false" mode="out-in" @enter="enterHomePage" @leave="leaveHomePage">
               <div v-if="newsActive && useCustomHome" key="custom-home" class="custom-home-fill">
                 <CustomHomePage :entry-url="customHome?.entryUrl ?? ''" />
               </div>

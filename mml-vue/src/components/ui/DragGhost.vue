@@ -8,6 +8,8 @@ defineProps<{
   x: number;
   /** 指针纵坐标，视口坐标 */
   y: number;
+  /** 固定宽度，单位 px；分组拖拽时给整行宽度 */
+  width?: number;
 }>();
 </script>
 
@@ -15,7 +17,8 @@ defineProps<{
   <Teleport to="body">
     <!-- 遮罩：拖动期间挡住底下的界面，按钮不会跟着高亮、也不会被点到 -->
     <div class="drag-shield" />
-    <div class="drag-ghost" :style="{ left: x + 'px', top: y + 'px' }">
+    <div class="drag-ghost" :class="{ wide: width !== undefined }"
+      :style="{ left: x + 'px', top: y + 'px', width: width !== undefined ? width + 'px' : undefined }">
       <slot />
     </div>
   </Teleport>
@@ -48,5 +51,12 @@ defineProps<{
   box-shadow: var(--shadow-lg);
   transform: translate(-40%, -50%) scale(1.04);
   pointer-events: none;
+}
+
+/* 分组拖拽：直接占满一行，左缘贴列表内容区，不再以指针为中心 */
+.drag-ghost.wide {
+  max-width: none;
+  min-height: 48px;
+  transform: translateY(-50%) scale(1.02);
 }
 </style>

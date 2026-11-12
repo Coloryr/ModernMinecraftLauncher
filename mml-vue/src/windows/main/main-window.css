@@ -54,6 +54,7 @@
 /* ================= 主体 ================= */
 
 .main {
+  position: relative;
   flex: 1;
   display: flex;
   min-height: 0;
@@ -110,24 +111,16 @@
   width: 300px;
   /* 与 MainSidebar 的 .sidebar 同宽 */
   overflow: hidden;
-  /* 占满 / 收回都会改 flex-grow，常开也不会在启动时播（初始值不变） */
-  transition: flex-grow 0.3s var(--ease-out);
+  /* 占满 / 收回改 flex-grow，主页 / 收起改 width；初始值不变不会播动画 */
+  transition:
+    width 0.3s var(--ease-out),
+    flex-grow 0.3s var(--ease-out);
 }
 
 .main.sidebar-anim .sidebar-slot {
   transition:
     width 0.3s var(--ease-out),
     flex-grow 0.3s var(--ease-out);
-}
-
-/* 占满 / 收回时详情区的宽度、内边距与透明度一起过渡；
-   不能再用 display:none，否则右侧是"啪"地消失 */
-.main.sidebar-anim .detail {
-  transition:
-    max-width 0.3s var(--ease-out),
-    flex-grow 0.3s var(--ease-out),
-    padding 0.3s var(--ease-out),
-    opacity 0.2s var(--ease-out);
 }
 
 .sidebar-slot.collapsed {
@@ -148,13 +141,50 @@
 }
 
 .main.pane-max .detail {
-  flex: 0 1 0;
-  min-width: 0;
-  padding-left: 0;
-  padding-right: 0;
+  transform: translateX(100%);
   opacity: 0;
   overflow: hidden;
   pointer-events: none;
+}
+
+/* 占满 / 收回动画期间给详情一层底色，滑过侧栏时不会透出下面的内容 */
+.main.pane-absolute .sidebar-slot {
+  position: relative;
+  z-index: 1;
+}
+
+.main.pane-absolute .detail {
+  z-index: 2;
+  background: var(--bg);
+}
+
+.main.side-right .detail {
+  left: 0;
+  right: 300px;
+}
+
+.main.sidebar-collapsed .detail {
+  left: 24px;
+}
+
+.main.sidebar-collapsed.side-right .detail {
+  left: 0;
+  right: 24px;
+}
+
+/* 启动器主页占满内容区：左侧实例栏整个收起，主页铺满整行 */
+.main.home-active .sidebar-slot {
+  width: 0;
+}
+
+.main.home-active .detail,
+.main.home-active.side-right .detail {
+  left: 0;
+  right: 0;
+}
+
+.main.side-right.pane-max .detail {
+  transform: translateX(-100%);
 }
 
 /* 侧栏贴右时，让侧栏钉在槽位右缘，收窄时从左侧裁掉（视觉上向右滑出） */
@@ -203,13 +233,21 @@
 /* ----- 右侧内容区 ----- */
 
 .detail {
-  flex: 1;
+  /* 固定在侧栏右边：占满 / 收回只推 transform，不参与 flex 宽度分配 */
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 300px;
+  right: 0;
+  z-index: 0;
+  flex: none;
+  width: auto;
   max-width: 100%;
-  /* 占满时详情的 flex-grow 从 1 变 0，收回时再变回来 */
   transition:
-    flex-grow 0.3s var(--ease-out),
-    padding 0.3s var(--ease-out),
-    opacity 0.2s var(--ease-out);
+    transform 0.3s var(--ease-out),
+    opacity 0.3s var(--ease-out),
+    left 0.3s var(--ease-out),
+    right 0.3s var(--ease-out);
   display: flex;
   flex-direction: column;
   /* 上内边距比别处紧一档：这一屏顶部就是工具栏 / 实例信息，不用再留 22px */
