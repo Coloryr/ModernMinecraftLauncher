@@ -1203,6 +1203,9 @@ export default {
   "launch.instanceLockError": "Instance error. Please contact the modpack author.",
   "launch.ready": "Ready",
   "launch.launching": "Launching…",
+  "launch.checkingFiles": "Checking files",
+  "launch.downloadingFiles": "Downloading files",
+  "launch.cancelPrepare": "Cancel download",
   "launch.cancel": "Cancel launch",
   "launch.stop": "Close game",
   "launch.cancelAskTitle": "Syncing server pack",
@@ -1288,8 +1291,6 @@ export default {
   "add.addedTitle": "Instance Added",
   "add.askContinue": "Instance “{name}” was added. Add another one?",
   "add.archiveReadFail": "Failed to read archive contents",
-  "add.yes": "Yes",
-  "add.no": "No",
   "add.closeBlocked": "Loading data — the window can't be closed yet",
   "add.dropBusy": "The previous action is still running — try dropping again in a moment",
   // Add-instance window overlay (files only)

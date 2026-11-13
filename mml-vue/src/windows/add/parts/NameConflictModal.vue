@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 添加实例 · 实例重名确认弹窗
-// 后端创建流程会暂停等这条答复：点遮罩 / 右上角关闭都按「否」处理，避免流程挂住
+// 后端创建流程会暂停等这条答复：点遮罩 / 右上角关闭都按「取消」处理，避免流程挂住
 import { t } from "../../../lib/i18n";
 import BaseModal from "../../../components/ui/BaseModal.vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
@@ -28,8 +28,8 @@ const emit = defineEmits<{
       }}
     </p>
     <div class="modal-actions">
-      <BaseButton @click="emit('answer', false)">{{ t("add.no") }}</BaseButton>
-      <BaseButton variant="primary" @click="emit('answer', true)">{{ t("add.yes") }}</BaseButton>
+      <BaseButton @click="emit('answer', false)">{{ t("add.cancel") }}</BaseButton>
+      <BaseButton variant="primary" @click="emit('answer', true)">{{ t("actions.confirm") }}</BaseButton>
     </div>
   </BaseModal>
 </template>

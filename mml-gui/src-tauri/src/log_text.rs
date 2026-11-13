@@ -185,6 +185,11 @@ pub enum LogText {
         /// 失败原因，运行时构建报的错
         error: String,
     },
+    /// 实例文件补全没能启动，运行时或线程没建起来
+    PrepareFailed {
+        /// 失败原因
+        error: String,
+    },
     /// 自动标记模组时读文件算哈希失败
     AutoMarkReadFailed {
         /// 读失败的文件路径
@@ -871,6 +876,9 @@ impl LogText {
             LogText::LaunchRuntimeFailed { error } => {
                 format!("游戏启动运行时创建失败: {error}")
             }
+            LogText::PrepareFailed { error } => {
+                format!("实例文件补全没能启动: {error}")
+            }
             LogText::AutoMarkReadFailed { path, error } => {
                 format!("自动标记：读文件失败 {path}：{error}")
             }
@@ -1247,6 +1255,9 @@ impl LogText {
             ),
             LogText::LaunchRuntimeFailed { error } => {
                 format!("failed to create the game launch runtime: {error}")
+            }
+            LogText::PrepareFailed { error } => {
+                format!("failed to start completing instance files: {error}")
             }
             LogText::AutoMarkReadFailed { path, error } => {
                 format!("auto mark: failed to read {path}: {error}")

@@ -22,6 +22,7 @@ export type InstanceInfoDto = {
   source: string | null,
   order: number,
   busy: boolean,
+  preparing: string | null,
 };
 
 export type GroupDto = {

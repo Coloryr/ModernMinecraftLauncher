@@ -104,6 +104,9 @@ pub(super) async fn import(
         .text(),
     );
 
+    // 导入可能只带来游戏目录，核心与运行库仍然是缺的：建完实例统一走自动补全
+    crate::windows::main::prepare::start(app, &game.read().unwrap().uuid.to_string());
+
     Ok(MinecraftImportDto {
         name,
         version: version.to_string(),

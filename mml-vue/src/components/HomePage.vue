@@ -38,14 +38,20 @@ const props = withDefaults(
   { loading: false, page: 1, hasMore: true, backLabelKey: "home.backToList", launching: false },
 );
 
-/** 快捷启动按钮能不能点：启动中 / 运行中都按住，别在主页重复点出两次启动 */
+/** 快捷启动按钮能不能点：启动中 / 补全中 / 运行中都按住，别在主页重复点出两次启动 */
 const playDisabled = computed(
-  () => !props.currentInstance || props.launching || props.currentInstance.running,
+  () =>
+    !props.currentInstance ||
+    props.launching ||
+    !!props.currentInstance.preparing ||
+    props.currentInstance.running,
 );
 
 /** 快捷启动按钮的文案：跟着实例状态走 */
 const playLabel = computed(() => {
   if (props.launching) return t("launch.launching");
+  if (props.currentInstance?.preparing === "download") return t("launch.downloadingFiles");
+  if (props.currentInstance?.preparing) return t("launch.checkingFiles");
   if (props.currentInstance?.running) return t("launch.running");
   return t("home.lastPlay");
 });

@@ -263,6 +263,8 @@ pub(crate) fn finish_task(
             task.cancelled.store(false, Ordering::Release);
             task.done.store(true, Ordering::Release);
             crate::windows::main::emit_instance_change(app, "add");
+            // 整合包装完只带 mods 与配置，核心 / 运行库 / 资源文件还得补一次
+            crate::windows::main::prepare::start(app, &uuid.to_string());
             Some(NotifyText::ModpackDone {
                 name: task.name.clone(),
             })

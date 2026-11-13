@@ -37,7 +37,7 @@ use crate::log_text::LogText;
 use crate::windows::log::emit_log_line;
 
 use super::args::core_instance;
-use super::{emit_launch_error, launch_gate};
+use super::{emit_launch_error, launch_gate, prepare};
 pub(crate) use launch_gate::import_guard;
 
 /// 正在启动中的实例的取消令牌：界面点「取消启动」时置位，启动线程在检查点退出
@@ -224,6 +224,10 @@ pub(crate) async fn launch_game(
     }
 
     let id = Uuid::parse_str(&uuid).map_err(|_| err_keys::GAME_NOT_FOUND.to_string())?;
+    // 自动补全还在跑：两边都会写实例目录，等它结束或用户取消补全再启动
+    if prepare::is_preparing(&id) {
+        return Err(err_keys::INSTANCE_BUSY.to_string());
+    }
     let reservation = launch_gate::begin_launch(id)?;
     let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
 

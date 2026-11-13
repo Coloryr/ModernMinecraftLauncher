@@ -1204,6 +1204,9 @@ export default {
   "launch.instanceLockError": "实例错误，请联系整合包作者",
   "launch.ready": "就绪",
   "launch.launching": "正在启动…",
+  "launch.checkingFiles": "检查文件中",
+  "launch.downloadingFiles": "下载文件中",
+  "launch.cancelPrepare": "取消补全",
   "launch.cancel": "取消启动",
   "launch.stop": "关闭游戏",
   "launch.cancelAskTitle": "正在同步服务器包",
@@ -1289,8 +1292,6 @@ export default {
   "add.addedTitle": "实例添加成功",
   "add.askContinue": "实例「{name}」添加成功，是否还需要继续添加？",
   "add.archiveReadFail": "读取压缩包内容失败",
-  "add.yes": "是",
-  "add.no": "否",
   "add.closeBlocked": "正在获取数据，暂时无法关闭窗口",
   "add.dropBusy": "上一个操作还没结束，稍后再拖入",
   // 添加实例窗口的拖入遮罩（只接文件）

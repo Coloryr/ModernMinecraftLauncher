@@ -232,6 +232,7 @@ export function createCommands(invoke: Invoke) {
       addGroup: (name: string) => invoke<string | null>("main_add_group", { name }),
       autoSaveTarget: (uuid: string) => invoke<AutoSaveTargetDto | null>("main_auto_save_target", { uuid }),
       cancelLaunch: (uuid: string) => invoke<boolean>("main_cancel_launch", { uuid }),
+      cancelPrepare: (uuid: string) => invoke<boolean>("main_cancel_prepare", { uuid }),
       checkLaunch: (uuid: string) => invoke<LaunchPrecheckDto | null>("main_check_launch", { uuid }),
       copyInstance: (uuid: string, name: string) => invoke<boolean>("main_copy_instance", { uuid, name }),
       createInstance: (name: string, version: string, loader: string | null, loaderVersion: string | null, group: string | null, modpackType: string | null, source: string | null) => invoke<InstanceInfoDto>("main_create_instance", { name, version, loader, loaderVersion, group, modpackType, source }),

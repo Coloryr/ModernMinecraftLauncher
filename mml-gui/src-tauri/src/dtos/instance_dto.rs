@@ -49,6 +49,9 @@ pub struct InstanceInfoDto {
     /// 是否有操作占着这个实例：运行中、下载、扫描、导出、生成都算，期间不能删 / 改名
     #[serde(default)]
     pub busy: bool,
+    /// 文件补全阶段：`check` 检查中、`download` 下载中；`None` 表示没在补全
+    #[serde(default)]
+    pub preparing: Option<String>,
 }
 
 /// 分组条目

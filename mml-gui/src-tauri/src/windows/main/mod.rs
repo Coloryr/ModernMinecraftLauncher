@@ -13,6 +13,7 @@ pub(crate) mod deleting;
 pub(crate) mod instance;
 pub(crate) mod launch;
 pub(crate) mod launch_gate;
+pub(crate) mod prepare;
 pub(crate) mod query;
 
 use std::collections::{HashMap, HashSet};

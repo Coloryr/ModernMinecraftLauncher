@@ -82,6 +82,8 @@ pub async fn add_import_folder(
     }
     crate::windows::main::emit_instance_change(&app, "add");
     crate::windows::add::notify_instance_added(&app, &uuid);
+    // 导入只搬了实例自己的文件，核心与运行库还得补：建完就挂上下载任务
+    crate::windows::main::prepare::start(&app, &uuid);
     Ok(uuid)
 }
 
@@ -216,6 +218,7 @@ pub async fn add_import_archive(
             if let Ok(uuid) = &res {
                 crate::windows::main::emit_instance_change(&app, "add");
                 crate::windows::add::notify_instance_added(&app, &uuid.to_string());
+                crate::windows::main::prepare::start(&app, &uuid.to_string());
             }
         }
     }
@@ -277,6 +280,7 @@ pub async fn add_import_url(
     let uuid = uuid.to_string();
     crate::windows::main::emit_instance_change(&app, "add");
     crate::windows::add::notify_instance_added(&app, &uuid);
+    crate::windows::main::prepare::start(&app, &uuid);
     Ok(uuid)
 }
 
@@ -333,6 +337,8 @@ pub async fn add_create_new(
     let uuid = res.read().unwrap().uuid.to_string();
     crate::windows::main::emit_instance_change(&app, "add");
     crate::windows::add::notify_instance_added(&app, &uuid);
+    // 新建只写了空目录与配置，版本核心、运行库、资源文件全缺，这就开始补
+    crate::windows::main::prepare::start(&app, &uuid);
     Ok(uuid)
 }
 
@@ -388,6 +394,8 @@ pub async fn add_import_server_pack(
     let uuid = uuid.to_string();
     crate::windows::main::emit_instance_change(&app, "add");
     crate::windows::add::notify_instance_added(&app, &uuid);
+    // 包内容按清单在启动时同步，这里先补版本核心与运行库
+    crate::windows::main::prepare::start(&app, &uuid);
     Ok(uuid)
 }
 

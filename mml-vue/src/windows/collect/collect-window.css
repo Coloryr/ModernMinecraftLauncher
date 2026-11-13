@@ -297,13 +297,9 @@
   color: var(--accent);
 }
 
-/* 空状态那句提示：做成一块面板，别让它孤零零浮在空页面中间。
-   底色与列表卡片同一档，描边用分隔线色，读起来是"这里本来是列表" */
+/* 分组里没有收藏：只留一句居中提示。
+   原先铺了一层卡片底，空分组看着像"这里有一块内容"，反而比空白更碍眼 */
 .collect-empty {
-  padding: 28px 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-card);
-  text-align: center;
+  padding: 24px 16px;
 }
 

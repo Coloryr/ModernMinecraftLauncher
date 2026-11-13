@@ -1038,11 +1038,11 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
       <template v-if="!isEmpty">
         <BaseButton size="sm" variant="ghost" class="icon-btn-head" v-tip="t('collect.addModpack')"
           :aria-label="t('collect.addModpack')" @click="openWindow('add_modpack')">
-          <GlyphIcon name="package" :size="15" :weight="1.8" />
+          <GlyphIcon name="package" :size="15" :weight="1.8" add />
         </BaseButton>
         <BaseButton size="sm" variant="ghost" class="icon-btn-head" v-tip="t('collect.addResource')"
           :aria-label="t('collect.addResource')" @click="openAddResource">
-          <GlyphIcon name="puzzle" :size="15" :weight="1.8" />
+          <GlyphIcon name="puzzle" :size="15" :weight="1.8" add />
         </BaseButton>
       </template>
     </template>
@@ -1189,7 +1189,7 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
         @keydown.enter="confirmAddGroup" />
       <div class="modal-actions">
         <BaseButton @click="showAddGroup = false">{{ t("add.cancel") }}</BaseButton>
-        <BaseButton variant="primary" @click="confirmAddGroup">{{ t("add.yes") }}</BaseButton>
+        <BaseButton variant="primary" @click="confirmAddGroup">{{ t("actions.confirm") }}</BaseButton>
       </div>
     </BaseModal>
 
@@ -1198,8 +1198,8 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
       @close="deleteGroupTarget = ''">
       <p class="delete-tip">{{ t("collect.deleteGroupConfirm", { name: groupLabel(deleteGroupTarget) }) }}</p>
       <div class="modal-actions">
-        <BaseButton @click="deleteGroupTarget = ''">{{ t("add.no") }}</BaseButton>
-        <BaseButton variant="primary" @click="confirmDeleteGroup">{{ t("add.yes") }}</BaseButton>
+        <BaseButton @click="deleteGroupTarget = ''">{{ t("add.cancel") }}</BaseButton>
+        <BaseButton variant="primary" @click="confirmDeleteGroup">{{ t("actions.confirm") }}</BaseButton>
       </div>
     </BaseModal>
 
@@ -1207,8 +1207,8 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
     <BaseModal v-if="removeOpen" :title="t('collect.deleteFav')" :closable="false" @close="removeOpen = false">
       <p class="delete-tip">{{ t("collect.removeConfirm", { count: actionUuids.length }) }}</p>
       <div class="modal-actions">
-        <BaseButton @click="removeOpen = false">{{ t("add.no") }}</BaseButton>
-        <BaseButton variant="primary" @click="confirmRemove">{{ t("add.yes") }}</BaseButton>
+        <BaseButton @click="removeOpen = false">{{ t("add.cancel") }}</BaseButton>
+        <BaseButton variant="primary" @click="confirmRemove">{{ t("actions.confirm") }}</BaseButton>
       </div>
     </BaseModal>
 
@@ -1222,8 +1222,8 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
         }}
       </p>
       <div class="modal-actions">
-        <BaseButton @click="clearOpen = false">{{ t("add.no") }}</BaseButton>
-        <BaseButton variant="primary" @click="confirmClear">{{ t("add.yes") }}</BaseButton>
+        <BaseButton @click="clearOpen = false">{{ t("add.cancel") }}</BaseButton>
+        <BaseButton variant="primary" @click="confirmClear">{{ t("actions.confirm") }}</BaseButton>
       </div>
     </BaseModal>
 
@@ -1235,7 +1235,7 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
       </select>
       <div class="modal-actions">
         <BaseButton @click="addToGroupTarget = ''">{{ t("add.cancel") }}</BaseButton>
-        <BaseButton variant="primary" @click="confirmAddToGroup">{{ t("add.yes") }}</BaseButton>
+        <BaseButton variant="primary" @click="confirmAddToGroup">{{ t("actions.confirm") }}</BaseButton>
       </div>
     </BaseModal>
 

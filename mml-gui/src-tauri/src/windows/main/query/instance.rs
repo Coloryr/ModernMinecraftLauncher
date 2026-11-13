@@ -79,6 +79,8 @@ pub fn main_get_instances() -> Vec<InstanceInfoDto> {
                     &inst.get_base_path(),
                 )
                 .is_some(),
+                // 建实例后的自动补全阶段，主窗口启动按钮据此显示"下载文件中"
+                preparing: crate::windows::main::prepare::phase_of(&inst.uuid).map(str::to_string),
             }
         })
         .collect()

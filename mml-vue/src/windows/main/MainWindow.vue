@@ -2052,6 +2052,37 @@ const launchActionText = computed(() =>
   isLaunching.value ? t("launch.cancel") : t("launch.stop"),
 );
 
+/** 当前选中实例是否正在补全文件：建实例后的自动下载，结束后才能启动 */
+const isPreparing = computed(() => !!selected.value?.preparing);
+
+/** 补全阶段的进度：下载阶段用真实下载进度，检查阶段没有确定值 */
+const preparingPct = computed(() => {
+  if (selected.value?.preparing !== "download" || !downloadProgress.hasTasks.value) return null;
+  return Math.round(downloadProgress.percent.value);
+});
+
+/** 补全阶段文案：检查中 / 下载文件中 */
+const preparingText = computed(() =>
+  selected.value?.preparing === "download"
+    ? t("launch.downloadingFiles")
+    : t("launch.checkingFiles"),
+);
+
+/**
+ * 取消正在进行的文件补全
+ *
+ * 后端停下载并清掉阶段，实例列表刷新后按钮回到「启动游戏」；已经下完的文件留着。
+ *
+ * - `uuid`: 实例 uuid
+ */
+async function cancelPrepare(uuid: string) {
+  try {
+    await commands.main.cancelPrepare(uuid);
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
+
 /** 关闭游戏确认弹窗 */
 const stopAsk = ref(false);
 /** 关闭动作正在跑，防连点 */
@@ -2089,7 +2120,9 @@ async function cancelLaunch(uuid: string) {
 function onLaunchAction() {
   const inst = selected.value;
   if (!inst) return;
-  if (isLaunching.value) {
+  if (isPreparing.value) {
+    void cancelPrepare(inst.uuid);
+  } else if (isLaunching.value) {
     void cancelLaunch(inst.uuid);
   } else if (inst.running) {
     stopAsk.value = true;
@@ -2185,7 +2218,12 @@ const launchMenuPos = ref({ x: 0, y: 0 });
 
 /** 调试启动是否可用：与启动按钮同口径，运行中 / 启动中 / 离线限制都按住 */
 const canDebugLaunch = computed(
-  () => !!selected.value && !selected.value.running && !offlineLaunchBlocked.value && !isLaunching.value,
+  () =>
+    !!selected.value &&
+    !selected.value.running &&
+    !offlineLaunchBlocked.value &&
+    !isLaunching.value &&
+    !isPreparing.value,
 );
 
 /** 下拉菜单项：只放调试启动，具体选项交给 DebuggerLaunchModal */
@@ -2557,7 +2595,8 @@ onMounted(async () => {
               <div class="launch-actions">
                 <div class="launch-row">
                   <BaseButton variant="primary" size="lg" class="launch-main-btn" :class="{ running: selected?.running }"
-                    :disabled="!selected || (!selected.running && offlineLaunchBlocked)" @click="onLaunchAction">
+                    :disabled="!selected || (!selected.running && !isPreparing && offlineLaunchBlocked)"
+                    @click="onLaunchAction">
                     <!-- 启动中：按钮里是阶段 + 进度；运行中：运行中。悬停两者都换成取消 / 关闭动作 -->
                     <span v-if="selected?.running" class="launch-busy">
                       <LaunchProgress v-if="isLaunching" :text="launchStageText" :percent="launchPct" />
@@ -2565,6 +2604,14 @@ onMounted(async () => {
                       <span class="launch-hover">
                         <GlyphIcon :name="isLaunching ? 'close' : 'power'" :size="14" />
                         {{ launchActionText }}
+                      </span>
+                    </span>
+                    <!-- 文件补全中：显示检查 / 下载阶段与进度，点它是取消补全 -->
+                    <span v-else-if="isPreparing" class="launch-busy">
+                      <LaunchProgress :text="preparingText" :percent="preparingPct" />
+                      <span class="launch-hover">
+                        <GlyphIcon name="close" :size="14" />
+                        {{ t("launch.cancelPrepare") }}
                       </span>
                     </span>
                     <template v-else>
@@ -2684,13 +2731,22 @@ onMounted(async () => {
                       <div class="detail-side">
                         <div class="launch-row">
                           <BaseButton variant="primary" size="lg" class="play-btn" :class="{ running: selected.running }"
-                            :disabled="!selected.running && offlineLaunchBlocked" @click="onLaunchAction">
+                            :disabled="!selected.running && !isPreparing && offlineLaunchBlocked"
+                            @click="onLaunchAction">
                             <span v-if="selected.running" class="launch-busy">
                               <LaunchProgress v-if="isLaunching" :text="launchStageText" :percent="launchPct" />
                               <span v-else class="launch-running">{{ t("launch.running") }}</span>
                               <span class="launch-hover">
                                 <GlyphIcon :name="isLaunching ? 'close' : 'power'" :size="14" />
                                 {{ launchActionText }}
+                              </span>
+                            </span>
+                            <!-- 文件补全中：与列表模式同一套，点它是取消补全 -->
+                            <span v-else-if="isPreparing" class="launch-busy">
+                              <LaunchProgress :text="preparingText" :percent="preparingPct" />
+                              <span class="launch-hover">
+                                <GlyphIcon name="close" :size="14" />
+                                {{ t("launch.cancelPrepare") }}
                               </span>
                             </span>
                             <template v-else>
