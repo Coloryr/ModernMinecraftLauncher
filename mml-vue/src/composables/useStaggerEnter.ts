@@ -2,6 +2,9 @@
 //
 // 用 Web Animations API 而不是 CSS 类：子元素数量不固定，延迟要按实际数量摊开；
 // 全局"界面动画"关掉时直接完成，不阻塞切换。
+//
+// 没有行可错峰时（空列表、加载骨架、数据还在路上）整块淡入：子页切换常常先落到
+// 一个还没有行的空页上，只淡标题的话看着就是硬切。
 import { animations } from "../lib/appearance";
 
 /** 完成回调，Vue Transition 用 */
@@ -19,7 +22,7 @@ type Done = () => void;
  *
  * # 返回值
  *
- * - `enter`: 给 `<Transition @enter>` 用
+ * - `enter`: 给 `<Transition @enter>` 用；有行就逐行落下，没有行就整块淡入
  * - `leave`: 旧页立即移除，不做退场
  */
 export function useStaggerEnter(
@@ -43,13 +46,30 @@ export function useStaggerEnter(
       done();
       return;
     }
-    const items = Array.from(el.querySelectorAll(selector)).slice(0, max);
-    const fadeItems = fadeSelector ? Array.from(el.querySelectorAll(fadeSelector)) : [];
-    const probe = items[0] ?? fadeItems[0];
-    if ((!items.length && !fadeItems.length) || typeof probe?.animate !== "function") {
+    // 没有 Web Animations 的环境直接完成，别把切换卡住
+    if (typeof el.animate !== "function") {
       done();
       return;
     }
+    const items = Array.from(el.querySelectorAll(selector)).slice(0, max);
+    if (!items.length) {
+      // 整块入场：位移比逐行小一档，整页一起动时别晃得太夸张
+      const animation = el.animate(
+        [
+          { opacity: 0, transform: "translateY(8px)" },
+          { opacity: 1, transform: "translateY(0)" },
+        ],
+        { duration: 240, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "both" },
+      );
+      animation.finished
+        .catch(() => undefined)
+        .finally(() => {
+          animation.cancel();
+          done();
+        });
+      return;
+    }
+    const fadeItems = fadeSelector ? Array.from(el.querySelectorAll(fadeSelector)) : [];
     let left = items.length + fadeItems.length;
     const finish = () => {
       left -= 1;

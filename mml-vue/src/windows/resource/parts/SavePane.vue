@@ -24,13 +24,11 @@ import {
 import BaseButton from "../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../components/ui/BaseModal.vue";
 import BaseSwitch from "../../../components/ui/BaseSwitch.vue";
-import ContentHead from "./ContentHead.vue";
 import CloudSavePane from "./CloudSavePane.vue";
 import FormattedText from "../../../components/ui/FormattedText.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
-import SaveTabs from "./SaveTabs.vue";
 import VirtualList from "../../../components/ui/VirtualList.vue";
 import { RESOURCE_ROW_GAP } from "../../../composables/useVirtualRows";
 import { useRowSelect } from "../composables/useRowSelect";
@@ -480,25 +478,23 @@ function saveTip(item: SaveItemDto): string {
 </script>
 
 <template>
-  <ContentHead :data="data">
-    <SaveTabs :data="data" />
-    <!-- 有选中项时顶栏换成批量操作条，与模组列表同一口径。
-         这一条与右键的批量菜单**动作一致**，都只有「删除」：批量备份用户不要 -->
-    <template #actions>
-      <!-- 存档云同步：还没上线，只在源码启动（测试版）时露出来 -->
-      <CloudSavePane v-if="isSourceBuild" :uuid="instanceUuid" :saves="saves" :disabled="busy" @busy="busy = $event"
-        @changed="reloadCurrent" />
-      <template v-if="count">
-        <span class="row-selected-count">{{ t("resource.selectedCount", { n: count }) }}</span>
-        <BaseButton size="sm" variant="danger" :disabled="busy" @click="batchRemove">
-          {{ t("resource.delete") }}
-        </BaseButton>
-        <BaseButton size="sm" :disabled="busy" @click="clear">
-          {{ t("resource.clearSelection") }}
-        </BaseButton>
-      </template>
+  <!-- 操作条挂到窗口层那条子页切换栏上，切换「存档 / 数据包」时这一条不重建，见 ResourceWindow。
+       有选中项时顶栏换成批量操作条，与模组列表同一口径。
+       这一条与右键的批量菜单**动作一致**，都只有「删除」：批量备份用户不要 -->
+  <Teleport to="#resource-saves-actions">
+    <!-- 存档云同步：还没上线，只在源码启动（测试版）时露出来 -->
+    <CloudSavePane v-if="isSourceBuild" :uuid="instanceUuid" :saves="saves" :disabled="busy" @busy="busy = $event"
+      @changed="reloadCurrent" />
+    <template v-if="count">
+      <span class="row-selected-count">{{ t("resource.selectedCount", { n: count }) }}</span>
+      <BaseButton size="sm" variant="danger" :disabled="busy" @click="batchRemove">
+        {{ t("resource.delete") }}
+      </BaseButton>
+      <BaseButton size="sm" :disabled="busy" @click="clear">
+        {{ t("resource.clearSelection") }}
+      </BaseButton>
     </template>
-  </ContentHead>
+  </Teleport>
 
   <div v-if="loading" class="item-list">
     <ListSkeleton />

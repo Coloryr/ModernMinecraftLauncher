@@ -11,6 +11,7 @@ import { formatCount, t } from "../lib/i18n";
 import { formatDate } from "../lib/format";
 import { svgIcon } from "../lib/modrinthIcon";
 import { cardTags, hiddenTagTip } from "../lib/projectTags";
+import { popStar } from "../lib/starPop";
 import type { ProjectItemDto } from "../lib/bindings";
 
 const props = defineProps<{
@@ -33,13 +34,19 @@ const emit = defineEmits<{
 
 /** 卡片上显示的标签与折叠数；同一份结果给模板多处用，别每次渲染都重算 */
 const tags = computed(() => cardTags(props.item.tag));
+
+/** 点收藏：按钮先弹一下，收藏状态由窗口层交给后端 */
+function onStar(e: MouseEvent) {
+  popStar(e.currentTarget as HTMLElement | null);
+  emit("star", props.item);
+}
 </script>
 
 <template>
   <div class="pack-item">
     <!-- 收藏星标（右上角）：点击收藏 / 取消收藏 -->
     <button class="pack-star" :class="{ on: item.isStar }"
-      v-tip="item.isStar ? t('modpack.unstar') : t('modpack.star')" @click.stop="emit('star', item)">
+      v-tip="item.isStar ? t('modpack.unstar') : t('modpack.star')" @click.stop="onStar">
       <svg viewBox="0 0 24 24" width="17" height="17" stroke-width="2" stroke-linejoin="round">
         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
       </svg>

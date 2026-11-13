@@ -214,6 +214,30 @@
   margin-left: auto;
 }
 
+/* 存档 / 数据包那条顶栏挂在窗口层，切分类进来时它不在 <Transition> 里，自己淡入一次；
+   子页之间切换时它不重建，所以不会每切一次就闪一下 */
+.resource-layout .cat-content > .content-head {
+  animation: resource-head-in 0.18s var(--ease-out);
+}
+
+@keyframes resource-head-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* 子页操作条的落点：存档 / 数据包两个子页把自己的按钮 Teleport 进来，
+   这里照 .head-actions 的排布摆一行，刷新按钮仍在最右 */
+.resource-layout .head-pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* 工具条里的按钮：高度与同行的视图切换（SegmentedTabs）一样是全 app 那一档 32px，
    .mini-btn 的默认就是 32，这里只管横向留白 */
 .resource-layout .head-actions .mini-btn {

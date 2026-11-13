@@ -17,9 +17,13 @@ use crate::{
 
 use super::{
     handle::InstanceHandle,
-    java::{capture_stem, debugger_dir_error, java_major_of, jdwp_arg},
+    java::{debugger_dir_error, java_major_of, jdwp_arg},
     types::{GameLaunchArg, GameRunObj, LaunchDebugger},
 };
+
+// 捕获文件名只给 RenderDoc 用，那个分支在 macOS 上不编译
+#[cfg(any(windows, target_os = "linux"))]
+use super::java::capture_stem;
 
 impl InstanceSettingObj {
     /// 启动游戏实例

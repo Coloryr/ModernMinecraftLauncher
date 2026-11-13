@@ -1,5 +1,8 @@
 <script setup lang="ts">
-// 存档分类的子页切换：存档 / 数据包（存档页与数据包页共用这一段）
+// 存档分类的子页切换：存档 / 数据包
+//
+// 由 ResourceWindow 渲染在窗口层，存档页与数据包页**共用这一份**：放进子页里的话
+// 每次切换都会重建控件，滑块只会跳过去，没有滑动的过程。
 import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
 import { t } from "../../../lib/i18n";
 import type { useResourceData } from "../composables/useResourceData";

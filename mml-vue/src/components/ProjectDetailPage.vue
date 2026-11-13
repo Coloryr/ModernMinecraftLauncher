@@ -19,6 +19,8 @@ import { svgIcon } from "../lib/modrinthIcon";
 import { usePageActive } from "../lib/pageActive";
 import { usePageKeys } from "../composables/usePageKeys";
 import { toggleStar } from "../lib/projectCollect";
+import { popStar } from "../lib/starPop";
+import { scrollToElementSmooth } from "../lib/scrollTop";
 import { cardTags, hiddenTagTip } from "../lib/projectTags";
 import type {
   FileListItemDto,
@@ -318,8 +320,15 @@ function onDetailClick(e: MouseEvent) {
 /** 版本列表锚点：头部「版本列表」按钮滚动到这里 */
 const versionsRef = ref<HTMLElement | null>(null);
 
+/** 滚到版本区：自己按帧滚，别指望 WebView 的平滑滚动 */
 function scrollToVersions() {
-  versionsRef.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+  scrollToElementSmooth(versionsRef.value, 8);
+}
+
+/** 收藏按钮：按钮先弹一下，实心与否仍以后端结果为准 */
+function onStarClick(e: MouseEvent) {
+  popStar(e.currentTarget as HTMLElement | null);
+  if (current.value) void toggleStar(current.value);
 }
 </script>
 
@@ -367,7 +376,7 @@ function scrollToVersions() {
                 {{ t("modpack.download") }}
               </button>
               <button class="detail-star" :class="{ on: current.isStar }"
-                v-tip="current.isStar ? t('modpack.unstar') : t('modpack.star')" @click="toggleStar(current)">
+                v-tip="current.isStar ? t('modpack.unstar') : t('modpack.star')" @click="onStarClick">
                 <svg viewBox="0 0 24 24" width="20" height="20" stroke-width="2" stroke-linejoin="round">
                   <path
                     d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
@@ -394,12 +403,23 @@ function scrollToVersions() {
           </div>
 
           <div class="detail-scroll">
-            <!-- 详情正文的加载 / 失败只在这里提示一次；版本列表是并行的另一份加载，自己管自己 -->
-            <div v-if="detailLoading" class="empty-tip">{{ t("modpack.loadingDetail") }}</div>
+            <!-- 详情正文的加载 / 失败只在这里提示一次；版本列表是并行的另一份加载，自己管自己。
+                 加载态用骨架占位，与列表那套 .sk 同一份呼吸动画 -->
+            <div v-if="detailLoading" class="detail-loading" role="status" :aria-label="t('modpack.loadingDetail')">
+              <div class="sk sk-line w40 detail-loading-title"></div>
+              <div class="sk sk-line w90"></div>
+              <div class="sk sk-line w90"></div>
+              <div class="sk sk-line w60"></div>
+              <div class="detail-shots detail-loading-shots">
+                <div class="sk detail-loading-shot"></div>
+                <div class="sk detail-loading-shot"></div>
+              </div>
+            </div>
             <div v-else-if="detailError" class="error-text detail-error" role="alert">{{ detailError }}</div>
             <!-- 简介 / 截图 / 版本列表合并为一块大卡片，分区间距隔开，避免多框割裂 -->
             <div class="detail-card">
-              <template v-if="detail">
+              <!-- 到货的简介与截图整块升起，见下面 .detail-intro 的动画 -->
+              <div v-if="detail" class="detail-intro">
                 <!-- Modrinth：正文；CurseForge：简介。标题都用「项目简介」 -->
                 <div class="detail-section">{{ t("modpack.summary") }}</div>
                 <article v-if="bodyHtml" class="detail-md" v-html="bodyHtml"></article>
@@ -412,9 +432,9 @@ function scrollToVersions() {
                       v-tip="shot.name || shot.description" @click="openPreview(shot.logo)" />
                   </div>
                 </template>
-              </template>
+              </div>
 
-              <div ref="versionsRef" class="detail-block versions-anchor">
+              <div ref="versionsRef" class="detail-block">
                 <div class="detail-section detail-versions-head">
                   <span>{{ t("modpack.versions") }}</span>
                   <div class="version-tools">
@@ -440,9 +460,10 @@ function scrollToVersions() {
                   </div>
                 </div>
                 <div class="detail-files" :class="{ 'is-loading-dim': filesLoading }">
-                  <!-- 首次加载用骨架；翻页时保留旧内容并压暗（结果到了才整体替换） -->
+                  <!-- 首次加载用骨架；翻页时保留旧内容并压暗（结果到了才整体替换）。
+                       骨架与真行都按顺序落下，见项目详情 css 里的 --row-i 错峰 -->
                   <template v-if="filesLoading && pageFiles.length === 0">
-                    <div v-for="n in 5" :key="n" class="sk-row compact">
+                    <div v-for="(n, index) in 5" :key="n" class="sk-row compact" :style="{ '--row-i': index }">
                       <div class="sk-lines">
                         <div class="sk sk-line w70"></div>
                         <div class="sk sk-line w45"></div>
@@ -456,7 +477,8 @@ function scrollToVersions() {
                   </div>
                   <div v-else-if="pageFiles.length === 0" class="empty-tip">{{ t("modpack.noVersions") }}</div>
                   <template v-else>
-                    <div v-for="file in pageFiles" :key="file.source.fid" class="file-row">
+                    <div v-for="(file, index) in pageFiles" :key="file.source.fid" class="file-row"
+                      :style="{ '--row-i': Math.min(index, 8) }">
                       <div class="file-info">
                         <span class="file-name">
                           {{ file.name }}

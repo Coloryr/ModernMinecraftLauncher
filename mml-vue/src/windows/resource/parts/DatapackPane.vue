@@ -8,12 +8,10 @@ import { computed, ref, watch } from "vue";
 import { t } from "../../../lib/i18n";
 import { stripFormatting } from "../../../lib/formatting";
 import { deleteDatapack, toggleDatapack } from "../../../lib/api";
-import ContentHead from "./ContentHead.vue";
 import FormattedText from "../../../components/ui/FormattedText.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
-import SaveTabs from "./SaveTabs.vue";
 import VirtualList from "../../../components/ui/VirtualList.vue";
 import { RESOURCE_ROW_GAP } from "../../../composables/useVirtualRows";
 import { useRowSelect } from "../composables/useRowSelect";
@@ -208,27 +206,25 @@ function formatLabel(item: DataPackItemDto): string {
 </script>
 
 <template>
-  <ContentHead :data="data">
-    <SaveTabs :data="data" />
+  <!-- 操作条挂到窗口层那条子页切换栏上，切换「存档 / 数据包」时这一条不重建，见 ResourceWindow -->
+  <Teleport to="#resource-saves-actions">
     <!-- 有选中项时顶栏换成批量操作条，与其它分类同一口径 -->
-    <template #actions>
-      <template v-if="count">
-        <span class="row-selected-count">{{ t("resource.selectedCount", { n: count }) }}</span>
-        <button v-if="canEnable" class="mini-btn" :disabled="busy" @click="batchToggle(true)">
-          {{ t("resource.enable") }}
-        </button>
-        <button v-if="canDisable" class="mini-btn" :disabled="busy" @click="batchToggle(false)">
-          {{ t("resource.disable") }}
-        </button>
-        <button class="mini-btn danger" :disabled="busy" @click="batchRemove">
-          {{ t("resource.delete") }}
-        </button>
-        <button class="mini-btn" :disabled="busy" @click="clear">
-          {{ t("resource.clearSelection") }}
-        </button>
-      </template>
+    <template v-if="count">
+      <span class="row-selected-count">{{ t("resource.selectedCount", { n: count }) }}</span>
+      <button v-if="canEnable" class="mini-btn" :disabled="busy" @click="batchToggle(true)">
+        {{ t("resource.enable") }}
+      </button>
+      <button v-if="canDisable" class="mini-btn" :disabled="busy" @click="batchToggle(false)">
+        {{ t("resource.disable") }}
+      </button>
+      <button class="mini-btn danger" :disabled="busy" @click="batchRemove">
+        {{ t("resource.delete") }}
+      </button>
+      <button class="mini-btn" :disabled="busy" @click="clear">
+        {{ t("resource.clearSelection") }}
+      </button>
     </template>
-  </ContentHead>
+  </Teleport>
 
   <VirtualList class="item-list" :count="dpSave ? datapacks.length : 0" :row-gap="RESOURCE_ROW_GAP">
     <!-- 存档下拉：选完之后选中项只显示存档名，前面补一个常驻的标签说明这是什么。

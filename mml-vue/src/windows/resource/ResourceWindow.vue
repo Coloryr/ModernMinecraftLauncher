@@ -29,7 +29,9 @@ import { useResourceOps } from "./composables/useResourceOps";
 import { useResourceView } from "./composables/useResourceView";
 import CategoryRail from "./parts/CategoryRail.vue";
 import ConfirmModal from "./parts/ConfirmModal.vue";
+import ContentHead from "./parts/ContentHead.vue";
 import RenameModal from "./parts/RenameModal.vue";
+import SaveTabs from "./parts/SaveTabs.vue";
 import DatapackPane from "./parts/DatapackPane.vue";
 import DropConflictModal from "./parts/DropConflictModal.vue";
 import DropOverlay from "../../components/ui/DropOverlay.vue";
@@ -324,10 +326,27 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
 
       <section class="cat-content">
         <!--
+          存档类的两个子页共用这一条顶栏：子页切换栏挂在**窗口层**，子页之间来回切时不重建，
+          分段控件的滑块才能从「存档」滑到「数据包」（放在子页里的话是两份控件，滑块只会跳）。
+
+          子页自己的操作条 —— 存档的云同步 / 批量删除、数据包的批量启用禁用 ——
+          由子页 Teleport 进 #resource-saves-actions，所以这一条在子页切换时也不用挪位置。
+        -->
+        <ContentHead v-if="instance && category === 'saves'" :data="data">
+          <SaveTabs :data="data" />
+          <template #actions>
+            <div id="resource-saves-actions" class="head-pane-actions"></div>
+          </template>
+        </ContentHead>
+
+        <!--
           切分类加一段淡入淡出，与主窗口的 view-swap 同一套观感。
           `<Transition>` 不产生 DOM，所以 .cat-content 的 flex 布局不受影响；
           但里面的 `.pane-swap` 要**复刻**「顶栏 + 列表」之间的纵向间距（gap 12px），
           否则包一层后间距会丢；主窗口的 .detail-instance 也是这么处理的。
+
+          存档类的顶栏在上面那一层，不在这个 Transition 里：间距由 .cat-content 的 gap 给，
+          子页之间切换只换下面的列表，顶栏与滑块原地不动。
         -->
         <Transition :css="false" mode="out-in" @enter="enterPane" @leave="leavePane">
           <!-- 没有选中实例：只给这一条引导，不再顺带铺一个空列表，原先两段会同时出现 -->

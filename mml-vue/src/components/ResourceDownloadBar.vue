@@ -136,6 +136,20 @@ function progressText(group: ResourceGroupProgress): string {
   border-radius: 10px;
   background: var(--bg-card);
   border: 1px solid var(--border);
+  /* 任务栏是后插进内容区的：升起一下，别让列表底部突然多出一块 */
+  animation: res-bar-in 0.18s var(--ease-out);
+}
+
+/* 新加入的下载项目：与任务栏同一套入场 */
+.res-task {
+  animation: res-bar-in 0.18s var(--ease-out);
+}
+
+@keyframes res-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .res-bar-head {

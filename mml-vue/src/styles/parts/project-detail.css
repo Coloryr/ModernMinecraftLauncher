@@ -299,14 +299,57 @@
   padding: 0;
 }
 
+/* 内容到货的入场：简介与截图整块升起，版本行按顺序落下（--row-i 由模板给）。
+   与页面进场同一套观感：不透明度 + 8px 上移 */
+.detail-intro,
+.detail-loading,
+.detail-files .sk-row,
+.detail-files .file-row {
+  animation: detail-rise 0.18s var(--ease-out) both;
+}
+
+/* 行多时压住总时长：最多错峰 8 行，再往后的行跟着最后一批一起出 */
+.detail-files .sk-row,
+.detail-files .file-row {
+  animation-delay: calc(var(--row-i, 0) * 24ms);
+}
+
+@keyframes detail-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* 项目信息加载占位：与列表骨架同一套 .sk 呼吸动画，形状按「简介 + 两张截图」摆 */
+.detail-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detail-loading-title {
+  height: 16px;
+  margin-bottom: 2px;
+}
+
+.detail-loading .sk-line {
+  height: 12px;
+}
+
+.detail-loading-shots {
+  margin-top: 6px;
+}
+
+.detail-loading-shot {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+}
+
 /* 卡片内分区的上间距（截图 / 版本列表） */
 .detail-block {
   margin-top: 16px;
-}
-
-/* 「版本列表」跳转按钮的滚动落点 */
-.versions-anchor {
-  scroll-margin-top: 8px;
 }
 
 .detail-summary {
