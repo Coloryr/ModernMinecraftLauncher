@@ -1,0 +1,171 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -34,6 +34,8 @@
+ tokio = { version = "1.52.3", features = ["sync", "time"] }
+ 
+ [target.'cfg(target_os = "macos")'.dependencies]
++# M²L 本地修改：窗口缩放时同步重摆红黄绿（src/traffic.rs）
++block2 = "=0.6.2"
+ objc2 = { version = "=0.6.4", features = ["exception"] }
+ objc2-app-kit = { version = "=0.3.2", default-features = false, features = [
+     "std",
+@@ -46,6 +48,10 @@
+ objc2-foundation = { version = "=0.3.2", default-features = false, features = [
+     "std",
+     "NSGeometry",
++    "NSNotification",
++    "NSOperation",
++    "NSString",
++    "block2",
+ ] }
+ 
+ [target.'cfg(target_os = "windows")'.dependencies]
+--- a/src/traffic.rs
++++ b/src/traffic.rs
+@@ -11,12 +11,107 @@
+ #[cfg(feature = "macos-transparency")]
+ use objc2_app_kit::NSColor;
+ use objc2_app_kit::{NSWindow, NSWindowButton, NSWindowStyleMask};
+-use objc2_foundation::NSRect;
+-use std::{ffi::c_void, panic::AssertUnwindSafe};
++use objc2_foundation::{NSNotificationCenter, NSRect};
++use std::{
++    collections::HashMap,
++    ffi::c_void,
++    panic::AssertUnwindSafe,
++    sync::{Mutex, Once, OnceLock},
++};
+ use tauri::{Error, Manager, Runtime, WebviewWindow, WindowEvent};
+ 
+ const MACOS_TITLEBAR_EVENT: &str = "macos-titlebar-state";
++
++/// 正在被跟踪的窗口，键是 NSWindow 指针；值是要保持的红黄绿内边距
++static RESIZE_INSETS: OnceLock<Mutex<HashMap<usize, (f64, f64)>>> = OnceLock::new();
++
++fn resize_insets() -> &'static Mutex<HashMap<usize, (f64, f64)>> {
++    RESIZE_INSETS.get_or_init(|| Mutex::new(HashMap::new()))
++}
++
++/// 让 AppKit 在窗口缩放时也保持自定义的红黄绿位置
++///
++/// AppKit 每次 live resize 都把标题栏容器与按钮摆回系统默认位置，插件原本只在 Tauri 的
++/// `Resized` 事件里补摆；事件要等这一轮布局与绘制之后才处理，拖动窗口时就会看到按钮
++/// 先跳回默认位置再被摆回来。这里听 `NSWindowDidResizeNotification`：它在 AppKit 完成
++/// 本次布局、绘制之前同步投递，先强制布局再摆位，绘制时已经是自定义位置。
++fn install_resize_observer() {
++    static INSTALLED: Once = Once::new();
++    INSTALLED.call_once(|| {
++        let block = block2::RcBlock::new(
++            |notification: std::ptr::NonNull<objc2_foundation::NSNotification>| {
++                // SAFETY: 通知中心在主线程同步调用这个 block，通知对象在调用期间存活
++                let notification = unsafe { notification.as_ref() };
++                let Some(object) = notification.object() else {
++                    return;
++                };
++                let Ok(window) = object.downcast::<NSWindow>() else {
++                    return;
++                };
++                let key = (&*window as *const NSWindow) as usize;
++                let Ok(insets) = resize_insets().lock() else {
++                    return;
++                };
++                let Some(&(inset_x, inset_y)) = insets.get(&key) else {
++                    return;
++                };
++                reapply_traffic_lights(&window, inset_x, inset_y);
++            },
++        );
++        // SAFETY: 只注册一个进程级的通知 observer；通知中心自己持有它，不随 block 释放
++        unsafe {
++            let center = NSNotificationCenter::defaultCenter();
++            let _ = center.addObserverForName_object_queue_usingBlock(
++                Some(objc2_app_kit::NSWindowDidResizeNotification),
++                None,
++                None,
++                &block,
++            );
++        }
++    });
++}
+ 
++/// 通知回调里补摆一次：先让 AppKit 把本次 resize 的布局算完，再覆盖回自定义位置
++fn reapply_traffic_lights(ns_window: &NSWindow, inset_x: f64, inset_y: f64) {
++    if ns_window
++        .styleMask()
++        .contains(NSWindowStyleMask::FullScreen)
++    {
++        return;
++    }
++    let Some(content_view) = ns_window.contentView() else {
++        return;
++    };
++    // SAFETY: contentView 的父视图是 AppKit 持有的窗口 frame 视图，只在本轮主线程回调里借用
++    if let Some(frame_view) = unsafe { content_view.superview() } {
++        frame_view.layoutSubtreeIfNeeded();
++    }
++    let snapshot = TrafficSnapshot {
++        inset_x,
++        inset_y,
++        target: None,
++    };
++    let _ = appkit("repositioning macOS traffic lights on resize", || {
++        position_traffic_lights(ns_window, snapshot)
++    });
++}
++
++fn track_resize_insets(key: NativeWindowKey, snapshot: TrafficSnapshot) {
++    install_resize_observer();
++    let Ok(mut insets) = resize_insets().lock() else {
++        return;
++    };
++    insets.insert(key.native_window, (snapshot.inset_x, snapshot.inset_y));
++}
++
++fn untrack_resize_insets(key: NativeWindowKey) {
++    if let Some(insets) = RESIZE_INSETS.get() {
++        if let Ok(mut insets) = insets.lock() {
++            insets.remove(&key.native_window);
++        }
++    }
++}
++
+ fn with_registry<R: Runtime, T>(
+     window: &WebviewWindow<R>,
+     action: impl FnOnce(&mut TrafficRegistry) -> T,
+@@ -294,7 +389,6 @@
+         )
+         .into());
+     }
+-
+     // SAFETY: Tauri documents `ns_window` as the WKWebView's NSWindow handle.
+     // The caller is on Tauri's event-loop thread, and the reference is not
+     // retained or stored beyond this synchronous AppKit operation.
+@@ -310,6 +404,7 @@
+         }
+         registry.record_observation(key, generation, observation)
+     })?;
++    track_resize_insets(key, snapshot);
+     if let Some((target, titlebar)) = dispatch {
+         let script = frontend::dispatch_script(target, MACOS_TITLEBAR_EVENT, &titlebar)?;
+         if let Err(eval_error) = window.eval(script) {
+@@ -360,6 +455,7 @@
+     let observed = window.clone();
+     window.on_window_event(move |event| match event {
+         WindowEvent::Destroyed => {
++            untrack_resize_insets(key);
+             if let Err(error) = with_registry(&observed, |registry| {
+                 registry.destroy(key, generation);
+             }) {
+@@ -472,8 +568,10 @@
+ 
+ pub(crate) fn deactivate<R: Runtime>(window: &WebviewWindow<R>) -> Result<(), Error> {
+     let key = native_window_key(window)?;
+-    let Some(deactivation) = with_registry(window, |registry| registry.begin_deactivation(key))?
+-    else {
++    let deactivation = with_registry(window, |registry| registry.begin_deactivation(key))?;
++    // 定位已关闭：无论下面恢复成不成功，都不再在缩放时补摆
++    untrack_resize_insets(key);
++    let Some(deactivation) = deactivation else {
+         return Ok(());
+     };
+ 

@@ -6051,6 +6051,7 @@ version = "3.0.5"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
+ "block2",
  "gtk",
  "objc2",
  "objc2-app-kit",
