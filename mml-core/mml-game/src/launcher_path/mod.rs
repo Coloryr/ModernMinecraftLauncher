@@ -24,7 +24,7 @@ pub mod libraries_path;
 pub mod version_path;
 
 /// 内置的 ColorASM jar 数据
-const COLORASM_FILE: &[u8] = include_bytes!("../../assets/ColorASM-1.4.5-all.jar");
+const COLORASM_FILE: &[u8] = include_bytes!("../../assets/ColorASM-1.4.7-all.jar");
 
 /// ColorASM jar 的存放位置
 static COLORASM: LazyLock<PathBuf> = LazyLock::new(|| {
@@ -32,8 +32,8 @@ static COLORASM: LazyLock<PathBuf> = LazyLock::new(|| {
         .join("com")
         .join("coloryr")
         .join("colorasm")
-        .join("1.4.5")
-        .join("ColorASM-1.4.5-all.jar");
+        .join("1.4.7")
+        .join("ColorASM-1.4.7-all.jar");
 
     local
 });
@@ -141,7 +141,7 @@ pub fn ready_optifine_wrapper() -> CoreResult<()> {
 /// 返回对应的下载项
 pub fn get_colorasm() -> FileItemObj {
     FileItemObj {
-        name: String::from("com.coloryr.colormc:colormcasm:1.4.5:all"),
+        name: String::from("com.coloryr.colormc:colormcasm:1.4.7:all"),
         file: COLORASM.clone(),
         url: Default::default(),
         hash: Default::default(),

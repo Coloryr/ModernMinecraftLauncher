@@ -9,7 +9,7 @@
 
 | 组件 | 版本 | 许可 | 上游 |
 | --- | --- | --- | --- |
-| ColorASM | 1.4.5 | Apache-2.0，本项目作者作品 | [Coloryr/ColorMC](https://github.com/Coloryr/ColorMC) |
+| ColorASM | 1.4.7 | Apache-2.0，本项目作者作品 | [Coloryr/ColorMC](https://github.com/Coloryr/ColorMC) |
 | ForgeWrapper | prism-2025-12-07 | MIT | [ZekerZhayard/ForgeWrapper](https://github.com/ZekerZhayard/ForgeWrapper) |
 | OptifineWrapper | 1.1 | MIT | [Coloryr/OptifineWrapper](https://github.com/Coloryr/OptifineWrapper) |
 | mml-server-sync | 1.5.2 | Apache-2.0，本项目作者作品 | [Coloryr/mml-server-sync](https://github.com/Coloryr/mml-server-sync) |
