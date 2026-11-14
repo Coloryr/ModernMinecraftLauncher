@@ -261,7 +261,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
   /* 上下留白跟着窗口内容区的原内边距（22px）走，且放进滚动内容里：

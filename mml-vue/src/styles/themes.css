@@ -564,6 +564,8 @@ html.has-bg.bg-frosted :is(
   /* 骨架行 */
   .sk-row
 ) {
+  /* 老 macOS 的 WebKit 只认带前缀的写法；新版两个都认，重复一条不影响 */
+  -webkit-backdrop-filter: blur(14px) saturate(1.06);
   backdrop-filter: blur(14px) saturate(1.06);
 }
 

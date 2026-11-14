@@ -3,9 +3,10 @@
 //
 // 状态在 useSettingsGamepad：切到别的标签时本组件会被卸载，未保存的编辑内容
 // 必须留在设置窗口那一层。
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../../components/ui/BaseModal.vue";
+import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import SettingsGroup from "../SettingsGroup.vue";
 import GamepadTestPanel from "../GamepadTestPanel.vue";
@@ -46,6 +47,9 @@ const {
   createOpen,
   createName,
   createError,
+  createBusy,
+  resetOpen,
+  resetBusy,
   deleteOpen,
   pendingName,
   isTaken,
@@ -54,6 +58,8 @@ const {
   discardAndSelect,
   openCreate,
   doCreate,
+  openReset,
+  doReset,
   doDelete,
   activate,
   save,
@@ -62,6 +68,27 @@ const {
 } = props.settings;
 
 onMounted(init);
+
+/** 新建弹窗的输入框：打开即聚焦，免得还要再点一下才能输入 */
+const createInput = ref<HTMLInputElement | null>(null);
+watch(createOpen, async (open) => {
+  if (!open) return;
+  await nextTick();
+  createInput.value?.focus();
+});
+
+/**
+ * 输入框回车提交
+ *
+ * - `event`: 键盘事件；输入法组词中的回车只用来确认候选词，不能拿去建配置
+ */
+function submitCreate(event: KeyboardEvent) {
+  if (event.isComposing) return;
+  void doCreate();
+}
+
+/** 新配置复制的是生效中的那份，弹窗里写清楚复制来源 */
+const copySource = computed(() => profiles.value.find((item) => item.active)?.name ?? "");
 
 /** 按钮触发方式的三档，顺序即下拉顺序 */
 const MODES: GamepadButtonModeDto[] = ["normal", "toggle", "repeat"];
@@ -166,26 +193,36 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
 
 <template>
   <SettingsGroup id="gamepad" :flash="flashGroup === 'gamepad'">
-    <!-- 配置：下拉选一份，右边是保存 / 删除 / 新建 -->
+    <!-- 配置：下拉选一份；除保存外都是图标键，文字进提示 -->
     <div class="gp-bar">
       <span class="gp-bar-label">{{ t("winGamepad.profiles") }}</span>
       <select class="field-select gp-select" :value="editing" :aria-label="t('winGamepad.profiles')"
         @change="onPick">
         <option v-for="item in profiles" :key="item.name" :value="item.name">{{ item.name }}</option>
       </select>
-      <BaseButton size="sm" :disabled="!config || active" @click="activate">
-        {{ active ? t("winGamepad.active") : t("winGamepad.activate") }}
-      </BaseButton>
+      <button class="ui-btn-icon gp-activate" :class="{ 'is-active': active }" :disabled="!config || active"
+        v-tip="active ? t('winGamepad.active') : t('winGamepad.activate')"
+        :aria-label="active ? t('winGamepad.active') : t('winGamepad.activate')" @click="activate">
+        <GlyphIcon name="check" :size="14" />
+      </button>
       <span class="gp-bar-gap" />
       <!-- 未保存提示常驻占位：一出现就把整排按钮挤到下一行 -->
       <span class="gp-dirty" :class="{ 'is-on': dirty }">{{ t("winGamepad.unsaved") }}</span>
       <BaseButton size="sm" variant="accent" :disabled="!config || saving" @click="save">
         {{ t("winGamepad.save") }}
       </BaseButton>
-      <BaseButton size="sm" variant="danger" :disabled="profiles.length <= 1" @click="deleteOpen = true">
-        {{ t("winGamepad.delete") }}
-      </BaseButton>
-      <BaseButton size="sm" @click="openCreate">{{ t("winGamepad.new") }}</BaseButton>
+      <button class="ui-btn-icon" :disabled="!config" v-tip="t('winGamepad.resetHint')"
+        :aria-label="t('winGamepad.reset')" @click="openReset">
+        <GlyphIcon name="refresh" :size="14" />
+      </button>
+      <button class="ui-btn-icon" :disabled="profiles.length <= 1" v-tip="t('winGamepad.delete')"
+        :aria-label="t('winGamepad.delete')" @click="deleteOpen = true">
+        <GlyphIcon name="trash" :size="14" />
+      </button>
+      <button class="ui-btn-icon" v-tip="t('winGamepad.new')" :aria-label="t('winGamepad.new')"
+        @click="openCreate">
+        <GlyphIcon name="plus" :size="14" />
+      </button>
     </div>
 
     <!-- 手柄列表与状态图：没有可编辑的配置时也照样显示实时状态 -->
@@ -232,9 +269,10 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
           <select v-model="rule.mode" class="field-select gp-mode">
             <option v-for="item in MODES" :key="item" :value="item">{{ modeLabel(item) }}</option>
           </select>
-          <BaseButton size="sm" variant="ghost" class="gp-remove" @click="buttonRules.splice(index, 1)">
-            ✕
-          </BaseButton>
+          <button class="ui-btn-icon gp-remove" v-tip="t('winGamepad.removeBinding')"
+            :aria-label="t('winGamepad.removeBinding')" @click="buttonRules.splice(index, 1)">
+            <GlyphIcon name="close" :size="14" />
+          </button>
         </div>
         <div class="gp-row gp-row-add-button">
           <GamepadKeyPicker :button="newButton.button" :modifier="newButton.modifier" :layout="effectiveLayout"
@@ -244,11 +282,11 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
           <select v-model="newButton.mode" class="field-select gp-mode">
             <option v-for="item in MODES" :key="item" :value="item">{{ modeLabel(item) }}</option>
           </select>
-          <BaseButton size="sm"
+          <button class="ui-btn-icon"
             :disabled="isTaken(newButton.button, newButton.modifier) || newButton.modifier === newButton.button"
-            @click="addButton">
-            {{ t("winGamepad.addButton") }}
-          </BaseButton>
+            v-tip="t('winGamepad.addButton')" :aria-label="t('winGamepad.addButton')" @click="addButton">
+            <GlyphIcon name="plus" :size="14" />
+          </button>
         </div>
       </section>
 
@@ -270,10 +308,11 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
             <input v-model.number="rule.from" class="field-input" type="number" step="0.05" min="-1" max="1" />
             <input v-model.number="rule.to" class="field-input" type="number" step="0.05" min="-1" max="1" />
             <GamepadActionPicker v-model="rule.action" :actions="actions" />
-              <BaseButton size="sm" variant="ghost" class="gp-remove" @click="config.axes.splice(index, 1)">
-                ✕
-              </BaseButton>
-            </div>
+            <button class="ui-btn-icon gp-remove" v-tip="t('winGamepad.removeBinding')"
+              :aria-label="t('winGamepad.removeBinding')" @click="config.axes.splice(index, 1)">
+              <GlyphIcon name="close" :size="14" />
+            </button>
+          </div>
           <!-- 这条轴现在的读数，落在区间里时高亮 -->
           <AxisRangeBar :from="rule.from" :to="rule.to" :value="axisValue(rule.axis)" />
         </template>
@@ -284,7 +323,10 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
           <input v-model.number="newAxis.from" class="field-input" type="number" step="0.05" min="-1" max="1" />
           <input v-model.number="newAxis.to" class="field-input" type="number" step="0.05" min="-1" max="1" />
           <GamepadActionPicker v-model="newAxis.action" :actions="actions" />
-          <BaseButton size="sm" @click="addAxis">{{ t("winGamepad.addAxis") }}</BaseButton>
+          <button class="ui-btn-icon" v-tip="t('winGamepad.addAxis')" :aria-label="t('winGamepad.addAxis')"
+            @click="addAxis">
+            <GlyphIcon name="plus" :size="14" />
+          </button>
         </div>
         <AxisRangeBar :from="newAxis.from" :to="newAxis.to" :value="axisValue(newAxis.axis)" />
       </section>
@@ -325,13 +367,28 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
 
     <!-- 新建配置 -->
     <BaseModal v-if="createOpen" :title="t('winGamepad.createTitle')" @close="createOpen = false">
-      <label class="field-label">{{ t("winGamepad.nameLabel") }}</label>
-      <input v-model="createName" class="field-input" spellcheck="false" @keyup.enter="doCreate" />
+      <label class="field-label" for="gamepad-profile-name">{{ t("winGamepad.nameLabel") }}</label>
+      <input id="gamepad-profile-name" ref="createInput" v-model="createName" class="field-input"
+        spellcheck="false" autocomplete="off" maxlength="32" @keydown.enter="submitCreate" />
+      <p v-if="copySource" class="field-desc">{{ t("winGamepad.createCopy", { name: copySource }) }}</p>
       <p class="field-desc">{{ t("winGamepad.nameHint") }}</p>
       <p v-if="createError" class="error-text">{{ createError }}</p>
       <div class="modal-actions">
         <BaseButton @click="createOpen = false">{{ t("actions.cancel") }}</BaseButton>
-        <BaseButton variant="primary" @click="doCreate">{{ t("winGamepad.create") }}</BaseButton>
+        <BaseButton variant="primary" :disabled="!createName.trim() || createBusy" @click="doCreate">
+          {{ t("winGamepad.create") }}
+        </BaseButton>
+      </div>
+    </BaseModal>
+
+    <!-- 恢复默认键位：先确认，套用后仍是未保存状态 -->
+    <BaseModal v-if="resetOpen" :title="t('winGamepad.resetTitle')" @close="resetOpen = false">
+      <p class="modal-text">{{ t("winGamepad.resetConfirm") }}</p>
+      <div class="modal-actions">
+        <BaseButton @click="resetOpen = false">{{ t("actions.cancel") }}</BaseButton>
+        <BaseButton variant="danger" :disabled="resetBusy" @click="doReset">
+          {{ t("winGamepad.reset") }}
+        </BaseButton>
       </div>
     </BaseModal>
 
@@ -377,6 +434,18 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
   flex-shrink: 0;
   font-size: 12.5px;
   color: var(--text-dim);
+}
+
+/* 顶栏图标键：方形不参与压缩，窄窗口先压下拉 */
+.gp-bar .ui-btn-icon {
+  flex-shrink: 0;
+}
+
+/* 生效中的配置：按钮此时禁用，默认的 0.5 透明度会把状态一起压掉，
+   图标常亮强调色才看得出"当前用的是这份" */
+.gp-activate.is-active:disabled {
+  color: var(--accent);
+  opacity: 1;
 }
 
 /* 窄窗口先压下拉，别让按钮换行 */
@@ -436,11 +505,11 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
 }
 
 .gp-row-button {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 96px 30px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 96px var(--ctl-h);
 }
 
 .gp-row-axis {
-  grid-template-columns: 110px 76px 76px minmax(0, 1fr) 30px;
+  grid-template-columns: 110px 76px 76px minmax(0, 1fr) var(--ctl-h);
 }
 
 .gp-row-head {
@@ -450,11 +519,11 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
 }
 
 .gp-row-add-button {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 96px auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 96px var(--ctl-h);
 }
 
 .gp-row-add-axis {
-  grid-template-columns: 110px 76px 76px minmax(0, 1fr) auto;
+  grid-template-columns: 110px 76px 76px minmax(0, 1fr) var(--ctl-h);
 }
 
 /* 新增行与上面的已有绑定用虚线隔开 */

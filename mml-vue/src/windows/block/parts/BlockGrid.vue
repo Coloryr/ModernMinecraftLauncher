@@ -356,7 +356,7 @@ function onCellKey(e: KeyboardEvent, i: number) {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
   /* 顶部只留悬停上浮的 2px：内容区的顶部留白由上面的搜索条提供，滚动区从它下面开始。

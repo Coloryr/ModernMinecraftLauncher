@@ -436,7 +436,7 @@ async function loadList() {
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 12px;
   align-content: start;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
 }

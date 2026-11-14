@@ -1,0 +1,14 @@
+--- a/src/traffic.rs
++++ b/src/traffic.rs
+@@ -370,6 +370,11 @@
+             }
+         }
+         event if should_refresh_traffic_lights(event) => {
++            // M²L 本地修改：关闭 / 重建窗口时底层 NSWindow 可能已经先失效，
++            // 此时没有红黄绿可刷新，不必往 stderr 刷一条无意义的错误
++            if observed.ns_window().is_err() {
++                return;
++            }
+             if let Err(error) = refresh(&observed, key, generation) {
+                 eprintln!(
+                     "decoration: failed to refresh macOS traffic lights for {:?}: {error}",

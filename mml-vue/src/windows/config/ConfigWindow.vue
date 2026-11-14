@@ -771,7 +771,7 @@ useWindowRefresh(() => {
   gap: 4px;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
   padding: 2px 10px 14px;

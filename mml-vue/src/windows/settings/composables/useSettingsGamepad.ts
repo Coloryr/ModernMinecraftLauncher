@@ -27,9 +27,11 @@ import { ALL_BUTTONS } from "../gamepadLabels";
  * - `dirty`: 编辑器是否有未保存改动
  * - `actions`: 可选动作名，来自后端
  * - `newButton` / `newAxis`: 新增绑定的草稿
- * - `createOpen` / `createName` / `createError` / `deleteOpen` / `pendingName`: 弹窗状态
+ * - `createOpen` / `createName` / `createError` / `createBusy` / `deleteOpen` / `pendingName`: 弹窗状态
+ * - `resetOpen` / `resetBusy`: 「恢复默认键位」的确认弹窗
  * - `init` / `requestSelect` / `discardAndSelect`: 首次装载与切换配置
  * - `openCreate` / `doCreate` / `doDelete` / `activate` / `save`: 新建、删除、设为生效、保存
+ * - `openReset` / `doReset`: 把当前配置的键位恢复成内置默认
  * - `addButton` / `addAxis`: 往当前配置里加一条绑定
  */
 export function useSettingsGamepad() {
@@ -86,6 +88,12 @@ export function useSettingsGamepad() {
   const createOpen = ref(false);
   const createName = ref("");
   const createError = ref("");
+  /** 正在建配置：挡住重复提交 */
+  const createBusy = ref(false);
+  /** 「恢复默认键位」确认弹窗是否打开 */
+  const resetOpen = ref(false);
+  /** 正在取默认键位 */
+  const resetBusy = ref(false);
   const deleteOpen = ref(false);
   /** 待切换的配置名：有未保存改动时先问一句 */
   const pendingName = ref<string | null>(null);
@@ -193,11 +201,13 @@ export function useSettingsGamepad() {
 
   /** 建一份新配置，内容复制当前生效的那份 */
   async function doCreate() {
+    if (createBusy.value) return;
     const name = createName.value.trim();
     if (!validName(name)) {
       createError.value = t("winGamepad.nameInvalid");
       return;
     }
+    createBusy.value = true;
     try {
       await commands.gamepad.createProfile(name);
       createOpen.value = false;
@@ -205,6 +215,42 @@ export function useSettingsGamepad() {
       await openProfile(name);
     } catch (e) {
       createError.value = tErr(e);
+    } finally {
+      createBusy.value = false;
+    }
+  }
+
+  /** 打开「恢复默认键位」确认弹窗；没有打开的配置时什么也不做 */
+  function openReset() {
+    if (!config.value) return;
+    resetOpen.value = true;
+  }
+
+  /**
+   * 把内置默认键位套到当前编辑内容
+   *
+   * 只替换键位与摇杆：生效状态、选中的手柄与外观保持原样；结果仍是未保存状态，
+   * 用户点保存后才落盘，反悔可以直接切走配置。
+   */
+  async function doReset() {
+    if (!config.value || resetBusy.value) return;
+    resetBusy.value = true;
+    try {
+      const defaults = await commands.gamepad.defaultConfig();
+      config.value = {
+        ...config.value,
+        separateCursor: defaults.separateCursor,
+        buttons: defaults.buttons,
+        cursorButtons: defaults.cursorButtons,
+        axes: defaults.axes,
+        mouse: defaults.mouse,
+      };
+      resetOpen.value = false;
+      showToast(t("winGamepad.resetDone"));
+    } catch (e) {
+      showToast(tErr(e));
+    } finally {
+      resetBusy.value = false;
     }
   }
 
@@ -363,6 +409,9 @@ export function useSettingsGamepad() {
     createOpen,
     createName,
     createError,
+    createBusy,
+    resetOpen,
+    resetBusy,
     deleteOpen,
     pendingName,
     isTaken,
@@ -371,6 +420,8 @@ export function useSettingsGamepad() {
     discardAndSelect,
     openCreate,
     doCreate,
+    openReset,
+    doReset,
     doDelete,
     activate,
     save,

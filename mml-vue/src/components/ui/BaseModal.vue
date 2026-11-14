@@ -112,7 +112,9 @@ const active = usePageActive();
 .modal {
   max-width: 92vw;
   max-height: 85vh;
-  overflow-y: auto;
+  /* 钉成常驻滚动槽：WebKit 的 scrollbar-gutter 只在溢出时占位，不钉住短弹窗的内边距
+     会从 15 + 9 = 24px 掉回 15px，见 styles/scrollbar.css 的 WebKit 例外 */
+  overflow-y: scroll;
   /* 滚动条槽位**两侧都留**：只留右侧时，内容整体左移一截，`padding` 虽然左右对称，
      看着却是右边宽（见 styles/scrollbar.css 的 9px）。槽位常驻，所以滚动条出现 /
      消失时内容不会横向跳。

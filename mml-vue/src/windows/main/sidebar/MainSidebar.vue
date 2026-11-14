@@ -857,11 +857,14 @@ defineExpose({ scrollToInstance });
 }
 
 /* 滚动与"只渲染视口附近那几行"由 VirtualList 负责，这里只管左右内边距 */
-.sidebar-list {
+.sidebar-list.vlist {
   flex: 1;
   scrollbar-gutter: stable;
+  /* WebKit 的 scrollbar-gutter 只在真的溢出时才占位：实例少、列表不滚时右边只剩补偿后的 3px，
+     行会贴到右边框。钉成常驻滚动槽，两个引擎都稳定占 9px，左右才一直是 12px */
+  overflow-y: scroll;
   padding: 2px var(--side-pad-x) 14px;
-  /* 与 scrollbar-gutter 成对：减掉常驻的那 9px，行才是左右各 10px，见 styles/scrollbar.css */
+  /* 与 scrollbar-gutter 成对：减掉常驻的那 9px，行才是左右各 12px，见 styles/scrollbar.css */
   padding-right: calc(var(--side-pad-x) - 9px);
 }
 
@@ -878,6 +881,7 @@ defineExpose({ scrollToInstance });
   padding-right: calc(var(--side-pad-x) - 9px);
   background: var(--bg-side);
   /* 侧栏在透明 / 毛玻璃主题下是半透明的，粘滞头要挡住底下滚过的行 */
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   box-shadow: 0 1px 0 var(--border);
   z-index: 2;

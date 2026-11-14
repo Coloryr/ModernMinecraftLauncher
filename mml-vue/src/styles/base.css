@@ -57,6 +57,11 @@ textarea,
   user-select: text;
 }
 
+/* WebKit 默认再给 placeholder 叠一层透明度，Chromium 不叠；统一成 1，两边颜色才一致 */
+::placeholder {
+  opacity: 1;
+}
+
 /* 没开材质、也没设背景图时窗口不能透：底下既没有模糊也没有底色，透出去就是未处理的桌面 */
 html:not(.has-material):not(.has-bg) body {
   background: var(--bg);

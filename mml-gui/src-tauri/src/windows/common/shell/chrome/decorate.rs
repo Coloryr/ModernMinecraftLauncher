@@ -2,12 +2,15 @@
 //!
 //! 只在 macOS 上编译；插件摆的是 AppKit 原生按钮，位置要在窗口激活后、显示前定好。
 
+#[cfg(target_os = "macos")]
+use tauri::WebviewWindow;
+
 /// macOS 原生红黄绿距窗口左缘的点数
 #[cfg(target_os = "macos")]
-const TRAFFIC_LIGHTS_INSET_X: f32 = 16.0;
+pub(super) const TRAFFIC_LIGHTS_INSET_X: f32 = 16.0;
 /// macOS 原生红黄绿所在标题栏容器比按钮多出的高度，按钮 14 + 38 = 52，与 `--titlebar-h` 对齐
 #[cfg(target_os = "macos")]
-const TRAFFIC_LIGHTS_INSET_Y: f32 = 38.0;
+pub(super) const TRAFFIC_LIGHTS_INSET_Y: f32 = 38.0;
 
 /// 按本地日期判断今天是否要换用另一套标题栏样式
 ///
@@ -15,7 +18,7 @@ const TRAFFIC_LIGHTS_INSET_Y: f32 = 38.0;
 ///
 /// 需要换用时返回 `true`
 #[cfg(target_os = "macos")]
-fn is_april_fools() -> bool {
+pub(super) fn is_april_fools() -> bool {
     use chrono::{Datelike, Local};
 
     let now = Local::now();
@@ -30,7 +33,7 @@ fn is_april_fools() -> bool {
 ///
 /// 取不到原生窗口或主线程调度失败时返回错误文案
 #[cfg(target_os = "macos")]
-fn hide_native_traffic_lights(window: &WebviewWindow) -> Result<(), String> {
+pub(super) fn hide_native_traffic_lights(window: &WebviewWindow) -> Result<(), String> {
     use objc2_app_kit::{NSWindow, NSWindowButton};
     use tauri::Manager;
 

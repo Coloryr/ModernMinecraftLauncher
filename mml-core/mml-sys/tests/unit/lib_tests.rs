@@ -23,9 +23,17 @@ fn test_system_info_matches_target() {
         info.is_arm,
         cfg!(target_arch = "arm") || cfg!(target_arch = "aarch64")
     );
-    if cfg!(target_pointer_width = "64") {
-        assert_eq!(info.system_arch, ArchEnum::X86_64);
-    }
+    // 与 SystemInfo::new 的判定同源：64 位 ARM（如 Apple Silicon）不是 X86_64
+    let expected_arch = match (
+        cfg!(target_pointer_width = "64"),
+        cfg!(target_arch = "arm") || cfg!(target_arch = "aarch64"),
+    ) {
+        (true, true) => ArchEnum::AArch64,
+        (true, false) => ArchEnum::X86_64,
+        (false, true) => ArchEnum::Arm,
+        (false, false) => ArchEnum::X86,
+    };
+    assert_eq!(info.system_arch, expected_arch);
 
     // system_name 与 std::env::consts::OS 一致
     assert_eq!(info.system_name, std::env::consts::OS);

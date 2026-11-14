@@ -398,7 +398,6 @@ mod linux_admin_tests {
 #[cfg(target_os = "macos")]
 mod macos_admin_tests {
     use std::collections::HashMap;
-    use std::io::Read;
 
     use mml_sys::process_helper;
 

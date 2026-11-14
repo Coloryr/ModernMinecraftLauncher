@@ -181,7 +181,7 @@ watch(
   margin-top: 6px;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
 }

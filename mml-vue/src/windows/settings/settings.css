@@ -126,7 +126,8 @@
 .settings-layout .tab-content {
   flex: 1;
   min-width: 0;
-  overflow-y: auto;
+  /* 常驻滚动槽：WebKit 只在溢出时占位，不钉住右内边距会少 9px */
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css；上内边距挪到 .set-page —— 吸顶元素贴的是滚动容器的内边距盒，
      留在这里会让吸顶的配置行永远比内容区顶边低 22px */
@@ -167,7 +168,7 @@
   left: 0;
   right: 0;
   max-height: 320px;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
   padding: 4px;

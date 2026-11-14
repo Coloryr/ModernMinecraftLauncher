@@ -51,7 +51,9 @@
  *    参考实现：`WindowFrame` 的 `.frame-body.gutter`、`project-detail.css` 的 `.detail-scroll`。
  *    **WebKit 例外**：它的 `scrollbar-gutter` 只在内容真的溢出时才占位，装得下时一点都不预留
  *    （实测 `offsetWidth === clientWidth`）。这时上面那句补偿就白减 9px，右边比左边窄。
- *    这类容器要再配一句 `overflow-y: scroll` 把槽位钉成常驻，见 `.frame-body.gutter`。
+ *    所以**凡带 `scrollbar-gutter` 的滚动容器都再配一句 `overflow-y: scroll`** 把槽位钉成
+ *    常驻；不补偿的容器也要配，否则 WebKit 下内容从"装得下"变成"开始滚"时会横跳 9px。
+ *    新增滚动容器照此成对写，见 `.frame-body.gutter`。
  *
  * 别指望 `overflow: overlay` 能顶替第 5 条：WebView2（Chromium 156）实测把它按 `auto` 处理，
  * 自定义了 `::-webkit-scrollbar` 的滚动条照样占那 9px。真要"浮层滚动条"只有

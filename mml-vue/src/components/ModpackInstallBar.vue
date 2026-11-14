@@ -215,7 +215,7 @@ async function clearDone() {
 }
 
 .mp-bar.fill-h :deep(.collapse.open > .collapse-inner) {
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
      行不往左缩（槽位由上面的 scrollbar-gutter 常驻），滚动条画在这 8px 上

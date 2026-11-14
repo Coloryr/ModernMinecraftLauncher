@@ -159,7 +159,8 @@
   gap: 8px;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  /* 常驻滚动槽，见 styles/scrollbar.css 的 WebKit 例外 */
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   padding-right: calc(26px - 9px);
 }
@@ -246,7 +247,7 @@
 .si-list {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: scroll;
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -313,7 +314,7 @@
 .si-config-tree {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
 }
 

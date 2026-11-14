@@ -9,7 +9,7 @@
   right: 0;
   z-index: 20;
   max-height: 180px;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
   padding: 4px;

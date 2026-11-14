@@ -286,7 +286,8 @@
 .detail-scroll {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  /* 常驻滚动槽，见 styles/scrollbar.css 的 WebKit 例外 */
+  overflow-y: scroll;
   /* 滚动条槽位常驻预留，右边距再减掉这 9px（与 WindowFrame 的 .frame-body.gutter 同一口径，
      见 styles/scrollbar.css）：左右内边距才是真正的 26px —— 正文右边缘与上面的头部、
      与各个卡片对齐，滚动条画在外边距里，不占内容宽度，内容长短变化时也不会左右跳 */

@@ -39,13 +39,15 @@ fn test_check_parent() {
         ".",
         "..",
         "../x",
-        "..\\x",
         &nested,
         &format!("..{MAIN_SEPARATOR}..{MAIN_SEPARATOR}x"),
     ];
     for item in bad {
         assert!(check_parent(item).is_err(), "{item:?} 不该通过");
     }
+    // 反斜杠只有在 Windows 上才是分隔符；macOS / Linux 上它是普通文件名字符
+    #[cfg(windows)]
+    assert!(check_parent("..\\x").is_err(), "..\\x 不该通过");
 }
 
 /// 备注的键：禁用后缀要剥掉，这样启用 / 禁用来回切时备注才是同一份

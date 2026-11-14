@@ -214,6 +214,14 @@ select.field-select {
   }
 }
 
+/* 数字框：WebKit 常驻右侧步进箭头，Chromium 悬停才显示，两边外观不一致。
+   统一去掉，需要步进的地方用 NumberStepper */
+.field-input[type="number"]::-webkit-inner-spin-button,
+.field-input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* 悬停：描边往强调色靠一档（比聚焦弱），让"能点/能打字"这件事在鼠标移上去时有个反馈；
    禁用态不响应 */
 .field-input:hover:not(:disabled),

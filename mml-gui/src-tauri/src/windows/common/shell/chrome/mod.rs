@@ -12,7 +12,7 @@ use crate::windows::geometry::{clamp_runtime_min_size, reconcile_min_size};
 use crate::windows::registry::min_size_of_label;
 use super::shared::main_window_label;
 #[cfg(target_os = "macos")]
-use super::decorate::{
+use self::decorate::{
     TRAFFIC_LIGHTS_INSET_X, TRAFFIC_LIGHTS_INSET_Y, hide_native_traffic_lights, is_april_fools,
 };
 

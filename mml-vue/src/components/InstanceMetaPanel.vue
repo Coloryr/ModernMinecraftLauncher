@@ -169,13 +169,16 @@ async function applyModpackUpdate(fileId: string) {
 
 // ================= 版本类型 + 版本 =================
 
+const typeFilter = ref(normType(props.instance.versionType ?? "release"));
+
+// 清单可能是空的（离线 / 代理不通），也可能已没有这个类型：至少放进实例自己的类型，
+// 否则 :value 匹配不到任何 option，下拉就是一片空白
 const versionTypes = computed(() => {
   const set = new Set<string>();
   for (const v of props.versions) set.add(normType(v.versionType));
+  set.add(typeFilter.value);
   return [...set];
 });
-
-const typeFilter = ref(normType(props.instance.versionType ?? "release"));
 
 // 跟随实例（切换实例 / 更新后同步）
 watch(
@@ -185,9 +188,13 @@ watch(
   },
 );
 
-const filteredVersions = computed(() =>
-  props.versions.filter((v) => normType(v.versionType) === typeFilter.value),
-);
+// 补一条当前版本：清单为空或清单里已没有它时，下拉同样不会空白，与加载器版本一个口径
+const filteredVersions = computed(() => {
+  const list = props.versions.filter((v) => normType(v.versionType) === typeFilter.value);
+  const cur = props.instance.version;
+  if (cur && !list.some((v) => v.id === cur)) list.unshift({ id: cur, versionType: typeFilter.value });
+  return list;
+});
 
 /**
  * 换游戏版本：加载器类型回到原版
@@ -509,6 +516,8 @@ function onPlatformChange(value: string) {
           <GlyphIcon name="refresh" :size="14" :weight="2" />
         </button>
       </div>
+      <!-- 清单没拉到时只剩当前版本一项，说一声，否则看着像下拉坏了 -->
+      <p v-if="!versions.length" class="field-hint meta-hint">{{ t("meta.versionListEmpty") }}</p>
 
       <!-- 加载器类型 + 加载器版本 -->
       <span class="meta-label">{{ t("meta.loader") }}</span>
@@ -681,6 +690,12 @@ function onPlatformChange(value: string) {
 /* 加载器查询进度所在的那一行：跨满整行，跟在字段下面 */
 .meta-progress {
   grid-column: 1 / -1;
+}
+
+/* 版本清单为空时的提示：同样跨满整行，纵向间距交给网格的 row-gap */
+.meta-hint {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 /* 下拉 + 刷新按钮（与添加实例窗口一致的排布） */

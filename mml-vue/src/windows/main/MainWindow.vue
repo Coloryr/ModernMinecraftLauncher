@@ -374,7 +374,9 @@ function enterHomePage(el: Element, done: () => void) {
 }
 
 function leaveHomePage(_el: Element, done: () => void) {
-  done();
+  // 退场不做动画，但**不能同步 done()**：Vue 在 out-in 移除旧节点时会拿到 null，
+  // 实测抛 unhandledrejection: parentNode，详情区随后一直空白。放到下一个宏任务。
+  window.setTimeout(done, 0);
 }
 const newsLoading = ref(false);
 

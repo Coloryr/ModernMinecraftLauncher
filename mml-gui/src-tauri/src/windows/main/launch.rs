@@ -794,31 +794,39 @@ fn open_renderdoc_capture(app: &AppHandle, uuid: &Uuid) {
     let Some(since) = RENDERDOC_SESSIONS.lock().unwrap().remove(uuid) else {
         return;
     };
-    let uuid = uuid.to_string();
-    let app = app.clone();
-    // qrenderdoc 起界面要一两秒，别占着退出轮询线程
-    let _ = std::thread::Builder::new()
-        .name("Mml RenderDoc Capture".to_string())
-        .spawn(move || {
-            let text = match (
-                mml_tools::renderdoc::find_gui(),
-                mml_tools::renderdoc::latest_capture(since),
-            ) {
-                (Some(gui), Some(capture)) => {
-                    let path = capture.to_string_lossy().into_owned();
-                    match std::process::Command::new(&gui).arg(&capture).spawn() {
-                        Ok(_) => LogText::RenderDocOpened { path }.text(),
-                        Err(err) => LogText::RenderDocOpenFailed {
-                            path,
-                            error: err.to_string(),
+    #[cfg(any(windows, target_os = "linux"))]
+    {
+        let uuid = uuid.to_string();
+        let app = app.clone();
+        // qrenderdoc 起界面要一两秒，别占着退出轮询线程
+        let _ = std::thread::Builder::new()
+            .name("Mml RenderDoc Capture".to_string())
+            .spawn(move || {
+                let text = match (
+                    mml_tools::renderdoc::find_gui(),
+                    mml_tools::renderdoc::latest_capture(since),
+                ) {
+                    (Some(gui), Some(capture)) => {
+                        let path = capture.to_string_lossy().into_owned();
+                        match std::process::Command::new(&gui).arg(&capture).spawn() {
+                            Ok(_) => LogText::RenderDocOpened { path }.text(),
+                            Err(err) => LogText::RenderDocOpenFailed {
+                                path,
+                                error: err.to_string(),
+                            }
+                            .text(),
                         }
-                        .text(),
                     }
-                }
-                _ => LogText::RenderDocNoCapture.text(),
-            };
-            emit_log_line(&app, &uuid, &text, false);
-        });
+                    _ => LogText::RenderDocNoCapture.text(),
+                };
+                emit_log_line(&app, &uuid, &text, false);
+            });
+    }
+    // 其它平台没有随包提供的 RenderDoc 工具链，启动阶段就会被内核拒绝，这里只清掉会话
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        let _ = (app, since);
+    }
 }
 
 /// 从 panic 载荷里取可读文本，取不到时返回空串

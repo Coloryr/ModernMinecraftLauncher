@@ -78,7 +78,7 @@ const emit = defineEmits<{
   font-size: 13px;
   word-break: break-all;
   max-height: 180px;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
 }

@@ -161,6 +161,7 @@ watch(
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overflow-y: scroll;
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 10px;

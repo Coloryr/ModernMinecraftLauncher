@@ -257,7 +257,8 @@
   padding-right: var(--content-pad-scroll);
   gap: 16px;
   min-width: 0;
-  overflow-y: auto;
+  /* 常驻滚动槽，见 styles/scrollbar.css 的 WebKit 例外 */
+  overflow-y: scroll;
   scrollbar-gutter: stable;
 }
 
@@ -301,7 +302,8 @@
   padding: 18px var(--content-pad-x) var(--content-pad-bottom);
   /* 与 scrollbar-gutter 成对，见 styles/scrollbar.css */
   padding-right: var(--content-pad-scroll);
-  overflow-y: auto;
+  /* 常驻滚动槽，见 styles/scrollbar.css 的 WebKit 例外 */
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   min-width: 0;
 }
@@ -623,7 +625,8 @@
   padding: 20px var(--content-pad-x) 30px;
   /* 与 scrollbar-gutter 成对，见 styles/scrollbar.css */
   padding-right: var(--content-pad-scroll);
-  overflow-y: auto;
+  /* 常驻滚动槽，见 styles/scrollbar.css 的 WebKit 例外 */
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   min-width: 0;
 }

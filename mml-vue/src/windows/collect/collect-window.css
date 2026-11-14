@@ -84,7 +84,8 @@
 .collect-scroll {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  /* 常驻滚动槽，见 styles/scrollbar.css 的 WebKit 例外 */
+  overflow-y: scroll;
   /* 见 styles/scrollbar.css */
   scrollbar-gutter: stable;
   /* 右边缘顶到窗口边：抵消 .frame-body 的 26px 右内边距，滚动条才贴着窗口右边，

@@ -20,6 +20,9 @@ defineProps<{
   display: grid;
   grid-template-rows: 0fr;
   transition: grid-template-rows 0.22s var(--ease-out);
+  /* 作为 flex 子项时不能被压扁：列表模式的实例设置面板在 WebKit 下会被
+     1fr 行连同内容一起缩到 0，整块消失（Chromium 不会缩） */
+  flex-shrink: 0;
 }
 
 .collapse.open {

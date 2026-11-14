@@ -25,6 +25,8 @@ defineProps<{
   inset: 0;
   z-index: 300;
   background: var(--overlay);
+  /* 老 macOS 的 WebKit 只认带前缀的写法 */
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
   display: flex;
   align-items: center;

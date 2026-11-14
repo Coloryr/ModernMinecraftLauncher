@@ -102,6 +102,19 @@ pub fn gamepad_get_config(name: String) -> Result<GamepadConfigDto, String> {
         .map_err(error_key)
 }
 
+/// 内置默认映射，供界面的「恢复默认键位」套用
+///
+/// 只读：不碰配置目录，也不改变当前生效的映射。界面把返回的键位套到正在编辑的配置上，
+/// 仍要用户点保存才落盘；`selected` 固定为 false，套用后不会顶掉别的配置。
+///
+/// # 返回值
+///
+/// 见 [`GamepadConfigDto`]
+#[gui_macros::command]
+pub fn gamepad_default_config() -> GamepadConfigDto {
+    config_to_dto(&mml_gamepad::GamepadConfig::default())
+}
+
 /// 保存一份映射
 ///
 /// - `name`: 配置名，即文件名去掉 `.json`

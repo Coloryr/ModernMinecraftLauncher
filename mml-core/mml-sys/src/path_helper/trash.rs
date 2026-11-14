@@ -11,9 +11,9 @@ use std::time::UNIX_EPOCH;
 
 use std::path::Path;
 
-#[cfg(any(not(windows), test))]
+#[cfg(any(target_os = "linux", test))]
 use std::fs;
-#[cfg(any(not(windows), test))]
+#[cfg(any(target_os = "linux", test))]
 use std::path::PathBuf;
 
 use mml_names::i18_items::error_type::CoreResult;

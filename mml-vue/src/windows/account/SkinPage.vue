@@ -845,7 +845,8 @@ onBeforeUnmount(() => {
 .skin-side {
   width: 280px;
   flex: none;
-  overflow-y: auto;
+  /* 常驻滚动槽，见 styles/scrollbar.css 的 WebKit 例外 */
+  overflow-y: scroll;
   /* 面板右边缘即窗口右边缘（子页面态 body-flush），滚动条就画在最右边；
      见 styles/scrollbar.css */
   scrollbar-gutter: stable;

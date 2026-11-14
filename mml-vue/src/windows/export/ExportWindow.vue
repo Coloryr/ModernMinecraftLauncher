@@ -1205,7 +1205,8 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   box-sizing: border-box;
-  overflow-y: auto;
+  /* 常驻滚动槽：WebKit 只在溢出时占位，不钉住两侧留白会随内容长短变，见 styles/scrollbar.css */
+  overflow-y: scroll;
   /* 两侧都留滚动条槽：只留一侧时右侧会凭空多出一截，和左边不一样宽 */
   scrollbar-gutter: stable both-edges;
   /* 见 styles/scrollbar.css */

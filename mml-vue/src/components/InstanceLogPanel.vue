@@ -133,7 +133,7 @@ watch(
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 见 styles/scrollbar.css */
   font-family: "Cascadia Code", Consolas, "Courier New", monospace;

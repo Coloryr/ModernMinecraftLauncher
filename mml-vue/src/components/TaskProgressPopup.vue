@@ -159,7 +159,7 @@ function barStyle(value: number, unknown: boolean | undefined): { width: string 
   flex: 1;
   min-height: 0;
   margin-top: 6px;
-  overflow-y: auto;
+  overflow-y: scroll;
   /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回，与项目列表同一做法 */
   margin-right: -8px;
   padding-right: 8px;

@@ -51,72 +51,105 @@ export function useStaggerEnter(
       done();
       return;
     }
-    const items = Array.from(el.querySelectorAll(selector)).slice(0, max);
-    if (!items.length) {
-      // 整块入场：位移比逐行小一档，整页一起动时别晃得太夸张
-      const animation = el.animate(
-        [
-          { opacity: 0, transform: "translateY(8px)" },
-          { opacity: 1, transform: "translateY(0)" },
-        ],
-        { duration: 240, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "both" },
-      );
-      animation.finished
-        .catch(() => undefined)
-        .finally(() => {
-          animation.cancel();
-          done();
-        });
+    // 窗口没焦点时 WebKit 会暂停 Web Animations：启动时不抢前台，
+    // 详情会一直停在 opacity: 0。直接完成，内容立刻可见。
+    if (!document.hasFocus()) {
+      done();
       return;
     }
-    const fadeItems = fadeSelector ? Array.from(el.querySelectorAll(fadeSelector)) : [];
-    let left = items.length + fadeItems.length;
-    const finish = () => {
-      left -= 1;
-      if (left === 0) done();
+    const items = Array.from(el.querySelectorAll(selector)).slice(0, max);
+    const running: Animation[] = [];
+    let settled = false;
+    let watchdog: number | null = null;
+
+    /** 只完成一次：超时兜底与正常结束可能同时到达 */
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      if (watchdog !== null) window.clearTimeout(watchdog);
+      done();
     };
 
-    // 标题只做透明度渐变，位置固定，不跟着下面的分组上下移动
-    fadeItems.forEach((item) => {
-      const animation = item.animate([{ opacity: 0 }, { opacity: 1 }], {
-        duration: 240,
-        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-        fill: "both",
-      });
+    /** 跟踪一个动画；结束或取消后都往 finish 走 */
+    const track = (animation: Animation, finish: () => void) => {
+      running.push(animation);
       animation.finished
         .catch(() => undefined)
         .finally(() => {
           animation.cancel();
           finish();
         });
-    });
+    };
 
-    // 元素多时压缩间隔，整套入场不超过 320 + 420ms
-    const gap = items.length > 1 ? Math.min(step, 420 / (items.length - 1)) : 0;
-    items.forEach((item, index) => {
-      const animation = item.animate(
-        [
-          { opacity: 0, transform: `translateY(${offset}px)` },
-          { opacity: 1, transform: "translateY(0)" },
-        ],
-        {
-          duration,
-          delay: index * gap,
+    // WebKit 在窗口失焦 / 后台时会暂停 Web Animations，finished 可能永远不 resolve。
+    // 超时后直接取消动画并完成切换，避免内容一直停在 opacity: 0（实例详情整块消失）。
+    watchdog = window.setTimeout(
+      () => {
+        running.forEach((animation) => animation.cancel());
+        settle();
+      },
+      duration + Math.min(step * Math.max(0, items.length - 1), 420) + 600,
+    );
+
+    try {
+      if (!items.length) {
+        // 整块入场：位移比逐行小一档，整页一起动时别晃得太夸张
+        const animation = el.animate(
+          [
+            { opacity: 0, transform: "translateY(8px)" },
+            { opacity: 1, transform: "translateY(0)" },
+          ],
+          { duration: 240, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "both" },
+        );
+        track(animation, settle);
+        return;
+      }
+
+      const fadeItems = fadeSelector ? Array.from(el.querySelectorAll(fadeSelector)) : [];
+      let left = items.length + fadeItems.length;
+      const finish = () => {
+        left -= 1;
+        if (left <= 0) settle();
+      };
+
+      // 标题只做透明度渐变，位置固定，不跟着下面的分组上下移动
+      fadeItems.forEach((item) => {
+        const animation = item.animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: 240,
           easing: "cubic-bezier(0.22, 1, 0.36, 1)",
           fill: "both",
-        },
-      );
-      animation.finished
-        .catch(() => undefined)
-        .finally(() => {
-          animation.cancel();
-          finish();
         });
-    });
+        track(animation, finish);
+      });
+
+      // 元素多时压缩间隔，整套入场不超过 320 + 420ms
+      const gap = items.length > 1 ? Math.min(step, 420 / (items.length - 1)) : 0;
+      items.forEach((item, index) => {
+        const animation = item.animate(
+          [
+            { opacity: 0, transform: `translateY(${offset}px)` },
+            { opacity: 1, transform: "translateY(0)" },
+          ],
+          {
+            duration,
+            delay: index * gap,
+            easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+            fill: "both",
+          },
+        );
+        track(animation, finish);
+      });
+    } catch {
+      // 某个元素不可动画时不能让整页停在起始帧
+      settle();
+    }
   }
 
   function leave(_el: Element, done: Done) {
-    done();
+    // 退场不做动画，但**不能同步 done()**：Vue 在 out-in 模式下可能已经先摘掉旧节点，
+    // 同步完成会让它的 remove 回调拿到 null，实测抛 unhandledrejection: parentNode。
+    // 放到下一个宏任务，让当前 patch 收尾后再完成切换。
+    window.setTimeout(done, 0);
   }
 
   return { enter, leave };

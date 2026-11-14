@@ -640,7 +640,7 @@ watch(
 .menu-list {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 滚到底不把滚动交给页面：浮层是 fixed，页面一动它就脱离按钮 */
   overscroll-behavior: contain;

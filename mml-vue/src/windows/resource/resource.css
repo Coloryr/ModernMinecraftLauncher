@@ -18,7 +18,7 @@
   gap: 18px;
   height: 100%;
   /* 右边**不加**滚动条宽度的内边距：滚动条占位交给 `.item-list` 的
-     `scrollbar-gutter: stable` 处理（按需占位），这里加死宽度会在"没有滚动条"
+     `scrollbar-gutter: stable` 处理（常驻占位），这里加死宽度会在"没有滚动条"
      时把内容顶出去（用户看到的：右边被切掉）。
      窗口内边距（.frame-body 的 22px 26px）由内容区用负外边距还回来，
      于是内容右边缘顶到窗口右边、滚动条正好落在最右。 */
@@ -117,7 +117,7 @@
   1. 窗口内边距 26px（`.frame-body` 的 `22px 26px`）—— 用 `margin-right: -26px` 抵消，
      内容区右边缘才顶得到窗口边（否则整块离右边一道 26px 的缝）；
   2. 滚动条占位 9px —— 交给 `.item-list` / `.shot-list` 的 `scrollbar-gutter: stable`
-     （按需占位）。**不要手写 `padding-right: 9px`**：那个值只在"有滚动条"时成立，
+     （常驻占位）。**不要手写 `padding-right: 9px`**：那个值只在"有滚动条"时成立，
      没滚动条时会把内容顶出去（踩过一次）；
   3. 卡片自己的留白 26px —— 由**滚动容器的 `padding-right`** 给（见 `.item-list`），
      不是给 `.cat-content`。这一步是"滚动条贴窗口边"的关键：
@@ -266,9 +266,10 @@
      加在**滚动容器**上而不是 `.cat-content` 上，是为了让滚动条仍贴在容器最右
      （= 窗口右边）：滚动条的 gutter 在 padding box 之外，内容盒才受 padding 影响。 */
   padding-right: 26px;
-  /* 滚动条占位由浏览器按需决定：写死 padding-right 会在没有滚动条时把内容顶出去，
-     而"要不要占位"正随内容长短变化（踩过的坑，见上面那段说明） */
+  /* 钉成常驻滚动槽：WebKit 只在溢出时占位，短列表下卡片会比 .content-head 少让 9px，
+     右缘对不齐。常驻后两个引擎都是 26 + 9，见 styles/scrollbar.css 的 WebKit 例外 */
   scrollbar-gutter: stable;
+  overflow-y: scroll;
 }
 
 .resource-layout .item-row {
@@ -471,10 +472,11 @@
 /* ---------- 截图网格 ---------- */
 
 /* 同样不套外框：格子自己就是框。
-   滚动条占位与留白口径同 .item-list（按需占位 + 26px 内容留白） */
+   滚动条占位与留白口径同 .item-list（常驻占位 + 26px 内容留白） */
 .resource-layout .shot-list {
   flex: 1;
-  overflow-y: auto;
+  /* 常驻滚动槽，口径同 .item-list，见 styles/scrollbar.css 的 WebKit 例外 */
+  overflow-y: scroll;
   padding-right: 26px;
   scrollbar-gutter: stable;
 }
@@ -596,6 +598,7 @@
   min-height: 0;
   min-width: 0;
   overflow: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
 }
 

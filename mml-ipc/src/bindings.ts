@@ -190,6 +190,7 @@ export function createCommands(invoke: Invoke) {
     },
     gamepad: {
       createProfile: (name: string) => invoke<void>("gamepad_create_profile", { name }),
+      defaultConfig: () => invoke<GamepadConfigDto>("gamepad_default_config"),
       deleteProfile: (name: string) => invoke<void>("gamepad_delete_profile", { name }),
       getActions: () => invoke<string[]>("gamepad_get_actions"),
       getConfig: (name: string) => invoke<GamepadConfigDto>("gamepad_get_config", { name }),
