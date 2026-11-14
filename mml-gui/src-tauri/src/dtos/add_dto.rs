@@ -42,6 +42,11 @@ pub struct NameConflictDto {
     pub kind: String,
     /// 冲突的实例名
     pub name: String,
+    /// 发起确认的页面 kind：add / add_modpack
+    ///
+    /// 单窗口模式下两个页面共用一个窗口，事件两边都能收到；
+    /// 页面按这个字段只处理自己发起的那一条。
+    pub owner: String,
 }
 
 /// 压缩包检测结果

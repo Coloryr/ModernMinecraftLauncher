@@ -4,7 +4,7 @@
 // 顶部进度条显示任务数与详情，见 ModpackInstallBar。
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
-import { api } from "../../lib/api";
+import { answerNameConflict, api, onAddNameConflict } from "../../lib/api";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { isRunning, overallPercent, useModpackStatus } from "../../lib/modpackTasks";
@@ -12,6 +12,7 @@ import { setTaskbarProgress } from "../../lib/taskbarProgress";
 import { useUnlisteners } from "../../composables/useUnlisteners";
 import type { GroupDto } from "../../lib/bindings";
 import ModpackMode from "./ModpackMode.vue";
+import NameConflictModal from "../add/parts/NameConflictModal.vue";
 
 defineEmits<{
   /** 请求关闭本窗口 */
@@ -45,6 +46,27 @@ onUnmounted(() => setTaskbarProgress(null));
 /** 事件订阅卸载时统一注销：onMounted 里的 await 之后登记 onUnmounted 是无效写法 */
 const { track } = useUnlisteners();
 
+/**
+ * 实例重名确认：安装流程在后台暂停等这条答复
+ *
+ * 后端会把发起安装的窗口提到前台，弹窗在这里渲染；点关闭按拒绝处理，
+ * 避免安装 future 一直挂着。
+ */
+const nameConflict = ref<{ id: number; kind: string; name: string } | null>(null);
+
+/**
+ * 答复重名确认并收起弹窗
+ *
+ * - `answer`: true = 覆盖或自动改名，false = 取消本次安装
+ */
+async function answerConflict(answer: boolean) {
+  const cur = nameConflict.value;
+  nameConflict.value = null;
+  if (cur) {
+    await answerNameConflict(cur.id, answer).catch(() => { });
+  }
+}
+
 /** 安装在线整合包：实例名取自整合包元数据，命令立即返回（任务后台安装） */
 async function install(p: {
   source: string;
@@ -63,6 +85,13 @@ async function install(p: {
 
 onMounted(async () => {
   track(initModpackStatus());
+  track(
+    onAddNameConflict((e) => {
+      // 单窗口模式下两个页面都能收到这条事件：只处理本页发起的那一条
+      if (e.owner !== "add_modpack") return;
+      nameConflict.value = e;
+    }),
+  );
 
   try {
     // 默认分组（空白名字）不进下拉：输入框留空即默认分组
@@ -82,6 +111,8 @@ onMounted(async () => {
       <ModpackMode ref="modeRef" :group="group" :groups="groups" :status="modpackStatus" @update:group="group = $event"
         @install="install" @detail="detailOpen = $event" />
     </div>
+    <NameConflictModal v-if="nameConflict" :kind="nameConflict.kind" :name="nameConflict.name"
+      @answer="answerConflict" />
   </WindowFrame>
 </template>
 

@@ -77,7 +77,11 @@ pub(crate) trait ModPackWorker {
     /// 是否成功取得全部模组信息；查询失败返回对应错误
     async fn get_info(&self) -> CoreResult<bool>;
     /// 下载所需文件
-    async fn download(&self);
+    ///
+    /// # 返回值
+    ///
+    /// 全部成功返回 `Ok(())`；取消返回 `TaskCancel`，失败返回下载错误
+    async fn download(&self) -> CoreResult<()>;
     /// 更新游戏实例版本信息
     ///
     /// - `game`: 目标实例
@@ -144,6 +148,8 @@ struct PackExtractGui {
     pack: AddModPackGui,
     /// 本批总文件数；`start` 写入，`update` 时用来带上总数
     total: AtomicUsize,
+    /// 安装流程的取消令牌：解压逐条检查，取消后尽快收尾
+    cancel: CancellationToken,
 }
 
 impl IBaseArchiveGui for PackExtractGui {
@@ -182,7 +188,7 @@ impl IBaseArchiveGui for PackExtractGui {
     }
 
     fn cancelled(&self) -> bool {
-        self.archive.as_ref().is_some_and(|gui| gui.cancelled())
+        self.cancel.is_cancelled() || self.archive.as_ref().is_some_and(|gui| gui.cancelled())
     }
 
     fn file_rename(&self, name: &str) -> bool {
@@ -204,7 +210,11 @@ impl IBaseArchiveGui for PackExtractGui {
 /// # 返回值
 ///
 /// 两者都没有时返回 `None`，调用方按没有界面处理
-pub(crate) fn pack_extract_gui(pack: AddModPackGui, archive: BaseArchiveGui) -> BaseArchiveGui {
+pub(crate) fn pack_extract_gui(
+    pack: AddModPackGui,
+    archive: BaseArchiveGui,
+    cancel: CancellationToken,
+) -> BaseArchiveGui {
     if pack.is_none() && archive.is_none() {
         return None;
     }
@@ -212,6 +222,7 @@ pub(crate) fn pack_extract_gui(pack: AddModPackGui, archive: BaseArchiveGui) -> 
         archive,
         pack,
         total: AtomicUsize::new(0),
+        cancel,
     }) as Arc<dyn IBaseArchiveGui>)
 }
 
@@ -287,6 +298,7 @@ impl BaseModPackWorker {
                 archive: self.archive_gui.clone(),
                 pack: self.pack_gui.clone(),
                 total: AtomicUsize::new(0),
+                cancel: self.cancel.clone(),
             }) as Arc<dyn IBaseArchiveGui>)
         } else {
             None

@@ -112,7 +112,7 @@ function barStyle(value: number, unknown: boolean | undefined): { width: string 
                 <div class="progress-fill" :class="{ 'is-roll': row.subUnknown }"
                   :style="barStyle(row.subPercent ?? 0, row.subUnknown)" />
               </div>
-              <span class="tp-status-cell" aria-hidden="true"></span>
+              <span class="tp-status-cell">{{ row.subStatusText }}</span>
             </div>
           </template>
 

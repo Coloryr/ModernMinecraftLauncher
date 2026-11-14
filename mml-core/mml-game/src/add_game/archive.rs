@@ -31,10 +31,11 @@ use crate::{
 /// - `strip_dir`: 压缩包整体套的顶层目录名，不剥时传 `None`
 /// - `pack_gui`: 安装进度回调，逐条解压进度写进它的子进度
 /// - `archive_gui`: 可选的压缩包弹窗回调
+/// - `cancel`: 取消令牌；解压逐条检查，取消后尽快退出
 ///
 /// # 返回值
 ///
-/// 成功返回 `Ok(())`；解压失败返回对应错误
+/// 成功返回 `Ok(())`；解压失败或取消返回对应错误
 pub(super) fn extract_pack<P: AsRef<Path>>(
     archive: &BaseArchive,
     output_dir: P,
@@ -42,10 +43,11 @@ pub(super) fn extract_pack<P: AsRef<Path>>(
     strip_dir: Option<String>,
     pack_gui: &AddModPackGui,
     archive_gui: BaseArchiveGui,
+    cancel: CancellationToken,
 ) -> CoreResult<()> {
     // 桥由内核统一挂：只等调用方传 archive_gui 的话，漏挂一处整段解压就没有
     // 文件名与子进度条。安装弹窗与压缩包弹窗拿的是同一份逐条进度
-    let gui = pack_extract_gui(pack_gui.clone(), archive_gui);
+    let gui = pack_extract_gui(pack_gui.clone(), archive_gui, cancel);
     archive.extract_all(output_dir, Some(unselect), strip_dir, gui)
 }
 
@@ -122,14 +124,19 @@ pub(super) async fn archive<P: AsRef<Path>>(
     let mut unselect = unselect.unwrap_or_default();
     unselect.push(game_entry.name.clone());
 
-    extract_pack(
+    if let Err(err) = extract_pack(
         &archive,
         game.read().unwrap().get_base_path(),
         unselect,
         strip_dir,
         &pack_gui,
         archive_gui,
-    )?;
+        cancel,
+    ) {
+        // 解压失败 / 取消：半成品实例留着只会被当成导入成功
+        let _ = crate::delete_instance(&uuid);
+        return Err(err);
+    }
 
     if let Some(pack_gui) = &pack_gui {
         pack_gui.set_state(AddModPackState::Done);

@@ -95,7 +95,7 @@ pub async fn add_modpack_install(
         token.clone(),
     )?;
 
-    let gui = instance_gui(&window);
+    let gui = instance_gui(&window, "add_modpack");
 
     // 后台安装：命令不等安装结束，安装 future 非 Send，放阻塞线程上 block_on
     let app_task = app.clone();

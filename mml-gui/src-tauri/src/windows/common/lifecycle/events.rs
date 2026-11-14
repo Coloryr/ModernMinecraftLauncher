@@ -2,14 +2,12 @@
 //!
 //! 关窗请求在这里统一处理：拦下要阻止的关闭，其余走到销毁流程。
 
-use std::sync::Mutex;
-
 use tauri::{Manager, WebviewWindow};
 
 use uuid::Uuid;
 
 use super::create::{close_guarded, emit_close_blocked, notify_modpack_window};
-use super::models::{OPEN_WINDOWS, model_for_kind, remove_window_model};
+use super::models::{OPEN_WINDOWS, remove_window_model};
 use crate::windows::geometry::save_window_state;
 use crate::windows::registry::{
     ADD_MODPACK_WINDOW_UUID, MAIN_WINDOW_UUID, family_of_label, uuid_of_label,
@@ -83,14 +81,9 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
         }
         // 窗口已销毁：清理句柄与跟随窗口的模型，下次开窗重新创建
         tauri::WindowEvent::Destroyed => {
-            // 关窗时把还在等应答的重名确认对话框按"拒绝"收尾：用户没答就关窗的话，
-            // 安装 future 会永久 pending、任务卡在"进行中"，发送端也一直留在表里
-            if let Some(kind) = label.strip_prefix("mml-")
-                && let Some(model) =
-                    model_for_kind::<Mutex<crate::windows::add::AddWindowModel>>(kind)
-            {
-                model.lock().unwrap().reject_all_dialogs();
-            }
+            // 关窗时把还在等应答的重名确认按"拒绝"收尾：用户没答就关窗的话，
+            // 安装 future 会永久 pending、任务卡在"进行中"
+            crate::windows::add::reject_conflicts_of(&label);
             // 配置窗口关了，它打开过的 NBT 文件也该放手：句柄不能留到下次开窗。
             // 配置窗口是一个实例一个，只清本实例那一份 —— 别的实例的编辑器还开着
             if let Some(hit) = family_of_label(&label)

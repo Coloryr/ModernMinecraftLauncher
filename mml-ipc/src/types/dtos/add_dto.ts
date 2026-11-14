@@ -21,6 +21,7 @@ export type NameConflictDto = {
   id: number,
   kind: string,
   name: string,
+  owner: string,
 };
 
 export type DetectedPackDto = {

@@ -29,6 +29,8 @@ export interface TaskProgressRow {
   subPercent?: number | null;
   /** 子进度总数未知 */
   subUnknown?: boolean;
+  /** 子进度右侧的数字，如「37 / 150」；null / 省略时这一格留空 */
+  subStatusText?: string | null;
   /** 是否可以取消；只有进行中的任务给按钮 */
   cancelable?: boolean;
 }

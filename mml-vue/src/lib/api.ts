@@ -2281,9 +2281,12 @@ export function onAddLoaderProgress(cb: (e: { step: number; total: number }) => 
  * 取消监听的函数
  */
 export function onAddNameConflict(
-  cb: (e: { id: number; kind: string; name: string }) => void,
+  cb: (e: { id: number; kind: string; name: string; owner: string }) => void,
 ): Promise<UnlistenFn> {
-  return listen<{ id: number; kind: string; name: string }>(AddNameConflict, (e) => cb(e.payload));
+  return listen<{ id: number; kind: string; name: string; owner: string }>(
+    AddNameConflict,
+    (e) => cb(e.payload),
+  );
 }
 
 /**

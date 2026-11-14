@@ -52,6 +52,9 @@ function statusTextOf(task: ModPackTaskDto): string {
   if (kind === "failed") return t("modpack.bar.failed");
   if (kind === "cancelled") return t("modpack.bar.cancelled");
   const state = t(`add.packState.${task.state}`);
+  // 下载阶段由子进度报文件数：主状态再带阶段序号时，“4/5”会被读成“下载到第 4 个文件”，
+  // 而它其实是第 4 个安装阶段。
+  if (task.state === "downloadFile" && task.subTotal > 0) return state;
   return task.total ? `${state} ${task.now}/${task.total}` : state;
 }
 
@@ -59,6 +62,10 @@ function statusTextOf(task: ModPackTaskDto): string {
 const rows = computed<TaskProgressRow[]>(() =>
   props.status.tasks.map((task) => {
     const active = isRunning(task);
+    const fileCount =
+      active && task.state === "downloadFile" && task.subTotal > 0
+        ? `${task.subNow} / ${task.subTotal}`
+        : null;
     return {
       key: `${task.pid}:${task.fid}`,
       name: task.name,
@@ -71,6 +78,7 @@ const rows = computed<TaskProgressRow[]>(() =>
       subText: active ? task.subText : null,
       subPercent: active && task.subTotal > 0 ? (task.subNow / task.subTotal) * 100 : null,
       subUnknown: active && !!task.subText && !task.subTotal,
+      subStatusText: fileCount,
       cancelable: active,
     };
   }),

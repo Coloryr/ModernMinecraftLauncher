@@ -91,7 +91,7 @@ pub async fn upgrade_modpack(
         gui.set_now(5, Some(6));
     }
 
-    worker.download().await;
+    worker.download().await?;
 
     if let Some(gui) = &pack_gui {
         gui.set_state(AddModPackState::Done);

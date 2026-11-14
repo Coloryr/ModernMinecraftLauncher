@@ -127,14 +127,19 @@ pub(super) async fn mmc_archive<P: AsRef<Path>>(
     // 解压到实例基础目录，`.minecraft/` 下的内容自然落到游戏目录 base/.minecraft。
     // mmc-pack.json 所在目录即包裹层，解压时去掉
     let strip_dir = path.trim_end_matches(['/', '\\']).to_string();
-    super::archive::extract_pack(
+    if let Err(err) = super::archive::extract_pack(
         &archive,
         game.read().unwrap().get_base_path(),
         unselect,
         (!strip_dir.is_empty()).then_some(strip_dir),
         &pack_gui,
         archive_gui.clone(),
-    )?;
+        cancel.clone(),
+    ) {
+        // 解压失败 / 取消：半成品实例留着只会被当成导入成功
+        let _ = crate::delete_instance(&uuid);
+        return Err(err);
+    }
 
     let json = game.read().unwrap().read_custom_json();
     if !json.is_empty() {
@@ -264,14 +269,19 @@ pub(super) async fn hmcl_archive<P: AsRef<Path>>(
         strip_dir
     };
 
-    super::archive::extract_pack(
+    if let Err(err) = super::archive::extract_pack(
         &archive,
         game.read().unwrap().get_base_path(),
         unselect,
         Some(dir),
         &pack_gui,
         archive_gui.clone(),
-    )?;
+        cancel.clone(),
+    ) {
+        // 解压失败 / 取消：半成品实例留着只会被当成导入成功
+        let _ = crate::delete_instance(&uuid);
+        return Err(err);
+    }
 
     if let Some(pack_gui) = &pack_gui {
         pack_gui.set_state(AddModPackState::Done);
@@ -389,14 +399,19 @@ pub(super) async fn hmcl_server_archive<P: AsRef<Path>>(
         strip_dir
     };
 
-    super::archive::extract_pack(
+    if let Err(err) = super::archive::extract_pack(
         &archive,
         game.read().unwrap().get_base_path(),
         unselect,
         Some(dir),
         &pack_gui,
         archive_gui.clone(),
-    )?;
+        cancel.clone(),
+    ) {
+        // 解压失败 / 取消：半成品实例留着只会被当成导入成功
+        let _ = crate::delete_instance(&uuid);
+        return Err(err);
+    }
 
     // 清单里带下载地址的文件按 MML 的同步流程拉下来，同时把 server.json 落进实例；
     // fileApi 为空时只落清单，文件靠 overrides 里带的那份

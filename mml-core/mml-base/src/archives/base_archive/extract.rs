@@ -164,6 +164,11 @@ impl BaseArchive {
                         if error.lock().unwrap().is_some() {
                             return;
                         }
+                        // 取消：别的线程可能已经写过半份，先把剩下的叫停
+                        if gui.is_some_and(|gui| gui.cancelled()) {
+                            *error.lock().unwrap() = Some(ErrorType::TaskCancel);
+                            return;
+                        }
                         // 先报名字再解压：大文件或慢盘时界面不能干等
                         if let Some(gui) = gui {
                             gui.update(Some(task.name.clone()), current.load(Ordering::SeqCst));
@@ -222,6 +227,10 @@ impl BaseArchive {
     ) -> CoreResult<()> {
         let mut current = 0usize;
         for task in tasks {
+            // 取消：逐条检查，别把整包都解完才让调用方看到 TaskCancel
+            if gui.is_some_and(|gui| gui.cancelled()) {
+                return Err(ErrorType::TaskCancel);
+            }
             // 先报名字再解压：等文件写完才报的话，首个条目偏大时界面会空等很久
             if let Some(gui) = gui {
                 gui.update(Some(task.name.clone()), current);
@@ -338,6 +347,9 @@ impl BaseArchive {
         }
 
         if let Some(gui) = gui {
+            if gui.cancelled() {
+                return Err(ErrorType::TaskCancel);
+            }
             gui.start(tasks.len());
             // 并行解压要先给每个线程开一遍压缩包，大包在机械盘上这一段不短：
             // 先把第一条名字亮出来，界面不至于只看到一条不动的进度条
@@ -361,7 +373,10 @@ impl BaseArchive {
             self.extract_tasks_sequential(&tasks, gui)
         };
 
-        if let Some(gui) = gui {
+        // 取消 / 失败时不报完成：done 会把子进度写成满格，看着像解压完了
+        if result.is_ok()
+            && let Some(gui) = gui
+        {
             gui.done();
         }
         result

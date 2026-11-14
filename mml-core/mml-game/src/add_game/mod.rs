@@ -19,7 +19,7 @@ pub use self::install::{install_archive_from_file, install_archive_from_url};
 pub use self::launcher_pack::{
     LauncherVersion, find_minecraft_prefix, pick_primary, scan_versions, version_folder_has_data,
 };
-pub(crate) use self::modpack::download_with_progress;
+pub(crate) use self::modpack::{DownloadProgressUnit, download_with_progress};
 pub use self::online::{install_curseforge, install_modrinth};
 pub use self::server_pack::{
     fetch_server_pack, install_server_pack_from_url, install_server_pack_from_url_with_skip,

@@ -1,12 +1,14 @@
 //! 添加实例窗口的模型与进度回调：窗口模型、重名确认对话框、进度桥
 //!
-//! 从 `add/mod.rs` 拆出来的。这一层是"窗口运行态"：`AddWindowModel` 持有取消令牌 / 关闭保护 /
-//! 对话框应答通道，另有重名确认与进度上报两个 `IAdd*Gui` 实现。
+//! 从 `add/mod.rs` 拆出来的。这一层是"窗口运行态"：`AddWindowModel` 持有取消令牌与关闭保护，
+//! 另有重名确认与进度上报两个 `IAdd*Gui` 实现。
+//! 重名确认的应答通道是**进程级**的：添加实例与下载整合包两个窗口都可能发起，
+//! 而答复只带事件 id，不能绑在某个窗口的模型上，见 `CONFLICT_WAITERS`。
 //! `AddWindowModel` 与 `instance_gui` 按原路径再导出，窗口生命周期、下载整合包窗口在用。
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Instant;
 
 use async_trait::async_trait;
@@ -14,7 +16,7 @@ use mml_game::GameInstance;
 use mml_game::gui_hook::{
     AddInstanceGui, AddModPackGui, AddModPackState, IAddInstanceGui, IAddModPackGui,
 };
-use tauri::{Emitter, WebviewWindow};
+use tauri::{Emitter, Manager, WebviewWindow};
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 
@@ -24,14 +26,12 @@ use crate::listens;
 use crate::windows;
 use crate::windows::modpack_task::pack_state_id;
 
-/// 添加实例窗口模型：只存取消令牌 / 关闭保护 / 重名对话框应答通道这些运行态，不落盘
+/// 添加实例窗口模型：只存取消令牌 / 关闭保护这些运行态，不落盘
 pub(crate) struct AddWindowModel {
     /// 进行中安装任务的取消令牌，None 表示当前无任务
     cancel: Mutex<Option<CancellationToken>>,
     /// 关闭保护：查询数据期间为 true，`CloseRequested` 阶段拒绝关闭
     close_guard: AtomicBool,
-    /// 重名确认对话框的应答通道，键为事件 id，前端答复后唤醒创建流程
-    dialog: Mutex<HashMap<u32, oneshot::Sender<bool>>>,
 }
 
 impl Default for AddWindowModel {
@@ -42,7 +42,7 @@ impl Default for AddWindowModel {
 }
 
 impl AddWindowModel {
-    /// 创建空模型，取消令牌 / 关闭保护 / 对话框表都为空
+    /// 创建空模型，取消令牌与关闭保护都为空
     ///
     /// # 返回值
     ///
@@ -51,7 +51,6 @@ impl AddWindowModel {
         Self {
             cancel: Mutex::new(None),
             close_guard: AtomicBool::new(false),
-            dialog: Mutex::new(HashMap::new()),
         }
     }
 
@@ -64,23 +63,6 @@ impl AddWindowModel {
     pub(crate) fn set_cancel(&self, token: CancellationToken) {
         if let Some(old) = self.cancel.lock().unwrap().replace(token) {
             old.cancel();
-        }
-    }
-
-    /// 关窗时把还在等应答的重名确认对话框全部按"拒绝"收尾
-    ///
-    /// 不这么做：用户没答就关窗 → 安装 future 永久 pending，任务停在"进行中"，
-    /// 发送端也一直留在表里。唤醒它们即"窗口关了 = 拒绝"，与 `ask` 的注释一致。
-    pub(crate) fn reject_all_dialogs(&self) {
-        let pending: Vec<oneshot::Sender<bool>> = self
-            .dialog
-            .lock()
-            .unwrap()
-            .drain()
-            .map(|(_, tx)| tx)
-            .collect();
-        for tx in pending {
-            let _ = tx.send(false);
         }
     }
 
@@ -108,25 +90,6 @@ impl AddWindowModel {
     pub fn close_guard(&self) -> bool {
         self.close_guard.load(Ordering::Acquire)
     }
-
-    /// 登记重名确认应答通道
-    ///
-    /// - `id`: 对话框事件 id
-    /// - `tx`: 应答发送端，由 `take_dialog` 取出后唤醒创建流程
-    fn set_dialog(&self, id: u32, tx: oneshot::Sender<bool>) {
-        self.dialog.lock().unwrap().insert(id, tx);
-    }
-
-    /// 取走重名确认应答通道，取后移除
-    ///
-    /// - `id`: 对话框事件 id
-    ///
-    /// # 返回值
-    ///
-    /// 该 id 还在等待答复时返回其发送端，否则 `None`
-    pub(crate) fn take_dialog(&self, id: u32) -> Option<oneshot::Sender<bool>> {
-        self.dialog.lock().unwrap().remove(&id)
-    }
 }
 
 /// 取添加实例窗口模型
@@ -147,6 +110,50 @@ pub(super) fn model(_window: &WebviewWindow) -> Result<Arc<Mutex<AddWindowModel>
 /// 重名确认对话框事件 id 自增
 pub(super) static DIALOG_ID: AtomicU32 = AtomicU32::new(1);
 
+/// 一条还在等用户答复的重名确认
+struct ConflictWaiter {
+    /// 弹窗所在窗口的标签；答复必须来自同一窗口
+    label: String,
+    /// 应答发送端
+    tx: oneshot::Sender<bool>,
+}
+
+/// 进程级的重名确认应答表：添加实例与下载整合包两个窗口都可能发起，
+/// 答复只带事件 id，不能绑在某个窗口的模型上
+static CONFLICT_WAITERS: LazyLock<Mutex<HashMap<u32, ConflictWaiter>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// 答复一条重名确认；id 不存在或不是本窗口发起时忽略
+///
+/// - `label`: 答复方窗口标签
+/// - `id`: 对话框事件 id
+/// - `answer`: 用户是否同意
+pub(crate) fn answer_conflict(label: &str, id: u32, answer: bool) {
+    let mut waiters = CONFLICT_WAITERS.lock().unwrap();
+    if waiters.get(&id).is_some_and(|waiter| waiter.label == label)
+        && let Some(waiter) = waiters.remove(&id)
+    {
+        let _ = waiter.tx.send(answer);
+    }
+}
+
+/// 窗口关闭：把发往它的待答确认全部按拒绝收尾，别让安装 future 永久 pending
+///
+/// - `label`: 被销毁窗口的标签
+pub(crate) fn reject_conflicts_of(label: &str) {
+    let mut waiters = CONFLICT_WAITERS.lock().unwrap();
+    let ids: Vec<u32> = waiters
+        .iter()
+        .filter(|(_, waiter)| waiter.label == label)
+        .map(|(id, _)| *id)
+        .collect();
+    for id in ids {
+        if let Some(waiter) = waiters.remove(&id) {
+            let _ = waiter.tx.send(false);
+        }
+    }
+}
+
 /// 实例重名确认对话框事件：kind 取 overwrite 覆盖 / rename 自动改名
 ///
 /// - `window`: 目标窗口，事件只发给它自己
@@ -156,10 +163,12 @@ pub(super) fn emit_add_name_conflict(window: &WebviewWindow, dto: NameConflictDt
     let _ = window.emit_to(window.label(), listens::ADD_NAME_CONFLICT, dto);
 }
 
-/// 实例创建重名确认：向添加实例窗口发事件弹窗，等待用户在对话框上答复
+/// 实例创建重名确认：向发起安装的页面发事件弹窗，等待用户在对话框上答复
 pub(super) struct AddInstanceDialogGui {
     /// 弹窗与等待答复所属的窗口
     window: WebviewWindow,
+    /// 发起确认的页面 kind，见 [`NameConflictDto::owner`]
+    owner: &'static str,
 }
 
 impl AddInstanceDialogGui {
@@ -170,20 +179,36 @@ impl AddInstanceDialogGui {
     ///
     /// # 返回值
     ///
-    /// 用户同意返回 `true`；拒绝、窗口已关闭或模型缺失返回 `false`
+    /// 用户同意返回 `true`；拒绝或窗口已关闭返回 `false`
     async fn ask(&self, kind: &str, name: &str) -> bool {
-        let Ok(store) = model(&self.window) else {
+        // 窗口在注册等待前就没了：没人能答，按拒绝收尾，别把安装 future 挂在通道上
+        if self
+            .window
+            .app_handle()
+            .get_webview_window(self.window.label())
+            .is_none()
+        {
             return false;
-        };
+        }
         let id = DIALOG_ID.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
-        store.lock().unwrap().set_dialog(id, tx);
+        CONFLICT_WAITERS.lock().unwrap().insert(
+            id,
+            ConflictWaiter {
+                label: self.window.label().to_string(),
+                tx,
+            },
+        );
+        // 这条确认挡着安装流程：把窗口提到前台，别让用户在一堆窗口里找
+        let _ = self.window.unminimize();
+        let _ = self.window.set_focus();
         emit_add_name_conflict(
             &self.window,
             NameConflictDto {
                 id,
                 kind: kind.to_string(),
                 name: name.to_string(),
+                owner: self.owner.to_string(),
             },
         );
         rx.await.unwrap_or(false)
@@ -219,13 +244,15 @@ impl IAddInstanceGui for AddInstanceDialogGui {
 /// 构建重名确认回调，跟随调用方窗口
 ///
 /// - `window`: 弹窗与等待答复所属的窗口
+/// - `owner`: 发起确认的页面 kind，`add` 或 `add_modpack`
 ///
 /// # 返回值
 ///
 /// 交给内核安装流程的重名确认回调
-pub(crate) fn instance_gui(window: &WebviewWindow) -> AddInstanceGui {
+pub(crate) fn instance_gui(window: &WebviewWindow, owner: &'static str) -> AddInstanceGui {
     Some(Arc::new(AddInstanceDialogGui {
         window: window.clone(),
+        owner,
     }) as Arc<dyn IAddInstanceGui>)
 }
 

@@ -57,7 +57,7 @@ pub async fn add_import_folder(
         mml_game::check_name(name).map_err(|e| e.to_string())?;
     }
     // 安装 future 非 Send：阻塞线程 block_on；读锁在块内释放后再发事件
-    let gui = instance_gui(&window);
+    let gui = instance_gui(&window, "add");
     // assets / libraries 归启动器自己共用：实例内一律不复制，是否合并到共用目录由 copy_data 决定
     let unselect = data_root.as_ref().map(|_| {
         vec![
@@ -152,7 +152,7 @@ pub async fn add_import_archive(
     // 前端传的是分组 uuid；空 / 非法 = 默认分组
     let group = crate::windows::parse_group_id(group);
     let pack = parse_pack_type(&pack_type)?;
-    let gui = instance_gui(&window);
+    let gui = instance_gui(&window, "add");
     let name = name.filter(|item| !item.trim().is_empty());
     if let Some(name) = &name {
         mml_game::check_name(name).map_err(|e| e.to_string())?;
@@ -252,7 +252,7 @@ pub async fn add_import_url(
     } = prepare(&window)?;
     // 前端传的是分组 uuid；空 / 非法 = 默认分组
     let group = crate::windows::parse_group_id(group);
-    let gui = instance_gui(&window);
+    let gui = instance_gui(&window, "add");
     let progress = pack_gui(&window);
     let name = name.filter(|item| !item.trim().is_empty());
     if let Some(name) = &name {
@@ -326,7 +326,7 @@ pub async fn add_create_new(
         ..Default::default()
     };
     // mml-game 的安装 future 非 Send，放阻塞线程上 block_on 执行
-    let gui = instance_gui(&window);
+    let gui = instance_gui(&window, "add");
     let res = tauri::async_runtime::spawn_blocking(move || {
         // 分组不在实例配置里，由 kernel 的 group_save.json 管，创建时一并指定
         tauri::async_runtime::block_on(obj.create_instance_in_group(gui, group))
@@ -373,7 +373,7 @@ pub async fn add_import_server_pack(
     } = prepare(&window)?;
     // 前端传的是分组 uuid；空 / 非法 = 默认分组
     let group = crate::windows::parse_group_id(group);
-    let gui = instance_gui(&window);
+    let gui = instance_gui(&window, "add");
     let name = name.filter(|item| !item.trim().is_empty());
     if let Some(name) = &name {
         mml_game::check_name(name).map_err(|e| e.to_string())?;

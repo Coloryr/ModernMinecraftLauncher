@@ -14,23 +14,19 @@ pub(crate) mod create;
 pub(crate) mod loader;
 pub(crate) mod model;
 
-// 按原路径再导出：窗口生命周期用 `add::AddWindowModel`，下载整合包窗口用 `add::instance_gui`
-pub(crate) use self::model::{AddWindowModel, instance_gui};
+// 按原路径再导出：窗口生命周期用 `add::AddWindowModel` 与对话框清理，下载整合包窗口用 `add::instance_gui`
+pub(crate) use self::model::{AddWindowModel, instance_gui, reject_conflicts_of};
 
 use self::model::model;
 
 /// 用户对重名确认对话框的答复，用于唤醒等待中的创建流程
 ///
-/// - `window`: 调用方窗口，用于取本窗口模型
+/// - `window`: 调用方窗口，答复只接受发起这次确认的那个窗口
 /// - `id`: 对话框事件 id，对应后端登记的应答通道
 /// - `answer`: 用户是否同意
 #[gui_macros::command]
 pub fn add_answer_name_conflict(window: WebviewWindow, id: u32, answer: bool) {
-    if let Ok(store) = model(&window)
-        && let Some(tx) = store.lock().unwrap().take_dialog(id)
-    {
-        let _ = tx.send(answer);
-    }
+    model::answer_conflict(window.label(), id, answer);
 }
 
 /// 取消进行中的安装任务

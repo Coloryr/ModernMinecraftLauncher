@@ -43,7 +43,13 @@ pub async fn install_modrinth(
     let file = item.file.clone();
 
     let outcome =
-        super::modpack::download_with_progress(vec![item], pack_gui.clone(), cancel.clone()).await;
+        super::modpack::download_with_progress(
+            vec![item],
+            pack_gui.clone(),
+            cancel.clone(),
+            super::modpack::DownloadProgressUnit::Bytes,
+        )
+        .await;
     if !outcome.is_done() {
         return Err(ErrorType::DownloadFileFail);
     }
@@ -100,7 +106,13 @@ pub async fn install_curseforge(
     let file = item.file.clone();
 
     let outcome =
-        super::modpack::download_with_progress(vec![item], pack_gui.clone(), cancel.clone()).await;
+        super::modpack::download_with_progress(
+            vec![item],
+            pack_gui.clone(),
+            cancel.clone(),
+            super::modpack::DownloadProgressUnit::Bytes,
+        )
+        .await;
     if !outcome.is_done() {
         return Err(ErrorType::DownloadFileFail);
     }
