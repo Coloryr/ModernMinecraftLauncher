@@ -19,12 +19,20 @@ fn default_map_compiles() {
     assert!(!map.buttons.is_empty());
     assert_eq!(map.mouse.deadzone, 0.15);
 
+    // 面键默认走鼠标：A 是左键，X 是空格
     let south = button_index(Button::South).unwrap();
     assert!(
         map.buttons
             .iter()
-            .any(|rule| rule.index == south && rule.combo.steps.contains(&Action::Key(32)))
+            .any(|rule| rule.index == south && rule.combo.steps.contains(&Action::Mouse(0)))
     );
+    let north = button_index(Button::North).unwrap();
+    assert!(
+        map.buttons
+            .iter()
+            .any(|rule| rule.index == north && rule.combo.steps.contains(&Action::Key(32)))
+    );
+    assert!(!map.cursor_buttons.is_empty());
 }
 
 /// 键名、鼠标键、滚轮都能解析

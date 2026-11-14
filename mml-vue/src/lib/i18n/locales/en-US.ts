@@ -2294,6 +2294,7 @@ export default {
   "gamepadPopup.enabled": "Enable in-game gamepad",
   "gamepadPopup.enabledHint": "When off, the gamepad is only previewed here and sends nothing to the game",
   "gamepadPopup.saved": "Gamepad settings saved",
+  "gamepadPopup.settings": "Gamepad settings",
   "gamepadPopup.close": "Close",
   "winGamepad.pickOrder": "Order",
   "winGamepad.pickEmpty": "Nothing recorded",

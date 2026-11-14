@@ -108,6 +108,16 @@ fn quiet(stream: &mut TcpStream) {
         .unwrap();
 }
 
+/// 建一条普通按钮绑定
+fn rule(button: Button, action: &str) -> crate::map::ButtonRule {
+    crate::map::ButtonRule {
+        button,
+        modifier: None,
+        action: action.to_string(),
+        mode: crate::map::ButtonMode::Normal,
+    }
+}
+
 fn frame(relay: &mut Relay, values: &PadValues, map: &CompiledMap) {
     relay.forward(target_instance(), Some(1), Some(values), map, 0.016);
 }
@@ -124,9 +134,18 @@ fn tcp_relay_releases_on_mode_device_target_changes_and_reconnect() {
     let mut other = connect(port, other_uuid, false);
     assert!(mml_ipc::is_game_connected(uuid));
     assert_eq!(target_instance(), Some(uuid));
-    // 转发默认是关的，这里显式打开
+    // 转发默认是关的，这里显式打开；按钮也显式给三条，免得跟着默认映射漂
     let mut config = GamepadConfig::default();
     config.enabled = true;
+    config.separate_cursor = false;
+    config.buttons = vec![
+        rule(Button::South, "Space"),
+        rule(Button::LeftTrigger, "MouseLeft"),
+        rule(Button::DPadUp, "ScrollUp"),
+    ];
+    // 速度也钉住：默认值一改，位移断言就差出十几像素
+    config.mouse.cursor_speed = 700.0;
+    config.mouse.turn_speed = 900.0;
     let map = config.compile().unwrap();
     let mut relay = Relay::new();
     let mut values = PadValues {

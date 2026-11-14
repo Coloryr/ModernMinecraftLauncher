@@ -15,7 +15,8 @@ fn empty_values() -> PadValues {
 fn button_press_maps_to_key() {
     let map = map::GamepadConfig::default().compile().unwrap();
     let mut values = empty_values();
-    values.buttons[button_index(Button::South).unwrap()] = 1.0;
+    // 默认映射里 X / north 是空格
+    values.buttons[button_index(Button::North).unwrap()] = 1.0;
 
     assert!(desired_actions(&map, &values, true).contains(&Action::Key(32)));
 }
@@ -49,10 +50,11 @@ fn stick_down_maps_to_back() {
 #[test]
 fn modifier_combo_overrides_plain_binding() {
     let mut config = map::GamepadConfig::default();
-    // 默认已有 South → Space，再加一条 LeftTrigger + South → F
+    // 默认已有 South → MouseLeft，再加一条 RightTrigger + South → F
+    // 修饰键用 RT 而不是 LT：LT 自己也绑着鼠标左键，会把断言搅浑
     config.buttons.push(map::ButtonRule {
         button: Button::South,
-        modifier: Some(Button::LeftTrigger),
+        modifier: Some(Button::RightTrigger),
         action: String::from("F"),
         mode: map::ButtonMode::Normal,
     });
@@ -61,24 +63,24 @@ fn modifier_combo_overrides_plain_binding() {
     let mut values = empty_values();
     values.buttons[button_index(Button::South).unwrap()] = 1.0;
 
-    // 只按 A：空格
+    // 只按 A：左键
     let plain = desired_actions(&map, &values, true);
-    assert!(plain.contains(&Action::Key(32)));
+    assert!(plain.contains(&Action::Mouse(0)));
     assert!(!plain.contains(&Action::Key(70)));
 
-    // 按住 LT 再按 A：F 生效，空格被压住
-    values.buttons[button_index(Button::LeftTrigger).unwrap()] = 1.0;
+    // 按住 RT 再按 A：F 生效，左键被压住
+    values.buttons[button_index(Button::RightTrigger).unwrap()] = 1.0;
     let combo = desired_actions(&map, &values, true);
     assert!(combo.contains(&Action::Key(70)));
-    assert!(!combo.contains(&Action::Key(32)));
+    assert!(!combo.contains(&Action::Mouse(0)));
 }
 
-/// 十字键上映射成滚轮向上
+/// 左肩键映射成滚轮向上
 #[test]
-fn dpad_maps_to_scroll() {
+fn shoulder_maps_to_scroll() {
     let map = map::GamepadConfig::default().compile().unwrap();
     let mut values = empty_values();
-    values.buttons[button_index(Button::DPadUp).unwrap()] = 1.0;
+    values.buttons[button_index(Button::LeftTrigger2).unwrap()] = 1.0;
 
     assert!(desired_actions(&map, &values, true).contains(&Action::Scroll(1)));
 }
@@ -195,6 +197,51 @@ fn cursor_mode_uses_its_own_buttons() {
 
     assert_eq!(desired_actions(&map, &values, true), [Action::Key(32)].into());
     assert_eq!(desired_actions(&map, &values, false), [Action::Mouse(0)].into());
+}
+
+/// 换模式：先松开旧模式按住的动作，切换时还按着的按钮要等松开才生效
+#[test]
+fn mode_switch_releases_and_blocks_held_buttons() {
+    let mut relay = Relay::new();
+    relay.target = Some(Uuid::from_u128(9));
+    relay.grabbed = Some(true);
+    relay.counts.insert(Action::Key(32), 1);
+    relay.active.insert(0);
+
+    let south = button_index(Button::South).unwrap();
+    let mut values = empty_values();
+    values.buttons[south] = 1.0;
+
+    relay.on_mode_change(false, &values);
+    assert_eq!(relay.grabbed, Some(false));
+    assert!(relay.counts.is_empty(), "切换模式要松开旧模式的动作");
+    assert!(relay.active.is_empty());
+
+    // 切换瞬间还按着：新模式下这颗按钮先不发
+    assert_eq!(relay.mask_blocked(&values).buttons[south], 0.0);
+    // 松开一次解除，再按才生效
+    values.buttons[south] = 0.0;
+    let _ = relay.mask_blocked(&values);
+    values.buttons[south] = 1.0;
+    assert_eq!(relay.mask_blocked(&values).buttons[south], 1.0);
+}
+
+/// 映射换了版本（改过配置）也要先松开：规则编号会整体重排，按旧编号解键会解错
+#[test]
+fn map_reload_releases_held_actions() {
+    let mut relay = Relay::new();
+    relay.generation = map::generation();
+    relay.target = Some(Uuid::from_u128(9));
+    relay.counts.insert(Action::Key(32), 1);
+    relay.active.insert(0);
+
+    relay.sync_generation();
+    assert!(!relay.counts.is_empty(), "版本没变时不该动");
+
+    map::bump_generation();
+    relay.sync_generation();
+    assert!(relay.counts.is_empty());
+    assert!(relay.active.is_empty());
 }
 
 /// 关掉分离时两种模式共用游戏内那套

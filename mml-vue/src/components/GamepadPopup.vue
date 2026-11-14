@@ -9,6 +9,7 @@ import BaseSwitch from "./ui/BaseSwitch.vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
 import { t, tErr } from "../lib/i18n";
 import { showToast } from "../lib/toast";
+import { openWindow } from "../windows/windowManager";
 import {
   commands,
   type GamepadConfigDto,
@@ -109,6 +110,12 @@ async function toggleEnabled(value: boolean) {
   config.value.enabled = value;
   await save();
 }
+
+/** 收起弹窗，打开设置窗口的「手柄」页 —— 映射细节与轴区间都在那边 */
+function openSettings() {
+  emit("close");
+  void openWindow("settings", { tab: "gamepad" });
+}
 </script>
 
 <template>
@@ -161,6 +168,7 @@ async function toggleEnabled(value: boolean) {
 
     <div class="modal-actions">
       <BaseButton @click="emit('close')">{{ t("gamepadPopup.close") }}</BaseButton>
+      <BaseButton variant="primary" @click="openSettings">{{ t("gamepadPopup.settings") }}</BaseButton>
     </div>
   </BaseModal>
 </template>

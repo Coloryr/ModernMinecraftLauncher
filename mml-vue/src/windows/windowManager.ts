@@ -139,6 +139,8 @@ export interface WindowOpenParams {
   action?: "add" | "relogin";
   /** Java 下载窗口要预选的主版本，如 17；启动缺 Java 时从提示弹窗带过去 */
   javaMajor?: number;
+  /** 打开后落到哪个标签页，设置窗口用；标题栏手柄弹窗的「手柄设置」靠它直接进手柄页 */
+  tab?: string;
 }
 
 /**
@@ -166,6 +168,8 @@ export interface WindowParamsState {
   action: string | null;
   /** Java 下载窗口要预选的主版本，见 {@link WindowOpenParams.javaMajor} */
   javaMajor: number | null;
+  /** 要落到哪个设置标签，见 {@link WindowOpenParams.tab} */
+  tab: string | null;
 }
 
 /** 一份空参数，字段与 {@link WindowOpenParams} 一一对应；重置点共用它，别各抄一份 */
@@ -180,6 +184,7 @@ function emptyWindowParams(): WindowParamsState {
     category: null,
     action: null,
     javaMajor: null,
+    tab: null,
   };
 }
 
@@ -365,6 +370,36 @@ export function clearTargetCategory() {
 }
 
 /**
+ * 取本次要落到哪个设置标签
+ *
+ * 单窗口取 openWindow 带入的参数，多窗口取本窗口 URL 上的参数。
+ * 设置窗口据此直接停到手柄页这类指定标签。
+ *
+ * # 返回值
+ *
+ * 没有指定标签时为 null，调用方按上次停留的标签处理
+ */
+export function targetSettingsTab(): string | null {
+  return multiWindow.value
+    ? new URLSearchParams(window.location.search).get(SETTINGS_TAB_PARAM)
+    : windowParams.value.tab;
+}
+
+/**
+ * 用掉本次的设置标签参数
+ *
+ * 设置窗口落到那个标签后就清掉：之后在窗口里怎么切，都不该被这一个参数拽回去。
+ * 单窗口清内存，多窗口把它从本窗口 URL 上摘掉。
+ */
+export function clearTargetSettingsTab() {
+  windowParams.value = { ...windowParams.value, tab: null };
+  if (!multiWindow.value) return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete(SETTINGS_TAB_PARAM);
+  window.history.replaceState({}, "", url);
+}
+
+/**
  * 取本次要直接打开的日志文件
  *
  * 单窗口取 openWindow 带入的参数，多窗口取本窗口 URL 上的参数。
@@ -484,6 +519,9 @@ const ACTION_PARAM = "wact";
 /** Java 下载窗口预选主版本的 URL 键；多窗口模式下只能靠 URL 送 */
 const JAVA_MAJOR_PARAM = "jmajor";
 
+/** 设置窗口要落到哪个标签的 URL 键；多窗口模式下只能靠 URL 送 */
+const SETTINGS_TAB_PARAM = "stab";
+
 /** 按 kind 与带入参数拼出目标窗口的 URL；多窗口模式下新窗口靠它取参数 */
 function urlFor(
   kind: WindowKind,
@@ -529,6 +567,11 @@ function urlFor(
     url.searchParams.set(JAVA_MAJOR_PARAM, String(params.javaMajor));
   } else {
     url.searchParams.delete(JAVA_MAJOR_PARAM);
+  }
+  if (params?.tab) {
+    url.searchParams.set(SETTINGS_TAB_PARAM, params.tab);
+  } else {
+    url.searchParams.delete(SETTINGS_TAB_PARAM);
   }
   if (params?.drop) {
     url.searchParams.set(DROP_PARAMS.path, params.drop.path);
@@ -789,6 +832,7 @@ export async function openWindow(kind: WindowKind, params?: WindowOpenParams) {
       category: params?.category ?? null,
       action: params?.action ?? null,
       javaMajor: params?.javaMajor ?? null,
+      tab: params?.tab ?? null,
     };
     if (!isTauri()) window.history.pushState({}, "", urlFor(kind, params));
     return;
@@ -814,6 +858,7 @@ export async function openWindow(kind: WindowKind, params?: WindowOpenParams) {
       params?.category ||
       params?.action ||
       params?.javaMajor ||
+      params?.tab ||
       params?.project ||
       (kind === "server_pack" && !!params?.uuid)
     ) {

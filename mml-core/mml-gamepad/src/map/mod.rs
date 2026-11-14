@@ -368,21 +368,28 @@ impl Default for GamepadConfig {
             swap_ab: false,
             // 默认分离：鼠标模式下大多是点击 / 翻背包，与游戏内按键不是一套
             separate_cursor: true,
-            cursor_buttons: None,
+            cursor_buttons: Some(vec![
+                repeat_rule(Button::DPadUp, "ScrollUp"),
+                repeat_rule(Button::DPadDown, "ScrollDown"),
+                button_rule(Button::South, "MouseLeft"),
+                button_rule(Button::East, "Escape"),
+                button_rule(Button::LeftTrigger2, "LeftShift"),
+            ]),
+            // 面键走鼠标：A 左键、B 右键，Y 跳、X 潜行
             buttons: vec![
-                button_rule(Button::South, "Space"),
-                button_rule(Button::East, "E"),
-                button_rule(Button::North, "Q"),
-                button_rule(Button::West, "F"),
+                button_rule(Button::South, "MouseLeft"),
+                button_rule(Button::East, "MouseRight"),
+                button_rule(Button::North, "Space"),
+                button_rule(Button::West, "LeftShift"),
                 button_rule(Button::LeftTrigger, "MouseLeft"),
                 button_rule(Button::RightTrigger, "MouseRight"),
-                button_rule(Button::LeftTrigger2, "LeftShift"),
-                button_rule(Button::RightTrigger2, "LeftControl"),
-                button_rule(Button::Select, "Tab"),
-                button_rule(Button::Start, "Escape"),
-                button_rule(Button::LeftThumb, "F5"),
-                button_rule(Button::DPadUp, "ScrollUp"),
-                button_rule(Button::DPadDown, "ScrollDown"),
+                button_rule(Button::LeftTrigger2, "ScrollUp"),
+                button_rule(Button::RightTrigger2, "ScrollDown"),
+                button_rule(Button::Select, "Escape"),
+                button_rule(Button::Start, "E"),
+                button_rule(Button::DPadUp, "Q"),
+                button_rule(Button::DPadDown, "F3"),
+                button_rule(Button::DPadRight, "F"),
             ],
             axes: vec![
                 // 读取层已统一为 Y 轴向上为正
@@ -394,8 +401,8 @@ impl Default for GamepadConfig {
             mouse: MouseRule {
                 cursor_stick: Stick::Left,
                 turn_stick: Stick::Right,
-                cursor_speed: 700.0,
-                turn_speed: 900.0,
+                cursor_speed: 1200.0,
+                turn_speed: 1500.0,
                 deadzone: 0.15,
             },
         }
@@ -554,4 +561,4 @@ pub(crate) use self::store::*;
 
 pub(crate) use self::defaults::combo_of;
 pub use self::profiles::{action_names, config, create, delete, profiles, save, set_active};
-pub use self::runtime::{current, in_range, init, reload_if_changed};
+pub use self::runtime::{current, generation, in_range, init, reload_if_changed};

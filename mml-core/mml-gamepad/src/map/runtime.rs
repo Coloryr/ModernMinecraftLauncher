@@ -3,10 +3,29 @@
 //! 当前生效的映射、配置目录扫描与热重载。
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use mml_names::{i18_items::info_type::InfoType, names};
 
 use super::*;
+
+/// 生效映射的版本号：每次重新加载 +1，转发线程据此判断"换表了"
+static GENERATION: AtomicU64 = AtomicU64::new(0);
+
+/// 当前生效映射的版本号
+///
+/// # 返回值
+///
+/// 单调递增；转发线程只在它变化时处理一次松键
+pub fn generation() -> u64 {
+    GENERATION.load(Ordering::Relaxed)
+}
+
+/// 测试用：把版本号推进一格，模拟配置改过
+#[cfg(test)]
+pub(crate) fn bump_generation() {
+    GENERATION.fetch_add(1, Ordering::Relaxed);
+}
 
 /// 加载配置目录，首次运行时建目录并写一份默认配置
 ///
@@ -63,6 +82,7 @@ pub(super) fn reload(dir: &Path) {
 
     let Some(profile) = pick(&scan.profiles) else {
         *MAP.write().unwrap() = CompiledMap::built_in();
+        GENERATION.fetch_add(1, Ordering::Relaxed);
         mml_log::warn_type(InfoType::GamepadMapUnavailable {
             path: dir.display().to_string(),
         });
@@ -70,6 +90,7 @@ pub(super) fn reload(dir: &Path) {
     };
 
     *MAP.write().unwrap() = profile.map.clone();
+    GENERATION.fetch_add(1, Ordering::Relaxed);
     mml_log::info_type(InfoType::GamepadMapLoaded {
         path: profile.path.display().to_string(),
     });

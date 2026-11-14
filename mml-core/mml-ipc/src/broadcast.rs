@@ -36,10 +36,14 @@ pub(crate) fn add_client(tx: &TcpChannel) {
 /// 清理已关闭的客户端通道
 pub(crate) fn cleanup() {
     CLIENTS.write().unwrap().retain(|tx| !tx.is_closed());
-    GAME_CHANNELS
+    let mut channels = GAME_CHANNELS.write().unwrap();
+    channels.retain(|_uuid, tx| !tx.is_closed());
+    // 通道没了，它上报的鼠标状态也就不作数：留着会让下次启动的同一个实例
+    // 一上来就顶着上一局的光标 / 抓取模式，而手柄模式是按这个状态切的
+    MOUSE_STATES
         .write()
         .unwrap()
-        .retain(|_uuid, tx| !tx.is_closed());
+        .retain(|uuid, _| channels.contains_key(uuid));
 }
 
 /// 广播消息给所有客户端

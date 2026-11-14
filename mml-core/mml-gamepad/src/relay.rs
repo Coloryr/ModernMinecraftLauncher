@@ -65,6 +65,8 @@ struct Relay {
     acc_x: f64,
     /// 累计的垂直位移，单位像素
     acc_y: f64,
+    /// 上次处理的是哪一版映射，见 [`map::generation`]
+    generation: u64,
 }
 
 /// 启动转发线程
@@ -110,7 +112,55 @@ impl Relay {
             blocked: [false; BUTTON_COUNT],
             acc_x: 0.0,
             acc_y: 0.0,
+            generation: map::generation(),
         }
+    }
+
+    /// 挡掉切换瞬间还按着的那几颗按钮，松开后自动解除
+    ///
+    /// - `values`: 这一帧的手柄原始值
+    ///
+    /// # 返回值
+    ///
+    /// 挡掉之后的按钮值；轴原样带过去
+    fn mask_blocked(&mut self, values: &PadValues) -> PadValues {
+        let mut filtered = PadValues {
+            buttons: values.buttons,
+            axes: values.axes,
+        };
+        for (index, blocked) in self.blocked.iter_mut().enumerate() {
+            *blocked &= values.buttons[index] >= BUTTON_DOWN;
+            if *blocked {
+                filtered.buttons[index] = 0.0;
+            }
+        }
+        filtered
+    }
+
+    /// 换了一份映射就先松开所有动作
+    ///
+    /// 规则编号按列表下标排，配置一改（包括拨「鼠标模式单独绑定」）整套编号都会重排：
+    /// 还按旧编号去新表里查动作，会解错键，或者根本解不掉。
+    fn sync_generation(&mut self) {
+        let generation = map::generation();
+        if self.generation == generation {
+            return;
+        }
+        self.release_all();
+        self.generation = generation;
+    }
+
+    /// 鼠标抓取状态变了：松开旧模式按住的动作，挡住此刻还按着的按钮
+    ///
+    /// 挡住的那几颗要等松开才生效，免得在菜单里按住的方向键 / 确认键过一帧
+    /// 就当成另一套模式的动作发出去。
+    ///
+    /// - `grabbed`: 新的抓取状态
+    /// - `values`: 这一帧的手柄原始值
+    fn on_mode_change(&mut self, grabbed: bool, values: &PadValues) {
+        self.release_all();
+        self.grabbed = Some(grabbed);
+        self.blocked = values.buttons.map(|value| value >= BUTTON_DOWN);
     }
 
     /// 走一帧
@@ -145,6 +195,9 @@ impl Relay {
             return;
         }
 
+        // 换表检查排在目标切换之前：松开旧动作时发的还是老实例
+        self.sync_generation();
+
         if target != self.target {
             self.release_all();
             self.target = target;
@@ -176,21 +229,10 @@ impl Relay {
 
         let grabbed = mml_ipc::get_mouse_state(uuid).unwrap_or(false);
         if self.grabbed != Some(grabbed) {
-            self.release_all();
-            self.grabbed = Some(grabbed);
-            self.blocked = values.buttons.map(|value| value >= BUTTON_DOWN);
+            self.on_mode_change(grabbed, values);
         }
 
-        let mut filtered = PadValues {
-            buttons: values.buttons,
-            axes: values.axes,
-        };
-        for (index, blocked) in self.blocked.iter_mut().enumerate() {
-            *blocked &= values.buttons[index] >= BUTTON_DOWN;
-            if *blocked {
-                filtered.buttons[index] = 0.0;
-            }
-        }
+        let filtered = self.mask_blocked(values);
         let buttons = map.buttons_for(grabbed);
         let frame = self.step(map, buttons, Instant::now(), &desired_rules(map, &filtered, grabbed));
         let released: Vec<usize> = self.active.difference(&frame.active).copied().collect();

@@ -2295,6 +2295,7 @@ export default {
   "gamepadPopup.enabled": "启用游戏内手柄",
   "gamepadPopup.enabledHint": "关着时只在设置里预览，不会向游戏发送输入",
   "gamepadPopup.saved": "手柄设置已保存",
+  "gamepadPopup.settings": "手柄设置",
   "gamepadPopup.close": "关闭",
   "winGamepad.pickOrder": "顺序",
   "winGamepad.pickEmpty": "还没记录",

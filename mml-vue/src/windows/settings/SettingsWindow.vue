@@ -24,6 +24,7 @@ import ExperimentalTab from "./parts/tabs/ExperimentalTab.vue";
 import { loadBuildInfo } from "../../lib/buildInfo";
 import { t } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
+import { clearTargetSettingsTab, targetSettingsTab, windowParams } from "../windowManager";
 import { KEYS, readString, writeString } from "../../lib/storage";
 import { useSettingsUi } from "./composables/useSettingsUi";
 import { useSettingsSkin } from "./composables/useSettingsSkin";
@@ -58,6 +59,21 @@ function storedTab(): SettingsTab {
 }
 
 const tab = ref<SettingsTab>(storedTab());
+
+/**
+ * 落到本次打开指定的标签
+ *
+ * 入口是主窗口标题栏的手柄弹窗（「手柄设置」），单窗口模式下可能已经停在本窗口，
+ * 所以除了挂载时读一次，还要跟着参数变化再读。参数读完即清，之后切页不受它影响。
+ */
+function applyTargetTab() {
+  const wanted = targetSettingsTab();
+  if (!wanted) return;
+  clearTargetSettingsTab();
+  if (isSettingsTab(wanted)) tab.value = wanted;
+}
+
+watch(() => windowParams.value.tab, applyTargetTab);
 
 /** 右侧换页：标题只渐变、不位移；各分组按顺序落下 */
 const { enter: enterPage, leave: leavePage } = useStaggerEnter(".setting-group", {
@@ -265,6 +281,7 @@ function unbindKeys() {
 
 onMounted(async () => {
   bindKeys();
+  applyTargetTab();
   // 各区域的加载互不依赖，一起发（失败的各自留空）
   await Promise.all([
     network.load(),

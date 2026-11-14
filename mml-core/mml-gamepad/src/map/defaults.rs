@@ -16,6 +16,16 @@ pub(super) fn button_rule(button: Button, action: &str) -> ButtonRule {
     }
 }
 
+/// 建一条连发模式的按钮绑定
+pub(super) fn repeat_rule(button: Button, action: &str) -> ButtonRule {
+    ButtonRule {
+        button,
+        modifier: None,
+        action: action.to_string(),
+        mode: ButtonMode::Repeat,
+    }
+}
+
 /// 建一条轴绑定
 pub(super) fn axis_rule(axis: Axis, from: f32, to: f32, action: &str) -> AxisRule {
     AxisRule {
