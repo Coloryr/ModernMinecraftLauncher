@@ -81,6 +81,10 @@ impl InstanceSettingObj {
             args.push(format!("-Dcoloryrasm.mixin.port={}", mixin.port));
             args.push(format!("-Dcoloryrasm.mixin.uuid={}", self.uuid));
             args.push(format!("-Dcoloryrasm.mixin.key={}", mixin.key));
+            // 只走 -javaagent，不要把这个 jar 也塞进 classpath：
+            // Forge 1.20.5+ 的 secure bootstrap 会把 classpath 上的 jar 变成自动模块，
+            // agent 的类因此落进命名模块，被改写的 org.lwjgl.glfw 不读它，
+            // 调用直接抛 IllegalAccessError（early display 起不来、游戏秒退）
             args.push(format!(
                 "-javaagent:{}",
                 launcher_path::get_colorasm().file.to_string_lossy()

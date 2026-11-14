@@ -5,7 +5,6 @@
 //
 // 维护约定：**这里列的是"能搜到的设置项"**，标签页里加/改设置项时同步这里；
 // 键名写错不会报错，只是搜不到，所以加完记得在搜索框里打一遍试试。
-import { isSourceBuild } from "../../lib/buildInfo";
 import { t } from "../../lib/i18n";
 import { SETTINGS_TABS, type SettingsTab } from "./types";
 
@@ -232,6 +231,7 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "client", group: "gameTitle", labelKey: "winSettings.titleDelay", extra: ["title", "间隔"] },
   { tab: "client", group: "serverPack", labelKey: "winSettings.serverPackExport", extra: ["server pack", "serverpack", "服务器包", "导出", "分发"] },
   { tab: "gamepad", group: "gamepad", labelKey: "winSettings.tabDesc.gamepad", extra: ["gamepad", "joystick", "controller", "手柄", "摇杆", "按键映射"] },
+  { tab: "gamepad", group: "gamepad", labelKey: "winGamepad.separateCursor", extra: ["button", "bindings", "mouse mode", "鼠标模式", "按钮绑定", "分离"] },
 
   // ---- 实验性功能 ----
   { tab: "experimental", group: "experimental", labelKey: "winSettings.resourceLink", extra: ["resource mapping", "hard link", "资源映射", "硬链接", "公共目录"] },
@@ -333,8 +333,6 @@ export function searchSettings(query: string, limit = 40): SettingsHit[] {
 
   const hits: SettingsHit[] = [];
   for (const e of SETTINGS_INDEX) {
-    // 手柄页只有测试版（源码启动）才有，正式 / 预发布连搜索也不该命中
-    if (e.tab === "gamepad" && !isSourceBuild.value) continue;
     const groupTitleKey = GROUP_TITLES[e.group];
     const groupLabel = groupTitleKey ? t(groupTitleKey) : e.group;
     const label = t(e.labelKey);

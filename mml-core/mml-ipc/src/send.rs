@@ -2,6 +2,15 @@ use crate::*;
 
 use crate::broadcast::send_to_game;
 
+/// 向指定游戏实例发送设置标题消息
+///
+/// - `uuid`: 游戏实例 ID
+/// - `title`: 要设置的标题
+///
+/// # 返回值
+///
+/// 消息体只含标题，与 ColorMC 一致，游戏实例由 `uuid` 对应的通道定位；
+/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`
 pub fn set_title(uuid: Uuid, title: &str) -> bool {
     let mut content = BytesMut::new();
     content.put_i32(TYPE_SET_TITLE);

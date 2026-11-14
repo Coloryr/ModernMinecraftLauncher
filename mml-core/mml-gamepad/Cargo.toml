@@ -34,3 +34,5 @@ uuid.workspace = true
 # gamepad_demo 用它响应 Ctrl+C 退出
 ctrlc = "~3.5.2"
 mml-testutil = { path = "../mml-testutil" }
+# 转发测试要像游戏端一样算连接应答
+mml-base = { path = "../mml-base" }

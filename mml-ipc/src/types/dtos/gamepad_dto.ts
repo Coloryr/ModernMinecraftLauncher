@@ -64,9 +64,12 @@ export type GamepadLayoutDto = "xbox" | "playstation";
 export type GamepadConfigDto = {
   selected: boolean,
   enabled: boolean,
+  device: string | null,
   layout: GamepadLayoutDto,
   swapAb: boolean,
+  separateCursor: boolean,
   buttons: GamepadButtonRuleDto[],
+  cursorButtons: GamepadButtonRuleDto[],
   axes: GamepadAxisRuleDto[],
   mouse: GamepadMouseDto,
 };

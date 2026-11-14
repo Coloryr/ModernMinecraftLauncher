@@ -450,4 +450,13 @@ pub enum ErrorType {
     },
     /// IPC：接收缓冲区溢出，断开连接
     IpcBufferOverrun,
+    /// IPC：游戏实例的连接应答与启动器算出的不一致
+    IpcGameAuthFailed,
+    /// IPC：连接在限定时间内没有完成验证
+    IpcGameAuthTimeout,
+    /// IPC：连接未通过验证就发送游戏消息
+    IpcGameMessageBeforeAuth {
+        /// 消息类型号
+        msg_type: i32,
+    },
 }

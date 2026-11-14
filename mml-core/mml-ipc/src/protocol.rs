@@ -57,7 +57,7 @@ pub(crate) fn message_len(buf: &[u8]) -> CoreResult<Option<usize>> {
                 }
             }
         }
-        TYPE_GAME_CHANNEL => {
+        TYPE_GAME_CHANNEL | TYPE_GAME_PROOF | TYPE_GAME_CHALLENGE => {
             if !string_field(buf, &mut offset)? {
                 return Ok(None);
             }
@@ -84,17 +84,54 @@ pub(crate) fn message_len(buf: &[u8]) -> CoreResult<Option<usize>> {
 /// 处理一条消息
 ///
 /// - `data`: 消息体，不含类型头，读完即消费
-/// - `client_tx`: 该连接的出站通道，注册游戏通道时使用
+/// - `client_tx`: 该连接的出站通道，通过验证后用于注册广播与游戏通道
+/// - `state`: 该连接的握手状态，应答核对通过后就地置为已验证
+///
+/// # 返回值
+///
+/// 应答不匹配、或未验证就发游戏消息时返回错误，调用方据此断开连接
 pub(crate) async fn process_message(
     data: &mut BytesMut,
     client_tx: &mpsc::UnboundedSender<BytesMut>,
+    state: &mut ClientState,
 ) -> CoreResult<()> {
     if data.len() < 4 {
         return Ok(());
     }
     let msg_type = data.get_i32();
 
+    // 游戏侧消息只能来自已验证的连接；启动器之间的「启动显示 / 启动参数」不要求验证
     match msg_type {
+        TYPE_GAME_MOUSE_STATE | TYPE_GAME_CHANNEL | TYPE_GAME_WINDOW_SIZE | TYPE_GAME_WINDOW_FOCUS
+            if !state.authenticated =>
+        {
+            return Err(IpcGameMessageBeforeAuth { msg_type });
+        }
+        _ => {}
+    }
+
+    match msg_type {
+        TYPE_GAME_PROOF => {
+            // 重复应答直接忽略，否则已通过验证的连接可以被改回未验证
+            if state.authenticated {
+                return Ok(());
+            }
+            let proof = data.read_string();
+            let key = AUTH_KEY.get().map(String::as_str).unwrap_or_default();
+            if !auth::verify(&auth::proof(key, &state.nonce), &proof) {
+                return Err(IpcGameAuthFailed);
+            }
+            state.authenticated = true;
+
+            // 先回「验证结果」再进广播列表：同一通道按入队顺序发送，
+            // 这样 MOTD 广播不会插在验证结果前面，游戏端不会把它当成握手响应
+            let mut result = BytesMut::new();
+            result.put_i32(TYPE_GAME_AUTH_RESULT);
+            let _ = client_tx.send(result);
+
+            // 通过验证才进广播列表，未验证的连接收不到 MOTD
+            broadcast::add_client(client_tx);
+        }
         TYPE_GAME_MOUSE_STATE => {
             let uuid_str = data.read_string();
             let guid = Uuid::parse_str(&uuid_str)

@@ -4,6 +4,12 @@
 
 use super::*;
 
+/// 单个文件最多尝试的次数：首次加两次重试
+///
+/// 连不上主机时每试一次都要等满超时，试太多次只是把失败拖成几分钟；
+/// 文件是断点续传的，下次再下会接着已经落盘的部分。
+const MAX_ATTEMPTS: i32 = 3;
+
 /// 记一条失败日志并累加重试次数
 ///
 /// 光记错误类型看不出是哪个文件、哪个地址；下载失败多半出在地址或网络上，
@@ -28,5 +34,5 @@ pub(crate) fn is_need_err(
         error: mml_names::i18::get_error(err),
         url: item.url.clone(),
     }));
-    *times > 5
+    *times >= MAX_ATTEMPTS
 }

@@ -106,7 +106,7 @@ import type {
   ViewMode,
   MenuActionEvent,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, JavaInstallStatus, JavaMissing, LaunchError, LaunchState, MenuAction, MinecraftProgress, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, JavaInstallStatus, JavaMissing, LaunchError, LaunchState, MenuAction, MinecraftProgress, PrepareError, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
 
 export interface CreateInstanceOpts {
   /** 加载器 ID，缺省为 `normal` */
@@ -1038,6 +1038,28 @@ export const api = {
   },
 
   /**
+   * 启动前检查：游戏内手柄开着但这次不会注入 ColorASM
+   *
+   * - `uuid`: 实例 uuid
+   *
+   * # 返回值
+   *
+   * 需要询问用户是否打开 ColorASM 时返回 true
+   */
+  async gamepadNeedsAsm(uuid: string): Promise<boolean> {
+    return commands.main.gamepadNeedsAsm(uuid);
+  },
+
+  /**
+   * 为实例打开 ColorASM 注入并保存
+   *
+   * - `uuid`: 实例 uuid
+   */
+  async enableColorasm(uuid: string): Promise<void> {
+    return commands.main.enableColorasm(uuid);
+  },
+
+  /**
    * 删除实例
    *
    * - `uuid`: 实例 uuid
@@ -1301,6 +1323,20 @@ export const api = {
    */
   async analyzeLog(uuid: string, path: string): Promise<CrashAnalysisDto> {
     return commands.log.analyze(uuid, path);
+  },
+
+  /**
+   * 在文件管理器里打开日志所在目录
+   *
+   * - `uuid`: 实例 uuid
+   * - `path`: 文件绝对路径，取自 `getLogFiles`；`null` 表示运行日志，落到实例的 logs 目录
+   *
+   * # 返回值
+   *
+   * 打开成功返回；路径不在日志列表里或目录已不存在时报错
+   */
+  async openLogDir(uuid: string, path: string | null): Promise<void> {
+    return commands.log.openDir(uuid, path);
   },
 
   /**
@@ -1975,6 +2011,21 @@ export function onGameExit(cb: (e: ExitEvent) => void): Promise<UnlistenFn> {
  */
 export function onLaunchError(cb: (e: ErrorEvent) => void): Promise<UnlistenFn> {
   return listen<ErrorEvent>(LaunchError, (e) => cb(e.payload));
+}
+
+/**
+ * 实例文件补全失败事件
+ *
+ * 补全在后台跑，失败时窗口上没有任何提示，只能靠这条事件弹框说明原因。
+ *
+ * - `cb`: 失败时回调，带实例 uuid 与错误文案
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ */
+export function onPrepareError(cb: (e: ErrorEvent) => void): Promise<UnlistenFn> {
+  return listen<ErrorEvent>(PrepareError, (e) => cb(e.payload));
 }
 
 /**

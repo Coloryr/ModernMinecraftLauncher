@@ -11,6 +11,7 @@ import SettingsGroup from "../SettingsGroup.vue";
 import GamepadTestPanel from "../GamepadTestPanel.vue";
 import GamepadKeyPicker from "../GamepadKeyPicker.vue";
 import GamepadActionPicker from "../GamepadActionPicker.vue";
+import SegmentedTabs from "../../../../components/ui/SegmentedTabs.vue";
 import AxisRangeBar from "../AxisRangeBar.vue";
 import { ALL_AXES, axisLabel } from "../../gamepadLabels";
 import { t } from "../../../../lib/i18n";
@@ -38,6 +39,8 @@ const {
   active,
   saving,
   actions,
+  buttonMode,
+  buttonRules,
   newButton,
   newAxis,
   createOpen,
@@ -62,6 +65,21 @@ onMounted(init);
 
 /** 按钮触发方式的三档，顺序即下拉顺序 */
 const MODES: GamepadButtonModeDto[] = ["normal", "toggle", "repeat"];
+
+/** 按钮映射的两套：游戏内模式用游戏里那套，鼠标模式用鼠标那套 */
+const modeOptions = computed(() => [
+  { value: "game", label: t("winGamepad.btnModeIngame") },
+  { value: "cursor", label: t("winGamepad.btnModeCursor") },
+]);
+
+/**
+ * 切换按钮映射看哪一套
+ *
+ * - `value`: game / cursor
+ */
+function setButtonMode(value: string) {
+  buttonMode.value = value;
+}
 
 /** 手柄实时状态：轴区间条显示当前值用 */
 const { axisValue } = useGamepadState();
@@ -159,7 +177,8 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
         {{ active ? t("winGamepad.active") : t("winGamepad.activate") }}
       </BaseButton>
       <span class="gp-bar-gap" />
-      <span v-if="dirty" class="gp-dirty">{{ t("winGamepad.unsaved") }}</span>
+      <!-- 未保存提示常驻占位：一出现就把整排按钮挤到下一行 -->
+      <span class="gp-dirty" :class="{ 'is-on': dirty }">{{ t("winGamepad.unsaved") }}</span>
       <BaseButton size="sm" variant="accent" :disabled="!config || saving" @click="save">
         {{ t("winGamepad.save") }}
       </BaseButton>
@@ -181,8 +200,6 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
       </div>
       <BaseSwitch :model-value="config.enabled" @update:model-value="(value) => config && (config.enabled = value)" />
     </div>
-    <p v-if="config?.enabled" class="tip-note">{{ t("winGamepad.ingameAsm") }}</p>
-
     <p v-if="!editing" class="empty-tip">{{ t("winGamepad.empty") }}</p>
     <p v-else-if="!config" class="empty-tip">{{ t("winGamepad.broken") }}</p>
 
@@ -190,13 +207,24 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
       <section class="gp-sec">
         <h3 class="gp-sec-title">{{ t("winGamepad.buttons") }}</h3>
         <p class="field-desc">{{ t("winGamepad.buttonHint") }}</p>
+        <!-- 鼠标模式单独一套时，下面这张表跟着上面的分段切 -->
+        <div class="gp-button-mode">
+          <div class="switch-text">
+            <span class="switch-label">{{ t("winGamepad.separateCursor") }}</span>
+            <span class="switch-state">{{ t("winGamepad.separateCursorHint") }}</span>
+          </div>
+          <BaseSwitch :model-value="config.separateCursor"
+            @update:model-value="(value) => config && (config.separateCursor = value)" />
+        </div>
+        <SegmentedTabs v-if="config.separateCursor" class="gp-btn-mode" :model-value="buttonMode"
+          :options="modeOptions" @update:model-value="setButtonMode" />
         <div class="gp-row gp-row-head gp-row-button">
           <span>{{ t("winGamepad.button") }}</span>
           <span>{{ t("winGamepad.action") }}</span>
           <span>{{ t("winGamepad.mode") }}</span>
           <span></span>
         </div>
-        <div v-for="(rule, index) in config.buttons" :key="rule.button + '|' + rule.modifier" class="gp-row gp-row-button">
+        <div v-for="(rule, index) in buttonRules" :key="rule.button + '|' + rule.modifier" class="gp-row gp-row-button">
           <GamepadKeyPicker :button="rule.button" :modifier="rule.modifier" :layout="effectiveLayout"
             :swap-ab="config.swapAb" @update:button="(value) => setRuleButton(rule, value)"
             @update:modifier="(value) => setRuleModifier(rule, value)" />
@@ -204,7 +232,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
           <select v-model="rule.mode" class="field-select gp-mode">
             <option v-for="item in MODES" :key="item" :value="item">{{ modeLabel(item) }}</option>
           </select>
-          <BaseButton size="sm" variant="ghost" class="gp-remove" @click="config.buttons.splice(index, 1)">
+          <BaseButton size="sm" variant="ghost" class="gp-remove" @click="buttonRules.splice(index, 1)">
             ✕
           </BaseButton>
         </div>
@@ -328,14 +356,21 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
 </template>
 
 <style scoped>
-/* 顶部配置行：下拉吃掉剩余宽度，动作按钮靠右 */
+/* 顶部配置行：下拉吃掉剩余宽度，动作按钮靠右；往下滚时吸在内容区顶部 */
 .gp-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  /* 吸顶后 margin 会留在上方、露出一条滚过去的行，间距一律用 padding */
+  margin: 0;
   /* 上面是分组标题与副标题，紧贴着会看着像标题的附属控件 */
-  margin: 14px 0 16px;
+  padding: 14px 0 16px;
+  /* 有背景图 / 系统材质时 --bg 是半透明的，吸顶会透出下面滚过去的行，改用不透明底 */
+  background: var(--bg-solid, var(--bg));
+  border-bottom: 1px solid var(--border);
 }
 
 .gp-bar-label {
@@ -344,23 +379,46 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
   color: var(--text-dim);
 }
 
+/* 窄窗口先压下拉，别让按钮换行 */
 .gp-select {
-  width: 220px;
+  flex: 0 1 220px;
+  min-width: 120px;
   max-width: 100%;
 }
 
 .gp-bar-gap {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .gp-dirty {
+  flex: 0 0 auto;
+  /* 一直占着这一格，只切换可见性，出现 / 消失时整排不跟着挪 */
+  visibility: hidden;
   color: var(--yellow);
   font-size: 11.5px;
   white-space: nowrap;
 }
 
+.gp-dirty.is-on {
+  visibility: visible;
+}
+
 .gp-sec {
   margin-bottom: 24px;
+}
+
+/* 按钮映射上方的分离开关与模式切换 */
+.gp-button-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.gp-btn-mode {
+  margin: 10px 0 12px;
 }
 
 .gp-sec-title {

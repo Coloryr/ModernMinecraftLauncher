@@ -380,7 +380,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
           </button>
         </div>
 
-        <!-- 方向键 + 鼠标 + 滚轮 -->
+        <!-- 方向键：单独一小块 -->
         <div class="ap-side">
           <div class="ap-side-title">{{ t("winGamepad.arrowKeys") }}</div>
           <div v-for="row in ARROW_ROWS" :key="row.map((k) => k.label).join('|')" class="ap-arrows">
@@ -391,13 +391,21 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
               {{ key.label }}
             </button>
           </div>
-          <div class="ap-side-title">{{ t("winGamepad.mouseActions") }}</div>
-          <button v-for="key in supported(MOUSE_KEYS)" :key="key" type="button" class="ap-key wide"
+        </div>
+      </div>
+
+      <!-- 鼠标与滚轮：横排铺在键盘下面，竖着挤在右侧会把弹窗撑得老高 -->
+      <div class="ap-extra">
+        <div class="ap-extra-group">
+          <span class="ap-extra-title">{{ t("winGamepad.mouseActions") }}</span>
+          <button v-for="key in supported(MOUSE_KEYS)" :key="key" type="button" class="ap-key"
             :class="{ on: isLastAction(key), mod: isPickedAction(key) }" @click="choose(key)">
             {{ actionLabel(key) }}
           </button>
-          <div class="ap-side-title">{{ t("winGamepad.scrollActions") }}</div>
-          <button v-for="key in supported(SCROLL_KEYS)" :key="key" type="button" class="ap-key wide"
+        </div>
+        <div class="ap-extra-group">
+          <span class="ap-extra-title">{{ t("winGamepad.scrollActions") }}</span>
+          <button v-for="key in supported(SCROLL_KEYS)" :key="key" type="button" class="ap-key"
             :class="{ on: isLastAction(key), mod: isPickedAction(key) }" @click="choose(key)">
             {{ actionLabel(key) }}
           </button>
@@ -452,7 +460,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
   color: var(--text-dim);
 }
 
-/* 三块并排：主键盘 / 编辑键 / 方向与鼠标 */
+/* 三块并排：主键盘 / 编辑键 / 方向键 */
 .ap-layout {
   display: flex;
   gap: 12px;
@@ -536,18 +544,39 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
   display: flex;
   flex-direction: column;
   gap: 4px;
-  width: 112px;
+  width: 86px;
   flex-shrink: 0;
-}
-
-.ap-side .ap-key {
-  width: 100%;
 }
 
 .ap-side-title {
   font-size: 11.5px;
   color: var(--text-dim);
   margin-top: 6px;
+}
+
+/* 鼠标与滚轮：横排，按钮按内容定宽 */
+.ap-extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.ap-extra-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ap-extra-title {
+  margin-right: 2px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.ap-extra .ap-key {
+  width: auto;
+  padding: 0 10px;
 }
 
 /* 顺序行 */

@@ -44,10 +44,6 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
             if label == "mml-lobby" {
                 crate::windows::lobby::cancel();
             }
-            // 下载整合包窗口关掉：那两个进度指示器要回到主页面，广播一次让 `window_open` 变 false
-            if uuid == ADD_MODPACK_WINDOW_UUID {
-                notify_modpack_window(window.app_handle());
-            }
             if let Some(win) = window.app_handle().get_webview_window(&label) {
                 // 最大化 / 全屏：只记标志、不覆盖几何，否则下次会开在另一块屏、而且不最大化
                 let maximized =
@@ -107,6 +103,12 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
             resource::cancel_window(&label);
             OPEN_WINDOWS.write().unwrap().remove(&uuid);
             remove_window_model(&uuid);
+            // 下载整合包窗口已经销毁：`window_open` 到这一步才是 false。
+            // 关闭请求阶段窗口还在，那时广播算出来仍是 true，主窗口的下载 / 整合包
+            // 两个指示器会一直被藏住，直到下一次整合包任务广播才恢复
+            if uuid == ADD_MODPACK_WINDOW_UUID {
+                notify_modpack_window(window.app_handle());
+            }
             if uuid == MAIN_WINDOW_UUID {
                 // 主界面关掉了：若此刻已经没有实例在跑，后台没有留下的理由。
                 // 与"最后一个实例退出"两处互相兜底，谁后发生谁收尾，见 tray::quit_idle

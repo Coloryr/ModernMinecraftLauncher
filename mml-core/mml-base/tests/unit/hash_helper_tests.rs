@@ -37,6 +37,23 @@ fn test_gen_hash_from_string() {
     );
 }
 
+/// HMAC-SHA256：RFC 4231 第 1 组用例，密钥 20 个 0x0b
+#[test]
+fn test_gen_hmac_sha256_rfc4231() {
+    let key = "\x0b".repeat(20);
+    assert_eq!(
+        gen_hmac_sha256(&key, "Hi There"),
+        "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
+    );
+
+    // 结果固定长度的小写十六进制，密钥不同结果不同
+    let a = gen_hmac_sha256("secret", "nonce");
+    assert_eq!(a.len(), 64);
+    assert!(a.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+    assert_ne!(a, gen_hmac_sha256("secret2", "nonce"));
+    assert_ne!(a, gen_hmac_sha256("secret", "nonce2"));
+}
+
 /// 从数据流生成哈希，数据跨缓冲区分块
 #[test]
 fn test_gen_hash_from_reader() {

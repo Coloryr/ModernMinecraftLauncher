@@ -27,12 +27,22 @@
 //! | 游戏通道 | 9 | 游戏 -> 启动器 | uuid(String) |
 //! | 设置标题 | 10 | 启动器 -> 游戏 | 标题(String) |
 //! | 窗口大小 | 11 | 游戏 -> 启动器 | uuid(String) + 宽(i32) + 高(i32) |
-//! | 连接验证 | 12 | 启动器 -> 游戏 | 密钥(String) |
 //! | 窗口聚焦 | 13 | 游戏 -> 启动器 | uuid(String) + 状态(bool) |
+//! | 连接挑战 | 14 | 启动器 -> 游戏 | 挑战串(String) |
+//! | 连接应答 | 15 | 游戏 -> 启动器 | 应答串(String) |
+//! | 验证结果 | 16 | 启动器 -> 游戏 | 无，只在通过时下发 |
 //!
-//! 游戏连接建立后，启动器先把「连接验证」(12) 发给游戏，密钥由 IPC 服务启动时随机生成，
-//! 经 get_auth_key 取出后作为启动参数传给游戏；游戏校验通过后才注册游戏通道。
-//! 启动器实例之间的「启动显示 / 启动参数」不需要这步验证。
+//! 连接建立后启动器先下发「连接挑战」(14)，内容是这次连接现生成的随机串。游戏用启动参数里的
+//! 密钥对它算 HMAC-SHA256，把 64 位小写十六进制结果作为「连接应答」(15) 发回；启动器用同一份
+//! 密钥再算一遍比对，通过后把该连接加入广播列表，并回一条无消息体的「验证结果」(16)。
+//! 密钥本身不过网，挑战串每次连接都换，抓到的应答无法重放。
+//!
+//! 应答不对时启动器不回「验证结果」，直接断开；游戏收不到它就知道握手没通过。
+//!
+//! 未通过验证的连接不能注册游戏通道，也不能上报鼠标 / 窗口状态，发了直接断开；
+//! 建立连接后十秒内没通过验证同样断开。启动器实例之间的「启动显示 / 启动参数」不参与握手。
+//!
+//! 12 号消息是旧的「连接验证」（明文下发密钥），握手改成挑战应答后已停用，编号不再复用。
 //!
 //! 输入类消息由启动器按游戏通道定向发送，消息体不含 uuid。
 //! 键盘与鼠标按键使用 GLFW 编码，鼠标移动是相对位移，单位像素，正数向右或向下；
@@ -52,7 +62,7 @@
 //!
 //! 通过 [`init()`] 启动服务并获取监听端口与验证密钥，启动游戏时应把
 //! [`get_port()`] 与 [`get_auth_key()`] 的结果作为启动参数传给游戏。
-//! 游戏 Agent 连接回启动器后，先校验启动器发来的「连接验证」(12)，再注册游戏通道。
+//! 游戏 Agent 连接回启动器后，先用密钥应答启动器下发的挑战串，通过后才注册游戏通道。
 //! 启动器启动时若已记录到运行中的实例端口，将端口传给 [`init()`]：
 //! init 会读取本进程命令行参数并调用 [`notify_existing()`] 通知已运行实例，
 //! 通知成功时返回 `Ok(None)`，当前进程应退出；否则本进程作为第一个实例
@@ -70,8 +80,9 @@ use mml_base::events::{EventArgHandler, EventHandler};
 use mml_names::i18_items::error_type::{
     CoreResult, ErrorData,
     ErrorType::{
-        IpcAcceptError, IpcBindError, IpcBufferOverrun, IpcFrameTooLarge, IpcInvalidFrame,
-        IpcRuntimeCreateError, IpcWriteError, SocketError, ThreadError,
+        IpcAcceptError, IpcBindError, IpcBufferOverrun, IpcFrameTooLarge, IpcGameAuthFailed,
+        IpcGameAuthTimeout, IpcGameMessageBeforeAuth, IpcInvalidFrame, IpcRuntimeCreateError,
+        IpcWriteError, SocketError, ThreadError,
     },
 };
 use mml_names::i18_items::info_type::InfoType;
@@ -98,11 +109,16 @@ const TYPE_MOUSE_SCROLL: i32 = 8;
 const TYPE_GAME_CHANNEL: i32 = 9;
 const TYPE_SET_TITLE: i32 = 10;
 const TYPE_GAME_WINDOW_SIZE: i32 = 11;
-const TYPE_GAME_AUTH: i32 = 12;
 const TYPE_GAME_WINDOW_FOCUS: i32 = 13;
+const TYPE_GAME_CHALLENGE: i32 = 14;
+const TYPE_GAME_PROOF: i32 = 15;
+const TYPE_GAME_AUTH_RESULT: i32 = 16;
 
 /// 单个消息体的最大长度，单位字节；本地 IPC 正常数据远小于该值，用于防御异常长度
 const MAX_FRAME_SIZE: usize = 1 << 20;
+
+/// 从连接建立到通过验证的时限，单位秒；超时断开，避免空闲连接一直占着任务
+const AUTH_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// 客户端出站通道
 type TcpChannel = mpsc::UnboundedSender<BytesMut>;
@@ -159,6 +175,27 @@ pub struct WindowSize {
     pub width: i32,
     /// 窗口高度，单位像素；取值来自游戏端上报的 i32，无有效范围约束
     pub height: i32,
+}
+
+/// 单条连接的握手状态
+///
+/// 挑战串在连接建立时生成；应答核对通过后认证标记置真，未通过验证的连接
+/// 不进广播列表、不能注册游戏通道
+pub(crate) struct ClientState {
+    /// 本次连接下发的挑战串，应答按它计算
+    pub(crate) nonce: String,
+    /// 是否已通过挑战应答
+    pub(crate) authenticated: bool,
+}
+
+impl ClientState {
+    /// 为一条新连接生成握手状态，挑战串每次都不同
+    fn new() -> Self {
+        Self {
+            nonce: auth::new_nonce(),
+            authenticated: false,
+        }
+    }
 }
 
 /// 注册启动显示事件回调，新启动实例请求显示主窗口时触发
@@ -285,16 +322,8 @@ pub fn clear_servers() {
     SERVER_INFOS.write().unwrap().clear();
 }
 
-/// 向指定游戏实例发送设置标题消息
-///
-/// - `uuid`: 游戏实例 ID
-/// - `title`: 要设置的标题
-///
-/// # 返回值
-///
-/// 消息体只含标题，与 ColorMC 一致，游戏实例由 `uuid` 对应的通道定位；
-/// 发送成功返回 `true`，游戏实例未注册通道时返回 `false`
 pub(crate) mod broadcast;
+mod auth;
 mod protocol;
 
 #[cfg(test)]

@@ -128,8 +128,14 @@
   min-width: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
-  padding: 22px calc(26px - 9px) 22px 26px;
+  /* 见 styles/scrollbar.css；上内边距挪到 .set-page —— 吸顶元素贴的是滚动容器的内边距盒，
+     留在这里会让吸顶的配置行永远比内容区顶边低 22px */
+  padding: 0 calc(26px - 9px) 22px 26px;
+}
+
+/* 页面顶部留白：替代原 .tab-content 的上内边距 */
+.settings-layout .set-page {
+  padding-top: 22px;
 }
 
 .settings-layout .set-panel {

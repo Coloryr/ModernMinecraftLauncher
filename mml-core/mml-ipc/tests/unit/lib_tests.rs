@@ -16,6 +16,22 @@ fn ensure_log() {
     });
 }
 
+/// 已通过验证的连接状态，用来直接测消息处理
+fn verified() -> ClientState {
+    ClientState {
+        nonce: auth::new_nonce(),
+        authenticated: true,
+    }
+}
+
+/// 尚未通过验证的连接状态
+fn pending() -> ClientState {
+    ClientState {
+        nonce: auth::new_nonce(),
+        authenticated: false,
+    }
+}
+
 /// 构造「类型 + 字符串」消息
 fn msg_with_string(msg_type: i32, s: &str) -> BytesMut {
     let mut buf = BytesMut::new();
@@ -176,7 +192,8 @@ async fn test_process_mouse_state() {
     let mut buf = msg_with_string(TYPE_GAME_MOUSE_STATE, &uuid.to_string());
     buf.put_u8(1);
 
-    process_message(&mut buf, &mpsc::unbounded_channel().0)
+    let mut state = verified();
+    process_message(&mut buf, &mpsc::unbounded_channel().0, &mut state)
         .await
         .unwrap();
 
@@ -185,7 +202,7 @@ async fn test_process_mouse_state() {
     // 同 uuid 二次上报 false 应覆盖
     let mut buf = msg_with_string(TYPE_GAME_MOUSE_STATE, &uuid.to_string());
     buf.put_u8(0);
-    process_message(&mut buf, &mpsc::unbounded_channel().0)
+    process_message(&mut buf, &mpsc::unbounded_channel().0, &mut state)
         .await
         .unwrap();
     assert_eq!(get_mouse_state(uuid), Some(false));
@@ -198,8 +215,9 @@ async fn test_process_mouse_state_bad_uuid() {
     let mut buf = msg_with_string(TYPE_GAME_MOUSE_STATE, "not-a-uuid");
     buf.put_u8(1);
 
+    let mut state = verified();
     assert!(
-        process_message(&mut buf, &mpsc::unbounded_channel().0)
+        process_message(&mut buf, &mpsc::unbounded_channel().0, &mut state)
             .await
             .is_err()
     );
@@ -214,7 +232,8 @@ async fn test_process_window_size() {
     buf.put_i32(1920);
     buf.put_i32(1080);
 
-    process_message(&mut buf, &mpsc::unbounded_channel().0)
+    let mut state = verified();
+    process_message(&mut buf, &mpsc::unbounded_channel().0, &mut state)
         .await
         .unwrap();
 
@@ -243,7 +262,9 @@ async fn test_process_launch_arg() {
     buf.put_i32(TYPE_LAUNCH_ARG);
     buf.write_string_list(&expect);
 
-    process_message(&mut buf, &mpsc::unbounded_channel().0)
+    // 启动器之间的消息不要求验证，未验证的连接也能处理
+    let mut state = pending();
+    process_message(&mut buf, &mpsc::unbounded_channel().0, &mut state)
         .await
         .unwrap();
 
@@ -261,7 +282,8 @@ async fn test_get_game_uuids() {
     let (tx, _rx) = mpsc::unbounded_channel();
     let mut buf = msg_with_string(TYPE_GAME_CHANNEL, &uuid.to_string());
 
-    process_message(&mut buf, &tx).await.unwrap();
+    let mut state = verified();
+    process_message(&mut buf, &tx, &mut state).await.unwrap();
 
     assert!(get_game_uuids().contains(&uuid));
 }
@@ -270,5 +292,63 @@ async fn test_get_game_uuids() {
 #[test]
 fn test_set_title_unknown_uuid() {
     assert!(!set_title(Uuid::new_v4(), "hello"));
+}
+
+/// 应答正确时连接被标记为已验证，并回一条通过结果
+#[tokio::test]
+async fn test_process_proof_accept() {
+    ensure_log();
+    let mut state = pending();
+    let key = AUTH_KEY.get().map(String::as_str).unwrap_or_default();
+    let proof = auth::proof(key, &state.nonce);
+
+    let mut buf = msg_with_string(TYPE_GAME_PROOF, &proof);
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    process_message(&mut buf, &tx, &mut state).await.unwrap();
+
+    assert!(state.authenticated);
+    let result = rx.recv().await.unwrap();
+    let mut result = &result[..];
+    assert_eq!(result.get_i32(), TYPE_GAME_AUTH_RESULT);
+    assert!(result.is_empty(), "通过结果不带消息体");
+}
+
+/// 应答不对时报错、保持未验证，也不回「验证结果」
+#[tokio::test]
+async fn test_process_proof_reject() {
+    ensure_log();
+    let mut state = pending();
+    let mut buf = msg_with_string(TYPE_GAME_PROOF, "deadbeef");
+    let (tx, mut rx) = mpsc::unbounded_channel();
+
+    assert!(matches!(
+        process_message(&mut buf, &tx, &mut state).await,
+        Err(IpcGameAuthFailed)
+    ));
+    assert!(!state.authenticated);
+    assert!(rx.try_recv().is_err(), "失败时不应下发验证结果");
+}
+
+/// 未验证的连接发游戏消息直接报错，不能注册通道
+#[tokio::test]
+async fn test_process_game_message_before_auth() {
+    ensure_log();
+    let uuid = Uuid::new_v4();
+    let mut buf = msg_with_string(TYPE_GAME_CHANNEL, &uuid.to_string());
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut state = pending();
+
+    assert!(matches!(
+        process_message(&mut buf, &tx, &mut state).await,
+        Err(IpcGameMessageBeforeAuth { .. })
+    ));
+    assert!(!GAME_CHANNELS.read().unwrap().contains_key(&uuid));
+}
+
+/// 应答消息按字符串推算边界
+#[test]
+fn test_message_len_proof() {
+    let buf = msg_with_string(TYPE_GAME_PROOF, &"a".repeat(64));
+    assert_eq!(message_len(&buf).unwrap(), Some(buf.len()));
 }
 

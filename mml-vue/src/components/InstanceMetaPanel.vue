@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 实例元信息面板：版本类型+版本 / 加载器+加载器版本 / 游戏内语言+日志编码 / 自动打开日志窗口 / 整合包类型
+// 实例元信息面板：版本类型+版本 / 加载器+加载器版本 / 游戏内语言+渲染器 / 日志编码+日志窗口开关 / 整合包类型
 // 元信息改动经 update 事件走 IPC 写入核心实例配置，日志窗口开关直接调日志设置命令；
 // 刷新按钮与添加实例窗口同逻辑
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
@@ -19,7 +19,7 @@ const props = defineProps<{
   instance: InstanceInfoDto;
   /** 可选版本清单，供版本类型 / 版本下拉使用 */
   versions: VersionInfoDto[];
-  /** 实例锁定生效：隐藏版本 / 加载器与整合包设置，只留游戏内语言、日志编码与自动打开日志窗口 */
+  /** 实例锁定生效：隐藏版本 / 加载器与整合包设置，只留游戏内语言、渲染器、日志编码与自动打开日志窗口 */
   locked?: boolean;
 }>();
 
@@ -556,24 +556,34 @@ function onPlatformChange(value: string) {
       </div>
     </template>
 
-    <!-- 游戏内语言 + 日志编码 -->
+    <!-- 游戏内语言 + 渲染器：渲染器只有 26.2 起的版本才有，没有时这一行只剩语言 -->
     <span class="meta-label">{{ t("meta.lang") }}</span>
-    <select class="field-select" :value="langValue" :disabled="langsLoading"
+    <!-- 加载中要选中那条占位项，否则下拉框会是一片空白 -->
+    <select class="field-select" :value="langsLoading ? '' : langValue" :disabled="langsLoading"
       @change="change({ lang: ($event.target as HTMLSelectElement).value })">
       <option v-if="langsLoading" value="">{{ t("meta.langLoading") }}</option>
       <template v-else>
         <option v-for="l in langs" :key="l.value" :value="l.value">{{ l.label }}</option>
       </template>
     </select>
-    <span class="meta-label small">{{ t("meta.logEncoding") }}</span>
+    <template v-if="instance.renderer">
+      <span class="meta-label small">{{ t("meta.renderer") }}</span>
+      <select class="field-select" :value="instance.renderer"
+        @change="change({ renderer: ($event.target as HTMLSelectElement).value })">
+        <option value="default">{{ t("meta.rendererAuto") }}</option>
+        <option value="opengl">{{ t("meta.rendererOpenGL") }}</option>
+        <option value="vulkan">{{ t("meta.rendererVulkan") }}</option>
+      </select>
+    </template>
+
+    <!-- 日志编码与自动打开日志窗口同一行，两者都是实例级的查看行为 -->
+    <span class="meta-label meta-row-start">{{ t("meta.logEncoding") }}</span>
     <select class="field-select" :value="instance.logEncoding ?? 'utf8'"
       @change="change({ logEncoding: ($event.target as HTMLSelectElement).value })">
       <option value="utf8">{{ t("meta.utf8") }}</option>
       <option value="gbk">{{ t("meta.gbk") }}</option>
     </select>
-
-    <!-- 自动打开日志窗口：实例级行为 -->
-    <span class="meta-label">{{ t("meta.logWindow") }}</span>
+    <span class="meta-label small">{{ t("meta.logWindow") }}</span>
     <label class="meta-switch">
       <BaseSwitch :model-value="logAutoShow" :disabled="!logAutoShowLoaded || logAutoShowBusy"
         @update:model-value="onLogAutoShow" />
@@ -651,9 +661,14 @@ function onPlatformChange(value: string) {
   text-align: right;
 }
 
-/* 自动打开日志窗口：开关与文案同一行，跨过右侧三列 */
+/* 另起一行：语言右边没有渲染器时，日志编码会顺着补进那一行的空位 */
+.meta-row-start {
+  grid-column: 1;
+}
+
+/* 日志窗口开关独占第 4 列：开关左缘与上面那行的下拉对齐 */
 .meta-switch {
-  grid-column: 2 / 5;
+  grid-column: 4;
   display: flex;
   align-items: center;
   gap: 8px;

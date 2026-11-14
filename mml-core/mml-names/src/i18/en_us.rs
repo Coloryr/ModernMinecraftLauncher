@@ -440,6 +440,15 @@ impl I18Lang for EnUs {
             ErrorType::IpcBufferOverrun => {
                 String::from("IPC: receive buffer overrun, dropping the connection")
             }
+            ErrorType::IpcGameAuthFailed => {
+                String::from("IPC: game handshake proof mismatch, dropping the connection")
+            }
+            ErrorType::IpcGameAuthTimeout => {
+                String::from("IPC: connection did not finish verification in time, dropping it")
+            }
+            ErrorType::IpcGameMessageBeforeAuth { msg_type } => {
+                format!("IPC: game message type {msg_type} arrived before verification, dropping the connection")
+            }
         }
     }
 

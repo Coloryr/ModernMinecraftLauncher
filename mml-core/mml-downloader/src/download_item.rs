@@ -93,7 +93,7 @@ pub struct DownloadItem {
     now_size: AtomicU64,
     /// 当前下载状态，取值见 [`DownloadItemState`]
     state: AtomicU32,
-    /// 累计错误次数，达到 5 次后放弃该文件
+    /// 累计错误次数，达到上限后放弃该文件，见 `download_thread::retry`
     error: AtomicU32,
 }
 

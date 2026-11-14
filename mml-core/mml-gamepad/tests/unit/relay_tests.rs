@@ -134,13 +134,13 @@ fn toggle_mode_holds_until_next_press() {
     down.insert(id);
 
     // 第一帧按下：进入保持
-    let frame = relay.step(&map, Instant::now(), &down);
+    let frame = relay.step(&map, &map.buttons, Instant::now(), &down);
     assert!(frame.active.contains(&id));
     // 松开后仍然保持
-    let frame = relay.step(&map, Instant::now(), &BTreeSet::new());
+    let frame = relay.step(&map, &map.buttons, Instant::now(), &BTreeSet::new());
     assert!(frame.active.contains(&id));
     // 再按一次才松开
-    let frame = relay.step(&map, Instant::now(), &down);
+    let frame = relay.step(&map, &map.buttons, Instant::now(), &down);
     assert!(!frame.active.contains(&id));
 }
 
@@ -163,9 +163,64 @@ fn repeat_mode_pulses_on_interval() {
     down.insert(id);
 
     let start = Instant::now();
-    assert_eq!(relay.step(&map, start, &down).pulses, vec![id]);
+    assert_eq!(relay.step(&map, &map.buttons, start, &down).pulses, vec![id]);
     // 间隔没到不重复触发
-    assert!(relay.step(&map, start + Duration::from_millis(10), &down).pulses.is_empty());
+    assert!(relay.step(&map, &map.buttons, start + Duration::from_millis(10), &down).pulses.is_empty());
     // 到了就再来一次
-    assert_eq!(relay.step(&map, start + REPEAT_INTERVAL, &down).pulses, vec![id]);
+    assert_eq!(relay.step(&map, &map.buttons, start + REPEAT_INTERVAL, &down).pulses, vec![id]);
+}
+
+/// 鼠标模式与游戏内模式各用一套按钮绑定
+#[test]
+fn cursor_mode_uses_its_own_buttons() {
+    let mut config = map::GamepadConfig::default();
+    config.buttons.clear();
+    config.axes.clear();
+    config.buttons.push(map::ButtonRule {
+        button: Button::South,
+        modifier: None,
+        action: String::from("Space"),
+        mode: map::ButtonMode::Normal,
+    });
+    config.cursor_buttons = Some(vec![map::ButtonRule {
+        button: Button::South,
+        modifier: None,
+        action: String::from("MouseLeft"),
+        mode: map::ButtonMode::Normal,
+    }]);
+    let map = config.compile().unwrap();
+
+    let mut values = empty_values();
+    values.buttons[button_index(Button::South).unwrap()] = 1.0;
+
+    assert_eq!(desired_actions(&map, &values, true), [Action::Key(32)].into());
+    assert_eq!(desired_actions(&map, &values, false), [Action::Mouse(0)].into());
+}
+
+/// 关掉分离时两种模式共用游戏内那套
+#[test]
+fn shared_buttons_when_separation_off() {
+    let mut config = map::GamepadConfig::default();
+    config.separate_cursor = false;
+    config.buttons.clear();
+    config.axes.clear();
+    config.buttons.push(map::ButtonRule {
+        button: Button::South,
+        modifier: None,
+        action: String::from("Space"),
+        mode: map::ButtonMode::Normal,
+    });
+    config.cursor_buttons = Some(vec![map::ButtonRule {
+        button: Button::South,
+        modifier: None,
+        action: String::from("MouseLeft"),
+        mode: map::ButtonMode::Normal,
+    }]);
+    let map = config.compile().unwrap();
+
+    let mut values = empty_values();
+    values.buttons[button_index(Button::South).unwrap()] = 1.0;
+
+    assert_eq!(desired_actions(&map, &values, true), [Action::Key(32)].into());
+    assert_eq!(desired_actions(&map, &values, false), [Action::Key(32)].into());
 }

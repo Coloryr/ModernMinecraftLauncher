@@ -423,11 +423,19 @@ export const gamepadActions = [
 export const gamepadProfiles = [{ name: "默认配置", active: true, error: null }];
 export const gamepadConfig = {
   selected: true,
+  // 鼠标模式单独一套按钮：默认打开，界面上的表跟着分段切
+  separateCursor: true,
   buttons: [
     { button: "south", modifier: null, action: "Space" },
     { button: "east", modifier: null, action: "Escape" },
     { button: "leftTrigger", modifier: null, action: "ShiftLeft" },
     { button: "rightTrigger", modifier: null, action: "MouseLeft" },
+  ],
+  // 鼠标模式那套：翻背包 / 开菜单时用来点界面
+  cursorButtons: [
+    { button: "south", modifier: null, action: "MouseLeft" },
+    { button: "east", modifier: null, action: "MouseRight" },
+    { button: "leftTrigger", modifier: null, action: "LeftShift" },
   ],
   axes: [
     { axis: "leftStickX", from: -0.6, to: -0.3, action: "KeyA" },

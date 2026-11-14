@@ -1,11 +1,12 @@
 //! 哈希计算和 Base64 编解码模块
 //!
-//! 提供 MD5、SHA1、SHA256、SHA512 哈希计算以及 Base64 编解码功能。
+//! 提供 MD5、SHA1、SHA256、SHA512 哈希计算、HMAC-SHA256 以及 Base64 编解码功能。
 //! 支持多种输入源：字节数组、字符串、文件、读取流，同步与异步两种
 
 use std::{io::Read, path::Path};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use hmac::{Hmac, KeyInit, Mac};
 use md5::Md5;
 use mml_names::i18_items::error_type::{CoreResult, ErrorData, ErrorType};
 use mml_sys::path_helper;
@@ -80,6 +81,23 @@ pub fn gen_hash_from_string(hash_type: HashType, data: &str) -> String {
     let mut hasher = create_hasher(hash_type);
     hasher.update(data.as_bytes());
     bytes_to_hex(&hasher.finalize()).to_ascii_lowercase()
+}
+
+/// 用密钥对文本做 HMAC-SHA256
+///
+/// 结果不可逆，用于「知道密钥才能算出来」的校验，密钥本身不出现在结果里
+///
+/// - `key`: 密钥，长度不限
+/// - `data`: 参与计算的文本，按 UTF-8 编码
+///
+/// # 返回值
+///
+/// 返回小写十六进制串，长度 64
+pub fn gen_hmac_sha256(key: &str, data: &str) -> String {
+    let mut mac =
+        Hmac::<Sha256>::new_from_slice(key.as_bytes()).expect("HMAC 接受任意长度的密钥");
+    mac.update(data.as_bytes());
+    bytes_to_hex(&mac.finalize().into_bytes())
 }
 
 /// 从数据流生成校验值，分块读取直到流结束

@@ -2,12 +2,13 @@
 //
 // 状态放在设置窗口这一层而不是标签组件里：切到别的标签时 GamepadTab 会被卸载，
 // 编辑中的内容与未保存改动必须留在这里，切回来才不会丢。
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import {
   commands,
   type GamepadAxisDto,
   type GamepadButtonDto,
   type GamepadButtonModeDto,
+  type GamepadButtonRuleDto,
   type GamepadConfigDto,
   type GamepadProfileDto,
 } from "../../../lib/bindings";
@@ -54,6 +55,24 @@ export function useSettingsGamepad() {
     profiles.value.some((item) => item.name === editing.value && item.active),
   );
 
+  /** 按钮映射编辑的是哪一套：game 游戏内模式 / cursor 鼠标模式 */
+  const buttonMode = ref("game");
+
+  /** 当前编辑的按钮绑定列表；关掉分离时永远是游戏内那套 */
+  const buttonRules = computed<GamepadButtonRuleDto[]>(() => {
+    const data = config.value;
+    if (!data) return [];
+    return data.separateCursor && buttonMode.value === "cursor" ? data.cursorButtons : data.buttons;
+  });
+
+  // 关掉分离后只剩一套，切回游戏内那套免得停在一个看不见的列表上
+  watch(
+    () => config.value?.separateCursor,
+    (separate) => {
+      if (!separate) buttonMode.value = "game";
+    },
+  );
+
   /** 新建按钮绑定时的草稿 */
   const newButton = reactive({
     button: "south" as GamepadButtonDto,
@@ -77,12 +96,12 @@ export function useSettingsGamepad() {
 
   /** 按钮是否已经有普通绑定，加新行时用来挑下一个按钮 */
   function isBound(button: GamepadButtonDto): boolean {
-    return !!config.value?.buttons.some((rule) => rule.button === button && !rule.modifier);
+    return buttonRules.value.some((rule) => rule.button === button && !rule.modifier);
   }
 
   /** 同一个按钮加同一个修饰键只能绑一条 */
   function isTaken(button: GamepadButtonDto, modifier: GamepadButtonDto | null): boolean {
-    return !!config.value?.buttons.some(
+    return buttonRules.value.some(
       (rule) => rule.button === button && (rule.modifier ?? null) === modifier,
     );
   }
@@ -265,7 +284,9 @@ export function useSettingsGamepad() {
         rule.from !== rule.to;
       if (!ok) return t("winGamepad.invalidRange");
     }
-    for (const rule of data.buttons) {
+    const lists = [data.buttons];
+    if (data.separateCursor) lists.push(data.cursorButtons);
+    for (const rule of lists.flat()) {
       if (!rule.action) return t("winGamepad.invalidAction");
       if (rule.modifier === rule.button) return t("winGamepad.invalidModifier");
     }
@@ -305,7 +326,7 @@ export function useSettingsGamepad() {
   /** 加一条按钮绑定，加完自动跳到下一个没有普通绑定的按钮 */
   function addButton() {
     if (!config.value || isTaken(newButton.button, newButton.modifier)) return;
-    config.value.buttons.push({
+    buttonRules.value.push({
       button: newButton.button,
       modifier: newButton.modifier,
       action: newButton.action,
@@ -335,6 +356,8 @@ export function useSettingsGamepad() {
     loading,
     saving,
     actions,
+    buttonMode,
+    buttonRules,
     newButton,
     newAxis,
     createOpen,

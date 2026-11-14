@@ -249,6 +249,16 @@ async function analyzeManually() {
   if (!analysis.value?.findings.length) showToast(t("analysis.noFinding"));
 }
 
+/** 在文件管理器里打开当前日志所在目录；运行日志没有文件，交给后端落到实例的 logs 目录 */
+async function openLogDir() {
+  if (!lockedUuid.value) return;
+  try {
+    await api.openLogDir(lockedUuid.value, liveSource.value ? null : file.value);
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
+
 /** 载入当前来源的全部日志行 */
 async function loadSource() {
   if (!lockedUuid.value) return;
@@ -737,6 +747,10 @@ onBeforeUnmount(() => {
           v-tip="analyzing ? t('logWindow.analyzing') : t('logWindow.analyze')"
           :aria-label="analyzing ? t('logWindow.analyzing') : t('logWindow.analyze')" @click="analyzeManually">
           <GlyphIcon name="alert" :size="15" :weight="1.8" />
+        </BaseButton>
+        <BaseButton size="sm" variant="ghost" class="icon-btn-head"
+          v-tip="t('logWindow.openDir')" :aria-label="t('logWindow.openDir')" @click="openLogDir">
+          <GlyphIcon name="folder" :size="15" :weight="1.8" />
         </BaseButton>
         <BaseButton size="sm" variant="ghost" class="icon-btn-head" v-tip="t('logWindow.search')"
           :aria-label="t('logWindow.search')" @click="onSearch">

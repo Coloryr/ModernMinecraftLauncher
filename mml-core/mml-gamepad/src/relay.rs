@@ -1,8 +1,9 @@
 //! 把手柄状态映射成键鼠消息，转发给运行中的游戏实例
 //!
 //! 每帧按映射规则算出应该按下的动作，只把变化发给游戏；摇杆位移按速度累计成
-//! 整数像素再发。光标模式与游戏内转动模式由游戏上报的鼠标抓取状态决定：
-//! 抓取时左摇杆走 WASD、右摇杆转视角；未抓取时左摇杆移光标，且不再触发
+//! 整数像素再发。鼠标模式与游戏内模式由游戏上报的鼠标抓取状态决定：
+//! 抓取时用游戏内那套按钮绑定、左摇杆走 WASD、右摇杆转视角；未抓取时用
+//! 鼠标模式那套按钮（没单独配过就是同一套），左摇杆移光标，且不再触发
 //! 左摇杆上的按键，避免翻背包时走动。
 //!
 //! 目标实例优先选已抓取鼠标的那个；只有一个游戏连接时直接用它。
@@ -17,8 +18,8 @@ use uuid::Uuid;
 
 use mml_names::i18_items::info_type::InfoType;
 
-use crate::map::{self, Action, ButtonMode, CompiledMap, combo_of, in_range};
-use crate::reader::{BUTTON_COUNT, PadValues, first_pad_id, pad_values};
+use crate::map::{self, Action, ButtonMode, ButtonRuleCompiled, CompiledMap, combo_of, in_range};
+use crate::reader::{BUTTON_COUNT, PadValues, first_pad_id, pad_id_by_name, pad_values};
 
 /// 转发间隔，约 60 帧每秒
 const TICK: Duration = Duration::from_millis(16);
@@ -117,9 +118,16 @@ impl Relay {
     /// - `delta`: 距上一帧的时间，单位秒
     fn tick(&mut self, delta: f64) {
         let target = target_instance();
-        let pad = target.and_then(|_| first_pad_id());
+        let map = map::current();
+        // 选了手柄就按名字找，没选或那台没连上时回落到第一个
+        let pad = target.and_then(|_| {
+            map.device
+                .as_deref()
+                .and_then(pad_id_by_name)
+                .or_else(first_pad_id)
+        });
         let values = pad.and_then(pad_values);
-        self.forward(target, pad, values.as_ref(), &map::current(), delta);
+        self.forward(target, pad, values.as_ref(), &map, delta);
     }
 
     /// 使用同一条转发链路处理设备快照，便于脱离物理驱动验证输入
@@ -183,7 +191,8 @@ impl Relay {
                 filtered.buttons[index] = 0.0;
             }
         }
-        let frame = self.step(map, Instant::now(), &desired_rules(map, &filtered, grabbed));
+        let buttons = map.buttons_for(grabbed);
+        let frame = self.step(map, buttons, Instant::now(), &desired_rules(map, &filtered, grabbed));
         let released: Vec<usize> = self.active.difference(&frame.active).copied().collect();
         for id in released {
             self.release_rule(uuid, map, id);
@@ -232,12 +241,19 @@ impl Relay {
      * 而是按间隔给出"点一下"。
      *
      * - `map`: 编译后的映射
+     * - `buttons`: 这一帧生效的那套按钮规则
      * - `now`: 这一帧的时间，连发按它算间隔
      * - `pressed`: 这一帧原始命中的规则编号
      */
-    fn step(&mut self, map: &CompiledMap, now: Instant, pressed: &BTreeSet<usize>) -> Frame {
+    fn step(
+        &mut self,
+        map: &CompiledMap,
+        buttons: &[ButtonRuleCompiled],
+        now: Instant,
+        pressed: &BTreeSet<usize>,
+    ) -> Frame {
         let mut frame = Frame::default();
-        for rule in &map.buttons {
+        for rule in buttons {
             let down = pressed.contains(&rule.id);
             match rule.mode {
                 ButtonMode::Normal => {
@@ -369,9 +385,10 @@ fn target_instance() -> Option<Uuid> {
 fn desired_rules(map: &CompiledMap, values: &PadValues, grabbed: bool) -> BTreeSet<usize> {
     let mut rules = BTreeSet::new();
 
+    let buttons = map.buttons_for(grabbed);
     // 组合键优先：同一按钮上带修饰键的规则命中时，不触发它不带修饰的绑定
     let mut combo = [false; BUTTON_COUNT];
-    for rule in &map.buttons {
+    for rule in buttons {
         if values.buttons[rule.index] < BUTTON_DOWN {
             continue;
         }
@@ -382,7 +399,7 @@ fn desired_rules(map: &CompiledMap, values: &PadValues, grabbed: bool) -> BTreeS
         }
     }
 
-    for rule in &map.buttons {
+    for rule in buttons {
         if values.buttons[rule.index] < BUTTON_DOWN {
             continue;
         }

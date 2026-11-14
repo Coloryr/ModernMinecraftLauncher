@@ -16,6 +16,7 @@ use crate::err_keys;
 use crate::windows;
 
 use super::group::{ensure_idle, uuid_short};
+use super::{RENDERER_KEY, renderer_of};
 use crate::windows::main::{emit_instance_change, model};
 
 /// 创建遗留实例记录：只写进窗口模型，核心实例由 mml-game 管理
@@ -68,6 +69,7 @@ pub fn main_create_instance(
         fid: None,
         server_url: None,
         lang: None,
+        renderer: None,
         log_encoding: None,
         source,
         // 新建的实例排到组末：给一个足够大的值，下次整组重编号时会被压回正常区间
@@ -174,7 +176,7 @@ pub async fn main_copy_instance(
 /// - `app`: 应用句柄，用于发变更事件
 /// - `window`: 调用方窗口，用于取本窗口模型改遗留数据
 /// - `uuid`: 实例 uuid；命中核心实例时走 mml-game，否则只改本地存储
-/// - `patch`: 要改的字段，缺失即不改；`lang` 写进实例的 options.txt
+/// - `patch`: 要改的字段，缺失即不改；`lang` 与 `renderer` 写进实例的 options.txt
 ///
 /// # 返回值
 ///
@@ -256,6 +258,11 @@ pub fn main_update_instance(
             obj.set_minecraft_option("lang", value)
                 .map_err(|e| e.to_string())?;
         }
+        // 渲染器同样落在 options.txt；26.2 之前游戏没有这个选项，前端也不给下拉
+        if let Some(v) = &patch.renderer {
+            obj.set_minecraft_option(RENDERER_KEY, Some(renderer_of(v)))
+                .map_err(|e| e.to_string())?;
+        }
 
         drop(obj);
     }
@@ -297,6 +304,9 @@ pub fn main_update_instance(
         }
         if let Some(v) = patch.lang {
             inst.lang = Some(v);
+        }
+        if let Some(v) = patch.renderer {
+            inst.renderer = Some(renderer_of(&v).to_string());
         }
         if let Some(v) = patch.log_encoding {
             inst.log_encoding = Some(v);

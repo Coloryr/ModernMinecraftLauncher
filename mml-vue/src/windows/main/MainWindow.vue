@@ -18,6 +18,7 @@ import {
   onLaunchError,
   onLaunchState,
   onMenuAction,
+  onPrepareError,
   onStartArg,
   openInstanceDir,
 } from "../../lib/api";
@@ -67,7 +68,6 @@ import MainCtxMenu from "./ctxmenu/MainCtxMenu.vue";
 import LaunchProgress from "../../components/LaunchProgress.vue";
 import IconPickModal from "./IconPickModal.vue";
 import DebuggerLaunchModal from "./DebuggerLaunchModal.vue";
-import BlockIconPickModal from "./BlockIconPickModal.vue";
 import OldDataModal from "./OldDataModal.vue";
 import FirstRunSetup from "./FirstRunSetup.vue";
 import FirstRunLanguage from "./FirstRunLanguage.vue";
@@ -1004,8 +1004,6 @@ const iconPickPath = ref("");
 
 /** 方块列表是否已渲染：有渲染结果才给"用方块改图标"的第二个入口 */
 const blocksRendered = ref(false);
-/** 正在从方块列表挑图标的实例；null 表示弹窗没开 */
-const blockIconInst = ref<InstanceInfoDto | null>(null);
 
 /** 问一次方块列表是否可用；渲染完方块窗口回来后要重问，见下面的 onActivated */
 async function refreshBlocksRendered() {
@@ -1017,12 +1015,12 @@ async function refreshBlocksRendered() {
 }
 
 /**
- * 打开方块图标选择弹窗
+ * 打开方块列表窗口挑图标
  *
- * - `inst`: 要改图标的实例
+ * 图标在窗口里设：右键方块 →「设为实例图标」，实例下拉默认高亮主窗口选中的那个。
  */
-function openBlockIconPick(inst: InstanceInfoDto) {
-  blockIconInst.value = inst;
+function openBlockWindow() {
+  void openWindow("block");
 }
 
 /**
@@ -1710,6 +1708,10 @@ async function subscribeEvents() {
       launchStage.value = "";
       statePct.value = null;
     }),
+    // 后台补全失败：界面上只有按钮回到「启动游戏」，失败原因靠这条事件弹框说明
+    onPrepareError((e) => {
+      prepareError.value = { uuid: e.uuid ?? "", message: e.message };
+    }),
     // 关窗后进程留在后台，再启动一次 exe 会把参数转过来：窗口已经开着不会重新初始化，
     // 只能在这里再取一次待办
     onStartArg(() => {
@@ -2259,6 +2261,21 @@ function onLaunchMenuPick(id: string) {
   if (id === "debug") launchDebugger();
 }
 
+/** 文件补全失败的原因；非空时弹错误框，可以就地重试 */
+const prepareError = ref<{ uuid: string; message: string } | null>(null);
+
+/** 重试文件补全：关掉错误框，重新开始下载缺的文件 */
+async function retryPrepare() {
+  const uuid = prepareError.value?.uuid;
+  prepareError.value = null;
+  if (!uuid) return;
+  try {
+    if (!(await commands.main.startPrepare(uuid))) showToast(t("err.instanceBusy"));
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
+
 /** 启动时缺少的 Java 主版本；非 null 时弹出「下载 Java」提示 */
 const javaMissing = ref<number | null>(null);
 
@@ -2575,7 +2592,7 @@ onMounted(async () => {
                     <GlyphIcon name="image" :size="15" :weight="1.8" />
                   </button>
                   <button v-if="blocksRendered" type="button" class="icon-edit" v-tip="t('actions.blockIcon')"
-                    :aria-label="t('actions.blockIcon')" @click="openBlockIconPick(selected)">
+                    :aria-label="t('actions.blockIcon')" @click="openBlockWindow">
                     <GlyphIcon name="cube" :size="15" :weight="1.8" />
                   </button>
                 </div>
@@ -2719,7 +2736,7 @@ onMounted(async () => {
                             <GlyphIcon name="image" :size="15" :weight="1.8" />
                           </button>
                           <button v-if="blocksRendered" type="button" class="icon-edit" v-tip="t('actions.blockIcon')"
-                            :aria-label="t('actions.blockIcon')" @click="openBlockIconPick(selected)">
+                            :aria-label="t('actions.blockIcon')" @click="openBlockWindow">
                             <GlyphIcon name="cube" :size="15" :weight="1.8" />
                           </button>
                         </div>
@@ -3034,6 +3051,16 @@ onMounted(async () => {
       </div>
     </BaseModal>
 
+    <!-- ===== 文件补全失败：后台下载没跑通，说清原因并给重试 ===== -->
+    <BaseModal v-if="prepareError" :title="t('launch.prepareErrorTitle')" :width="440"
+      @close="prepareError = null">
+      <p class="modal-text">{{ prepareError.message }}</p>
+      <div class="modal-actions">
+        <BaseButton @click="prepareError = null">{{ t("actions.close") }}</BaseButton>
+        <BaseButton variant="accent" @click="retryPrepare">{{ t("launch.prepareRetry") }}</BaseButton>
+      </div>
+    </BaseModal>
+
     <!-- ===== 启动缺 Java：先提示，确认后去下载对应版本 ===== -->
     <BaseModal v-if="javaMissing !== null" :title="t('launch.javaMissingTitle')" :width="440"
       :closable="false" @close="javaMissing = null">
@@ -3053,10 +3080,6 @@ onMounted(async () => {
     <!-- ===== 修改实例图标：右键实例 → 选择图片 → 截图范围 ===== -->
     <IconPickModal v-if="iconPickInst" :uuid="iconPickInst.uuid" :name="iconPickInst.name" :path="iconPickPath"
       @close="((iconPickInst = null), (iconPickPath = ''))" />
-
-    <!-- ===== 用方块列表里的图当实例图标（只有渲染过方块列表时才入口） ===== -->
-    <BlockIconPickModal v-if="blockIconInst" :uuid="blockIconInst.uuid" :name="blockIconInst.name"
-      @close="blockIconInst = null" />
 
     <!-- ===== 首启向导第一步：界面语言（见 checkFirstRun）===== -->
     <FirstRunLanguage v-if="langSetup" @close="onLangClosed" />

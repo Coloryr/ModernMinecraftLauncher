@@ -7,6 +7,7 @@ import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import ProjectCard from "../../components/ProjectCard.vue";
 import ProjectDetailPage from "../../components/ProjectDetailPage.vue";
 import { api, getAddModpackSource, setAddModpackSource } from "../../lib/api";
+import { pickSource, sourceOptions } from "../../lib/projectSources";
 import { useDownloadBadges } from "../../lib/downloadBadges";
 import { t, tErr } from "../../lib/i18n";
 import { toggleStar } from "../../lib/projectCollect";
@@ -38,13 +39,7 @@ const emit = defineEmits<{
 /** 后端列表每页 20 个项目 */
 const PAGE_SIZE = 20;
 
-/** 下载源的 i18n 文案键 */
-const SOURCE_LABELS: Record<string, string> = {
-  curseforge: "modpack.curseforge",
-  modrinth: "modpack.modrinth",
-};
-
-/** 可选下载源；value 是后端线串，label 走 i18n */
+/** 可选下载源；value 是后端线串，label 走 i18n，顺序固定 CurseForge 在左 */
 const sources = ref<Array<{ value: string; label: string }>>([]);
 /** 当前下载源；上次选的那个由后端落 gui_config.json */
 const source = ref("");
@@ -70,10 +65,10 @@ watch(source, (value) => {
   }
 })();
 
-// 上次存的源可能已经不在列表里（后端改了支持的平台）：落回第一个，免得筛出空列表
+// 上次存的源可能已经不在列表里（后端改了支持的平台）：落回默认源，免得筛出空列表
 watch(sources, (list) => {
-  if (list.length && !list.some((item) => item.value === source.value)) {
-    source.value = list[0].value;
+  if (list.length) {
+    source.value = pickSource(list.map((item) => item.value), source.value);
   }
 });
 
@@ -130,13 +125,10 @@ const bodyRef = ref<HTMLElement | null>(null);
 
 const maxPage = computed(() => Math.max(0, Math.ceil(total.value / PAGE_SIZE) - 1));
 
-/** 拉取下载源列表；没存过已选源时才默认第一个，后续筛选数据由 watch(source) 加载 */
+/** 拉取下载源列表；没存过已选源时默认 CurseForge，后续筛选数据由 watch(source) 加载 */
 async function loadSources() {
   try {
-    sources.value = (await api.getModpackSources()).map((value) => ({
-      value,
-      label: t(SOURCE_LABELS[value] ?? value),
-    }));
+    sources.value = sourceOptions(await api.getModpackSources());
   } catch (e) {
     error.value = tErr(e);
     return;
@@ -146,9 +138,7 @@ async function loadSources() {
     return;
   }
   // 已选源（上次保存的那个）还在列表里就留着，别被默认值盖掉
-  if (!sources.value.some((item) => item.value === source.value)) {
-    source.value = sources.value[0].value;
-  }
+  source.value = pickSource(sources.value.map((item) => item.value), source.value);
 }
 
 /**

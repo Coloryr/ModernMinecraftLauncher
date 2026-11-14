@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 主窗口顶部栏：同时充当自绘标题栏（整条可拖动，两端放窗口按钮）
 // 布局：品牌 + 主页切换 + 功能入口 + 主题切换 + 账户选择
-import { computed, onMounted, onUnmounted } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { t } from "../../../lib/i18n";
 import AccountSelector from "../../../components/AccountSelector.vue";
 import WindowControls from "../../../components/ui/WindowControls.vue";
@@ -13,6 +13,8 @@ import { detectOs, onTitleBarPointerDown, titleBarStyle } from "../../../lib/tit
 import { useWindowFullscreen } from "../../../lib/useWindowFullscreen";
 import { useModpackStatus } from "../../../lib/modpackTasks";
 import { pluginDecorated } from "../../../lib/decoration";
+import GamepadPopup from "../../../components/GamepadPopup.vue";
+import { useGamepadPresent } from "../../../lib/gamepadPresent";
 import MainBrand from "./MainBrand.vue";
 import type { AccountStoreDto } from "../../../lib/bindings";
 import type { FeatureId } from "../types";
@@ -51,6 +53,15 @@ onUnmounted(() => {
 
 /** 下载整合包窗口是否还开着 */
 const modpackWindowOpen = computed(() => !!modpackStatus.value?.windowOpen);
+/** 手柄弹窗是否打开 */
+const gamepadOpen = ref(false);
+/** 有没有连着手柄：入口只在插着手柄时出现 */
+const { present: hasGamepad } = useGamepadPresent();
+
+// 手柄拔掉后入口就没了，留着弹窗会再也关不上
+watch(hasGamepad, (present) => {
+  if (!present) gamepadOpen.value = false;
+});
 
 /** 顶栏动作，一律抛给主窗口执行 */
 const emit = defineEmits<{
@@ -117,6 +128,17 @@ const emit = defineEmits<{
         </svg>
       </button>
 
+      <!-- 手柄：检测到手柄才出现，点开选哪台手柄、用哪份配置、游戏内开关 -->
+      <button v-if="hasGamepad" class="topbar-icon-btn" v-tip="t('gamepadPopup.title')"
+        :aria-label="t('gamepadPopup.title')" @click="gamepadOpen = true">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 8h10a4 4 0 0 1 3.9 3.1l1 4.6a2.6 2.6 0 0 1-4.6 2.2L16 16H8l-1.3 1.9A2.6 2.6 0 0 1 2.1 15.7l1-4.6A4 4 0 0 1 7 8z" />
+          <path d="M7.5 11v3M6 12.5h3" />
+          <path d="M16 11.5h.01M17.5 13.5h.01" />
+        </svg>
+      </button>
+
       <AccountSelector :account="currentAccount" :accounts="accounts"
         @update:account="emit('update:account', $event)" />
     </div>
@@ -125,6 +147,9 @@ const emit = defineEmits<{
          这里按对调后的样式自己画一套，位置跟着样式走。
          Windows 的贴靠热区由 lib/decoration.ts 把这三个按钮的矩形报给插件 -->
     <WindowControls v-if="!pluginControls" :style="titleBarStyle" />
+
+    <!-- 弹窗自己 Teleport 到 body，放在顶栏里只是为了就地持有开关状态 -->
+    <GamepadPopup :open="gamepadOpen" @close="gamepadOpen = false" />
   </header>
 </template>
 

@@ -302,23 +302,37 @@ fn stick_to_dto(stick: Stick) -> GamepadStickDto {
     }
 }
 
+/// 内核按钮绑定转 DTO
+fn button_rule_to_dto(rule: &ButtonRule) -> GamepadButtonRuleDto {
+    GamepadButtonRuleDto {
+        button: button_to_dto(rule.button),
+        modifier: rule.modifier.map(button_to_dto),
+        action: rule.action.clone(),
+        mode: mode_to_dto(rule.mode),
+    }
+}
+
+/// DTO 按钮绑定转内核
+fn button_rule_from_dto(dto: GamepadButtonRuleDto) -> ButtonRule {
+    ButtonRule {
+        button: button_from_dto(dto.button),
+        modifier: dto.modifier.map(button_from_dto),
+        action: dto.action,
+        mode: mode_from_dto(dto.mode),
+    }
+}
+
 /// 内核配置转 DTO
 fn config_to_dto(config: &GamepadConfig) -> GamepadConfigDto {
     GamepadConfigDto {
         selected: config.selected,
         enabled: config.enabled,
+        device: config.device.clone(),
         layout: layout_to_dto(config.layout),
         swap_ab: config.swap_ab,
-        buttons: config
-            .buttons
-            .iter()
-            .map(|rule| GamepadButtonRuleDto {
-                button: button_to_dto(rule.button),
-                modifier: rule.modifier.map(button_to_dto),
-                action: rule.action.clone(),
-                mode: mode_to_dto(rule.mode),
-            })
-            .collect(),
+        separate_cursor: config.separate_cursor,
+        buttons: config.buttons.iter().map(button_rule_to_dto).collect(),
+        cursor_buttons: config.cursor_rules().iter().map(button_rule_to_dto).collect(),
         axes: config
             .axes
             .iter()
@@ -344,18 +358,15 @@ fn config_from_dto(dto: GamepadConfigDto) -> GamepadConfig {
     GamepadConfig {
         selected: dto.selected,
         enabled: dto.enabled,
+        device: dto.device,
         layout: layout_from_dto(dto.layout),
         swap_ab: dto.swap_ab,
-        buttons: dto
-            .buttons
-            .into_iter()
-            .map(|rule| ButtonRule {
-                button: button_from_dto(rule.button),
-                modifier: rule.modifier.map(button_from_dto),
-            mode: mode_from_dto(rule.mode),
-                action: rule.action,
-            })
-            .collect(),
+        separate_cursor: dto.separate_cursor,
+        buttons: dto.buttons.into_iter().map(button_rule_from_dto).collect(),
+        // 关掉分离时也把这份存下来，重新打开时还在
+        cursor_buttons: Some(
+            dto.cursor_buttons.into_iter().map(button_rule_from_dto).collect(),
+        ),
         axes: dto
             .axes
             .into_iter()

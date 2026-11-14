@@ -16,6 +16,7 @@ use crate::dtos::{
 };
 
 use crate::windows::main::args::{apply_args_to_core, args_from_core, core_instance};
+use crate::windows::main::instance::{RENDERER_KEY, renderer_of, supports_renderer};
 use crate::windows::main::model;
 
 /// 获取实例列表，对接 mml-game::get_instances 并合并运行状态
@@ -32,6 +33,8 @@ pub fn main_get_instances() -> Vec<InstanceInfoDto> {
         .filter(|inst| !crate::windows::main::deleting::is_deleting(&inst.read().unwrap().uuid))
         .map(|inst| {
             let inst = inst.read().unwrap();
+            // 语言与渲染器都落在 options.txt，读一次共用
+            let options = inst.get_minecraft_options().ok();
             InstanceInfoDto {
                 uuid: inst.uuid.to_string(),
                 name: inst.name.clone(),
@@ -51,9 +54,8 @@ pub fn main_get_instances() -> Vec<InstanceInfoDto> {
                 pid: inst.pid.clone(),
                 fid: inst.fid.clone(),
                 server_url: inst.server_url.clone(),
-                lang: inst
-                    .get_minecraft_options()
-                    .ok()
+                lang: options
+                    .as_ref()
                     .and_then(|options| {
                         options
                             .get("lang")
@@ -61,6 +63,14 @@ pub fn main_get_instances() -> Vec<InstanceInfoDto> {
                             .cloned()
                     })
                     .or_else(|| Some(mml_names::get_lang(crate::gui_config::locale()).to_string())),
+                // 26.2 之前游戏没有这个选项：不给值，前端也就不画这个下拉
+                renderer: supports_renderer(&inst.version).then(|| {
+                    options
+                        .as_ref()
+                        .and_then(|options| options.get(RENDERER_KEY))
+                        .map(|value| renderer_of(value).to_string())
+                        .unwrap_or_else(|| "default".to_string())
+                }),
                 log_encoding: Some(
                     if matches!(inst.encoding, LogEncoding::GBK) {
                         "gbk"

@@ -24,7 +24,7 @@ pub(crate) fn run_server(port_tx: std::sync::mpsc::Sender<u16>) {
             }
         };
 
-        // 端口对外之前先生成密钥，避免刚连上的客户端拿不到验证帧
+        // 端口对外之前先生成密钥，避免刚连上的客户端拿不到可校验的密钥
         let _ = AUTH_KEY.set(Uuid::new_v4().to_string());
 
         // 回传绑定端口
@@ -58,21 +58,18 @@ pub(crate) async fn accept_loop(listener: TcpListener) -> CoreResult<()> {
 /// 处理单个客户端连接，含读取循环与写入任务
 ///
 /// 每个连接分配一条出站通道，写入任务负责将通道中的消息发送到 TCP；
-/// 该通道同时注册进 [`CLIENTS`] 用于广播，并注册为游戏通道用于定向发送。
+/// 连接建立后先下发本次连接的挑战串，通过应答校验后才加入广播列表，
+/// 期间没完成验证的连接十秒后断开。
 pub(crate) async fn handle_client(stream: TcpStream) -> CoreResult<()> {
     let (mut reader, mut writer) = tokio::io::split(stream);
     let (write_tx, mut write_rx) = mpsc::unbounded_channel::<BytesMut>();
 
-    // 先发连接验证，客户端收到的第一条消息必须是密钥
-    if let Some(key) = AUTH_KEY.get() {
-        let mut auth = BytesMut::new();
-        auth.put_i32(TYPE_GAME_AUTH);
-        auth.write_string(key);
-        let _ = write_tx.send(auth);
-    }
-
-    // 注册客户端到广播列表
-    CLIENTS.write().unwrap().push(write_tx.clone());
+    // 每条连接一个挑战串，客户端收到的第一条消息必须是它
+    let mut state = ClientState::new();
+    let mut challenge = BytesMut::new();
+    challenge.put_i32(TYPE_GAME_CHALLENGE);
+    challenge.write_string(&state.nonce);
+    let _ = write_tx.send(challenge);
 
     // 写入任务：从通道接收数据并发送到 TCP
     let write_handle = tokio::spawn(async move {
@@ -83,6 +80,8 @@ pub(crate) async fn handle_client(stream: TcpStream) -> CoreResult<()> {
             }
         }
     });
+
+    let deadline = time::Instant::now() + AUTH_TIMEOUT;
 
     // 读取循环：消息无总长度前缀，按类型自定界解析，与 ColorMC 一致
     let mut buf = BytesMut::with_capacity(1024);
@@ -96,7 +95,7 @@ pub(crate) async fn handle_client(stream: TcpStream) -> CoreResult<()> {
         };
         if let Some(msg_len) = msg_len {
             let mut msg = buf.split_to(msg_len);
-            if let Err(err) = process_message(&mut msg, &write_tx).await {
+            if let Err(err) = process_message(&mut msg, &write_tx, &mut state).await {
                 mml_log::error_type(err);
                 break;
             }
@@ -107,10 +106,19 @@ pub(crate) async fn handle_client(stream: TcpStream) -> CoreResult<()> {
                 mml_log::error_type(IpcBufferOverrun);
                 break;
             }
-            let n = reader
-                .read_buf(&mut buf)
-                .await
-                .map_err(|err| SocketError(ErrorData::from_error(err)))?;
+            let n = if state.authenticated {
+                reader
+                    .read_buf(&mut buf)
+                    .await
+                    .map_err(|err| SocketError(ErrorData::from_error(err)))?
+            } else {
+                // 未验证的连接只给它到截止时间为止：没人应答的连接不长期占着任务
+                match time::timeout_at(deadline, reader.read_buf(&mut buf)).await {
+                    Ok(Ok(n)) => n,
+                    Ok(Err(err)) => return Err(SocketError(ErrorData::from_error(err))),
+                    Err(_) => return Err(IpcGameAuthTimeout),
+                }
+            };
             if n == 0 {
                 break;
             }

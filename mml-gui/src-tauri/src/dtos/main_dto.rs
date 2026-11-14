@@ -330,6 +330,8 @@ pub struct InstancePatch {
     pub server_url: Option<Option<String>>,
     /// 游戏内语言
     pub lang: Option<String>,
+    /// 渲染器：default / opengl / vulkan，未知值按 default
+    pub renderer: Option<String>,
     /// 日志编码：utf8 / gbk
     pub log_encoding: Option<String>,
 }

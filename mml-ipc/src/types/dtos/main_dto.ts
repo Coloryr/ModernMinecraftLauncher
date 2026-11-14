@@ -119,6 +119,7 @@ export type InstancePatch = {
   fid?: string | null,
   serverUrl?: string | null,
   lang?: string | null,
+  renderer?: string | null,
   logEncoding?: string | null,
 };
 

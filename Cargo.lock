@@ -3238,6 +3238,7 @@ dependencies = [
  "chrono",
  "digest 0.11.3",
  "flate2",
+ "hmac",
  "md-5",
  "memmap2",
  "mml-names",
@@ -3398,6 +3399,7 @@ name = "mml-gamepad"
 version = "0.1.0"
 dependencies = [
  "ctrlc",
+ "mml-base",
  "mml-ipc",
  "mml-log",
  "mml-names",

@@ -123,12 +123,20 @@ pub struct GamepadConfig {
     /// 是否启用游戏内手柄：关掉时转发线程不下发任何输入
     #[serde(default)]
     pub enabled: bool,
+    /// 选中的手柄名；`None` 表示用第一个已连接的手柄
+    #[serde(default)]
+    pub device: Option<String>,
     /// 手柄外观，只影响配置界面的记号
     pub layout: PadLayout,
     /// 是否交换 A / B 两个位置，按 Nintendo 布局的习惯显示
     pub swap_ab: bool,
-    /// 按钮绑定
+    /// 鼠标模式是否单独用一套按钮绑定；关着时两种模式共用 buttons
+    pub separate_cursor: bool,
+    /// 按钮绑定：游戏内模式，鼠标被游戏抓取时生效
     pub buttons: Vec<ButtonRule>,
+    /// 按钮绑定：鼠标模式，未抓取鼠标时生效；缺省表示与 buttons 相同
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor_buttons: Option<Vec<ButtonRule>>,
     /// 轴区间绑定
     pub axes: Vec<AxisRule>,
     /// 摇杆当鼠标用
@@ -237,8 +245,14 @@ pub enum GamepadError {
 pub struct CompiledMap {
     /// 是否启用游戏内手柄
     pub enabled: bool,
-    /// 按钮规则
+    /// 选中的手柄名；`None` 表示用第一个已连接的手柄
+    pub device: Option<String>,
+    /// 按钮规则：游戏内模式
     pub buttons: Vec<ButtonRuleCompiled>,
+    /// 是否用鼠标模式那套按钮
+    pub separate_cursor: bool,
+    /// 按钮规则：鼠标模式；关掉分离时为空
+    pub cursor_buttons: Vec<ButtonRuleCompiled>,
     /// 轴规则
     pub axes: Vec<AxisRuleCompiled>,
     /// 摇杆当鼠标用
@@ -348,8 +362,13 @@ impl Default for GamepadConfig {
             selected: false,
             // 游戏内手柄默认关：要配好映射、装好 coloryrasm 再打开
             enabled: false,
+            // 默认不挑设备，用第一个连上的
+            device: None,
             layout: PadLayout::default(),
             swap_ab: false,
+            // 默认分离：鼠标模式下大多是点击 / 翻背包，与游戏内按键不是一套
+            separate_cursor: true,
+            cursor_buttons: None,
             buttons: vec![
                 button_rule(Button::South, "Space"),
                 button_rule(Button::East, "E"),
@@ -384,31 +403,24 @@ impl Default for GamepadConfig {
 }
 
 impl GamepadConfig {
+    /// 鼠标模式实际用的按钮绑定：没单独配过时就是游戏内那套
+    pub fn cursor_rules(&self) -> &[ButtonRule] {
+        match self.cursor_buttons.as_deref() {
+            Some(rules) => rules,
+            None => &self.buttons,
+        }
+    }
+
+    /// 补上鼠标模式那套按钮绑定：旧配置里没有这一项时先与游戏内模式一致
+    pub fn normalize(&mut self) {
+        if self.cursor_buttons.is_none() {
+            self.cursor_buttons = Some(self.buttons.clone());
+        }
+    }
+
     /// 校验并编译成转发线程用的规则表
     pub fn compile(&self) -> Result<CompiledMap, String> {
-        let mut buttons = Vec::with_capacity(self.buttons.len());
-        for rule in &self.buttons {
-            let index = button_index(rule.button)
-                .ok_or_else(|| format!("未知手柄按钮：{:?}", rule.button))?;
-            let modifier = match rule.modifier {
-                Some(modifier) => {
-                    let modifier = button_index(modifier)
-                        .ok_or_else(|| format!("未知修饰键：{:?}", modifier))?;
-                    if modifier == index {
-                        return Err(String::from("修饰键不能和按钮相同"));
-                    }
-                    Some(modifier)
-                }
-                None => None,
-            };
-            buttons.push(ButtonRuleCompiled {
-                id: buttons.len(),
-                index,
-                modifier,
-                mode: rule.mode,
-                combo: parse_combo(&rule.action)?,
-            });
-        }
+        let buttons = compile_buttons(&self.buttons, 0)?;
 
         let mut axes = Vec::with_capacity(self.axes.len());
         for rule in &self.axes {
@@ -434,6 +446,12 @@ impl GamepadConfig {
             });
         }
 
+        let cursor_buttons = if self.separate_cursor {
+            compile_buttons(self.cursor_rules(), buttons.len() + axes.len())?
+        } else {
+            Vec::new()
+        };
+
         let mouse = &self.mouse;
         if mouse.cursor_speed < 0.0 || mouse.turn_speed < 0.0 {
             return Err(String::from("摇杆速度不能为负"));
@@ -444,7 +462,10 @@ impl GamepadConfig {
 
         Ok(CompiledMap {
             enabled: self.enabled,
+            device: self.device.clone(),
             buttons,
+            separate_cursor: self.separate_cursor,
+            cursor_buttons,
             axes,
             mouse: MouseRuleCompiled {
                 cursor: stick_rule(mouse.cursor_stick, mouse.cursor_speed),
@@ -455,7 +476,44 @@ impl GamepadConfig {
     }
 }
 
+/// 编译一组按钮规则，编号从 `base` 起接着排
+fn compile_buttons(rules: &[ButtonRule], base: usize) -> Result<Vec<ButtonRuleCompiled>, String> {
+    let mut out = Vec::with_capacity(rules.len());
+    for rule in rules {
+        let index = button_index(rule.button)
+            .ok_or_else(|| format!("未知手柄按钮：{:?}", rule.button))?;
+        let modifier = match rule.modifier {
+            Some(modifier) => {
+                let modifier = button_index(modifier)
+                    .ok_or_else(|| format!("未知修饰键：{:?}", modifier))?;
+                if modifier == index {
+                    return Err(String::from("修饰键不能和按钮相同"));
+                }
+                Some(modifier)
+            }
+            None => None,
+        };
+        out.push(ButtonRuleCompiled {
+            id: base + out.len(),
+            index,
+            modifier,
+            mode: rule.mode,
+            combo: parse_combo(&rule.action)?,
+        });
+    }
+    Ok(out)
+}
+
 impl CompiledMap {
+    /// 这一帧该用哪套按钮绑定：抓到鼠标时用游戏内那套，否则用鼠标模式那套
+    pub fn buttons_for(&self, grabbed: bool) -> &[ButtonRuleCompiled] {
+        if grabbed || !self.separate_cursor {
+            &self.buttons
+        } else {
+            &self.cursor_buttons
+        }
+    }
+
     /// 内置默认映射
     fn built_in() -> Self {
         GamepadConfig::default()

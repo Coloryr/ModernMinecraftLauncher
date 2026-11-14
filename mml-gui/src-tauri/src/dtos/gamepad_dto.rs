@@ -212,12 +212,18 @@ pub struct GamepadConfigDto {
     pub selected: bool,
     /// 是否启用游戏内手柄；关掉时不下发任何输入
     pub enabled: bool,
+    /// 选中的手柄名；null 表示用第一个已连接的手柄
+    pub device: Option<String>,
     /// 手柄外观，只影响配置界面的记号
     pub layout: GamepadLayoutDto,
     /// 是否交换 A / B 两个位置
     pub swap_ab: bool,
-    /// 按钮绑定
+    /// 鼠标模式是否单独用一套按钮绑定
+    pub separate_cursor: bool,
+    /// 按钮绑定：游戏内模式
     pub buttons: Vec<GamepadButtonRuleDto>,
+    /// 按钮绑定：鼠标模式
+    pub cursor_buttons: Vec<GamepadButtonRuleDto>,
     /// 轴区间绑定
     pub axes: Vec<GamepadAxisRuleDto>,
     /// 摇杆当鼠标用

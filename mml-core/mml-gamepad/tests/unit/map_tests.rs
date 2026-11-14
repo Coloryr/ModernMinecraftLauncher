@@ -64,6 +64,23 @@ fn config_roundtrip() {
     assert!(config.compile().is_ok());
 }
 
+/// 分离开关默认打开，写进 JSON；旧配置读出来会与游戏内那套共用按钮
+#[test]
+fn separate_cursor_defaults_on() {
+    let config = GamepadConfig::default();
+    assert!(config.separate_cursor);
+    let text = serde_json::to_string_pretty(&config).unwrap();
+    assert!(text.contains("\"SeparateCursor\": true"));
+
+    let mut legacy: GamepadConfig =
+        serde_json::from_str(r#"{"Buttons":[{"Button":"south","Action":"Space"}]}"#).unwrap();
+    assert!(legacy.separate_cursor);
+    assert!(legacy.cursor_buttons.is_none());
+    legacy.normalize();
+    assert_eq!(legacy.cursor_buttons.as_ref().unwrap().len(), 1);
+    assert!(legacy.compile().is_ok());
+}
+
 /// 修饰键不能和按钮相同
 #[test]
 fn modifier_cannot_match_button() {

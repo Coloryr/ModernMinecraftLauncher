@@ -18,6 +18,7 @@ export type InstanceInfoDto = {
   fid: string | null,
   serverUrl: string | null,
   lang: string | null,
+  renderer: string | null,
   logEncoding: string | null,
   source: string | null,
   order: number,

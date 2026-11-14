@@ -439,6 +439,22 @@ pub(crate) fn first_pad_id() -> Option<u64> {
     PADS.read().unwrap().keys().next().copied()
 }
 
+/// 按名字找已连接手柄的编号
+///
+/// - `name`: 手柄名，不区分大小写
+///
+/// # 返回值
+///
+/// 找到时返回编号；同名取编号最小的那个，没连接返回 None
+pub(crate) fn pad_id_by_name(name: &str) -> Option<u64> {
+    PADS.read()
+        .unwrap()
+        .iter()
+        .filter(|(_, pad)| pad.name.eq_ignore_ascii_case(name))
+        .map(|(id, _)| *id)
+        .min()
+}
+
 /// 列出当前已连接的手柄
 ///
 /// # 返回值

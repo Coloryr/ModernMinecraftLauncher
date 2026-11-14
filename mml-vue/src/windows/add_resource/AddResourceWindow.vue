@@ -18,6 +18,7 @@ import ProjectCard from "../../components/ProjectCard.vue";
 import ProjectDetailPage from "../../components/ProjectDetailPage.vue";
 import ResourceDownloadBar from "../../components/ResourceDownloadBar.vue";
 import { api, getAddResourceSource, setAddResourceSource } from "../../lib/api";
+import { pickSource, sourceOptions } from "../../lib/projectSources";
 import { useDownloadBadges } from "../../lib/downloadBadges";
 import { t, tErr } from "../../lib/i18n";
 import { toggleStar } from "../../lib/projectCollect";
@@ -63,13 +64,6 @@ const TYPES = computed(() => [
   { value: "save", label: t("addResource.saves") },
   { value: "dataPacks", label: t("addResource.datapacks") },
 ]);
-
-/** 下载源的 i18n 文案键 */
-const SOURCE_LABELS: Record<string, string> = {
-  curseforge: "modpack.curseforge",
-  modrinth: "modpack.modrinth",
-};
-
 /** 模组可按加载器过滤（normal = 全部）；实际选项按目标实例的版本收窄，见 `loaderChoices` */
 const LOADERS = ["normal", "forge", "fabric", "quilt", "neoforge", "cleanroom"];
 
@@ -92,15 +86,21 @@ const instanceChip = computed(() =>
 const pickableInstances = ref<InstanceInfoDto[]>([]);
 
 const type = ref("mod");
+/** 存档类型：只有 CurseForge 支持，源会被强制过去 */
+const isSaveType = computed(() => type.value === "save");
 const sources = ref<Array<{ value: string; label: string }>>([]);
-/** 下载源；上次选的那个由后端落 gui_config.json，见 AddResourceSource */
 /** 上次选的源还没读回来之前不要写回，否则会用空串把它覆盖掉 */
 let sourceReady = false;
+/** 用户上次选的源；存档类型会把源强制成 CurseForge，那个值不算偏好 */
+const savedSource = ref("");
+/** 当前下载源；偏好由后端落 gui_config.json，见 AddResourceSource */
 const source = ref("");
 watch(source, (value) => {
-  if (sourceReady) {
-    void setAddResourceSource(value).catch(() => { });
+  if (!sourceReady || isSaveType.value) {
+    return;
   }
+  savedSource.value = value;
+  void setAddResourceSource(value).catch(() => { });
 });
 
 // 读上次选的源：失败就当没选过
@@ -108,19 +108,23 @@ watch(source, (value) => {
   try {
     const saved = await getAddResourceSource();
     if (saved) {
-      source.value = saved;
+      savedSource.value = saved;
+      // 列表已经拉回来过（存档类型下会被强制成 CurseForge，这里别再动）
+      if (!isSaveType.value) {
+        source.value = pickSource(sources.value.map((item) => item.value), saved);
+      }
     }
   } catch {
-    // 读不到就用空串，由下面的 watcher 落回第一个
+    // 读不到就用空串，由下面的 watcher 落回默认源
   } finally {
     sourceReady = true;
   }
 })();
 
-// 上次存的源可能已经不在列表里（后端改了支持的平台）：落回第一个，免得筛出空列表
+// 上次存的源可能已经不在列表里（后端改了支持的平台）：落回默认源，免得筛出空列表
 watch(sources, (list) => {
-  if (list.length && !list.some((item) => item.value === source.value)) {
-    source.value = list[0].value;
+  if (list.length) {
+    source.value = pickSource(list.map((item) => item.value), source.value);
   }
 });
 
@@ -225,22 +229,17 @@ const bodyRef = ref<HTMLElement | null>(null);
 
 const maxPage = computed(() => Math.max(0, Math.ceil(total.value / PAGE_SIZE) - 1));
 
-/** 存档下载只有 CurseForge 有，Modrinth 没有 world 类型 */
-const sourceOptions = computed(() =>
+/** 当前类型下要列出来的下载源：存档只有 CurseForge 有，Modrinth 没有 world 类型 */
+const shownSources = computed(() =>
   type.value === "save"
     ? sources.value.filter((s) => s.value === "curseforge")
     : sources.value,
 );
 
-const isSaveType = computed(() => type.value === "save");
-
-/** 拉取下载源列表；没存过已选源时才默认第一个 */
+/** 拉取下载源列表；没存过已选源时默认 CurseForge */
 async function loadSources() {
   try {
-    sources.value = (await api.getModpackSources()).map((value) => ({
-      value,
-      label: t(SOURCE_LABELS[value] ?? value),
-    }));
+    sources.value = sourceOptions(await api.getModpackSources());
   } catch (e) {
     error.value = tErr(e);
     return;
@@ -250,9 +249,7 @@ async function loadSources() {
     return;
   }
   // 已选源（上次保存的那个）还在列表里就留着，别被默认值盖掉
-  if (!sources.value.some((item) => item.value === source.value)) {
-    source.value = sourceOptions.value[0]?.value ?? sources.value[0].value;
-  }
+  source.value = pickSource(sources.value.map((item) => item.value), source.value || savedSource.value);
 }
 
 /**
@@ -688,10 +685,15 @@ watch([source, type], () => {
 });
 
 watch(type, () => {
-  // Modrinth 没有存档类型，切到存档时把源换到 CurseForge
-  if (isSaveType.value && source.value === "modrinth") {
-    source.value = "curseforge";
+  // Modrinth 没有存档类型，切到存档时把源换到 CurseForge（这个强制值不写回偏好）
+  if (isSaveType.value) {
+    if (source.value !== "curseforge") {
+      source.value = "curseforge";
+    }
+    return;
   }
+  // 离开存档类型：回到用户上次选的源
+  source.value = pickSource(sources.value.map((item) => item.value), savedSource.value);
 });
 
 onMounted(async () => {
@@ -831,7 +833,7 @@ onActivated(async () => {
         <div class="res-filters">
           <SegmentedTabs v-model="type" :options="TYPES" :disabled="searching" />
           <!-- 存档只有 CurseForge 有：锁定源，不显示页签 -->
-          <SegmentedTabs v-if="!isSaveType" v-model="source" :options="sourceOptions" :disabled="searching" />
+          <SegmentedTabs v-if="!isSaveType" v-model="source" :options="shownSources" :disabled="searching" />
           <div v-else class="res-source-lock">
             <span class="res-source-name">{{ t("modpack.curseforge") }}</span>
             <span class="res-source-hint">{{ t("addResource.saveSourceLimit") }}</span>

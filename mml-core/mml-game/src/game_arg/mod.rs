@@ -209,10 +209,6 @@ impl InstanceSettingObj {
             ':'
         };
 
-        if obj.use_asm {
-            obj.game_libs.push(launcher_path::get_colorasm());
-        }
-
         let mut libs = self.get_libs(obj);
         let mut extra_class_path: Vec<PathBuf> = Vec::new();
         if let Some(jvm) = &self.advance_jvm

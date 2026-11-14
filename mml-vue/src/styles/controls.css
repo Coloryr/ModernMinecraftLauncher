@@ -196,6 +196,11 @@ select.field-select {
     margin-top: 0;
     margin-bottom: 4px;
     transform-origin: bottom;
+    /* 高度由 JS 按上方可用空间算好（--picker-max-h）。不封顶的话弹层比上方还高时，
+       position-try-order 会认为"上面也放不下"，直接回退成向下展开 —— 选项多的版本筛选
+       就是这么又翻回去的。封顶后弹层内部滚动，方向才稳定 */
+    max-height: var(--picker-max-h, 60vh);
+    overflow-y: auto;
   }
 
   select.field-select.select-up:not(:open)::picker(select) {

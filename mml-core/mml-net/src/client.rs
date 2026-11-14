@@ -45,6 +45,20 @@ impl fmt::Debug for Client {
     }
 }
 
+/// 这次失败值不值得换一条新连接再试一次
+///
+/// 超时与连不上主机说明网络或对端本身不通，重试只会再等满一个超时；
+/// 连接池里的旧连接被对端关掉这类"发出去就失败"的情况，换新连接才有意义。
+///
+/// - `error`: reqwest 报的错
+///
+/// # 返回值
+///
+/// 值得重试返回 `true`
+fn worth_retry(error: &reqwest::Error) -> bool {
+    !error.is_timeout() && !error.is_connect()
+}
+
 impl Client {
     /// 创建 HTTP 客户端
     ///
@@ -139,7 +153,7 @@ impl Client {
         abortable(async move { inner.execute(build).await.map_err(map_err) }).await
     }
 
-    /// 发送 GET 请求，失败时自动重试一次
+    /// 发送 GET 请求，失败时最多再试一次
     ///
     /// 连接池中的空闲连接可能已被服务端或代理关闭，复用时会立即报
     /// "error sending request"，此时换新连接重试一次即可。
@@ -154,8 +168,9 @@ impl Client {
             match client.get(&url).send().await {
                 Ok(resp) => Ok(resp),
                 Err(err) => {
+                    let should_retry = worth_retry(&err);
                     let mapped = map_err(err);
-                    if is_aborted(&mapped) {
+                    if is_aborted(&mapped) || !should_retry {
                         return Err(mapped);
                     }
                     client.get(&url).send().await.map_err(map_err)
@@ -213,9 +228,10 @@ impl Client {
             match first.send().await {
                 Ok(resp) => Ok(resp),
                 Err(err) => {
-                    // 中断不重试，同 get_with_retry：重试会带新世代号，本次中断对它无效
+                    // 中断与超时都不重试：前者见 get_with_retry，后者见 worth_retry
+                    let should_retry = worth_retry(&err);
                     let mapped = map_err(err);
-                    if is_aborted(&mapped) {
+                    if is_aborted(&mapped) || !should_retry {
                         return Err(mapped);
                     }
                     retry.send().await.map_err(map_err)

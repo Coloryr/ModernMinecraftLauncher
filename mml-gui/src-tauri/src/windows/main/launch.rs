@@ -621,6 +621,69 @@ pub fn main_launch_commands(uuid: String) -> Result<Option<LaunchCommandDto>, St
     Ok((commands.pre.is_some() || commands.post.is_some()).then_some(commands))
 }
 
+/// 启动前检查：游戏内手柄已开启，但这次启动不会注入 ColorASM
+///
+/// 手柄输入要经 ColorASM 的 IPC 通道才能进游戏，没注入时手柄在游戏里不生效。
+/// 前端据此在启动前询问用户是否打开 ColorASM。
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 需要询问用户时返回 `true`；实例不存在返回 `err.gameNotFound`
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub fn main_gamepad_needs_asm(uuid: String) -> Result<bool, String> {
+    let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
+    // 先拷出实例：读全局配置与手柄映射时不要一直握着实例锁
+    let inst = core.instance.read().unwrap().clone();
+    Ok(!colorasm_enabled(&inst) && gamepad_in_game())
+}
+
+/// 为实例打开 ColorASM 注入并保存
+///
+/// 写实例自己的 `JvmArg.ColorASM`，不影响全局设置；下次启动按这一份来。
+///
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 保存成功返回 `Ok(())`；实例不存在返回 `err.gameNotFound`
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub fn main_enable_colorasm(uuid: String) -> Result<(), String> {
+    let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
+    let mut inst = core.instance.write().unwrap();
+    let jvm = inst.jvm_arg.get_or_insert_with(RunArgObj::default);
+    jvm.colorasm = Some(true);
+    inst.save();
+    Ok(())
+}
+
+/// 实例这次启动是否注入 ColorASM
+///
+/// 与内核 `game_arg` 同一口径：实例写过就听实例的，没写回落到全局设置。
+///
+/// - `inst`: 实例配置
+fn colorasm_enabled(inst: &InstanceSettingObj) -> bool {
+    inst.jvm_arg
+        .as_ref()
+        .and_then(|jvm| jvm.colorasm)
+        .unwrap_or_else(|| mml_config::read_config().jvm_arg.colorasm.unwrap_or(false))
+}
+
+/// 游戏内手柄是否开启
+///
+/// 取当前生效的那份映射；读不到配置时按没开启处理。
+fn gamepad_in_game() -> bool {
+    mml_gamepad::profiles()
+        .into_iter()
+        .find(|item| item.active)
+        .and_then(|item| mml_gamepad::config(&item.name).ok())
+        .map(|config| config.enabled)
+        .unwrap_or(false)
+}
+
 /// 实例这次启动会执行的启动前 / 后命令
 ///
 /// 与内核 `start_game` 同一口径：实例设了用实例的，没设回落到全局；

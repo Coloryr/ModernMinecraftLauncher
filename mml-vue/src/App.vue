@@ -43,6 +43,7 @@ import LaunchCheckModal from "./components/LaunchCheckModal.vue";
 import ServerPackUpdateModal from "./components/ServerPackUpdateModal.vue";
 import ServerPackModsModal from "./components/ServerPackModsModal.vue";
 import LaunchCancelModal from "./components/LaunchCancelModal.vue";
+import GamepadAsmModal from "./components/GamepadAsmModal.vue";
 
 /** 下载管理：既是可切换的窗口页，也会在单窗口模式下当悬浮弹窗用（下面单独渲染一份） */
 const DownloadWindow = defineAsyncComponent(() => import("./windows/download/DownloadWindow.vue"));
@@ -284,6 +285,8 @@ const closeAskButton = computed(() =>
 
   <!-- 账户占用确认：任何窗口里点启动都可能弹，所以挂在根上 -->
   <AccountLockModal />
+  <!-- 游戏内手柄开着但没启用 ColorASM 时问一次 -->
+  <GamepadAsmModal />
   <!-- 启动后自动进入存档的确认，与上面同理 -->
   <AutoSaveModal />
   <!-- 启动前 / 后命令的确认：配了命令的实例启动前问一次 -->

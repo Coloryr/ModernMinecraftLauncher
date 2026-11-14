@@ -5,6 +5,7 @@
 
 use mml_base::file_item::FileHash;
 use mml_config::config_obj::SourceLocal;
+use mml_names::i18_items::error_type::ErrorType;
 use mml_names::names;
 
 use crate::{url_helper, urls};
@@ -101,39 +102,58 @@ pub async fn test_hash(dir: &str) -> Option<UrlHashObj> {
     }
 }
 
+/// 一次校验文件探测的结果
+enum HashProbe {
+    /// 拿到该算法的校验值
+    Found(String),
+    /// 这份校验文件不存在，或正文不是校验值形状：换下一种算法
+    Missing,
+    /// 主机连不上：余下的校验文件在同一台机器上，再问只是继续等超时
+    Unreachable,
+}
+
 /// 尝试获取校验值
 ///
 /// 依次尝试 `.sha256` / `.sha512` / `.sha1` 同名校验文件。Maven 仓库不保证每个构件都发全
 /// 这三种：Forge 的 `1.12.2-14.23.5.2864` 就只有 `.sha1`，缺的那种会回 404 加一页 HTML
 /// 错误页。所以这里只认成功响应，且正文必须真的长成该算法的校验值，否则继续往后试。
 ///
+/// 主机连不上时不再试后面的：三种校验文件都在同一台机器上，网络不通时继续问
+/// 只会再等满一次超时。
+///
 /// - `url`: 文件 URL
 ///
 /// # 返回值
 ///
-/// 返回第一个能拿到的校验值；全部拿不到时返回 [`FileHash::None`]
+/// 返回第一个能拿到的校验值；全部拿不到或主机不通时返回 [`FileHash::None`]
 pub async fn try_get_hash(url: &str) -> FileHash {
     let client = crate::get_work_client();
 
-    let sha256_url = url.to_string() + names::SHA256_DOT_EXT;
-    if let Some(hash) = fetch_hash(&client, &sha256_url, SHA256_HEX_LEN).await {
-        return FileHash::Sha256(hash);
+    let sha256_url = format!("{url}{}", names::SHA256_DOT_EXT);
+    match fetch_hash(&client, &sha256_url, SHA256_HEX_LEN).await {
+        HashProbe::Found(hash) => return FileHash::Sha256(hash),
+        HashProbe::Missing => {}
+        HashProbe::Unreachable => return FileHash::None,
     }
 
-    let sha512_url = url.to_string() + names::SHA512_DOT_EXT;
-    if let Some(hash) = fetch_hash(&client, &sha512_url, SHA512_HEX_LEN).await {
-        return FileHash::Sha512(hash);
+    let sha512_url = format!("{url}{}", names::SHA512_DOT_EXT);
+    match fetch_hash(&client, &sha512_url, SHA512_HEX_LEN).await {
+        HashProbe::Found(hash) => return FileHash::Sha512(hash),
+        HashProbe::Missing => {}
+        HashProbe::Unreachable => return FileHash::None,
     }
 
-    let sha1_url = url.to_string() + names::SHA1_DOT_EXT;
-    if let Some(hash) = fetch_hash(&client, &sha1_url, SHA1_HEX_LEN).await {
-        return FileHash::Sha1(hash);
+    let sha1_url = format!("{url}{}", names::SHA1_DOT_EXT);
+    match fetch_hash(&client, &sha1_url, SHA1_HEX_LEN).await {
+        HashProbe::Found(hash) => FileHash::Sha1(hash),
+        HashProbe::Missing | HashProbe::Unreachable => FileHash::None,
     }
-
-    FileHash::None
 }
 
 /// 取一个校验文件，只接受成功响应、且正文是校验值形状的响应
+///
+/// 要分开"这份文件不存在"与"主机不通"：前者换下一种算法，后者后面的也在同一台
+/// 机器上，继续问只是再等一次超时。
 ///
 /// - `client`: 网络客户端
 /// - `url`: 校验文件 URL
@@ -141,10 +161,17 @@ pub async fn try_get_hash(url: &str) -> FileHash {
 ///
 /// # 返回值
 ///
-/// 拿到合法校验值时返回小写形式，否则返回 `None`
-async fn fetch_hash(client: &crate::Client, url: &str, len: usize) -> Option<String> {
-    let text = client.get_text_success(url).await.ok()?;
-    parse_hash_text(&text, len)
+/// 见 [`HashProbe`]
+async fn fetch_hash(client: &crate::Client, url: &str, len: usize) -> HashProbe {
+    match client.get_text_success(url).await {
+        Ok(text) => match parse_hash_text(&text, len) {
+            Some(hash) => HashProbe::Found(hash),
+            None => HashProbe::Missing,
+        },
+        // 有状态码说明主机是通的，只是这份校验文件没有
+        Err(ErrorType::HttpError(data)) if data.status.is_some() => HashProbe::Missing,
+        Err(_) => HashProbe::Unreachable,
+    }
 }
 
 /// 从校验文件正文里取出校验值

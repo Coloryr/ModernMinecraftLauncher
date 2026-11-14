@@ -85,6 +85,7 @@ pub(super) fn parse_combo(text: &str) -> Result<Combo, String> {
 pub(crate) fn combo_of(map: &CompiledMap, id: usize) -> Option<&Combo> {
     map.buttons
         .iter()
+        .chain(map.cursor_buttons.iter())
         .find(|rule| rule.id == id)
         .map(|rule| &rule.combo)
         .or_else(|| {

@@ -69,6 +69,19 @@ export async function setCurrentAccount(acc: AccountStoreDto): Promise<boolean> 
 }
 
 /**
+ * 按 uuid 切换当前账户
+ *
+ * - `uuid`: 目标账户 uuid
+ *
+ * # 返回值
+ *
+ * 后端确实切换了返回 true
+ */
+export async function setCurrentAccountByUuid(uuid: string): Promise<boolean> {
+  return updateSelection(uuid);
+}
+
+/**
  * 清除当前选择，联机大厅锁定期间由后端拒绝
  *
  * # 返回值

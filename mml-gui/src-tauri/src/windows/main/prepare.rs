@@ -13,12 +13,15 @@ use mml_game::game_launch::{AutoJoinType, GameLaunchArg, LaunchDebugger};
 use mml_game::gui_hook::{ILaunchGui, LaunchGui, LaunchState, ProcessRunType};
 use mml_game::launcher::instance_setting_obj::InstanceSettingObj;
 use mml_names::i18_items::error_type::ErrorType;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use super::emit_instance_change;
+use crate::dtos::ErrorEvent;
 use crate::err_keys;
+use crate::i18;
+use crate::listens;
 use crate::log_text::LogText;
 
 /// 补全阶段，按「检查 → 下载」推进
@@ -65,6 +68,35 @@ static CANCEL: LazyLock<Mutex<HashMap<Uuid, CancellationToken>>> =
 pub fn main_cancel_prepare(uuid: String) -> Result<bool, String> {
     let id = Uuid::parse_str(&uuid).map_err(|_| err_keys::UUID.to_string())?;
     Ok(cancel(&id))
+}
+
+/// 开始补全实例缺失的文件
+///
+/// 补全失败后前端点「重试」走这里；已经在补全或实例正忙时不会重复开。
+///
+/// - `app`: 应用句柄，阶段变化与列表刷新都靠它发事件
+/// - `uuid`: 实例 uuid
+///
+/// # 返回值
+///
+/// 已经开始或已在补全返回 `true`；实例不存在、正忙或 uuid 非法返回 `false`
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub fn main_start_prepare(app: AppHandle, uuid: String) -> bool {
+    let Ok(id) = Uuid::parse_str(&uuid) else {
+        return false;
+    };
+    start(&app, &uuid);
+    is_preparing(&id)
+}
+
+/// 补全失败事件：前端据此弹错误框，并提供「重试」
+///
+/// - `app`: 应用句柄，事件的发送方
+/// - `event`: 失败详情，含实例 uuid 与错误文案
+#[gui_macros::emit]
+fn emit_prepare_error(app: &AppHandle, event: ErrorEvent) {
+    let _ = app.emit(listens::PREPARE_ERROR, event);
 }
 
 /// 取实例当前的补全阶段
@@ -175,11 +207,19 @@ pub(crate) fn start(app: &AppHandle, uuid: &str) {
                         inst.check_game_file(&mut arg, gui, token).await
                     })),
                     Err(error) => {
+                        let message = error.to_string();
                         mml_log::error(
                             LogText::PrepareFailed {
-                                error: error.to_string(),
+                                error: message.clone(),
                             }
                             .text(),
+                        );
+                        emit_prepare_error(
+                            &app_task,
+                            ErrorEvent {
+                                uuid: Some(id.to_string()),
+                                message,
+                            },
                         );
                         None
                     }
@@ -192,28 +232,54 @@ pub(crate) fn start(app: &AppHandle, uuid: &str) {
             match outcome {
                 // 用户取消不算失败：文件留在原地，下次启动接着补
                 Ok(Some(Err(err))) if !matches!(err, ErrorType::TaskCancel) => {
-                    mml_log::error_type(err)
+                    let message = i18::get_error(err.clone());
+                    mml_log::error_type(err);
+                    emit_prepare_error(
+                        &app_task,
+                        ErrorEvent {
+                            uuid: Some(id.to_string()),
+                            message,
+                        },
+                    );
                 }
                 Ok(_) => {}
-                Err(payload) => mml_log::error(
-                    LogText::Panic {
-                        thread: format!("Mml Prepare Instance {id}"),
-                        message: panic_text(&payload),
-                        location: String::new(),
-                    }
-                    .text(),
-                ),
+                Err(payload) => {
+                    let message = panic_text(&payload);
+                    mml_log::error(
+                        LogText::Panic {
+                            thread: format!("Mml Prepare Instance {id}"),
+                            message: message.clone(),
+                            location: String::new(),
+                        }
+                        .text(),
+                    );
+                    emit_prepare_error(
+                        &app_task,
+                        ErrorEvent {
+                            uuid: Some(id.to_string()),
+                            message,
+                        },
+                    );
+                }
             }
         });
 
     if let Err(error) = spawned {
         finish(&id);
         emit_instance_change(app, "edit");
+        let message = error.to_string();
         mml_log::error(
             LogText::PrepareFailed {
-                error: error.to_string(),
+                error: message.clone(),
             }
             .text(),
+        );
+        emit_prepare_error(
+            app,
+            ErrorEvent {
+                uuid: Some(id.to_string()),
+                message,
+            },
         );
     }
 }

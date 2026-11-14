@@ -48,15 +48,20 @@ fn connect(port: u16, uuid: Uuid, grabbed: bool) -> TcpStream {
     stream
         .set_write_timeout(Some(Duration::from_secs(3)))
         .unwrap();
-    assert_eq!(integer(&mut stream), 12);
+    // 挑战应答：读挑战串，用密钥算 HMAC-SHA256 发回，等「验证结果」
+    assert_eq!(integer(&mut stream), 14);
     let length = usize::try_from(integer(&mut stream)).unwrap();
     assert!(length < 1024);
-    let mut key = vec![0; length];
-    stream.read_exact(&mut key).unwrap();
-    assert_eq!(
-        String::from_utf8(key).unwrap(),
-        mml_ipc::get_auth_key().unwrap()
+    let mut nonce = vec![0; length];
+    stream.read_exact(&mut nonce).unwrap();
+    let proof = mml_base::hash_helper::gen_hmac_sha256(
+        mml_ipc::get_auth_key().unwrap(),
+        &String::from_utf8(nonce).unwrap(),
     );
+    stream.write_all(&15i32.to_be_bytes()).unwrap();
+    stream.write_all(&(proof.len() as i32).to_be_bytes()).unwrap();
+    stream.write_all(proof.as_bytes()).unwrap();
+    assert_eq!(integer(&mut stream), 16);
     report(&mut stream, 9, uuid, None);
     report(&mut stream, 1, uuid, Some(grabbed));
     wait_state(uuid, grabbed);

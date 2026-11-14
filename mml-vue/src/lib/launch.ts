@@ -4,7 +4,9 @@
 // 多窗口模式才是开新窗口；后端直接建窗会把单窗口模式撑出第二个窗口。
 import { api, modpackCheck } from "./api";
 import { askAccountLock } from "./accountLock";
+import { setCurrentAccountByUuid } from "./accountStore";
 import { askAutoSave } from "./autoSavePrompt";
+import { askGamepadAsm } from "./gamepadAsmPrompt";
 import { askLaunchCommand } from "./launchCommandPrompt";
 import { askLaunchCheck } from "./launchCheck";
 import { askServerPackUpdate } from "./serverPackPrompt";
@@ -50,6 +52,15 @@ export async function launchGame(
         await saveGuiConfig({ launchCheck: { checkMemory: false } }).catch(() => { });
       }
     }
+  }
+
+  // 游戏内手柄要经 ColorASM 的 IPC 才能进游戏：没注入时先问一次。
+  // 选「不开启」照常启动，只是手柄在游戏里不生效；后端判断要不要问
+  const gamepadAsm = await api.gamepadNeedsAsm(uuid).catch(() => false);
+  if (gamepadAsm) {
+    const answer = await askGamepadAsm();
+    if (!answer.ok) return false;
+    if (answer.enable) await api.enableColorasm(uuid);
   }
 
   // 实例配了启动前 / 后命令时先问一次：跳过由后端记着不跑，取消则中止这次启动。
@@ -98,40 +109,41 @@ export async function launchGame(
     }
   }
 
-  try {
-    await api.launchGame(
-      uuid,
-      enterWorld,
-      undefined,
-      autoSave,
-      serverPackAction,
-      serverPackSkip,
-      runCommands,
-      renderdoc,
-      nsight,
-      jvmDebug,
-    );
-  } catch (e) {
-    if (String(e) !== "err.accountInUse") throw e;
+  // 账户占用检查：被拦下时问一次，可以继续用当前账户，也可以换一个账户再试。
+  // 后端按「当前账户」取登录凭据，换账户要先切过去；切完照常检查新账户
+  let force = false;
+  for (;;) {
+    try {
+      await api.launchGame(
+        uuid,
+        enterWorld,
+        force,
+        autoSave,
+        serverPackAction,
+        serverPackSkip,
+        runCommands,
+        renderdoc,
+        nsight,
+        jvmDebug,
+      );
+      break;
+    } catch (e) {
+      if (String(e) !== "err.accountInUse") throw e;
 
-    const answer = await askAccountLock();
-    if (!answer.ok) return false;
-    if (!answer.keep) {
-      await saveGuiConfig({ client: { accountCheck: false } }).catch(() => { });
+      const answer = await askAccountLock();
+      if (answer.action === "cancel") return false;
+      if (!answer.keep) {
+        await saveGuiConfig({ client: { accountCheck: false } }).catch(() => { });
+      }
+      if (answer.action === "switch") {
+        // 换账户失败（后端拒绝，如联机大厅锁定）就中止这次启动，提示已经由账户存储弹过
+        if (!(await setCurrentAccountByUuid(answer.uuid))) return false;
+        force = false;
+        continue;
+      }
+      // 继续启动：这一次先放行；检查关掉后后续启动也不会再被拦
+      force = true;
     }
-    // 这一次先放行；检查关掉后后续启动不会再被拦
-    await api.launchGame(
-      uuid,
-      enterWorld,
-      true,
-      autoSave,
-      serverPackAction,
-      serverPackSkip,
-      runCommands,
-      renderdoc,
-      nsight,
-      jvmDebug,
-    );
   }
 
   if (autoShow) {

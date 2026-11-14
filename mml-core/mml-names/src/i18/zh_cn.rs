@@ -381,6 +381,15 @@ impl I18Lang for ZhCn {
             ErrorType::IpcInvalidFrame => "IPC：数据帧长度无效".to_string(),
             ErrorType::IpcFrameTooLarge { len } => format!("IPC：数据帧过长，{len} 字节"),
             ErrorType::IpcBufferOverrun => String::from("IPC：接收缓冲区溢出，断开连接"),
+            ErrorType::IpcGameAuthFailed => {
+                String::from("IPC：游戏实例的连接应答不匹配，已断开")
+            }
+            ErrorType::IpcGameAuthTimeout => {
+                String::from("IPC：连接未在规定时间内完成验证，已断开")
+            }
+            ErrorType::IpcGameMessageBeforeAuth { msg_type } => {
+                format!("IPC：连接未通过验证就发送了游戏消息，类型 {msg_type}，已断开")
+            }
         }
     }
 

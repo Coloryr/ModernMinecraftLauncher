@@ -36,6 +36,7 @@ export const LaunchState = "launch-state"
 export const LoadDone = "load-done"
 export const MenuAction = "menu-action"
 export const MinecraftProgress = "minecraft-progress"
+export const PrepareError = "prepare-error"
 export const ResourceListModsProgress = "resource-list-mods-progress"
 export const ResourceMapProgress = "resource-map-progress"
 export const ResourceModsAutoMarkProgress = "resource-mods-auto-mark-progress"
@@ -86,6 +87,7 @@ export interface EventPayloads {
   [LoadDone]: LoadState;
   [MenuAction]: MenuActionEvent;
   [MinecraftProgress]: MinecraftProgressDto;
+  [PrepareError]: ErrorEvent;
   [ResourceListModsProgress]: ModScanProgressDto;
   [ResourceMapProgress]: ResourceMapProgressDto;
   [ResourceModsAutoMarkProgress]: ModAutoMarkProgressDto;
@@ -150,6 +152,7 @@ export function createEvents(on: EventOn) {
     onLoadDone: (cb: (payload: LoadState) => void) => on(LoadDone, cb),
     onMenuAction: (cb: (payload: MenuActionEvent) => void) => on(MenuAction, cb),
     onMinecraftProgress: (cb: (payload: MinecraftProgressDto) => void) => on(MinecraftProgress, cb),
+    onPrepareError: (cb: (payload: ErrorEvent) => void) => on(PrepareError, cb),
     onResourceListModsProgress: (cb: (payload: ModScanProgressDto) => void) => on(ResourceListModsProgress, cb),
     onResourceMapProgress: (cb: (payload: ResourceMapProgressDto) => void) => on(ResourceMapProgress, cb),
     onResourceModsAutoMarkProgress: (cb: (payload: ModAutoMarkProgressDto) => void) => on(ResourceModsAutoMarkProgress, cb),

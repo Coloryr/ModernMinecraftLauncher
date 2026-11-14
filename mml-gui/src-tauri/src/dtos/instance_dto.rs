@@ -40,6 +40,9 @@ pub struct InstanceInfoDto {
     pub server_url: Option<String>,
     /// 游戏内语言
     pub lang: Option<String>,
+    /// 渲染器：default / opengl / vulkan，取自实例 options.txt 的 preferredGraphicsBackend；
+    /// `None` 表示该版本没有这个选项
+    pub renderer: Option<String>,
     /// 日志编码：utf8 / gbk
     pub log_encoding: Option<String>,
     /// 来源：导入的压缩包 / 文件夹 / 在线网址

@@ -48,7 +48,6 @@ export { default as JavaDownloadWindow } from "../windows/java_download/JavaDown
 export { default as LobbyWindow } from "../windows/lobby/LobbyWindow.vue";
 export { default as WinLobbyMappingLobby } from "../windows/lobby/MappingLobby.vue";
 export { default as LogWindow } from "../windows/log/LogWindow.vue";
-export { default as WinMainBlockIconPickModal } from "../windows/main/BlockIconPickModal.vue";
 export { default as WinMainColorMcMigrateSection } from "../windows/main/ColorMcMigrateSection.vue";
 export { default as WinMainDebuggerLaunchModal } from "../windows/main/DebuggerLaunchModal.vue";
 export { default as WinMainFirstRunLanguage } from "../windows/main/FirstRunLanguage.vue";

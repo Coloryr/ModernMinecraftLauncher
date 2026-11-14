@@ -25,6 +25,14 @@ pub(crate) async fn broadcast_servers() {
     }
 }
 
+/// 把通过验证的连接加入广播列表
+///
+/// - `tx`: 该连接的出站通道
+pub(crate) fn add_client(tx: &TcpChannel) {
+    cleanup();
+    CLIENTS.write().unwrap().push(tx.clone());
+}
+
 /// 清理已关闭的客户端通道
 pub(crate) fn cleanup() {
     CLIENTS.write().unwrap().retain(|tx| !tx.is_closed());

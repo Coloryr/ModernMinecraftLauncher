@@ -1,6 +1,6 @@
 //! 日志读取
 //!
-//! 列日志文件、按行读回，并把内核的日志条目转成前端要的 DTO；
+//! 列日志文件、按行读回、在文件管理器里打开日志所在目录，并把内核的日志条目转成前端要的 DTO；
 //! 解析规则跟着内核的日志格式走。
 
 use std::io::Read;
@@ -56,6 +56,40 @@ pub fn log_read_file(uuid: String, path: String) -> Result<Vec<LogLine>, String>
     let runtime = InstanceRuntimeLog::from_file(&path, game.encoding);
     let logs = runtime.logs.read().unwrap();
     Ok(logs.iter().map(log_line_from_item).collect())
+}
+
+/// 在文件管理器里打开日志所在目录
+///
+/// - `uuid`: 实例 uuid
+/// - `path`: `log_get_files` 返回的路径，仅接受列表内的路径；`None` 表示运行日志
+///
+/// # 返回值
+///
+/// 目录不存在或路径不在列表内返回错误文案
+#[gui_macros::ipc_group("log")]
+#[gui_macros::command]
+pub fn log_open_dir(uuid: String, path: Option<String>) -> Result<(), String> {
+    let instance = instance_handle(&uuid)?;
+    // 取完路径就放开实例读锁：打开文件管理器要起外部进程，别一直占着
+    let dir = {
+        let game = instance.read().unwrap();
+        match path {
+            Some(path) => {
+                let path = PathBuf::from(&path);
+                if !game.get_log_files().contains(&path) {
+                    return Err(err_keys::FILE_NOT_FOUND.to_string());
+                }
+                path.parent().map(Path::to_path_buf)
+            }
+            // 运行日志没有对应文件：落到实例的 logs 目录，游戏自己写的 latest.log 就在那里
+            None => Some(game.get_logs_path()),
+        }
+    };
+    let Some(dir) = dir.filter(|dir| dir.is_dir()) else {
+        return Err(err_keys::FILE_NOT_FOUND.to_string());
+    };
+    mml_sys::open_helper::open_dir(dir);
+    Ok(())
 }
 
 /// 分析一份日志 / 崩溃报告

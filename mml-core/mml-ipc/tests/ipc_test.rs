@@ -71,8 +71,8 @@ fn read_frame(stream: &mut std::net::TcpStream) -> Vec<u8> {
         6 | 7 => read_bytes_into(stream, &mut frame, 5),
         // 鼠标滚轮(8): i32
         8 => read_bytes_into(stream, &mut frame, 4),
-        // 连接验证(12): 密钥(String)
-        12 => read_string_into(stream, &mut frame),
+        // 连接挑战(14): 挑战串(String)
+        14 => read_string_into(stream, &mut frame),
         // 其它类型没有消息体
         _ => {}
     }
@@ -115,6 +115,29 @@ fn read_frame_of(stream: &mut std::net::TcpStream, expect_type: i32) -> Vec<u8> 
     }
 }
 
+/// 完成挑战应答：读挑战串、用密钥算应答、发回，等到「验证结果」
+///
+/// - `stream`: 已连上的游戏侧连接
+fn handshake(stream: &mut std::net::TcpStream) {
+    let payload = read_frame(stream);
+    let mut body = payload.as_slice();
+    assert_eq!(body.get_i32(), 14, "首帧应是连接挑战");
+    let nonce = read_string(&mut body);
+    assert_eq!(nonce.len(), 32);
+
+    let proof = mml_base::hash_helper::gen_hmac_sha256(get_auth_key().unwrap(), &nonce);
+    let mut content = Vec::new();
+    content.extend_from_slice(&15i32.to_be_bytes());
+    content.extend_from_slice(&(proof.len() as i32).to_be_bytes());
+    content.extend_from_slice(proof.as_bytes());
+    write_frame(stream, &content);
+
+    let payload = read_frame_of(stream, 16);
+    let mut body = payload.as_slice();
+    assert_eq!(body.get_i32(), 16);
+    assert!(body.is_empty(), "验证结果不带消息体");
+}
+
 /// 从帧字节中读出一个字符串字段
 fn read_string(buf: &mut &[u8]) -> String {
     let len = buf.get_i32() as usize;
@@ -131,6 +154,7 @@ fn test_channel_set_title() {
     let uuid = Uuid::new_v4();
 
     let mut stream = connect(port);
+    handshake(&mut stream);
 
     // 发送 GAME_CHANNEL(9): uuid
     let mut content = Vec::new();
@@ -170,6 +194,8 @@ fn test_motd_broadcast() {
     });
 
     let mut stream = connect(port);
+    // 未通过验证的连接收不到广播
+    handshake(&mut stream);
 
     // 读取广播的 MOTD(2)，跳过其它类型帧
     let payload = read_frame_of(&mut stream, 2);
@@ -248,6 +274,7 @@ fn test_game_state_report() {
     let uuid = Uuid::new_v4();
 
     let mut stream = connect(port);
+    handshake(&mut stream);
 
     // MOUSE_STATE(1): uuid + 状态(bool)
     let mut content = Vec::new();
@@ -307,6 +334,7 @@ fn test_send_input() {
     let uuid = Uuid::new_v4();
 
     let mut stream = connect(port);
+    handshake(&mut stream);
 
     // 发送 GAME_CHANNEL(9): uuid
     let mut content = Vec::new();
@@ -357,17 +385,79 @@ fn test_send_input() {
     assert_eq!(body.get_i32(), -2);
 }
 
-/// 连接建立后启动器先发「连接验证」(12)，内容是本进程生成的密钥
+/// 连接建立后启动器先发「连接挑战」(14)：随机串，每次连接都不同
 #[test]
-fn test_server_auth() {
+fn test_server_challenge() {
+    ensure_log();
+    let port = ipc_port();
+
+    let mut first = connect(port);
+    let payload = read_frame(&mut first);
+    let mut body = payload.as_slice();
+    assert_eq!(body.get_i32(), 14);
+    let nonce = read_string(&mut body);
+    assert_eq!(nonce.len(), 32);
+    assert_ne!(nonce, get_auth_key().unwrap(), "挑战串不能就是密钥");
+
+    let mut second = connect(port);
+    let payload = read_frame(&mut second);
+    let mut body = payload.as_slice();
+    assert_eq!(body.get_i32(), 14);
+    assert_ne!(read_string(&mut body), nonce, "每条连接的挑战串都不同");
+}
+
+/// 应答不对时不下发「验证结果」并断开连接
+#[test]
+fn test_server_rejects_wrong_proof() {
     ensure_log();
     let port = ipc_port();
     let mut stream = connect(port);
 
     let payload = read_frame(&mut stream);
     let mut body = payload.as_slice();
-    assert_eq!(body.get_i32(), 12);
-    assert_eq!(read_string(&mut body), get_auth_key().unwrap());
+    assert_eq!(body.get_i32(), 14);
+    let _ = read_string(&mut body);
+
+    let bad = "deadbeef";
+    let mut content = Vec::new();
+    content.extend_from_slice(&15i32.to_be_bytes());
+    content.extend_from_slice(&(bad.len() as i32).to_be_bytes());
+    content.extend_from_slice(bad.as_bytes());
+    write_frame(&mut stream, &content);
+
+    // 启动器直接关闭连接，读到的要么是 EOF，要么是连接被重置
+    let mut byte = [0u8; 1];
+    match stream.read(&mut byte) {
+        Ok(0) => {}
+        Ok(_) => panic!("wrong proof should not get any reply"),
+        Err(_) => {}
+    }
+}
+
+/// 未通过验证的连接发游戏通道不会注册
+#[test]
+fn test_game_channel_requires_auth() {
+    ensure_log();
+    let port = ipc_port();
+    let uuid = Uuid::new_v4();
+
+    let mut stream = connect(port);
+    // 先读掉挑战串，但不应答
+    let payload = read_frame(&mut stream);
+    let mut body = payload.as_slice();
+    assert_eq!(body.get_i32(), 14);
+    let _ = read_string(&mut body);
+
+    let mut content = Vec::new();
+    content.extend_from_slice(&9i32.to_be_bytes());
+    let uuid_str = uuid.to_string();
+    content.extend_from_slice(&(uuid_str.len() as i32).to_be_bytes());
+    content.extend_from_slice(uuid_str.as_bytes());
+    write_frame(&mut stream, &content);
+
+    // 给服务端留出处理时间，再确认通道没有注册
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    assert!(!set_title(uuid, "nobody"));
 }
 
 /// 向未注册通道的游戏发送输入应返回 false，不依赖网络返回

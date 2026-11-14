@@ -25,7 +25,7 @@ fn make_hello_file(name: &str) -> PathBuf {
     file
 }
 
-/// 重试次数未达上限 5 次时继续重试
+/// 尝试次数未达上限 3 次时继续重试
 #[test]
 fn is_need_err_allows_under_threshold() {
     crate::test_util::ensure_env();
@@ -39,13 +39,13 @@ fn is_need_err_allows_under_threshold() {
         later: Default::default(),
     };
     let mut times = 0;
-    for _ in 0..5 {
+    for _ in 0..2 {
         assert!(!is_need_err(&item, ErrorType::TaskCancel, &mut times));
     }
-    assert_eq!(times, 5);
+    assert_eq!(times, 2);
 }
 
-/// 重试次数超过上限 5 次后放弃
+/// 尝试次数达到上限 3 次后放弃
 #[test]
 fn is_need_err_stops_over_threshold() {
     crate::test_util::ensure_env();
@@ -57,9 +57,9 @@ fn is_need_err_stops_over_threshold() {
         hash: Default::default(),
         later: Default::default(),
     };
-    let mut times = 5;
+    let mut times = 2;
     assert!(is_need_err(&item, ErrorType::TaskCancel, &mut times));
-    assert_eq!(times, 6);
+    assert_eq!(times, 3);
 }
 
 /// 无需校验时直接通过

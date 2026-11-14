@@ -29,7 +29,10 @@ pub(crate) fn write_default(dir: &Path) -> Result<PathBuf, String> {
 /// 读取一份配置
 pub(crate) fn load_file(path: &Path) -> Result<GamepadConfig, String> {
     let text = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
-    serde_json::from_str(&text).map_err(|err| err.to_string())
+    let mut config: GamepadConfig = serde_json::from_str(&text).map_err(|err| err.to_string())?;
+    // 旧配置没有鼠标模式那套按钮：按游戏内那套补齐，行为与升级前一致
+    config.normalize();
+    Ok(config)
 }
 
 /// 写一份配置到文件，字段用大驼峰并带缩进，方便用户直接改
