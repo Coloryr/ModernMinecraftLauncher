@@ -65,7 +65,7 @@ pub fn run() {
             let studio = Studio::new(app.handle().clone(), config_path, config.clone(), cache);
             app.manage(studio.clone());
 
-            let window =
+            let builder =
                 WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                     .title(render(config.locale, MessageKey::Title, &[]))
                     .inner_size(1440.0, 920.0)
@@ -73,8 +73,13 @@ pub fn run() {
                     .center()
                     .theme(Some(config.theme.native()))
                     .background_color(config.theme.color())
-                    .visible(false)
-                    .build()?;
+                    .visible(false);
+            // macOS：标题栏用 Overlay 并藏掉标题，红黄绿才能浮在自绘顶栏上
+            #[cfg(target_os = "macos")]
+            let builder = builder
+                .title_bar_style(tauri::TitleBarStyle::Overlay)
+                .hidden_title(true);
+            let window = builder.build()?;
             // 前端加载失败时也要能看到窗口，而不是只剩一个进程
             reveal_later(window.clone());
 

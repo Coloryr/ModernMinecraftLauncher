@@ -539,7 +539,8 @@ onBeforeUnmount(() => { window.clearInterval(elapsedTimer); observer?.disconnect
 
     <div class="workbench">
       <nav class="activity-bar" :aria-label="t('title')">
-        <button class="activity-btn" :class="{ 'is-active': sidebarOpen }" :title="t('toggleFiles')" :aria-label="t('toggleFiles')" @click="sidebarOpen = !sidebarOpen"><GlyphIcon name="document" :size="18" /></button>
+        <button class="activity-btn" :class="{ 'is-active': sidebarOpen }" :title="t('toggleFiles')" :aria-label="t('toggleFiles')" @click="sidebarOpen = !sidebarOpen"><GlyphIcon name="folder" :size="18" /></button>
+        <button class="activity-btn" :class="{ 'is-active': editorOpen }" :title="editorOpen ? t('hideEditor') : t('showEditor')" :aria-label="editorOpen ? t('hideEditor') : t('showEditor')" @click="editorOpen = !editorOpen"><GlyphIcon name="document" :size="18" /></button>
         <button class="activity-btn" :class="{ 'is-active': previewOpen }" :title="t('preview')" :aria-label="t('preview')" @click="previewOpen = !previewOpen"><GlyphIcon name="grid" :size="18" /></button>
         <button class="activity-btn" :class="{ 'is-active': inspecting }" :disabled="!previewUrl" :title="t('inspect')" :aria-label="t('inspect')" @click="inspecting ? stopInspector() : openInspector()"><GlyphIcon name="bug" :size="18" /></button>
         <button class="activity-btn" :class="{ 'is-active': panelOpen && !panelCollapsed }" :title="t('output')" :aria-label="t('output')" @click="togglePanel"><GlyphIcon name="terminal" :size="18" /></button>
@@ -574,7 +575,6 @@ onBeforeUnmount(() => { window.clearInterval(elapsedTimer); observer?.disconnect
         <div class="panel-head">
           <strong>{{ t('contentPreview') }}</strong>
           <span class="grow" />
-          <button class="title-icon" :class="{ 'is-active': !editorOpen }" :title="editorOpen ? t('hideEditor') : t('showEditor')" :aria-label="editorOpen ? t('hideEditor') : t('showEditor')" @click="editorOpen = !editorOpen"><GlyphIcon :name="editorOpen ? 'maximize' : 'restore'" :size="14" /></button>
           <button class="title-icon" :disabled="!project || working" :title="t('preview')" :aria-label="t('preview')" @click="run(startPreview)"><GlyphIcon name="play" :size="14" /></button>
           <button class="title-icon" :disabled="!previewUrl || working" :title="t('stop')" :aria-label="t('stop')" @click="run(() => call('stop'))"><GlyphIcon name="stop" :size="14" /></button>
           <button class="title-icon" :disabled="!previewUrl" :title="t('reload')" :aria-label="t('reload')" @click="reloadPreview"><GlyphIcon name="refresh" :size="14" /></button>
