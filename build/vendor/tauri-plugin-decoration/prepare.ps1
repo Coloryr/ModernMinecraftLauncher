@@ -12,8 +12,8 @@
 #   - 上游升级只需改 $Ref 并重放 patch，冲突处有 `M²L 本地修改` 注释可对照。
 #
 # 用法：
-#   pwsh -File mml-gui/vendor/prepare.ps1            # 幂等，已存在则跳过
-#   pwsh -File mml-gui/vendor/prepare.ps1 -Force     # 强制重新拉取
+#   pwsh -File build/vendor/tauri-plugin-decoration/prepare.ps1            # 幂等，已存在则跳过
+#   pwsh -File build/vendor/tauri-plugin-decoration/prepare.ps1 -Force     # 强制重新拉取
 #
 # 注意：产物放在 target/vendor 下（已被 git 忽略）。cargo 在**解析依赖图时**
 # 就要求 path 依赖的 Cargo.toml 存在，所以这个脚本必须在 cargo 之前跑 ——
@@ -31,8 +31,8 @@ $Ref  = "235272b40d9a7b840ad49944e9fef334fde251ec"   # = v3.0.5
 $DirName = "tauri-plugin-decoration"
 
 $vendorDir = $PSScriptRoot
-# $PSScriptRoot = <repo>/mml-gui/vendor → 剥两层到仓库根
-$repoRoot = Split-Path (Split-Path $vendorDir -Parent) -Parent
+# $PSScriptRoot = <repo>/build/vendor/tauri-plugin-decoration → 剥三层到仓库根
+$repoRoot = Split-Path (Split-Path (Split-Path $vendorDir -Parent) -Parent) -Parent
 $patchDir = Join-Path $vendorDir "patches"
 $outDir = Join-Path $repoRoot "target/vendor/$DirName"
 

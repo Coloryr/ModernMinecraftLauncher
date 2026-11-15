@@ -173,7 +173,7 @@ ModernColoryrMinecraftLauncher/
 ├─ ipc-gen/                        IPC 代码生成器
 │  ├─ src/                         扫描 Rust 源码并生成 TypeScript
 │  └─ macros/                      命令 / 事件标记过程宏（gui-macros）
-├─ custom/                         四种自定义界面示例，各自构建成可导入的 zip
+├─ custom/                         五种自定义界面示例，各自构建成可导入的 zip
 │  ├─ custom-main-demo/            自定义主页面（home）
 │  ├─ custom-ui-demo/              整页主题 · Vue 组件（page）
 │  ├─ custom-ui-html-demo/         整页主题 · HTML（page）

@@ -5160,8 +5160,6 @@ dependencies = [
 [[package]]
 name = "sdl3-src"
 version = "3.4.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc5181b85760f18170dbc15b27b00d5aaaa003058bb14333ec7dd280665ef3a4"
 
 [[package]]
 name = "sdl3-sys"

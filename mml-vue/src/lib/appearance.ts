@@ -21,17 +21,25 @@ export const animations = ref(readFlag(KEYS.animations, true));
 /**
  * 开关全局动画
  *
+ * 真值落 `gui_config.client.animations`：多窗口模式下各窗口是独立 webview、localStorage
+ * 不跨窗口，只有走配置广播才能让已经开着的窗口跟着改。localStorage 留一份给浏览器预览。
+ *
  * - `v`: 是否启用动画
  */
 export function setAnimations(v: boolean) {
-  animations.value = v;
+  applyAnimations(v);
   writeFlag(KEYS.animations, v);
-  document.documentElement.classList.toggle("no-anim", !v);
+  void saveGuiConfig({ client: { animations: v } });
 }
 
-/** 启动恢复：只同步内存与 DOM，不回写本地存储 */
-export function applyAnimations() {
-  document.documentElement.classList.toggle("no-anim", !animations.value);
+/**
+ * 把动画开关落到 DOM
+ *
+ * - `v`: 是否启用动画；缺省沿用当前值，启动恢复用
+ */
+export function applyAnimations(v: boolean = animations.value) {
+  animations.value = v;
+  document.documentElement.classList.toggle("no-anim", !v);
 }
 
 // ---------------- 背景图 ----------------
@@ -284,6 +292,8 @@ if (isTauri()) {
   void listen<ClientConfigDto>(ClientConfigChange, (e) => {
     applyWindowAlpha(e.payload.windowOpacity);
     applyWindowMaterial(e.payload.windowEffect);
+    // 动画开关也在客户端设置里：别的窗口改了这边要跟着停 / 恢复
+    applyAnimations(e.payload.animations);
   });
 }
 

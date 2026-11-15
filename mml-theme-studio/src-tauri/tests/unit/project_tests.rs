@@ -38,7 +38,7 @@ fn rejects_unsafe_names() {
     assert!(validate_name("主题 demo").is_ok());
 }
 
-/// 四类模板完整复制，锁定 SDK，已有目标不覆盖
+/// 五类模板完整复制，锁定 SDK，已有目标不覆盖
 #[tokio::test]
 async fn copies_templates_and_locks_sdk() {
     let root = temp("projects");
@@ -56,15 +56,17 @@ async fn copies_templates_and_locks_sdk() {
         Template::Page,
         Template::Home,
         Template::Html,
+        Template::HomeHtml,
     ] {
         let demo = source.join("custom").join(template.dir());
-        let kind = if template == Template::Html {
-            "page"
-        } else {
-            template.as_str()
+        // 两个 HTML 模板在 theme.json 里仍分别声明 page / home
+        let kind = match template {
+            Template::Html => "page",
+            Template::HomeHtml => "home",
+            _ => template.as_str(),
         };
         fixture(&demo, kind).await;
-        if template == Template::Html {
+        if matches!(template, Template::Html | Template::HomeHtml) {
             std::fs::write(demo.join("src/index.html"), "<html></html>").unwrap();
         }
         std::fs::write(demo.join("old.zip"), "do not copy").unwrap();
@@ -93,7 +95,7 @@ async fn copies_templates_and_locks_sdk() {
                 .any(|entry| entry.unwrap().file_name() == "old.zip")
         );
         assert!(!project.root.ends_with("node_modules"));
-        if template != Template::Html {
+        if !matches!(template, Template::Html | Template::HomeHtml) {
             let package = read_json(&Path::new(&project.root).join("package.json"))
                 .await
                 .unwrap();
@@ -187,5 +189,22 @@ async fn open_project_requires_manifest_and_build_script() {
             .unwrap()
             .contains(&"src/theme.json".to_string())
     );
+}
+
+/// 主页带 index.html 时按 HTML 路线识别，没有则是组件路线
+#[tokio::test]
+async fn open_project_detects_home_routes() {
+    let root = temp("home-routes");
+    fixture(&root, "home").await;
+    assert_eq!(open_project(&root).await.unwrap().template, Template::Home);
+
+    std::fs::write(root.join("src/index.html"), "<!doctype html>").unwrap();
+    assert_eq!(
+        open_project(&root).await.unwrap().template,
+        Template::HomeHtml
+    );
+    assert_eq!(Template::parse("home-html"), Some(Template::HomeHtml));
+    assert_eq!(Template::HomeHtml.as_str(), "home-html");
+    assert_eq!(Template::HomeHtml.dir(), "custom-main-html-demo");
 }
 

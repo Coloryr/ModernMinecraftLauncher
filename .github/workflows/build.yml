@@ -106,7 +106,9 @@ jobs:
       - name: 检查 SDL2 构建工具
         run: cmake --version
       - name: 还原 vendor 插件
-        run: pwsh -NoProfile -File mml-gui/vendor/prepare.ps1
+        run: pwsh -NoProfile -File build/vendor/tauri-plugin-decoration/prepare.ps1
+      - name: 还原 SDL 裁剪补丁
+        run: node build/vendor/sdl3-src/prepare.mjs
       - name: 缓存 Rust
         uses: Swatinem/rust-cache@v2
         with:
@@ -166,7 +168,9 @@ jobs:
       - name: 设置 Rust
         uses: dtolnay/rust-toolchain@stable
       - name: 还原 vendor 插件
-        run: bash mml-gui/vendor/prepare.sh
+        run: bash build/vendor/tauri-plugin-decoration/prepare.sh
+      - name: 还原 SDL 裁剪补丁
+        run: node build/vendor/sdl3-src/prepare.mjs
       - name: 缓存 Rust
         uses: Swatinem/rust-cache@v2
         with:
@@ -305,7 +309,9 @@ jobs:
           command -v cmake >/dev/null 2>&1 || brew install cmake
           cmake --version
       - name: 还原 vendor 插件
-        run: bash mml-gui/vendor/prepare.sh
+        run: bash build/vendor/tauri-plugin-decoration/prepare.sh
+      - name: 还原 SDL 裁剪补丁
+        run: node build/vendor/sdl3-src/prepare.mjs
       - name: 缓存 Rust
         uses: Swatinem/rust-cache@v2
         with:

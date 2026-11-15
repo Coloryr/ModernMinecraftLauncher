@@ -5,7 +5,7 @@
 //!
 //! 注意：vendor 插件的还原**不能**放这里 —— cargo 在解析依赖图时就要读
 //! target/vendor/tauri-plugin-decoration/Cargo.toml，那发生在任何 build script
-//! 之前。改由各构建入口在 cargo 之前跑 `mml-gui/vendor/prepare.ps1`，
+//! 之前。改由各构建入口在 cargo 之前跑 `build/vendor/tauri-plugin-decoration/prepare.ps1`，
 //! 见 build/build-release.* 与 build/build-prerelease.*。
 
 use std::{

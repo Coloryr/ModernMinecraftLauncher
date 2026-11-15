@@ -215,6 +215,8 @@ pub struct ClientConfigDto {
     pub music_on: bool,
     /// 自定义音乐来源：本地音频文件路径或 http(s) 直链，空串表示没配
     pub music_source: String,
+    /// 界面动画开关：关闭后各窗口的过渡与入场动画瞬时完成
+    pub animations: bool,
     /// 窗口材质：auto / mica / acrylic / blur / none
     pub window_effect: String,
     /// 窗口底色不透明度，单位百分比
@@ -251,6 +253,7 @@ impl From<ClientConfig> for ClientConfigDto {
             custom_page_on: c.custom_page_on,
             music_on: c.music_on,
             music_source: c.music_source,
+            animations: c.animations,
             window_effect: c.window_effect,
             window_opacity: c.window_opacity,
             program_icon: c.program_icon,
@@ -285,6 +288,7 @@ impl From<ClientConfigDto> for ClientConfig {
             custom_page_on: c.custom_page_on,
             music_on: c.music_on,
             music_source: c.music_source,
+            animations: c.animations,
             window_effect: c.window_effect,
             window_opacity: c.window_opacity,
             program_icon: c.program_icon,
@@ -435,6 +439,7 @@ impl From<GuiConfig> for GuiConfigDto {
                 custom_page_on: c.client.custom_page_on,
                 music_on: c.client.music_on,
                 music_source: c.client.music_source,
+                animations: c.client.animations,
                 window_effect: c.client.window_effect,
                 window_opacity: c.client.window_opacity,
                 program_icon: c.client.program_icon,
@@ -524,6 +529,7 @@ impl From<GuiConfigDto> for GuiConfig {
                 custom_page_on: d.client.custom_page_on,
                 music_on: d.client.music_on,
                 music_source: d.client.music_source,
+                animations: d.client.animations,
                 window_effect: d.client.window_effect,
                 window_opacity: d.client.window_opacity,
                 program_icon: d.client.program_icon,

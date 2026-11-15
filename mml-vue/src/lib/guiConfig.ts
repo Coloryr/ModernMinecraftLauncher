@@ -219,6 +219,8 @@ export interface ClientConfig {
   commandNotice: boolean;
   /** 游戏自动进服地址：host 或 host:port，空表示不自动进服 */
   autoJoinServer: string;
+  /** 界面动画开关：关闭后各窗口的过渡与入场动画瞬时完成 */
+  animations: boolean;
   /** 窗口材质：auto（云母→亚克力→模糊降级）/ mica / acrylic / blur / none */
   windowEffect: string;
   /** 窗口底色不透明度，单位百分比 60–100 */
@@ -484,6 +486,7 @@ export function defaultConfig(): GuiConfig {
       commandNotice: true,
       autoJoinServer: readString(KEYS.autoJoinServer),
       // 这两项不做 localStorage 首帧缓存：真值一律来自 gui_config.json
+      animations: true,
       windowEffect: "none",
       windowOpacity: 85,
       motdServer: readString(KEYS.motdServer),

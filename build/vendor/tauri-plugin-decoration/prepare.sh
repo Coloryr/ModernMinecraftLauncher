@@ -13,8 +13,8 @@
 #   - 上游升级只需改 REF 并重放 patch，冲突处有 `M²L 本地修改` 注释可对照。
 #
 # 用法：
-#   bash mml-gui/vendor/prepare.sh            # 幂等，已存在则跳过
-#   bash mml-gui/vendor/prepare.sh --force    # 强制重新拉取
+#   bash build/vendor/tauri-plugin-decoration/prepare.sh            # 幂等，已存在则跳过
+#   bash build/vendor/tauri-plugin-decoration/prepare.sh --force    # 强制重新拉取
 #
 # 注意：产物放在 target/vendor 下（已被 git 忽略）。cargo 在**解析依赖图时**
 # 就要求 path 依赖的 Cargo.toml 存在，所以这个脚本必须在 cargo 之前跑 ——
@@ -28,8 +28,8 @@ REF="235272b40d9a7b840ad49944e9fef334fde251ec"   # = v3.0.5
 DIR_NAME="tauri-plugin-decoration"
 
 VENDOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# <repo>/mml-gui/vendor → 上溯两层到仓库根
-REPO_ROOT="$(cd "$VENDOR_DIR/../.." && pwd)"
+# <repo>/build/vendor/tauri-plugin-decoration → 上溯三层到仓库根
+REPO_ROOT="$(cd "$VENDOR_DIR/../../.." && pwd)"
 PATCH_DIR="$VENDOR_DIR/patches"
 OUT_DIR="$REPO_ROOT/target/vendor/$DIR_NAME"
 

@@ -23,6 +23,8 @@ echo '正在安装 mml-vue 的依赖...'
 (cd "$root/mml-vue" && npm install)
 
 # 还原 vendor 插件；否则第一次 cargo check 会因 path 依赖缺 Cargo.toml 直接失败
-bash "$root/mml-gui/vendor/prepare.sh"
+bash "$root/build/vendor/tauri-plugin-decoration/prepare.sh"
+# 还原打过补丁的 sdl3-src（Cargo.toml 的 [patch.crates-io] 指向它）
+node "$root/build/vendor/sdl3-src/prepare.mjs"
 
 echo '依赖安装完成。'

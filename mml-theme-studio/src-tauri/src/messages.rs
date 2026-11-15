@@ -48,6 +48,10 @@ pub enum MessageKey {
     Title,
     /// 正在下载 demo
     Downloading,
+    /// 正在安装依赖
+    Installing,
+    /// 正在构建 ZIP
+    Building,
     /// 正在准备预览
     Preparing,
     /// 预览已启动，参数为 `url`
@@ -58,6 +62,10 @@ pub enum MessageKey {
     Installed,
     /// 构建完成，参数为 `path`
     Built,
+    /// 已在外部编辑器中打开项目，参数为 `editor`
+    EditorOpened,
+    /// 没有找到外部编辑器，改为打开项目文件夹
+    EditorMissing,
     /// 文件已保存，参数为 `path`
     FileSaved,
     /// 上一个操作尚未结束
@@ -86,6 +94,8 @@ pub enum MessageKey {
     CommandFailed,
     /// 构建没有产出 ZIP
     MissingBuild,
+    /// 读取 CSS 清单超时
+    CatalogTimeout,
     /// 文件被外部修改，参数为 `path`
     Conflict,
     /// 预览启动失败
@@ -193,6 +203,10 @@ pub fn render(locale: Locale, key: MessageKey, values: &[(&'static str, String)]
         (Locale::EnUs, MessageKey::Title) => "M²L Theme Studio",
         (Locale::ZhCn, MessageKey::Downloading) => "正在下载 demo 和同一版本的开发契约…",
         (Locale::EnUs, MessageKey::Downloading) => "Downloading the demo and matching development contracts…",
+        (Locale::ZhCn, MessageKey::Installing) => "正在安装依赖…",
+        (Locale::EnUs, MessageKey::Installing) => "Installing dependencies…",
+        (Locale::ZhCn, MessageKey::Building) => "正在构建 ZIP…",
+        (Locale::EnUs, MessageKey::Building) => "Building ZIP…",
         (Locale::ZhCn, MessageKey::Preparing) => "正在准备预览…",
         (Locale::EnUs, MessageKey::Preparing) => "Preparing preview…",
         (Locale::ZhCn, MessageKey::PreviewReady) => "预览已启动：{url}",
@@ -203,6 +217,10 @@ pub fn render(locale: Locale, key: MessageKey, values: &[(&'static str, String)]
         (Locale::EnUs, MessageKey::Installed) => "Dependencies installed",
         (Locale::ZhCn, MessageKey::Built) => "构建完成：{path}",
         (Locale::EnUs, MessageKey::Built) => "Build complete: {path}",
+        (Locale::ZhCn, MessageKey::EditorOpened) => "已在 {editor} 中打开项目",
+        (Locale::EnUs, MessageKey::EditorOpened) => "Opened the project in {editor}",
+        (Locale::ZhCn, MessageKey::EditorMissing) => "找不到 VS Code 或 Cursor 的命令行入口，已改为打开项目文件夹",
+        (Locale::EnUs, MessageKey::EditorMissing) => "VS Code or Cursor was not found on PATH; opened the project folder instead",
         (Locale::ZhCn, MessageKey::FileSaved) => "文件已保存：{path}",
         (Locale::EnUs, MessageKey::FileSaved) => "File saved: {path}",
         (Locale::ZhCn, MessageKey::Busy) => "上一个操作尚未结束",
@@ -229,6 +247,8 @@ pub fn render(locale: Locale, key: MessageKey, values: &[(&'static str, String)]
         (Locale::EnUs, MessageKey::MissingSdk) => "Development contracts are missing. Install dependencies or create the project from a demo again",
         (Locale::ZhCn, MessageKey::CommandFailed) => "命令执行失败：{command}，退出码 {code}",
         (Locale::EnUs, MessageKey::CommandFailed) => "Command failed: {command}, exit code {code}",
+        (Locale::ZhCn, MessageKey::CatalogTimeout) => "读取 CSS 清单超时，请重试，或重新安装依赖",
+        (Locale::EnUs, MessageKey::CatalogTimeout) => "Timed out reading the CSS catalog. Retry, or reinstall dependencies",
         (Locale::ZhCn, MessageKey::MissingBuild) => "构建没有生成 ZIP，请查看输出日志",
         (Locale::EnUs, MessageKey::MissingBuild) => "The build did not produce a ZIP. Check the output log",
         (Locale::ZhCn, MessageKey::Conflict) => "文件已被外部修改，请重新打开后再保存：{path}",

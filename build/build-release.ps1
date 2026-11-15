@@ -55,8 +55,13 @@ if ($LASTEXITCODE -ne 0) { throw '版本同步失败，已中止构建。' }
 # vendor 插件（tauri-plugin-decoration）要先还原：它由 patch 打到上游源码上，
 # 而 cargo 解析依赖图时就要读它的 Cargo.toml，早于任何构建脚本，必须在这里先跑。
 # 脚本幂等，已还原过会直接跳过。
-powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'mml-gui\vendor\prepare.ps1')
+powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'build\vendor\tauri-plugin-decoration\prepare.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'vendor 插件还原失败，已中止构建。' }
+
+# SDL 裁剪：还原打过补丁的 sdl3-src 到 target/vendor（只存补丁，不存第三方源码），
+# Cargo.toml 的 [patch.crates-io] 指向它。补丁没变化时脚本直接跳过。
+node (Join-Path $root 'build\vendor\sdl3-src\prepare.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'SDL 裁剪准备失败，已中止构建。' }
 
 # 缺的三元组先补上；rustup target add 本身幂等，已装的不会重下
 foreach ($t in $targets) {

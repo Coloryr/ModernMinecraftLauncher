@@ -27,7 +27,7 @@ cd ../mml-vue && npm install && npm run dev
 ```
 
 Tauri CLI 由 Cargo 安装：`cargo install tauri-cli --version "^2" --locked`。
-`tauri.ps1` / `tauri.sh` 只是 `cargo tauri` 的包装：先跑 `vendor/prepare`，再转发参数；
+`tauri.ps1` / `tauri.sh` 只是 `cargo tauri` 的包装：先跑 `../build/vendor` 下的还原脚本，再转发参数；
 直接 `cargo tauri` 前仍要先还原插件。
 `cargo tauri dev/build` 会执行 `tauri.conf.json` 里的 `beforeDevCommand` /
 `beforeBuildCommand`，进入 `../mml-vue` 起 Vite 或构建前端，所以 Node 仍需要，
@@ -65,16 +65,17 @@ cargo check --manifest-path src-tauri/Cargo.toml
 
 命名、分组、事件名推导等规则见仓库根 [`ipc-gen/`](../ipc-gen/) 的扫描实现。
 
-## vendor：第三方插件还原
+## vendor：第三方源码还原（build/vendor）
 
 自绘窗口装饰依赖 `tauri-plugin-decoration`，但它需要本地改动（接受应用提供的窗口按钮矩形，
 从而既保住 M²L 自己的标题栏外观、又保留 Win11 贴靠布局）。仓库里**只存 patch**，构建前由
-[vendor/prepare.ps1](vendor/prepare.ps1) 按**固定 commit** 从上游克隆到 `target/vendor/` 再打补丁：
+[../build/vendor/tauri-plugin-decoration/prepare.ps1](../build/vendor/tauri-plugin-decoration/prepare.ps1) 按**固定 commit** 从上游克隆到 `target/vendor/` 再打补丁；
+SDL 也走同一套（[../build/vendor/sdl3-src/](../build/vendor/sdl3-src/)，取 crates.io 的 `sdl3-src` 再应用裁剪补丁）。
 
 ```bash
-powershell -NoProfile -ExecutionPolicy Bypass -File vendor/prepare.ps1           # Windows
-bash vendor/prepare.sh                                                         # Linux / macOS
-powershell -NoProfile -ExecutionPolicy Bypass -File vendor/prepare.ps1 -Force  # 强制重拉
+powershell -NoProfile -ExecutionPolicy Bypass -File build/vendor/tauri-plugin-decoration/prepare.ps1           # Windows
+bash build/vendor/tauri-plugin-decoration/prepare.sh                                                         # Linux / macOS
+powershell -NoProfile -ExecutionPolicy Bypass -File build/vendor/tauri-plugin-decoration/prepare.ps1 -Force  # 强制重拉
 ```
 
 必须早于任何 cargo 命令：cargo **解析依赖图时**就要读它的 `Cargo.toml`。

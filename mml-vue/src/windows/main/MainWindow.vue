@@ -357,7 +357,7 @@ function togglePaneMaximize() {
 const newsActive = ref(startupPage.value === "Home");
 
 /** 启动器主页 / 实例列表切换：与设置页同一套标题渐变 + 内容错峰 */
-const homeStagger = useStaggerEnter(".page-head, .last-card, .entry-cards, .news-panel", {
+const homeStagger = useStaggerEnter(".last-card, .entry-cards, .news-panel", {
   fade: ".page-head",
 });
 const listStagger = useStaggerEnter(":scope > *");
@@ -1493,6 +1493,7 @@ const clientConfig = ref<ClientConfig>({
   customPageOn: false,
   musicOn: false,
   musicSource: "",
+  animations: true,
   windowEffect: "none",
   windowOpacity: 85,
   programIcon: "",

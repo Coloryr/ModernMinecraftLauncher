@@ -23,8 +23,8 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 /// 启动桌面工具
 pub fn run() {
     tauri::Builder::default()
-        // F12 只归预览：关掉 WebView2 自带的浏览器快捷键（含 F12 / Ctrl+Shift+I），
-        // DevTools 本身不关，工具栏和预览里的 F12 仍通过 open_devtools 打开。
+        // F12 只归预览的元素检查：关掉 WebView2 自带的浏览器快捷键（含 F12 / Ctrl+Shift+I），
+        // 免得它弹出整个工具的开发者工具窗口。
         .plugin(
             tauri::plugin::Builder::<tauri::Wry>::new("studio-webview")
                 .on_webview_ready(|webview| {
@@ -141,10 +141,10 @@ pub fn run() {
             commands::studio_preview,
             commands::studio_stop,
             commands::studio_cancel,
-            commands::studio_devtools,
             commands::studio_locale,
             commands::studio_theme,
             commands::studio_dirty,
+            commands::studio_open_editor,
             commands::studio_reveal,
         ])
         .build(tauri::generate_context!())
@@ -158,10 +158,10 @@ pub fn run() {
         });
 }
 
-/// 关闭 WebView2 的浏览器专用快捷键，保留 DevTools API
+/// 关闭 WebView2 的浏览器专用快捷键
 ///
-/// 编辑器里的 F12 要留给 Monaco 的"转到定义"；预览页自己监听 F12 后
-/// 通过 postMessage 通知编辑器，再走 `open_devtools`。
+/// 编辑器里的 F12 要留给 Monaco 的「转到定义」；预览页自己监听 F12，
+/// 再通过 postMessage 让编辑器切换元素检查。
 #[cfg(windows)]
 fn disable_browser_accelerator_keys(
     core: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2,

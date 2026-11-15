@@ -20,7 +20,7 @@
 | `mml-vue/` | 前端（Vue3 + Vite）；窗口在 `src/windows/`，通用组件在 `src/components/` |
 | `ipc-gen/` | IPC 契约生成器（`gui-ipc-gen`）与过程宏（`ipc-gen/macros`，`gui-macros`） |
 | `mml-ipc/` | npm 契约包：按来源拆分的跨 IPC 类型、命令包装、事件订阅函数与自定义主页 `window.mml` 契约，`mml-vue` 与 `custom/` 下的示例共用 |
-| `custom/` | 四个自定义界面示例：`custom-main-demo/`（自定义主页面）、`custom-ui-demo/`（整页主题 · 组件）、`custom-ui-html-demo/`（整页主题 · HTML）、`custom-ui-css-demo/`（自定义 CSS）；各自构建出可直接导入启动器的 zip，用法见 [custom/README.md](../custom/README.md) |
+| `custom/` | 五个自定义界面示例：`custom-main-demo/`（自定义主页面 · 组件）、`custom-main-html-demo/`（自定义主页面 · HTML）、`custom-ui-demo/`（整页主题 · 组件）、`custom-ui-html-demo/`（整页主题 · HTML）、`custom-ui-css-demo/`（自定义 CSS）；各自构建出可直接导入启动器的 zip，用法见 [custom/README.md](../custom/README.md) |
 | `build/` | 版本文件、版本同步 / 打包辅助脚本，以及初始化 / 开发 / 构建脚本 |
 | `design/` | 程序图标的 SVG 源文件；改完用 `tauri icon` 重新生成各平台图标 |
 
@@ -95,7 +95,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `cd mml-vue && npm run shots` | 无后端渲染前端页面截图，`--scene=<名字>` 只跑一张；场景表见[前端页面截图目录](screenshots.md) |
 | `cd mml-vue && npm run shots:docs` | 按 `scenarios.mjs` 重新生成 `docs/screenshots.md` |
 | `cd mml-gui && .\tauri.ps1 icon ../design/icon/f-blend.svg` | 改过程序图标后重新生成 `src-tauri/icons/`；会顺带产出 `android/` 与 `ios/`，桌面端用不到可删 |
-| `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（四个示例的用法见 [custom/README.md](../custom/README.md)） |
+| `cd custom/custom-main-demo && npm run build` | 构建自定义主页面示例并打包成 `custom-main-demo.zip`（五个示例的用法见 [custom/README.md](../custom/README.md)） |
 
 `build/` 下带 PowerShell 版（`.ps1`，Windows）与 bash 版（`.sh`，Linux / macOS / Git Bash）：
 PowerShell 版在 Windows 默认出 x64 / arm64 两架构，bash 版构建当前架构；`build/*.mjs` 是版本同步与产物打包用的
@@ -245,7 +245,7 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 - 版本号只来自 `docs/version`：`check-version` 读文件里的数字版本，发版标签的数字部分必须与它一致
   （`build/version.mjs --tag` 解析后比对），不一致直接失败。标签带 `-pre` 后缀（如 `v0.1.9-pre`）走
   预发布通道，构建版本变成 `0.1.9-pre`：产物名保留后缀、清单与安装包元数据去掉后缀；不带后缀就是正式版。
-- macOS runner 的 `bash` 是 3.2，`build/*.sh` 与 `mml-gui/vendor/prepare.sh` 都不能用
+- macOS runner 的 `bash` 是 3.2，`build/*.sh` 与 `build/vendor/tauri-plugin-decoration/prepare.sh` 都不能用
   `mapfile` / `readarray` 这类 bash 4 语法。
 - FUSE 运行时包在 24.04 改名为 `libfuse2t64`：工作流装依赖前先用 `apt-cache show` 断言包名存在，
   将来再改名时直接失败并列出候选包，不会只留一句 `Unable to locate package`。

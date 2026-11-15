@@ -28,7 +28,11 @@ finally {
 }
 
 # 还原 vendor 插件；否则第一次 cargo check 会因 path 依赖缺 Cargo.toml 直接失败
-& (Join-Path $root 'mml-gui\vendor\prepare.ps1')
+& (Join-Path $root 'build\vendor\tauri-plugin-decoration\prepare.ps1')
 if ($LASTEXITCODE -ne 0) { throw "vendor 插件还原失败（退出码 $LASTEXITCODE）" }
+
+# 还原打过补丁的 sdl3-src；Cargo.toml 的 [patch.crates-io] 指向它
+node (Join-Path $root 'build\vendor\sdl3-src\prepare.mjs')
+if ($LASTEXITCODE -ne 0) { throw "SDL 裁剪还原失败（退出码 $LASTEXITCODE）" }
 
 Write-Host '依赖安装完成。'

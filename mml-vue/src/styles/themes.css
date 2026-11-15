@@ -526,16 +526,27 @@ html.has-bg .tab-content {
 /* 透明高斯模糊（设置 → 界面 → 背景图里的开关，html.bg-frosted 由 lib/appearance.ts 维护）：
    叠在背景图上的成块表面改用「半透明底 + 背景模糊」，文字不再被图上的细节干扰。
 
-   **新界面加卡片 / 面板时，把类名补进下面这张表**：漏了的那一块就是「半透明但没模糊」，
-   同屏摆着其它卡片一眼就能看出来对不上。只收本身有底色的表面 —— 透明元素加了会在文字
-   背后糊出一块方斑；弹窗内部的卡片不用加，弹窗底色不透明，模糊看不出来。
+   **新界面加卡片 / 面板 / 按钮时，把类名补进下面两张表**：漏了的那一块就是「半透明但没模糊」，
+   同屏摆着其它同类一眼就能看出来对不上。分两张表的口径：
+   - 这张：**平时就有底色**的表面，模糊常驻；
+   - 下面第二张：**平时透明、悬停才出底**的按钮，模糊只跟着悬停态走 —— 常驻会在透明区域
+     糊出一块方斑。
+   弹窗内部的卡片不用加，弹窗底色不透明，模糊看不出来。
    数量不必太担心：列表都由虚拟列表撑着，同时参与合成的只有视口里那几行。 */
 html.has-bg.bg-frosted :is(
   /* 外壳：标题栏、左侧栏、各类导航栏 */
   .frame-head, .topbar, .sidebar, .boot-head, .tab-rail, .cat-rail, .si-rail,
-  /* 通用控件与卡片 */
+  /* 通用控件：卡片、折叠头、分段、分页、整行添加、开关、步进器 */
   .collapse-head, .icon-btn, .seg-tabs, .tab-btn,
   .ui-btn.v-plain, .ui-btn.v-accent, .ui-btn.v-danger,
+  .page-btn, .add-row-btn, .switch, .stepper,
+  /* 各窗口的裸按钮：平时就有底色的那批 */
+  .account-btn, .card-btn, .empty-block-btn, .last-open,
+  .line-add, .line-del, .mp-cancel, .refresh-btn, .files-btn,
+  .retry-btn, .detail-jump, .install-btn, .multi-exit, .empty-clear,
+  /* 小标签 / 徽章：同屏摆在卡片上，不跟着糊就会是"有些清楚有些糊" */
+  .acc-type, .author-tag, .pack-badge, .dep-tag, .cat-chip,
+  .mp-tag, .res-tag, .tp-tag, .token-tag, .validity-badge,
   /* 主窗口 */
   .last-card, .entry-card, .empty-block, .page-back, .motd-card, .motd-refresh,
   .meta-panel, .args-panel, .server-config, .exec-panel, .json-panel, .proxy-panel,
@@ -565,6 +576,24 @@ html.has-bg.bg-frosted :is(
   .sk-row
 ) {
   /* 老 macOS 的 WebKit 只认带前缀的写法；新版两个都认，重复一条不影响 */
+  -webkit-backdrop-filter: blur(14px) saturate(1.06);
+  backdrop-filter: blur(14px) saturate(1.06);
+}
+
+/* 平时透明、悬停才出底的按钮：模糊跟着悬停态走。
+   常驻加会在一块没有底色的区域里糊出方斑，见上一条的口径。
+   新加这类按钮时把它补进来（含 .snap-hover：主窗口最大化键的悬停由插件转发） */
+html.has-bg.bg-frosted :is(
+  .ui-btn.v-ghost:hover, .ui-btn-icon:hover,
+  .wc-btn:hover, .wc-btn.snap-hover,
+  .topbar-icon-btn:hover, .mp-indicator:hover, .dl-indicator:hover,
+  .rs-indicator:hover, .jv-indicator:hover, .music-btn:hover,
+  .input-clear:hover, .back-btn:hover, .modal-x:hover, .step-btn:hover,
+  .multi-btn:hover, .tp-btn:hover, .detail-star:hover, .detail-link:hover,
+  .cat-item:hover, .option:hover, .menu-item:hover, .dp-cell:hover, .dp-nav:hover,
+  .ftree-row:hover, .found-item:hover, .pick-row:hover, .type-opt:hover,
+  .group-opt:hover, .cfg-dir:hover, .cfg-row:hover, .mods-row:hover
+) {
   -webkit-backdrop-filter: blur(14px) saturate(1.06);
   backdrop-filter: blur(14px) saturate(1.06);
 }

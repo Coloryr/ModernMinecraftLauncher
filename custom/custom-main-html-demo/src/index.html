@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN" data-mml-theme="Dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M²L · HTML 自定义主页面</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="home">
+    <!-- 只铺满主页内容区：启动器的标题栏、侧栏与其它窗口都在这一页外面 -->
+    <header class="bar">
+      <div class="brand">
+        <span class="brand-mark">星</span>
+        <strong class="brand-name">星野 Server</strong>
+        <span class="tag">HTML 主页</span>
+      </div>
+      <div class="bar-actions">
+        <span class="online"><i class="online-dot"></i><span id="online-count">24</span> 人在线</span>
+        <button class="ghost-btn" id="refresh" type="button" title="刷新实例列表">刷新</button>
+        <button class="icon-btn" id="theme-toggle" type="button" title="切换亮 / 暗主题" aria-label="切换亮 / 暗主题">
+          <svg class="icon icon-moon" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M13.2 9.6A5.6 5.6 0 0 1 6.4 2.8 5.6 5.6 0 1 0 13.2 9.6Z" />
+          </svg>
+          <svg class="icon icon-sun" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="3" />
+            <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9 13 13M13 3l-1.1 1.1M4.1 11.9 3 13" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="scroll">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">长期生存 · 正版互通</p>
+          <h1>欢迎回到 <span>星野</span></h1>
+          <p class="hero-sub">公告、活动、开服时间与一键进服都在这一页；它就是启动器主页的内容区，标题栏和侧栏仍由启动器自己画。</p>
+          <div class="hero-meta">
+            <span>1.20.1 · Forge</span>
+            <span>Java 17+</span>
+            <span>开服第 128 天</span>
+          </div>
+        </div>
+
+        <section class="join" aria-label="快速进服">
+          <div class="join-head">
+            <h2>快速进服</h2>
+            <span class="chip" id="launch-state">待机</span>
+          </div>
+
+          <div class="selected">
+            <span class="avatar" id="selected-avatar">?</span>
+            <div class="selected-info">
+              <strong id="selected-name">未选择实例</strong>
+              <span class="muted" id="selected-meta">从下面挑一个实例</span>
+            </div>
+          </div>
+
+          <div class="instances" id="instances" role="listbox" aria-label="本地实例"></div>
+          <p class="empty-tip" id="instance-empty" hidden>没有找到实例，先在启动器里新建一个。</p>
+
+          <div class="progress" id="progress" hidden><div class="progress-fill" id="progress-fill"></div></div>
+          <p class="stage" id="stage-text">准备就绪</p>
+          <p class="error" id="error-text" hidden></p>
+
+          <button class="primary-btn" id="launch" type="button" disabled>
+            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5-7-4.5Z" /></svg>
+            <span id="launch-label">开始冒险</span>
+          </button>
+          <p class="hint" id="host-hint" hidden>浏览器预览：没有 <code>window.mml</code>，实例与启动都是模拟的。</p>
+        </section>
+      </section>
+
+      <div class="grid">
+        <section class="card">
+          <div class="card-head"><h2>服主公告</h2><span class="chip">今日</span></div>
+          <ul class="notice-list">
+            <li><span>01</span>周日 20:00 活动：末地龙速通，前三名有专属称号。</li>
+            <li><span>02</span>客户端已更新到 1.20.1-v3，旧整合包进服前请先更新。</li>
+            <li><span>03</span>遇到问题在群里 @ 管理，并附上启动器日志。</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <div class="card-head"><h2>本周活动</h2><span class="chip">日历</span></div>
+          <ul class="event-list">
+            <li><span class="date">11-15</span><div><strong>末地龙速通</strong><p>周日 20:00 · 前三名有专属称号</p></div></li>
+            <li><span class="date">11-16</span><div><strong>建筑工坊</strong><p>周一 19:30 · 主题「海港灯塔」</p></div></li>
+            <li><span class="date">11-21</span><div><strong>钓鱼大赛</strong><p>周六 21:00 · 服务器商店代金券</p></div></li>
+          </ul>
+        </section>
+
+        <section class="card about">
+          <div class="card-head"><h2>这个示例演示了什么</h2></div>
+          <div class="about-grid">
+            <div>
+              <strong>只换内容区</strong>
+              <p>启动器把这一页放进主页区域的 iframe，标题栏、侧栏与其它窗口保持不变。</p>
+            </div>
+            <div>
+              <strong>window.mml</strong>
+              <p>拉实例、启动游戏、订阅启动阶段；不在启动器里打开时用模拟数据预览。</p>
+            </div>
+            <div>
+              <strong>零依赖</strong>
+              <p>没有 npm 依赖与打包器，改完 <code>src</code> 直接压 zip 导入启动器。</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <footer class="footer">
+        <span>M²L · custom-main-html-demo</span>
+        <span id="host-state">浏览器预览</span>
+      </footer>
+    </div>
+  </div>
+</body>
+</html>

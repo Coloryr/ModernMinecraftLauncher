@@ -184,3 +184,8 @@ inherits = "release"
 codegen-units = 16
 lto = "thin"
 
+
+# 打过补丁的 sdl3-src（由 build/vendor/sdl3-src/prepare.mjs 还原到 target/vendor）：
+# 关掉 dynapi、去掉 video/render/audio 等用不到的子系统，exe 少约 1.7 MB。
+[patch.crates-io]
+sdl3-src = { path = "target/vendor/sdl3-src" }

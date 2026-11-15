@@ -3,7 +3,7 @@
 # 本机（以及 Git for Windows 的默认安装）core.autocrlf=true，检出时会把文本文件
 # 一律转成 CRLF。下面两类文件**必须**钉成 LF，否则会坏：
 #
-# - *.patch：mml-gui/vendor/prepare.ps1 / prepare.sh 要拿它给 target/vendor 里的
+# - *.patch：build/vendor/tauri-plugin-decoration/prepare.ps1 / prepare.sh 要拿它给 target/vendor 里的
 #   上游源码打补丁，而上游自带 .gitattributes（`* text=auto eol=lf`）→ 源码是 LF。
 #   补丁一旦被检出成 CRLF，git apply 连一行上下文都匹配不上，
 #   报的就是 `error: patch failed: .../src/js/controls.js:67`（实测踩过）。

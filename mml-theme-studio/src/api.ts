@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 
 export type Locale = 'zh-CN' | 'en-US';
 export type Theme = 'Dark' | 'Light';
-export type Template = 'css' | 'page' | 'home' | 'html';
+export type Template = 'css' | 'page' | 'home' | 'html' | 'home-html';
 export interface Project { root: string; name: string; template: Template; revision: string }
 export interface SourceFile { path: string; text: string; hash: string }
 export interface CreateProject { parent: string; name: string; template: Template; source: string }
@@ -17,11 +17,13 @@ export interface StudioState {
   theme: Theme;
   recent: string[];
   environment: { nodeVersion?: string; git?: string; error?: string };
+  windowKinds: string[];
   windowMinSizes: Record<string, { width: number; height: number }>;
 }
 export type StudioEvent =
   | { type: 'log'; text: string }
   | { type: 'busy'; value: boolean }
+  | { type: 'step'; text: string }
   | { type: 'preview'; url: string }
   | { type: 'project'; project: Project };
 
@@ -39,10 +41,10 @@ interface Actions {
   preview: { input: undefined; output: string };
   stop: { input: undefined; output: undefined };
   cancel: { input: undefined; output: undefined };
-  devtools: { input: undefined; output: undefined };
   locale: { input: Locale; output: undefined };
   theme: { input: Theme; output: Theme };
   dirty: { input: boolean; output: undefined };
+  openEditor: { input: undefined; output: string };
   reveal: { input: undefined; output: string };
 }
 
@@ -91,6 +93,7 @@ export async function onEvent(callback: (event: StudioEvent) => void): Promise<(
   const unlisten = await Promise.all([
     listen<string>('studio-log', (event) => callback({ type: 'log', text: event.payload })),
     listen<boolean>('studio-busy', (event) => callback({ type: 'busy', value: event.payload })),
+    listen<string>('studio-step', (event) => callback({ type: 'step', text: event.payload })),
     listen<string>('studio-preview', (event) => callback({ type: 'preview', url: event.payload })),
   ]);
   return () => { for (const stop of unlisten) stop(); };

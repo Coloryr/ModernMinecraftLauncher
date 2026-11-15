@@ -19,56 +19,75 @@ pub struct WindowMinSize {
     pub height: f64,
 }
 
+impl WindowMinSize {
+    /// 构造一条最小尺寸
+    const fn new(width: f64, height: f64) -> Self {
+        Self { width, height }
+    }
+}
+
+/// 预览可选的窗口，顺序与启动器前端的窗口注册表一致
+///
+/// 启动器新增窗口后这里要跟着补，单测会对着启动器注册表校验集合，
+/// 漏掉或多出一条都会失败。
+pub const WINDOW_KINDS: &[&str] = &[
+    "lobby",
+    "main",
+    "settings",
+    "stats",
+    "help",
+    "resource",
+    "account",
+    "add",
+    "add_modpack",
+    "add_resource",
+    "collect",
+    "download",
+    "java_download",
+    "block",
+    "log",
+    "export",
+    "config",
+    "server_pack",
+    "server_instance",
+];
+
 /// 预览可选的窗口及启动器里的最小客户区尺寸
 ///
-/// 数值与 mml-gui/src-tauri/src/windows/registry/spec.rs 保持一致；
+/// 数值与 mml-gui/src-tauri/src/windows/common/registry/spec.rs 保持一致；
 /// 单测会直接读那份源码校验，改了启动器尺寸这里会失败。
 pub fn min_size_of_kind(kind: &str) -> WindowMinSize {
     match kind {
-        "main" => WindowMinSize {
-            width: 920.0,
-            height: 600.0,
-        },
-        "settings" => WindowMinSize {
-            width: 850.0,
-            height: 600.0,
-        },
-        "account" => WindowMinSize {
-            width: 800.0,
-            height: 650.0,
-        },
-        "add" => WindowMinSize {
-            width: 700.0,
-            height: 585.0,
-        },
-        "resource" => WindowMinSize {
-            width: 800.0,
-            height: 510.0,
-        },
-        "download" => WindowMinSize {
-            width: 670.0,
-            height: 470.0,
-        },
-        "log" => WindowMinSize {
-            width: 800.0,
-            height: 480.0,
-        },
+        "lobby" => WindowMinSize::new(780.0, 600.0),
+        "main" => WindowMinSize::new(920.0, 600.0),
+        "settings" => WindowMinSize::new(850.0, 600.0),
+        "stats" => WindowMinSize::new(780.0, 600.0),
+        "help" => WindowMinSize::new(640.0, 480.0),
+        "resource" => WindowMinSize::new(800.0, 510.0),
+        "account" => WindowMinSize::new(800.0, 650.0),
+        "add" => WindowMinSize::new(700.0, 585.0),
+        "add_modpack" => WindowMinSize::new(920.0, 600.0),
+        "add_resource" => WindowMinSize::new(800.0, 510.0),
+        "collect" => WindowMinSize::new(640.0, 480.0),
+        "download" => WindowMinSize::new(670.0, 470.0),
+        "java_download" => WindowMinSize::new(520.0, 420.0),
+        "block" => WindowMinSize::new(770.0, 560.0),
+        "log" => WindowMinSize::new(800.0, 480.0),
+        "export" => WindowMinSize::new(800.0, 640.0),
+        "config" => WindowMinSize::new(820.0, 560.0),
+        "server_pack" => WindowMinSize::new(640.0, 420.0),
+        "server_instance" => WindowMinSize::new(860.0, 500.0),
         // 启动器的通用窗口下限
-        _ => WindowMinSize {
-            width: 640.0,
-            height: 480.0,
-        },
+        _ => WindowMinSize::new(640.0, 480.0),
     }
 }
 
 /// 预览可选窗口的最小尺寸表
 pub fn min_sizes() -> BTreeMap<String, WindowMinSize> {
-    [
-        "main", "settings", "account", "add", "resource", "download", "log",
-    ]
-    .into_iter()
-    .map(|kind| (kind.to_string(), min_size_of_kind(kind)))
-    .collect()
+    WINDOW_KINDS
+        .iter()
+        .map(|kind| ((*kind).to_string(), min_size_of_kind(kind)))
+        .collect()
 }
 
 /// 预览 worker 发回的消息

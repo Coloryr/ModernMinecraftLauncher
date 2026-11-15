@@ -25,10 +25,11 @@
   `... --test <name>`，必要时加 `单个用例名` 过滤）。不要动辄
   `cargo check --workspace --all-targets` / `cargo test --workspace` / 整仓全量测试；
   同一结论不要重复跑第二遍（改了代码再验一次除外）。
-- 整仓检查：根目录 `.\check.ps1 --all`（bash 版 `bash check.sh --all`）会先还原 vendor 插件；
-  裸 `cargo check --all` 前必须已还原过 `target/vendor/tauri-plugin-decoration`，Cargo 没有可用的
-  构建前钩子，别指望它自己准备。
-- 桌面壳：`cd mml-gui && .\tauri.ps1 dev`（Linux / macOS 用 `bash tauri.sh dev`；会先还原 vendor 插件再起 mml-vue 的 vite，**端口 1420 必须空闲**）。
+- 整仓检查：根目录 `.\check.ps1 --all`（bash 版 `bash check.sh --all`）会先还原 vendor 里的两份源码（`tauri-plugin-decoration` 与 `sdl3-src`）；
+  裸 `cargo check --all` 前必须先跑过 `build/vendor/tauri-plugin-decoration/prepare.*` 与 `build/vendor/sdl3-src/prepare.mjs`，
+  把两份源码还原到 `target/vendor/`；Cargo 没有可用的构建前钩子，别指望它自己准备。
+- 桌面壳：`cd mml-gui && .\tauri.ps1 dev`（Linux / macOS 用 `bash tauri.sh dev`；会先还原 vendor 里的
+  两份源码再起 mml-vue 的 vite，**端口 1420 必须空闲**）。
 - 只跑前端：`build/dev-frontend.ps1`（bash 版 `build/dev-frontend.sh`；vite，1420）。
   只在 Rust 后端以 debug 模式单独运行（`cargo run`）时配合使用；`tauri dev` 已自带 vite，
   不要同时起。浏览器直连只能看到无 IPC 数据的空状态。

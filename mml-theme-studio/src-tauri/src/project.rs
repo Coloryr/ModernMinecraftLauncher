@@ -19,7 +19,7 @@ use tokio_util::sync::CancellationToken;
 /// 官方仓库
 pub const REPOSITORY: &str = "https://github.com/Coloryr/ModernMinecraftLauncher.git";
 
-/// 四种 demo
+/// 五种 demo
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Template {
@@ -31,6 +31,9 @@ pub enum Template {
     Home,
     /// HTML 整页主题
     Html,
+    /// HTML 自定义主页面
+    #[serde(rename = "home-html")]
+    HomeHtml,
 }
 
 impl Template {
@@ -41,6 +44,7 @@ impl Template {
             "page" => Some(Self::Page),
             "home" => Some(Self::Home),
             "html" => Some(Self::Html),
+            "home-html" => Some(Self::HomeHtml),
             _ => None,
         }
     }
@@ -52,6 +56,7 @@ impl Template {
             Self::Page => "page",
             Self::Home => "home",
             Self::Html => "html",
+            Self::HomeHtml => "home-html",
         }
     }
 
@@ -62,6 +67,7 @@ impl Template {
             Self::Page => "custom-ui-demo",
             Self::Home => "custom-main-demo",
             Self::Html => "custom-ui-html-demo",
+            Self::HomeHtml => "custom-main-html-demo",
         }
     }
 }
@@ -275,7 +281,8 @@ async fn prepare(
 
     let prepared = stage.join("project");
     copy_sources(&demo, &prepared).await?;
-    if template != Template::Html {
+    // 两个 HTML 模板都零依赖，不铺 mml-vue / mml-ipc 快照
+    if !matches!(template, Template::Html | Template::HomeHtml) {
         for package in ["mml-ipc", "mml-vue"] {
             copy_sources(
                 &repo.join(package),
@@ -329,14 +336,14 @@ pub async fn open_project(root: &Path) -> Result<Project, StudioError> {
         .get("type")
         .and_then(Value::as_str)
         .ok_or_else(invalid)?;
-    let template = if kind == "page"
-        && tokio::fs::try_exists(root.join("src/index.html"))
-            .await
-            .unwrap_or(false)
-    {
-        Template::Html
-    } else {
-        Template::parse(kind).ok_or_else(invalid)?
+    // 整页与主页都可能走 index.html；Vue 主页没有 index.html，按这个区分两条路线
+    let has_html = tokio::fs::try_exists(root.join("src/index.html"))
+        .await
+        .unwrap_or(false);
+    let template = match kind {
+        "page" if has_html => Template::Html,
+        "home" if has_html => Template::HomeHtml,
+        _ => Template::parse(kind).ok_or_else(invalid)?,
     };
     if !package
         .get("scripts")
@@ -402,6 +409,8 @@ pub async fn install_project(
         )
         .await?;
     }
+    // 没有终端时 npm 默认一行都不输出，http 级别至少能看见在拉哪些包；
+    // 状态栏另有步骤与秒数，这里补的是输出面板的实时反馈
     run(
         &node,
         &[
@@ -409,6 +418,7 @@ pub async fn install_project(
             "install".into(),
             "--no-audit".into(),
             "--no-fund".into(),
+            "--loglevel=http".into(),
         ],
         RunOptions {
             cwd: Some(root),

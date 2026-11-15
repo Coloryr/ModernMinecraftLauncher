@@ -127,7 +127,9 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
     // 否则别的窗口要等下次启动才跟着变
     let bg_view_changed = {
         let old = crate::gui_config::get();
-        old.bg_opacity != new_config.bg_opacity || old.bg_blur != new_config.bg_blur
+        old.bg_opacity != new_config.bg_opacity
+            || old.bg_blur != new_config.bg_blur
+            || old.bg_frosted != new_config.bg_frosted
     };
     // 主题 / 强调色同理，而且它连 localStorage 都靠不住：多窗口模式下各窗口是不同 webview，
     // storage 事件在它们之间不发，只有设置窗口自己会变

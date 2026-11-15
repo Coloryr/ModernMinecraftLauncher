@@ -138,13 +138,6 @@ pub async fn studio_cancel(studio: State<'_, Arc<Studio>>) -> Result<(), String>
     Ok(())
 }
 
-/// 打开开发者工具；预览 iframe 在同一套 DevTools 里
-#[tauri::command]
-pub async fn studio_devtools(studio: State<'_, Arc<Studio>>) -> Result<(), String> {
-    studio.inner().open_devtools();
-    Ok(())
-}
-
 /// 切换界面语言
 #[tauri::command]
 pub async fn studio_locale(studio: State<'_, Arc<Studio>>, input: String) -> Result<(), String> {
@@ -166,6 +159,13 @@ pub async fn studio_theme(studio: State<'_, Arc<Studio>>, input: String) -> Resu
 pub async fn studio_dirty(studio: State<'_, Arc<Studio>>, input: bool) -> Result<(), String> {
     studio.inner().set_dirty(input);
     Ok(())
+}
+
+/// 在外部编辑器里打开项目；顺序是 VS Code、Cursor、文件管理器
+#[tauri::command]
+pub async fn studio_open_editor(studio: State<'_, Arc<Studio>>) -> Result<String, String> {
+    let studio = studio.inner().clone();
+    finish(&studio, studio.open_editor().await).await
 }
 
 /// 在文件管理器里打开项目目录

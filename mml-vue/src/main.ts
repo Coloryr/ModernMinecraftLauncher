@@ -134,6 +134,8 @@ async function bootstrap() {
     restoreSkinConfig(cfg.skin.display, cfg.skin.pitch, cfg.skin.yaw);
     restoreCapeConfig(cfg.cape.display, cfg.cape.pitch, cfg.cape.yaw);
     restoreHeadConfig(cfg.head.headType, cfg.head.x, cfg.head.y);
+    // 动画开关同样以配置为准：localStorage 只是浏览器预览的兜底
+    applyAnimations(cfg.client.animations);
   }
 
   // 背景图：不阻塞挂载 —— 大图走 base64 IPC 很慢，挂着等它 = 黑屏一阵。
@@ -143,7 +145,8 @@ async function bootstrap() {
 
   applyTheme();
   applyLocale();
-  applyAnimations();
+  // 没读到配置（浏览器预览）时退回本地存储里的开关
+  if (!cfg) applyAnimations();
   // Monaco 的界面文案（查找框等）跟着界面语言走：包内没有语言包，表由我们自己挂。
   // watch 是为了在设置里改语言时立刻跟上，不用重开窗口
   applyMonacoNls(locale.value);

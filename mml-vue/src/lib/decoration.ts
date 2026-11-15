@@ -3,7 +3,7 @@
 // Windows 11 的贴靠面板靠窗口回答 `WM_NCHITTEST → HTMAXBUTTON`，即"鼠标是否在
 // 最大化按钮上"。插件放一个原生命中子窗口来回答，它的位置原本取自插件自己的按钮；
 // 要保留自绘外观，就走本地 vendor 版加的「外部控件提供者」接口直接给矩形
-// 见 mml-gui/vendor/patches/tauri-plugin-decoration.patch 里的 `M²L 本地修改`。
+// 见 build/vendor/tauri-plugin-decoration/patches/tauri-plugin-decoration.patch 里的 `M²L 本地修改`。
 // 不注册时插件量不到按钮，激活会退回原生 frame，系统标题栏与自绘按钮并存。
 //
 // 坐标一律物理像素：插件内部自己做 CSS 像素 × devicePixelRatio，这里再乘一次

@@ -26,7 +26,9 @@ node "$root/build/set-version.mjs"
 
 # vendor 插件要先还原（cargo 解析依赖图时就要读它的 Cargo.toml，早于构建脚本）；
 # 脚本幂等，已还原过会直接跳过
-bash "$root/mml-gui/vendor/prepare.sh"
+bash "$root/build/vendor/tauri-plugin-decoration/prepare.sh"
+# 还原打过补丁的 sdl3-src（Cargo.toml 的 [patch.crates-io] 指向它）
+node "$root/build/vendor/sdl3-src/prepare.mjs"
 
 # 直接调用 cargo 不会执行 Tauri 的 beforeBuildCommand，须先生成内嵌前端。
 npm --prefix "$root/mml-vue" run build

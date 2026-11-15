@@ -10,5 +10,6 @@
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
-bash vendor/prepare.sh
+bash "$(dirname "${BASH_SOURCE[0]}")/../build/vendor/tauri-plugin-decoration/prepare.sh"
+node "$(dirname "${BASH_SOURCE[0]}")/../build/vendor/sdl3-src/prepare.mjs"
 exec cargo tauri "$@"

@@ -392,6 +392,38 @@ async fn wait_cancel(cancel: Option<&CancellationToken>) {
     }
 }
 
+/// 在 PATH 里找可执行文件
+///
+/// - `program`: 命令名，不含扩展名，如 `code`
+///
+/// # 返回值
+///
+/// PATH 里的第一个命中路径；找不到返回 None
+pub async fn which(program: &str) -> Option<PathBuf> {
+    #[cfg(windows)]
+    let probe = run_quiet("where", &[program.to_string()]).await.ok()?;
+    #[cfg(not(windows))]
+    let probe = run_quiet("which", &[program.to_string()]).await.ok()?;
+    let first = probe.lines().next()?.trim();
+    (!first.is_empty()).then(|| PathBuf::from(first))
+}
+
+/// 启动一个不需要等待的外部程序，输出直接丢弃
+///
+/// - `program`: 可执行文件
+/// - `args`: 命令行参数
+pub fn spawn_detached(program: &str, args: &[String]) -> std::io::Result<()> {
+    let mut command = std::process::Command::new(program);
+    command
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    #[cfg(windows)]
+    hide_console_std(&mut command);
+    command.spawn().map(|_| ())
+}
+
 async fn run_quiet(program: &str, args: &[String]) -> Result<String, StudioError> {
     let mut command = Command::new(program);
     command

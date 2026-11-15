@@ -5,10 +5,84 @@
 //
 // 没有行可错峰时（空列表、加载骨架、数据还在路上）整块淡入：子页切换常常先落到
 // 一个还没有行的空页上，只淡标题的话看着就是硬切。
+//
+// 透明高斯模糊（html.bg-frosted）开着时，**淡入不能落在毛玻璃的祖先上**：祖先带不透明度动画，
+// 子树的 backdrop-filter 就采不到背后的背景图，卡片会从毛玻璃退成半透明底板，动画结束才恢复。
+// 位移不受影响（实测：祖先 transform 与元素自己淡入都不破坏模糊，只有祖先 opacity 会），
+// 所以含毛玻璃的容器只做位移，淡入拆给"不是毛玻璃祖先"的元素，见 fadeTargets。
 import { animations } from "../lib/appearance";
 
 /** 完成回调，Vue Transition 用 */
 type Done = () => void;
+
+/** 统一的入场缓动，各处动画共用一条曲线 */
+const EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+
+/** 本页有没有毛玻璃表面：没有这个类时一棵子树里都不会有 backdrop-filter，跳过扫描 */
+function frostedMode(): boolean {
+  return document.documentElement.classList.contains("bg-frosted");
+}
+
+/**
+ * 元素自己是否带背景模糊
+ *
+ * - `el`: 目标元素
+ *
+ * # 返回值
+ *
+ * 计算样式里 backdrop-filter 不是 none 时为 true
+ */
+function hasBackdrop(el: Element): boolean {
+  const style = getComputedStyle(el);
+  const value =
+    style.backdropFilter ||
+    (style as CSSStyleDeclaration & { webkitBackdropFilter?: string }).webkitBackdropFilter;
+  return !!value && value !== "none";
+}
+
+/**
+ * 子树里带背景模糊的元素，不含自己
+ *
+ * - `root`: 要扫描的子树根
+ *
+ * # 返回值
+ *
+ * 文档顺序；没有时为空数组
+ */
+function frostedInside(root: Element): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  root.querySelectorAll("*").forEach((el) => {
+    if (hasBackdrop(el)) out.push(el as HTMLElement);
+  });
+  return out;
+}
+
+/**
+ * 这次淡入该落在哪些元素上
+ *
+ * 沿"含毛玻璃"的分支往下走，遇到不再包含毛玻璃的元素就停：它连同整棵子树一起淡入。
+ * 毛玻璃元素本身也在结果里 —— 它自己的不透明度不影响自己的 backdrop-filter。
+ *
+ * - `root`: 要淡入的那块
+ * - `frosted`: root 子树里的毛玻璃元素，见 {@link frostedInside}
+ *
+ * # 返回值
+ *
+ * 需要各自挂一次透明度动画的元素
+ */
+function fadeTargets(root: Element, frosted: HTMLElement[]): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  const walk = (node: Element) => {
+    for (const child of Array.from(node.children)) {
+      // 子元素自己就是毛玻璃不算"祖先"：它自己淡入是安全的
+      const isAncestor = frosted.some((target) => target !== child && child.contains(target));
+      if (isAncestor) walk(child);
+      else out.push(child as HTMLElement);
+    }
+  };
+  walk(root);
+  return out;
+}
 
 /**
  * 生成一组分层错峰的进入 / 离开钩子
@@ -58,7 +132,11 @@ export function useStaggerEnter(
       return;
     }
     const items = Array.from(el.querySelectorAll(selector)).slice(0, max);
+    const fadeItems = fadeSelector ? Array.from(el.querySelectorAll(fadeSelector)) : [];
+    const frosted = frostedMode();
     const running: Animation[] = [];
+    /** 本轮建出来的动画：全部结束才算这次入场结束 */
+    const made: Animation[] = [];
     let settled = false;
     let watchdog: number | null = null;
 
@@ -81,6 +159,62 @@ export function useStaggerEnter(
         });
     };
 
+    /**
+     * 建一个动画并登记
+     *
+     * - `target`: 动画作用的元素
+     * - `frames`: 关键帧
+     * - `ms`: 时长，单位毫秒
+     * - `delay`: 延迟，单位毫秒
+     */
+    const make = (target: Element, frames: Keyframe[], ms: number, delay: number) => {
+      made.push(target.animate(frames, { duration: ms, delay, easing: EASING, fill: "both" }));
+    };
+
+    /**
+     * 淡入：毛玻璃开着时拆给不会破坏模糊的元素，否则就淡它自己
+     *
+     * - `target`: 原本要淡的那块
+     * - `ms` / `delay`: 时长与延迟，单位毫秒
+     */
+    const fadeIn = (target: Element, ms: number, delay: number) => {
+      const inner = frosted ? frostedInside(target) : [];
+      const parts = inner.length ? fadeTargets(target, inner) : [target as HTMLElement];
+      parts.forEach((part) => make(part, [{ opacity: 0 }, { opacity: 1 }], ms, delay));
+    };
+
+    /**
+     * 位移 + 淡入：含毛玻璃的容器只位移，淡入交给 {@link fadeIn} 拆下去
+     *
+     * - `target`: 要入场的元素
+     * - `ms` / `delay`: 时长与延迟，单位毫秒
+     * - `shift`: 入场位移，单位像素
+     */
+    const slideIn = (target: Element, ms: number, delay: number, shift: number) => {
+      const inner = frosted ? frostedInside(target) : [];
+      if (!inner.length) {
+        make(
+          target,
+          [
+            { opacity: 0, transform: `translateY(${shift}px)` },
+            { opacity: 1, transform: "translateY(0)" },
+          ],
+          ms,
+          delay,
+        );
+        return;
+      }
+      make(
+        target,
+        [{ transform: `translateY(${shift}px)` }, { transform: "translateY(0)" }],
+        ms,
+        delay,
+      );
+      fadeTargets(target, inner).forEach((part) => {
+        make(part, [{ opacity: 0 }, { opacity: 1 }], ms, delay);
+      });
+    };
+
     // WebKit 在窗口失焦 / 后台时会暂停 Web Animations，finished 可能永远不 resolve。
     // 超时后直接取消动画并完成切换，避免内容一直停在 opacity: 0（实例详情整块消失）。
     watchdog = window.setTimeout(
@@ -94,51 +228,26 @@ export function useStaggerEnter(
     try {
       if (!items.length) {
         // 整块入场：位移比逐行小一档，整页一起动时别晃得太夸张
-        const animation = el.animate(
-          [
-            { opacity: 0, transform: "translateY(8px)" },
-            { opacity: 1, transform: "translateY(0)" },
-          ],
-          { duration: 240, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "both" },
-        );
-        track(animation, settle);
-        return;
+        slideIn(el, 240, 0, 8);
+      } else {
+        // 标题只做透明度渐变，位置固定，不跟着下面的分组上下移动
+        fadeItems.forEach((item) => fadeIn(item, 240, 0));
+
+        // 元素多时压缩间隔，整套入场不超过 320 + 420ms
+        const gap = items.length > 1 ? Math.min(step, 420 / (items.length - 1)) : 0;
+        items.forEach((item, index) => slideIn(item, duration, index * gap, offset));
       }
 
-      const fadeItems = fadeSelector ? Array.from(el.querySelectorAll(fadeSelector)) : [];
-      let left = items.length + fadeItems.length;
+      if (!made.length) {
+        settle();
+        return;
+      }
+      let left = made.length;
       const finish = () => {
         left -= 1;
         if (left <= 0) settle();
       };
-
-      // 标题只做透明度渐变，位置固定，不跟着下面的分组上下移动
-      fadeItems.forEach((item) => {
-        const animation = item.animate([{ opacity: 0 }, { opacity: 1 }], {
-          duration: 240,
-          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-          fill: "both",
-        });
-        track(animation, finish);
-      });
-
-      // 元素多时压缩间隔，整套入场不超过 320 + 420ms
-      const gap = items.length > 1 ? Math.min(step, 420 / (items.length - 1)) : 0;
-      items.forEach((item, index) => {
-        const animation = item.animate(
-          [
-            { opacity: 0, transform: `translateY(${offset}px)` },
-            { opacity: 1, transform: "translateY(0)" },
-          ],
-          {
-            duration,
-            delay: index * gap,
-            easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-            fill: "both",
-          },
-        );
-        track(animation, finish);
-      });
+      made.forEach((animation) => track(animation, finish));
     } catch {
       // 某个元素不可动画时不能让整页停在起始帧
       settle();

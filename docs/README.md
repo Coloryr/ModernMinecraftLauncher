@@ -701,7 +701,8 @@ Windows 会把它下到启动器目录的 `tools/python`（整个启动器一份
 
 设置 → 客户端设置 → 自定义主页面。
 
-- 导入 zip，包根放 `index.html` 或 `custom.js`，可选 `custom.css`。
+- 导入 zip，包根放 `index.html` 或 `custom.js`，可选 `custom.css`；`index.html` 走 iframe，`custom.js` 注册 Vue 组件。
+- 示例：组件路线见 `custom/custom-main-demo`，HTML 路线见 `custom/custom-main-html-demo`。
 - 启用后主窗口的启动器主页换成该页面；没导入或关闭开关时回落到内置主页。
 - 页面里可以用 `window.mml` 调用命令、订阅白名单事件；包内静态资源随包读取。
 

@@ -52,6 +52,8 @@ pub struct StudioState {
     pub recent: Vec<String>,
     /// 外部工具环境
     pub environment: EnvironmentView,
+    /// 预览可选的窗口 kind，顺序与启动器前端注册表一致
+    pub window_kinds: Vec<&'static str>,
     /// 各预览窗口的最小客户区尺寸，按窗口 kind 索引
     pub window_min_sizes: BTreeMap<String, WindowMinSize>,
 }
@@ -172,6 +174,18 @@ impl Studio {
         self.log_raw(&format!("{}\n", render(locale, key, values)));
     }
 
+    /// 广播当前步骤，状态栏据此显示正在做什么；空串表示回到就绪
+    fn emit_step(&self, text: &str) {
+        let _ = self.app.emit("studio-step", text);
+    }
+
+    /// 记一条进度文案，同时把它顶到状态栏
+    async fn step(&self, key: MessageKey) {
+        let text = render(self.locale().await, key, &[]);
+        self.emit_step(&text);
+        self.log_raw(&format!("{text}\n"));
+    }
+
     /// 日志回调：给 project / process 用
     fn log_sink(&self) -> LogFn {
         let app = self.app.clone();
@@ -208,6 +222,7 @@ impl Studio {
         if let Some(task) = task.take() {
             let _ = task.done.send(true);
         }
+        self.emit_step("");
         self.busy.store(false, Ordering::SeqCst);
         self.emit_busy(false);
     }
@@ -278,6 +293,7 @@ impl Studio {
             theme: config.theme,
             recent: config.recent,
             environment,
+            window_kinds: preview::WINDOW_KINDS.to_vec(),
             window_min_sizes: preview::min_sizes(),
         }
     }
@@ -324,7 +340,7 @@ impl Studio {
         input: CreateProjectInput,
         cancel: &CancellationToken,
     ) -> Result<Project, StudioError> {
-        self.message(MessageKey::Downloading, &[]).await;
+        self.step(MessageKey::Downloading).await;
         let project = project::create_project(input, &self.cache, cancel, &self.log_sink()).await?;
         self.select_project(project.clone()).await?;
         self.message(MessageKey::Created, &[("path", project.root.clone())])
@@ -366,6 +382,7 @@ impl Studio {
     /// 安装依赖
     pub async fn install(&self, cancel: &CancellationToken) -> Result<(), StudioError> {
         self.stop_preview().await;
+        self.step(MessageKey::Installing).await;
         let project = self.require_project().await?;
         project::install_project(&project, cancel, &self.log_sink()).await?;
         self.message(MessageKey::Installed, &[]).await;
@@ -374,6 +391,7 @@ impl Studio {
 
     /// 构建 ZIP
     pub async fn build(&self, cancel: &CancellationToken) -> Result<Vec<String>, StudioError> {
+        self.step(MessageKey::Building).await;
         let project = self.require_project().await?;
         let artifacts = project::build_project(&project, cancel, &self.log_sink()).await?;
         for path in &artifacts {
@@ -386,23 +404,30 @@ impl Studio {
     /// 读取项目 SDK 里的控件与变量清单
     pub async fn catalog(&self) -> Result<Value, StudioError> {
         let project = self.require_project().await?;
-        if project.template == Template::Html {
+        // 两个 HTML 模板没有 SDK，也没有可列的控件清单
+        if matches!(project.template, Template::Html | Template::HomeHtml) {
             return Ok(json!({ "controls": [], "variables": [] }));
         }
         let environment = self.environment().await?;
         let worker = runtime_dir(&self.app).join("preview/catalog.mjs");
         let node = environment.node.to_string_lossy().into_owned();
         let args = vec![worker.to_string_lossy().into_owned(), project.root.clone()];
-        let output = run(
-            &node,
-            &args,
-            RunOptions {
-                cwd: Some(Path::new(&project.root)),
-                log: no_log(),
-                cancel: None,
-            },
+        // 清单脚本不在任务里跑，没有取消入口，必须自己兜住超时；
+        // 超时丢下 future 会顺带杀掉子进程
+        let output = tokio::time::timeout(
+            Duration::from_secs(60),
+            run(
+                &node,
+                &args,
+                RunOptions {
+                    cwd: Some(Path::new(&project.root)),
+                    log: no_log(),
+                    cancel: None,
+                },
+            ),
         )
         .await
+        .map_err(|_| StudioError::new(MessageKey::CatalogTimeout))?
         .map_err(|_| StudioError::new(MessageKey::MissingSdk))?;
         serde_json::from_str(&output).map_err(|_| StudioError::new(MessageKey::MissingSdk))
     }
@@ -424,6 +449,30 @@ impl Studio {
             let _ = std::process::Command::new("xdg-open").arg(path).spawn();
         }
         Ok(String::new())
+    }
+
+    /// 在外部编辑器中打开项目
+    ///
+    /// 依次尝试 VS Code、Cursor；都没有时退回文件管理器
+    ///
+    /// # 返回值
+    ///
+    /// 实际使用的编辑器名；退回文件管理器时是 `folder`
+    pub async fn open_editor(&self) -> Result<String, StudioError> {
+        let project = self.require_project().await?;
+        let root = Path::new(&project.root);
+        for (program, label) in [("code", "VS Code"), ("cursor", "Cursor")] {
+            if process::which(program).await.is_none() {
+                continue;
+            }
+            spawn_editor(program, root)?;
+            self.message(MessageKey::EditorOpened, &[("editor", label.to_string())])
+                .await;
+            return Ok(label.to_string());
+        }
+        self.reveal().await?;
+        self.message(MessageKey::EditorMissing, &[]).await;
+        Ok(String::from("folder"))
     }
 
     /// 切换界面语言
@@ -458,7 +507,7 @@ impl Studio {
         cancel: &CancellationToken,
     ) -> Result<String, StudioError> {
         self.stop_preview().await;
-        self.message(MessageKey::Preparing, &[]).await;
+        self.step(MessageKey::Preparing).await;
         let environment = self.environment().await?;
         let project = self.require_project().await?;
         tokio::fs::create_dir_all(&self.cache).await?;
@@ -584,28 +633,30 @@ impl Studio {
         self.emit_preview("");
     }
 
-    /// 打开编辑器窗口的开发者工具；预览 iframe 也在同一套 DevTools 里
-    pub fn open_devtools(&self) {
-        if self.preview_url_blocking().is_empty() {
-            return;
-        }
-        if let Some(window) = self.app.get_webview_window("main") {
-            window.open_devtools();
-        }
-    }
-
-    fn preview_url_blocking(&self) -> String {
-        // 这里只用来判断有没有预览，拿不到锁时按"没有"处理
-        self.preview
-            .try_lock()
-            .map(|preview| preview.url.clone())
-            .unwrap_or_default()
-    }
-
     /// 应用退出前同步回收预览与子进程
     pub fn shutdown_blocking(&self) {
         process::registry().kill_all();
     }
+}
+
+/// 启动外部编辑器并立即返回，不等它退出
+///
+/// - `program`: PATH 里的命令名，如 `code`
+/// - `root`: 项目根目录
+fn spawn_editor(program: &str, root: &Path) -> Result<(), StudioError> {
+    // Windows 上 code / cursor 是 .cmd，必须交给 cmd 解析
+    #[cfg(windows)]
+    let result = process::spawn_detached(
+        "cmd",
+        &[
+            "/C".to_string(),
+            program.to_string(),
+            root.to_string_lossy().into_owned(),
+        ],
+    );
+    #[cfg(not(windows))]
+    let result = process::spawn_detached(program, &[root.to_string_lossy().into_owned()]);
+    result.map_err(|error| StudioError::raw(error.to_string()))
 }
 
 /// 预览脚本所在目录：开发时用仓库，分发时用资源目录

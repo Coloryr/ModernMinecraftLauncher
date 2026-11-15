@@ -10,7 +10,7 @@ const template = ref<Template>('css');
 const parent = ref('');
 const local = ref(false);
 const source = ref('');
-const templates: Template[] = ['css', 'page', 'home', 'html'];
+const templates: Template[] = ['css', 'page', 'home', 'html', 'home-html'];
 
 async function pick(kind: 'parent' | 'source') {
   try {

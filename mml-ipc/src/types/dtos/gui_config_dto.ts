@@ -66,6 +66,7 @@ export type ClientConfigDto = {
   customPageOn: boolean,
   musicOn: boolean,
   musicSource: string,
+  animations: boolean,
   windowEffect: string,
   windowOpacity: number,
   programIcon: string,

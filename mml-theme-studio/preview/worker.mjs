@@ -7,11 +7,13 @@ import { existsSync } from 'node:fs';
 import { htmlPreview } from './html.mjs';
 import { asset, respond } from './assets.mjs';
 import { themeStatus, homeStatus } from './status.mjs';
-import { DEVTOOLS_SCRIPT } from './shortcut.mjs';
+import { INSPECTOR_SCRIPT } from './inspector.mjs';
 import { text } from '../lib/messages.mjs';
 
 const READY = '@@mml-studio@@';
 const [root, template, cache, locale = 'zh-CN'] = process.argv.slice(2);
+// 整页与主页的 HTML 路线都是独立页面，不需要 Vite 宿主
+const staticPreview = template === 'html' || template === 'home-html';
 let close = async () => {};
 
 async function vuePreview() {
@@ -79,7 +81,7 @@ async function vuePreview() {
               const color=new URLSearchParams(location.search).get('theme');
               if(color==='Dark'||color==='Light') writeString(KEYS.theme,color);
               ${template === 'home' ? "writeString(KEYS.startupPage,'Home');" : ''}
-              ${DEVTOOLS_SCRIPT}
+              ${INSPECTOR_SCRIPT}
               await import('/src/main.ts');` });
             return;
           }
@@ -127,7 +129,7 @@ process.stdin.on('close', shutdown);
 process.on('SIGTERM', shutdown);
 
 try {
-  const preview = template === 'html' ? await htmlPreview(root) : await vuePreview();
+  const preview = staticPreview ? await htmlPreview(root) : await vuePreview();
   close = preview.close;
   process.stdout.write(READY + JSON.stringify({ type: 'ready', url: preview.url }) + '\n');
 } catch (error) {

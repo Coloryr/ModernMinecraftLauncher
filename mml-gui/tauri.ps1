@@ -13,7 +13,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-& (Join-Path $PSScriptRoot 'vendor\prepare.ps1')
+& (Join-Path $PSScriptRoot '..\build\vendor\tauri-plugin-decoration\prepare.ps1')
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+& node (Join-Path $PSScriptRoot '..\build\vendor\sdl3-src\prepare.mjs')
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Push-Location $PSScriptRoot

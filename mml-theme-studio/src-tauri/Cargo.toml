@@ -14,8 +14,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "~2.7.4", features = [] }
 
 [dependencies]
-# devtools：正式版也要能打开预览页的开发者工具，F12 才不是只在 dev 里可用
-tauri = { version = "~2.12.5", features = ["devtools"] }
+tauri = { version = "~2.12.5", features = [] }
+# 自绘标题栏：与启动器同一套窗口装饰（Windows 贴靠布局、Linux 控件、macOS 红黄绿）
+tauri-plugin-decoration = "~3.0.5"
 tauri-plugin-dialog.workspace = true
 tokio = { workspace = true, features = ["sync", "time"] }
 tokio-util.workspace = true

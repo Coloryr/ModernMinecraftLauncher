@@ -1,11 +1,12 @@
 # custom —— 自定义界面示例
 
-M²L 的界面有三种互相独立的换皮方式，这里给四个能直接导入启动器的示例（整页主题有
-组件与 HTML 两条路线）。各例自成一个 npm 工程，互不依赖，按需进目录构建即可。
+M²L 的界面有三种互相独立的换皮方式，这里给五个能直接导入启动器的示例（整页主题与
+自定义主页面都有组件与 HTML 两条路线）。各例自成一个 npm 工程，互不依赖，按需进目录构建即可。
 
 | 目录 | 换哪一块 | 包根入口 | `theme.json` 的 `type` | 启动器里的开关 | 产物 |
 | --- | --- | --- | --- | --- | --- |
-| [custom-main-demo](custom-main-demo/README.md) | 主窗口「主页」的内容区 | `custom.js` + `custom.css` | `home` | 客户端设置 → 启用自定义主页面 | `custom-main-demo.zip` |
+| [custom-main-demo](custom-main-demo/README.md) | 主窗口「主页」的内容区，组件路线 | `custom.js` + `custom.css` | `home` | 客户端设置 → 启用自定义主页面 | `custom-main-demo.zip` |
+| [custom-main-html-demo](custom-main-html-demo/README.md) | 主窗口「主页」的内容区，换成一张 HTML 页面（iframe） | `index.html` | `home` | 客户端设置 → 启用自定义主页面 | `custom-main-html-demo.zip` |
 | [custom-ui-demo](custom-ui-demo/README.md) | 整个主窗口，按 kind 换窗口组件 | `custom.js` + `custom.css` | `page` | 界面 → 主题包 | `custom-ui-demo.zip` |
 | [custom-ui-html-demo](custom-ui-html-demo/README.md) | 整个主窗口，换成一张 HTML 页面（iframe） | `index.html` | `page` | 界面 → 主题包 | `custom-ui-html-demo.zip` |
 | [custom-ui-css-demo](custom-ui-css-demo/README.md) | 内置界面的样式，可装多份叠加 | `custom.css`（可选 `custom.js`） | `css` | 界面 → 样式包 | `custom-ui-css-demo.zip` |
@@ -15,9 +16,9 @@ M²L 的界面有三种互相独立的换皮方式，这里给四个能直接导
 
 ## 快速开始
 
-需要带代码编辑、实时预览和完整 F12 的独立界面时，可用 [M²L Theme Studio](../mml-theme-studio/README.md)，自动下载这四类 demo 并安装开发依赖。
+需要带代码编辑、实时预览和完整 F12 的独立界面时，可用 [M²L Theme Studio](../mml-theme-studio/README.md)，自动下载这五类 demo 并安装开发依赖。
 
-每个示例各自构建，除 HTML 示例外都要先装依赖：
+每个示例各自构建，除两个 HTML 示例外都要先装依赖：
 
 ```bash
 cd custom/custom-main-demo
@@ -30,6 +31,9 @@ npm run build
 
 cd ../custom-ui-html-demo
 npm run pack       # 无依赖，直接把 src 压成 zip
+
+cd ../custom-main-html-demo
+npm run pack       # 同上，主页 HTML 路线
 
 cd ../custom-ui-css-demo
 npm install
@@ -45,7 +49,7 @@ npm run build      # vite build 入口 + 压 zip
 
 构建产物（zip）留在各自目录下，已在 `.gitignore` 里忽略；重新构建会覆盖同名 zip。
 
-## 四个示例各自改什么
+## 五个示例各自改什么
 
 ### custom-main-demo —— 自定义主页面
 
@@ -55,6 +59,15 @@ npm run build      # vite build 入口 + 压 zip
 - 组件入口是 `src/App.vue`，注册在 `src/entry.ts` 的 `window.__mmlHomePages`；
 - 命令 / 事件封装在 `src/bridge.ts`，类型来自 `mml-ipc`；
 - 样式由 PostCSS 限定在 `.mml-home` 内，不会污染启动器其它窗口。
+
+### custom-main-html-demo —— 自定义主页面（HTML）
+
+同一块主页区域的 iframe 路线，包根只有 `index.html` / `style.css` / `app.js`：
+
+- 没有 Vue、没有打包器，`npm run pack` 只是复制 + 压 zip；
+- 启动器把它放进主页内容区的 sandbox iframe，并注入 `window.mml`；
+- 启动器的标题栏、侧栏与其它窗口不受影响；
+- 浏览器直接打开 `src/index.html` 就是预览模式，用假数据把界面跑起来。
 
 ### custom-ui-demo —— 整页主题
 

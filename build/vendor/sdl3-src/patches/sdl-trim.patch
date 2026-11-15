@@ -1,0 +1,907 @@
+diff --git a/SDL/CMakeLists.txt b/SDL/CMakeLists.txt
+index f7c1528..5e78754 100644
+--- a/SDL/CMakeLists.txt
++++ b/SDL/CMakeLists.txt
+@@ -7,6 +7,9 @@ endif()
+ # See docs/release_checklist.md
+ project(SDL3 LANGUAGES C VERSION "3.4.20")
+ 
++# MML: only the static library is needed
++set(SDL_SHARED OFF CACHE BOOL "MML: static build only" FORCE)
++
+ if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+   set(SDL3_MAINPROJECT ON)
+ else()
+@@ -943,15 +946,9 @@ if(SDL_ASSEMBLY)
+ 
+       if(COMPILER_SUPPORTS_LSX AND HAVE_LSXINTRIN_H)
+         set_property(SOURCE
+-            "${SDL3_SOURCE_DIR}/src/video/yuv2rgb/yuv_rgb_lsx.c"
+-            "${SDL3_SOURCE_DIR}/src/video/SDL_blit_A.c"
+-            "${SDL3_SOURCE_DIR}/src/video/SDL_fillrect.c"
+             APPEND PROPERTY COMPILE_OPTIONS "-mlsx")
+ 
+         set_property(SOURCE
+-            "${SDL3_SOURCE_DIR}/src/video/yuv2rgb/yuv_rgb_lsx.c"
+-            "${SDL3_SOURCE_DIR}/src/video/SDL_blit_A.c"
+-            "${SDL3_SOURCE_DIR}/src/video/SDL_fillrect.c"
+             PROPERTY SKIP_PRECOMPILE_HEADERS 1)
+         set(HAVE_LSX TRUE)
+       endif()
+@@ -1237,10 +1234,6 @@ sdl_glob_sources(
+   "${SDL3_SOURCE_DIR}/src/*.h"
+   "${SDL3_SOURCE_DIR}/src/atomic/*.c"
+   "${SDL3_SOURCE_DIR}/src/atomic/*.h"
+-  "${SDL3_SOURCE_DIR}/src/audio/*.c"
+-  "${SDL3_SOURCE_DIR}/src/audio/*.h"
+-  "${SDL3_SOURCE_DIR}/src/camera/*.c"
+-  "${SDL3_SOURCE_DIR}/src/camera/*.h"
+   "${SDL3_SOURCE_DIR}/src/core/*.c"
+   "${SDL3_SOURCE_DIR}/src/core/*.h"
+   "${SDL3_SOURCE_DIR}/src/cpuinfo/*.c"
+@@ -1255,12 +1248,8 @@ sdl_glob_sources(
+   "${SDL3_SOURCE_DIR}/src/io/generic/*.h"
+   "${SDL3_SOURCE_DIR}/src/filesystem/*.c"
+   "${SDL3_SOURCE_DIR}/src/filesystem/*.h"
+-  "${SDL3_SOURCE_DIR}/src/gpu/*.c"
+-  "${SDL3_SOURCE_DIR}/src/gpu/*.h"
+   "${SDL3_SOURCE_DIR}/src/joystick/*.c"
+   "${SDL3_SOURCE_DIR}/src/joystick/*.h"
+-  "${SDL3_SOURCE_DIR}/src/haptic/*.c"
+-  "${SDL3_SOURCE_DIR}/src/haptic/*.h"
+   "${SDL3_SOURCE_DIR}/src/hidapi/*.c"
+   "${SDL3_SOURCE_DIR}/src/hidapi/*.h"
+   "${SDL3_SOURCE_DIR}/src/locale/*.c"
+@@ -1269,14 +1258,6 @@ sdl_glob_sources(
+   "${SDL3_SOURCE_DIR}/src/main/*.h"
+   "${SDL3_SOURCE_DIR}/src/misc/*.c"
+   "${SDL3_SOURCE_DIR}/src/misc/*.h"
+-  "${SDL3_SOURCE_DIR}/src/power/*.c"
+-  "${SDL3_SOURCE_DIR}/src/power/*.h"
+-  "${SDL3_SOURCE_DIR}/src/render/*.c"
+-  "${SDL3_SOURCE_DIR}/src/render/*.h"
+-  "${SDL3_SOURCE_DIR}/src/render/*/*.c"
+-  "${SDL3_SOURCE_DIR}/src/render/*/*.h"
+-  "${SDL3_SOURCE_DIR}/src/sensor/*.c"
+-  "${SDL3_SOURCE_DIR}/src/sensor/*.h"
+   "${SDL3_SOURCE_DIR}/src/stdlib/*.c"
+   "${SDL3_SOURCE_DIR}/src/stdlib/*.h"
+   "${SDL3_SOURCE_DIR}/src/storage/*.c"
+@@ -1287,10 +1268,6 @@ sdl_glob_sources(
+   "${SDL3_SOURCE_DIR}/src/time/*.h"
+   "${SDL3_SOURCE_DIR}/src/timer/*.c"
+   "${SDL3_SOURCE_DIR}/src/timer/*.h"
+-  "${SDL3_SOURCE_DIR}/src/video/*.c"
+-  "${SDL3_SOURCE_DIR}/src/video/*.h"
+-  "${SDL3_SOURCE_DIR}/src/video/yuv2rgb/*.c"
+-  "${SDL3_SOURCE_DIR}/src/video/yuv2rgb/*.h"
+ )
+ 
+ file(GLOB SDL_UCLIBC_SOURCES "${SDL3_SOURCE_DIR}/src/libm/*.c")
+@@ -1335,8 +1312,6 @@ if(SDL_AUDIO)
+   if(SDL_DUMMYAUDIO)
+     set(SDL_AUDIO_DRIVER_DUMMY 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/audio/dummy/*.c"
+-      "${SDL3_SOURCE_DIR}/src/audio/dummy/*.h"
+     )
+     set(HAVE_DUMMYAUDIO TRUE)
+     set(HAVE_SDL_AUDIO TRUE)
+@@ -1344,8 +1319,6 @@ if(SDL_AUDIO)
+   if(SDL_DISKAUDIO)
+     set(SDL_AUDIO_DRIVER_DISK 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/audio/disk/*.c"
+-      "${SDL3_SOURCE_DIR}/src/audio/disk/*.h"
+     )
+     set(HAVE_DISKAUDIO TRUE)
+     set(HAVE_SDL_AUDIO TRUE)
+@@ -1357,8 +1330,6 @@ if(SDL_CAMERA)
+   if(SDL_DUMMYCAMERA)
+     set(SDL_CAMERA_DRIVER_DUMMY 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/camera/dummy/*.c"
+-      "${SDL3_SOURCE_DIR}/src/camera/dummy/*.h"
+     )
+     set(HAVE_DUMMYCAMERA TRUE)
+     set(HAVE_SDL_CAMERA TRUE)
+@@ -1405,8 +1376,6 @@ if(SDL_VIDEO)
+   if(SDL_DUMMYVIDEO)
+     set(SDL_VIDEO_DRIVER_DUMMY 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/video/dummy/*.c"
+-      "${SDL3_SOURCE_DIR}/src/video/dummy/*.h"
+     )
+     set(HAVE_DUMMYVIDEO TRUE)
+     set(HAVE_SDL_VIDEO TRUE)
+@@ -1444,16 +1413,12 @@ if(ANDROID)
+   if(SDL_AUDIO)
+     set(SDL_AUDIO_DRIVER_OPENSLES 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/audio/openslES/*.c"
+-      "${SDL3_SOURCE_DIR}/src/audio/openslES/*.h"
+     )
+ 
+     sdl_link_dependency(opensles LIBS ${ANDROID_DL_LIBRARY} OpenSLES)
+ 
+     set(SDL_AUDIO_DRIVER_AAUDIO 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/audio/aaudio/*.c"
+-      "${SDL3_SOURCE_DIR}/src/audio/aaudio/*.h"
+     )
+ 
+     set(HAVE_SDL_AUDIO TRUE)
+@@ -1473,8 +1438,6 @@ if(ANDROID)
+   if(SDL_HAPTIC)
+     set(SDL_HAPTIC_ANDROID 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/haptic/android/*.c"
+-      "${SDL3_SOURCE_DIR}/src/haptic/android/*.h"
+     )
+     set(HAVE_SDL_HAPTIC TRUE)
+   endif()
+@@ -1500,8 +1463,6 @@ if(ANDROID)
+   if(SDL_POWER)
+     set(SDL_POWER_ANDROID 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/power/android/*.c"
+-      "${SDL3_SOURCE_DIR}/src/power/android/*.h"
+     )
+     set(HAVE_SDL_POWER TRUE)
+   endif()
+@@ -1530,8 +1491,6 @@ if(ANDROID)
+     set(SDL_SENSOR_ANDROID 1)
+     set(HAVE_SDL_SENSORS TRUE)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/sensor/android/*.c"
+-      "${SDL3_SOURCE_DIR}/src/sensor/android/*.h"
+     )
+   endif()
+ 
+@@ -1539,16 +1498,12 @@ if(ANDROID)
+     set(SDL_CAMERA_DRIVER_ANDROID 1)
+     set(HAVE_CAMERA TRUE)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/camera/android/*.c"
+-      "${SDL3_SOURCE_DIR}/src/camera/android/*.h"
+     )
+   endif()
+ 
+   if(SDL_VIDEO)
+     set(SDL_VIDEO_DRIVER_ANDROID 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/video/android/*.c"
+-      "${SDL3_SOURCE_DIR}/src/video/android/*.h"
+     )
+     set(HAVE_SDL_VIDEO TRUE)
+ 
+@@ -1675,8 +1630,6 @@ elseif(EMSCRIPTEN)
+   if(SDL_AUDIO)
+     set(SDL_AUDIO_DRIVER_EMSCRIPTEN 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/audio/emscripten/*.c"
+-      "${SDL3_SOURCE_DIR}/src/audio/emscripten/*.h"
+     )
+     set(HAVE_SDL_AUDIO TRUE)
+   endif()
+@@ -1696,8 +1649,6 @@ elseif(EMSCRIPTEN)
+     set(SDL_CAMERA_DRIVER_EMSCRIPTEN 1)
+     set(HAVE_CAMERA TRUE)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/camera/emscripten/*.c"
+-      "${SDL3_SOURCE_DIR}/src/camera/emscripten/*.h"
+     )
+   endif()
+ 
+@@ -1713,8 +1664,6 @@ elseif(EMSCRIPTEN)
+   if(SDL_POWER)
+     set(SDL_POWER_EMSCRIPTEN 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/power/emscripten/*.c"
+-      "${SDL3_SOURCE_DIR}/src/power/emscripten/*.h"
+     )
+     set(HAVE_SDL_POWER TRUE)
+   endif()
+@@ -1747,16 +1696,12 @@ elseif(EMSCRIPTEN)
+     set(SDL_SENSOR_EMSCRIPTEN 1)
+     set(HAVE_SDL_SENSORS TRUE)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/sensor/emscripten/*.c"
+-      "${SDL3_SOURCE_DIR}/src/sensor/emscripten/*.h"
+     )
+   endif()
+ 
+   if(SDL_VIDEO)
+     set(SDL_VIDEO_DRIVER_EMSCRIPTEN 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/video/emscripten/*.c"
+-      "${SDL3_SOURCE_DIR}/src/video/emscripten/*.h"
+     )
+     set(HAVE_SDL_VIDEO TRUE)
+ 
+@@ -1812,15 +1757,11 @@ elseif(UNIX AND NOT APPLE AND NOT RISCOS AND NOT HAIKU)
+     if(NETBSD)
+         set(SDL_AUDIO_DRIVER_NETBSD 1)
+         sdl_glob_sources(
+-          "${SDL3_SOURCE_DIR}/src/audio/netbsd/*.c"
+-          "${SDL3_SOURCE_DIR}/src/audio/netbsd/*.h"
+         )
+         set(HAVE_SDL_AUDIO TRUE)
+     elseif(QNX)
+         set(SDL_AUDIO_DRIVER_QNX 1)
+         sdl_glob_sources(
+-          "${SDL3_SOURCE_DIR}/src/audio/qnx/*.c"
+-          "${SDL3_SOURCE_DIR}/src/audio/qnx/*.h"
+         )
+         sdl_link_dependency(asound LIBS asound)
+         set(HAVE_SDL_AUDIO TRUE)
+@@ -1916,8 +1857,6 @@ elseif(UNIX AND NOT APPLE AND NOT RISCOS AND NOT HAIKU)
+       set(SDL_CAMERA_DRIVER_V4L2 1)
+       set(HAVE_CAMERA TRUE)
+       sdl_glob_sources(
+-        "${SDL3_SOURCE_DIR}/src/camera/v4l2/*.c"
+-        "${SDL3_SOURCE_DIR}/src/camera/v4l2/*.h"
+       )
+     endif()
+ 
+@@ -1928,8 +1867,6 @@ elseif(UNIX AND NOT APPLE AND NOT RISCOS AND NOT HAIKU)
+     if(SDL_HAPTIC AND HAVE_LINUX_INPUT_H)
+       set(SDL_HAPTIC_LINUX 1)
+       sdl_glob_sources(
+-        "${SDL3_SOURCE_DIR}/src/haptic/linux/*.c"
+-        "${SDL3_SOURCE_DIR}/src/haptic/linux/*.h"
+       )
+       set(HAVE_SDL_HAPTIC TRUE)
+     endif()
+@@ -2307,8 +2244,6 @@ elseif(WINDOWS)
+     if(HAVE_DSOUND_H)
+       set(SDL_AUDIO_DRIVER_DSOUND 1)
+       sdl_glob_sources(
+-        "${SDL3_SOURCE_DIR}/src/audio/directsound/*.c"
+-        "${SDL3_SOURCE_DIR}/src/audio/directsound/*.h"
+       )
+       set(HAVE_SDL_AUDIO TRUE)
+     endif()
+@@ -2317,8 +2252,6 @@ elseif(WINDOWS)
+       set(SDL_AUDIO_DRIVER_WASAPI 1)
+       set(HAVE_WASAPI TRUE)
+       sdl_glob_sources(
+-        "${SDL3_SOURCE_DIR}/src/audio/wasapi/*.c"
+-        "${SDL3_SOURCE_DIR}/src/audio/wasapi/*.h"
+       )
+       set(HAVE_SDL_AUDIO TRUE)
+     endif()
+@@ -2327,9 +2260,6 @@ elseif(WINDOWS)
+   if(SDL_VIDEO)
+     set(SDL_VIDEO_DRIVER_WINDOWS 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/video/windows/*.c"
+-      "${SDL3_SOURCE_DIR}/src/video/windows/*.cpp"
+-      "${SDL3_SOURCE_DIR}/src/video/windows/*.h"
+     )
+ 
+     CheckOpenVR()
+@@ -2371,8 +2301,6 @@ elseif(WINDOWS)
+     set(SDL_SENSOR_WINDOWS 1)
+     set(HAVE_SDL_SENSORS TRUE)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/sensor/windows/*.c"
+-      "${SDL3_SOURCE_DIR}/src/sensor/windows/*.h"
+     )
+   endif()
+ 
+@@ -2482,8 +2410,6 @@ elseif(WINDOWS)
+     if(SDL_HAPTIC)
+       if(HAVE_DINPUT_H)
+         sdl_glob_sources(
+-          "${SDL3_SOURCE_DIR}/src/haptic/windows/*.c"
+-          "${SDL3_SOURCE_DIR}/src/haptic/windows/*.h"
+         )
+         set(SDL_HAPTIC_DINPUT 1)
+         set(HAVE_SDL_HAPTIC TRUE)
+@@ -2547,8 +2473,6 @@ elseif(APPLE)
+   if(SDL_AUDIO)
+     set(SDL_AUDIO_DRIVER_COREAUDIO 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/audio/coreaudio/*.m"
+-      "${SDL3_SOURCE_DIR}/src/audio/coreaudio/*.h"
+     )
+     set(HAVE_SDL_AUDIO TRUE)
+     set(SDL_FRAMEWORK_COREAUDIO 1)
+@@ -2617,8 +2541,6 @@ elseif(APPLE)
+       set(SDL_HAPTIC_DUMMY 1)
+     else()
+       sdl_glob_sources(
+-        "${SDL3_SOURCE_DIR}/src/haptic/darwin/*.c"
+-        "${SDL3_SOURCE_DIR}/src/haptic/darwin/*.h"
+       )
+       set(SDL_HAPTIC_IOKIT 1)
+       set(SDL_FRAMEWORK_IOKIT 1)
+@@ -2630,8 +2552,6 @@ elseif(APPLE)
+   if(SDL_POWER)
+     if (IOS OR TVOS OR VISIONOS OR WATCHOS)
+       sdl_glob_sources(
+-        "${SDL3_SOURCE_DIR}/src/power/uikit/*.m"
+-        "${SDL3_SOURCE_DIR}/src/power/uikit/*.h"
+       )
+       set(SDL_POWER_UIKIT 1)
+     else()
+@@ -2678,8 +2598,6 @@ elseif(APPLE)
+       set(SDL_SENSOR_COREMOTION 1)
+       set(HAVE_SDL_SENSORS TRUE)
+       sdl_glob_sources(
+-        "${SDL3_SOURCE_DIR}/src/sensor/coremotion/*.m"
+-        "${SDL3_SOURCE_DIR}/src/sensor/coremotion/*.h"
+       )
+     endif()
+   endif()
+@@ -2695,8 +2613,6 @@ elseif(APPLE)
+       set(SDL_IPHONE_LAUNCHSCREEN 1)
+       set(SDL_FRAMEWORK_GAMECONTROLLER 1)
+       sdl_glob_sources(
+-        "${SDL3_SOURCE_DIR}/src/video/uikit/*.m"
+-        "${SDL3_SOURCE_DIR}/src/video/uikit/*.h"
+       )
+       set(HAVE_SDL_VIDEO TRUE)
+     else()
+@@ -2748,8 +2664,6 @@ elseif(APPLE)
+         endif()
+         if(SDL_RENDER_METAL)
+           sdl_glob_sources(
+-            "${SDL3_SOURCE_DIR}/src/render/metal/*.m"
+-            "${SDL3_SOURCE_DIR}/src/render/metal/*.h"
+           )
+           set(SDL_VIDEO_RENDER_METAL 1)
+           set(HAVE_RENDER_METAL TRUE)
+@@ -2847,8 +2761,6 @@ elseif(HAIKU)
+   if(SDL_AUDIO)
+     set(SDL_AUDIO_DRIVER_HAIKU 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/audio/haiku/*.cc"
+-      "${SDL3_SOURCE_DIR}/src/audio/haiku/*.h"
+     )
+     set(HAVE_SDL_AUDIO TRUE)
+   endif()
+@@ -2865,8 +2777,6 @@ elseif(HAIKU)
+   if(SDL_VIDEO)
+     set(SDL_VIDEO_DRIVER_HAIKU 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/video/haiku/*.cc"
+-      "${SDL3_SOURCE_DIR}/src/video/haiku/*.h"
+     )
+     set(HAVE_SDL_VIDEO TRUE)
+ 
+@@ -2920,8 +2830,6 @@ elseif(RISCOS)
+   if(SDL_VIDEO)
+     set(SDL_VIDEO_DRIVER_RISCOS 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/video/riscos/*.c"
+-      "${SDL3_SOURCE_DIR}/src/video/riscos/*.h"
+     )
+     set(HAVE_SDL_VIDEO TRUE)
+   endif()
+@@ -2970,8 +2878,6 @@ elseif(VITA)
+   if(SDL_AUDIO)
+     set(SDL_AUDIO_DRIVER_VITA 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/audio/vita/*.c"
+-      "${SDL3_SOURCE_DIR}/src/audio/vita/*.h"
+     )
+     set(HAVE_SDL_AUDIO TRUE)
+   endif()
+@@ -3026,8 +2932,6 @@ elseif(VITA)
+     set(SDL_SENSOR_VITA 1)
+     set(HAVE_SDL_SENSORS TRUE)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/sensor/vita/*.c"
+-      "${SDL3_SOURCE_DIR}/src/sensor/vita/*.h"
+     )
+   endif()
+ 
+@@ -3040,8 +2944,6 @@ elseif(VITA)
+   if(SDL_VIDEO)
+     set(SDL_VIDEO_DRIVER_VITA 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/video/vita/*.c"
+-      "${SDL3_SOURCE_DIR}/src/video/vita/*.h"
+     )
+     set(HAVE_SDL_VIDEO TRUE)
+ 
+@@ -3132,8 +3034,6 @@ elseif(PSP)
+   if(SDL_AUDIO)
+     set(SDL_AUDIO_DRIVER_PSP 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/audio/psp/*.c"
+-      "${SDL3_SOURCE_DIR}/src/audio/psp/*.h"
+     )
+     set(HAVE_SDL_AUDIO TRUE)
+   endif()
+@@ -3185,8 +3085,6 @@ elseif(PSP)
+     set(SDL_VIDEO_DRIVER_PSP 1)
+     set(SDL_VIDEO_RENDER_PSP 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/video/psp/*.c"
+-      "${SDL3_SOURCE_DIR}/src/video/psp/*.h"
+     )
+     set(SDL_VIDEO_OPENGL 1)
+     set(HAVE_SDL_VIDEO TRUE)
+@@ -3212,8 +3110,6 @@ elseif(PS2)
+   if(SDL_AUDIO)
+     set(SDL_AUDIO_DRIVER_PS2 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/audio/ps2/*.c"
+-      "${SDL3_SOURCE_DIR}/src/audio/ps2/*.h"
+     )
+     set(HAVE_SDL_AUDIO TRUE)
+   endif()
+@@ -3257,8 +3153,6 @@ elseif(PS2)
+     set(SDL_VIDEO_DRIVER_PS2 1)
+     set(SDL_VIDEO_RENDER_PS2 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/video/ps2/*.c"
+-      "${SDL3_SOURCE_DIR}/src/render/ps2/*.c"
+     )
+     set(SDL_VIDEO_OPENGL 0)
+     set(HAVE_SDL_VIDEO TRUE)
+@@ -3278,8 +3172,6 @@ elseif(N3DS)
+   if(SDL_AUDIO)
+     set(SDL_AUDIO_DRIVER_N3DS 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/audio/n3ds/*.c"
+-      "${SDL3_SOURCE_DIR}/src/audio/n3ds/*.h"
+     )
+     set(HAVE_SDL_AUDIO TRUE)
+   endif()
+@@ -3337,8 +3229,6 @@ elseif(N3DS)
+   if(SDL_VIDEO)
+     set(SDL_VIDEO_DRIVER_N3DS 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/video/n3ds/*.c"
+-      "${SDL3_SOURCE_DIR}/src/video/n3ds/*.h"
+     )
+     set(HAVE_SDL_VIDEO TRUE)
+   endif()
+@@ -3370,10 +3260,6 @@ elseif(NGAGE)
+   if(SDL_AUDIO)
+     set(SDL_AUDIO_DRIVER_NGAGE 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/audio/ngage/*.c"
+-      "${SDL3_SOURCE_DIR}/src/audio/ngage/*.cpp"
+-      "${SDL3_SOURCE_DIR}/src/audio/ngage/*.h"
+-      "${SDL3_SOURCE_DIR}/src/audio/ngage/*.hpp"
+     )
+     set(HAVE_SDL_AUDIO TRUE)
+   endif()
+@@ -3389,9 +3275,6 @@ elseif(NGAGE)
+   if(SDL_RENDER)
+     set(SDL_VIDEO_RENDER_NGAGE 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/render/ngage/*.c"
+-      "${SDL3_SOURCE_DIR}/src/render/ngage/*.h"
+-      "${SDL3_SOURCE_DIR}/src/render/ngage/*.hpp"
+     )
+   endif()
+ 
+@@ -3399,8 +3282,6 @@ elseif(NGAGE)
+   set(SDL_TIME_NGAGE 1)
+ 
+   sdl_glob_sources(
+-    "${SDL3_SOURCE_DIR}/src/render/ngage/*.cpp"
+-    "${SDL3_SOURCE_DIR}/src/render/ngage/*.h"
+   )
+   sdl_glob_sources("${SDL3_SOURCE_DIR}/src/time/unix/*.c")
+ 
+@@ -3411,8 +3292,6 @@ elseif(NGAGE)
+ 
+   set(SDL_VIDEO_DRIVER_NGAGE 1)
+   sdl_glob_sources(
+-    "${SDL3_SOURCE_DIR}/src/video/ngage/*.c"
+-    "${SDL3_SOURCE_DIR}/src/video/ngage/*.h"
+   )
+   set(HAVE_SDL_TIMERS TRUE)
+ 
+@@ -3540,8 +3419,6 @@ if(SDL_VIDEO)
+   if(SDL_OFFSCREEN)
+     set(SDL_VIDEO_DRIVER_OFFSCREEN 1)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/video/offscreen/*.c"
+-      "${SDL3_SOURCE_DIR}/src/video/offscreen/*.h"
+     )
+     set(HAVE_OFFSCREEN TRUE)
+     set(HAVE_SDL_VIDEO TRUE)
+@@ -3553,24 +3430,18 @@ sdl_glob_sources(${SDL3_SOURCE_DIR}/src/tray/*.c)
+ if(SDL_GPU)
+   if(HAVE_DXGI1_6_H)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/gpu/d3d12/*.c"
+-      "${SDL3_SOURCE_DIR}/src/gpu/d3d12/*.h"
+     )
+     set(SDL_GPU_D3D12 1)
+     set(HAVE_SDL_GPU TRUE)
+   endif()
+   if(SDL_VIDEO_VULKAN)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/gpu/vulkan/*.c"
+-      "${SDL3_SOURCE_DIR}/src/gpu/vulkan/*.h"
+     )
+     set(SDL_GPU_VULKAN 1)
+     set(HAVE_SDL_GPU TRUE)
+   endif()
+   if(SDL_VIDEO_METAL)
+     sdl_glob_sources(
+-      "${SDL3_SOURCE_DIR}/src/gpu/metal/*.m"
+-      "${SDL3_SOURCE_DIR}/src/gpu/metal/*.h"
+     )
+     set(SDL_GPU_METAL 1)
+     set(HAVE_SDL_GPU TRUE)
+@@ -3592,15 +3463,11 @@ endif()
+ if(NOT HAVE_SDL_AUDIO)
+   set(SDL_AUDIO_DRIVER_DUMMY 1)
+   sdl_glob_sources(
+-    "${SDL3_SOURCE_DIR}/src/audio/dummy/*.c"
+-    "${SDL3_SOURCE_DIR}/src/audio/dummy/*.h"
+   )
+ endif()
+ if(NOT HAVE_SDL_VIDEO)
+   set(SDL_VIDEO_DRIVER_DUMMY 1)
+   sdl_glob_sources(
+-    "${SDL3_SOURCE_DIR}/src/video/dummy/*.c"
+-    "${SDL3_SOURCE_DIR}/src/video/dummy/*.h"
+   )
+ endif()
+ if(NOT HAVE_SDL_JOYSTICK)
+@@ -3613,15 +3480,11 @@ endif()
+ if(NOT HAVE_SDL_HAPTIC)
+   set(SDL_HAPTIC_DUMMY 1)
+   sdl_glob_sources(
+-    "${SDL3_SOURCE_DIR}/src/haptic/dummy/*.c"
+-    "${SDL3_SOURCE_DIR}/src/haptic/dummy/*.h"
+   )
+ endif()
+ if(NOT HAVE_SDL_SENSORS)
+   set(SDL_SENSOR_DUMMY 1)
+   sdl_glob_sources(
+-    "${SDL3_SOURCE_DIR}/src/sensor/dummy/*.c"
+-    "${SDL3_SOURCE_DIR}/src/sensor/dummy/*.h"
+   )
+ endif()
+ if(NOT HAVE_SDL_LOADSO)
+@@ -3678,8 +3541,6 @@ endif()
+ if(NOT HAVE_CAMERA)
+   set(SDL_CAMERA_DRIVER_DUMMY 1)
+   sdl_glob_sources(
+-    "${SDL3_SOURCE_DIR}/src/camera/dummy/*.c"
+-    "${SDL3_SOURCE_DIR}/src/camera/dummy/*.h"
+   )
+ endif()
+ 
+@@ -4390,3 +4251,11 @@ string(APPEND CMAKE_OBJC_FLAGS " ${CMAKE_C_FLAGS}")
+ 
+ SDL_PrintSummary()
+ debug_show_sdl_deps()
++
++# MML: stub implementations for the removed video/audio/render API layer
++set_source_files_properties("${SDL3_SOURCE_DIR}/src/mml_stubs.c" PROPERTIES SKIP_PRECOMPILE_HEADERS 1)
++foreach(_mml_target SDL3-static SDL3-shared)
++  if(TARGET ${_mml_target})
++    target_sources(${_mml_target} PRIVATE "${SDL3_SOURCE_DIR}/src/mml_stubs.c")
++  endif()
++endforeach()
+diff --git a/SDL/src/dynapi/SDL_dynapi.h b/SDL/src/dynapi/SDL_dynapi.h
+index 786d86e..aa0b759 100644
+--- a/SDL/src/dynapi/SDL_dynapi.h
++++ b/SDL/src/dynapi/SDL_dynapi.h
+@@ -70,8 +70,9 @@
+ #endif
+ 
+ // everyone else. This is where we turn on the API if nothing forced it off.
++// MML: 静态链接、不做现场换库，关掉 dynapi 后链接器才能丢掉未引用的 API
+ #ifndef SDL_DYNAMIC_API
+-#define SDL_DYNAMIC_API 1
++#define SDL_DYNAMIC_API 0
+ #endif
+ 
+ #endif
+diff --git a/SDL/src/mml_stubs.c b/SDL/src/mml_stubs.c
+new file mode 100644
+index 0000000..4f86581
+--- /dev/null
++++ b/SDL/src/mml_stubs.c
+@@ -0,0 +1,297 @@
++/* MML：裁剪版 SDL 的空实现。
++   去掉 video/render/audio/gpu/camera/sensor/haptic/power 等源文件后，保留的
++   events/joystick 代码里仍有对这些符号的引用。SDL 用 SDL_VIDEO_DISABLED 等宏
++   跳过大部分调用，剩下的在运行时都不会走到（没有窗口、没有音频设备），
++   这里统一返回 0（NULL / false / 0）。x64 调用约定下参数被忽略即可。 */
++#include <SDL3/SDL_stdinc.h>
++
++void *SDL_AddAudioDevice(void) { return 0; }
++void *SDL_AudioDeviceDisconnected(void) { return 0; }
++void *SDL_DefaultAudioDeviceChanged(void) { return 0; }
++void *SDL_FindPhysicalAudioDeviceByCallback(void) { return 0; }
++void *SDL_CheckWindowPixelSizeChanged(void) { return 0; }
++void *SDL_GetMessageBoxCount(void) { return 0; }
++void *SDL_GetNaturalDisplayOrientation(void) { return 0; }
++void *SDL_GetPrimaryDisplay(void) { return 0; }
++void *SDL_GetToplevelForKeyboardFocus(void) { return 0; }
++void *SDL_GetVideoDevice(void) { return 0; }
++void *SDL_GetWindowFromID(void) { return 0; }
++void *SDL_GetWindowID(void) { return 0; }
++void *SDL_GetWindowMouseRect(void) { return 0; }
++void *SDL_GetWindowProperties(void) { return 0; }
++void *SDL_GetWindowSizeInPixels(void) { return 0; }
++void *SDL_HasWindows(void) { return 0; }
++void *SDL_MinimizeWindow(void) { return 0; }
++void *SDL_OnDisplayAdded(void) { return 0; }
++void *SDL_OnDisplayMoved(void) { return 0; }
++void *SDL_OnVideoThread(void) { return 0; }
++void *SDL_OnWindowDisplayChanged(void) { return 0; }
++void *SDL_OnWindowEnter(void) { return 0; }
++void *SDL_OnWindowFocusGained(void) { return 0; }
++void *SDL_OnWindowFocusLost(void) { return 0; }
++void *SDL_OnWindowHidden(void) { return 0; }
++void *SDL_OnWindowLeave(void) { return 0; }
++void *SDL_OnWindowMaximized(void) { return 0; }
++void *SDL_OnWindowMinimized(void) { return 0; }
++void *SDL_OnWindowMoved(void) { return 0; }
++void *SDL_OnWindowPixelSizeChanged(void) { return 0; }
++void *SDL_OnWindowResized(void) { return 0; }
++void *SDL_OnWindowRestored(void) { return 0; }
++void *SDL_OnWindowShown(void) { return 0; }
++void *SDL_RestoreWindow(void) { return 0; }
++void *SDL_ShowMessageBox(void) { return 0; }
++void *SDL_ShowSimpleMessageBox(void) { return 0; }
++void *SDL_TextInputActive(void) { return 0; }
++void *SDL_ToggleDragAndDropSupport(void) { return 0; }
++void *SDL_UpdateWindowGrab(void) { return 0; }
++void *SDL_ConvertSurface(void) { return 0; }
++void *SDL_CreateSurface(void) { return 0; }
++void *SDL_DestroySurface(void) { return 0; }
++void *SDL_GetSurfaceProperties(void) { return 0; }
++void *SDL_SaveBMP(void) { return 0; }
++void *SDL_QuitPixelFormatDetails(void) { return 0; }
++void *SDL_GetRectIntersection(void) { return 0; }
++void *SDL_CloseSensor(void) { return 0; }
++void *SDL_GetSensorNameForID(void) { return 0; }
++void *SDL_GetSensorTypeForID(void) { return 0; }
++void *SDL_GetSensors(void) { return 0; }
++void *SDL_OpenSensor(void) { return 0; }
++void *SDL_DestroyRenderer(void) { return 0; }
++void *SDL_CancelClipboardData(void) { return 0; }
++void *SDL_SaveClipboardMimeTypes(void) { return 0; }
++void *SDL_GetSystemTheme(void) { return 0; }
++void *SDL_GetWindows(void) { return 0; }
++void *SDL_AddBasicVideoDisplay(void) { return 0; }
++
++/* 以下符号来自 sdl3 crate 的资源包装 / drop 实现，运行时不会被调用 */
++void *SDL_AcquireGPUCommandBuffer(void) { return 0; }
++void *SDL_AcquireGPUSwapchainTexture(void) { return 0; }
++void *SDL_AudioStreamDevicePaused(void) { return 0; }
++void *SDL_BeginGPUComputePass(void) { return 0; }
++void *SDL_BeginGPUCopyPass(void) { return 0; }
++void *SDL_BeginGPURenderPass(void) { return 0; }
++void *SDL_BindAudioStream(void) { return 0; }
++void *SDL_BindAudioStreams(void) { return 0; }
++void *SDL_BindGPUComputePipeline(void) { return 0; }
++void *SDL_BindGPUComputeSamplers(void) { return 0; }
++void *SDL_BindGPUComputeStorageBuffers(void) { return 0; }
++void *SDL_BindGPUComputeStorageTextures(void) { return 0; }
++void *SDL_BindGPUFragmentSamplers(void) { return 0; }
++void *SDL_BindGPUFragmentStorageBuffers(void) { return 0; }
++void *SDL_BindGPUFragmentStorageTextures(void) { return 0; }
++void *SDL_BindGPUGraphicsPipeline(void) { return 0; }
++void *SDL_BindGPUIndexBuffer(void) { return 0; }
++void *SDL_BindGPUVertexBuffers(void) { return 0; }
++void *SDL_BindGPUVertexSamplers(void) { return 0; }
++void *SDL_BindGPUVertexStorageBuffers(void) { return 0; }
++void *SDL_BindGPUVertexStorageTextures(void) { return 0; }
++void *SDL_BlitGPUTexture(void) { return 0; }
++void *SDL_CancelGPUCommandBuffer(void) { return 0; }
++void *SDL_ClaimWindowForGPUDevice(void) { return 0; }
++void *SDL_ClearAudioStream(void) { return 0; }
++void *SDL_CloseAudioDevice(void) { return 0; }
++void *SDL_CloseHaptic(void) { return 0; }
++void *SDL_CreateAudioStream(void) { return 0; }
++void *SDL_CreateGPUBuffer(void) { return 0; }
++void *SDL_CreateGPUComputePipeline(void) { return 0; }
++void *SDL_CreateGPUDevice(void) { return 0; }
++void *SDL_CreateGPUDeviceWithProperties(void) { return 0; }
++void *SDL_CreateGPUGraphicsPipeline(void) { return 0; }
++void *SDL_CreateGPUSampler(void) { return 0; }
++void *SDL_CreateGPUShader(void) { return 0; }
++void *SDL_CreateGPUTexture(void) { return 0; }
++void *SDL_CreateGPUTransferBuffer(void) { return 0; }
++void *SDL_CreatePalette(void) { return 0; }
++void *SDL_CreatePopupWindow(void) { return 0; }
++void *SDL_CreateRenderer(void) { return 0; }
++void *SDL_CreateSoftwareRenderer(void) { return 0; }
++void *SDL_CreateSurfaceFrom(void) { return 0; }
++void *SDL_CreateTexture(void) { return 0; }
++void *SDL_CreateWindowAndRenderer(void) { return 0; }
++void *SDL_CreateWindowWithProperties(void) { return 0; }
++void *SDL_DestroyAudioStream(void) { return 0; }
++void *SDL_DestroyGPUDevice(void) { return 0; }
++void *SDL_DestroyPalette(void) { return 0; }
++void *SDL_DestroyTexture(void) { return 0; }
++void *SDL_DestroyWindow(void) { return 0; }
++void *SDL_DisableScreenSaver(void) { return 0; }
++void *SDL_DispatchGPUCompute(void) { return 0; }
++void *SDL_DrawGPUIndexedPrimitives(void) { return 0; }
++void *SDL_DrawGPUPrimitives(void) { return 0; }
++void *SDL_EnableScreenSaver(void) { return 0; }
++void *SDL_EndGPUComputePass(void) { return 0; }
++void *SDL_EndGPUCopyPass(void) { return 0; }
++void *SDL_EndGPURenderPass(void) { return 0; }
++void *SDL_FillSurfaceRect(void) { return 0; }
++void *SDL_FlashWindow(void) { return 0; }
++void *SDL_FlushAudioStream(void) { return 0; }
++void *SDL_GL_CreateContext(void) { return 0; }
++void *SDL_GL_DestroyContext(void) { return 0; }
++void *SDL_GL_ExtensionSupported(void) { return 0; }
++void *SDL_GL_GetAttribute(void) { return 0; }
++void *SDL_GL_GetCurrentContext(void) { return 0; }
++void *SDL_GL_GetCurrentWindow(void) { return 0; }
++void *SDL_GL_GetProcAddress(void) { return 0; }
++void *SDL_GL_GetSwapInterval(void) { return 0; }
++void *SDL_GL_LoadLibrary(void) { return 0; }
++void *SDL_GL_MakeCurrent(void) { return 0; }
++void *SDL_GL_SwapWindow(void) { return 0; }
++void *SDL_GL_UnloadLibrary(void) { return 0; }
++void *SDL_GetAudioDeviceChannelMap(void) { return 0; }
++void *SDL_GetAudioDeviceFormat(void) { return 0; }
++void *SDL_GetAudioDeviceGain(void) { return 0; }
++void *SDL_GetAudioDeviceName(void) { return 0; }
++void *SDL_GetAudioPlaybackDevices(void) { return 0; }
++void *SDL_GetAudioRecordingDevices(void) { return 0; }
++void *SDL_GetAudioStreamAvailable(void) { return 0; }
++void *SDL_GetAudioStreamData(void) { return 0; }
++void *SDL_GetAudioStreamDevice(void) { return 0; }
++void *SDL_GetAudioStreamFormat(void) { return 0; }
++void *SDL_GetAudioStreamGain(void) { return 0; }
++void *SDL_GetAudioStreamQueued(void) { return 0; }
++void *SDL_GetClipboardText(void) { return 0; }
++void *SDL_GetClosestFullscreenDisplayMode(void) { return 0; }
++void *SDL_GetCurrentAudioDriver(void) { return 0; }
++void *SDL_GetCurrentDisplayOrientation(void) { return 0; }
++void *SDL_GetCurrentVideoDriver(void) { return 0; }
++void *SDL_GetDesktopDisplayMode(void) { return 0; }
++void *SDL_GetDisplayBounds(void) { return 0; }
++void *SDL_GetDisplayContentScale(void) { return 0; }
++void *SDL_GetDisplayForWindow(void) { return 0; }
++void *SDL_GetDisplayName(void) { return 0; }
++void *SDL_GetDisplayProperties(void) { return 0; }
++void *SDL_GetDisplayUsableBounds(void) { return 0; }
++void *SDL_GetDisplays(void) { return 0; }
++void *SDL_GetFullscreenDisplayModes(void) { return 0; }
++void *SDL_GetGPUShaderFormats(void) { return 0; }
++void *SDL_GetGPUSwapchainTextureFormat(void) { return 0; }
++void *SDL_GetGPUTextureFormatFromPixelFormat(void) { return 0; }
++void *SDL_GetMasksForPixelFormat(void) { return 0; }
++void *SDL_GetNumVideoDrivers(void) { return 0; }
++void *SDL_GetPixelFormatDetails(void) { return 0; }
++void *SDL_GetPixelFormatForMasks(void) { return 0; }
++void *SDL_GetPixelFormatFromGPUTextureFormat(void) { return 0; }
++void *SDL_GetPrimarySelectionText(void) { return 0; }
++void *SDL_GetRGBA(void) { return 0; }
++void *SDL_GetRectAndLineIntersection(void) { return 0; }
++void *SDL_GetRectUnion(void) { return 0; }
++void *SDL_GetRendererName(void) { return 0; }
++void *SDL_GetSurfaceAlphaMod(void) { return 0; }
++void *SDL_GetSurfaceBlendMode(void) { return 0; }
++void *SDL_GetSurfaceClipRect(void) { return 0; }
++void *SDL_GetSurfaceColorKey(void) { return 0; }
++void *SDL_GetSurfaceColorMod(void) { return 0; }
++void *SDL_GetTextInputArea(void) { return 0; }
++void *SDL_GetTextureAlphaMod(void) { return 0; }
++void *SDL_GetTextureBlendMode(void) { return 0; }
++void *SDL_GetTextureColorMod(void) { return 0; }
++void *SDL_GetTextureProperties(void) { return 0; }
++void *SDL_GetTextureScaleMode(void) { return 0; }
++void *SDL_GetWindowBordersSize(void) { return 0; }
++void *SDL_GetWindowDisplayScale(void) { return 0; }
++void *SDL_GetWindowFlags(void) { return 0; }
++void *SDL_GetWindowFullscreenMode(void) { return 0; }
++void *SDL_GetWindowICCProfile(void) { return 0; }
++void *SDL_GetWindowKeyboardGrab(void) { return 0; }
++void *SDL_GetWindowMaximumSize(void) { return 0; }
++void *SDL_GetWindowMinimumSize(void) { return 0; }
++void *SDL_GetWindowMouseGrab(void) { return 0; }
++void *SDL_GetWindowOpacity(void) { return 0; }
++void *SDL_GetWindowPixelDensity(void) { return 0; }
++void *SDL_GetWindowPixelFormat(void) { return 0; }
++void *SDL_GetWindowPosition(void) { return 0; }
++void *SDL_GetWindowProgressState(void) { return 0; }
++void *SDL_GetWindowProgressValue(void) { return 0; }
++void *SDL_GetWindowRelativeMouseMode(void) { return 0; }
++void *SDL_GetWindowSafeArea(void) { return 0; }
++void *SDL_GetWindowSize(void) { return 0; }
++void *SDL_GetWindowSurface(void) { return 0; }
++void *SDL_GetWindowTitle(void) { return 0; }
++void *SDL_HasClipboardText(void) { return 0; }
++void *SDL_HasPrimarySelectionText(void) { return 0; }
++void *SDL_HasRectIntersection(void) { return 0; }
++void *SDL_HasScreenKeyboardSupport(void) { return 0; }
++void *SDL_HideWindow(void) { return 0; }
++void *SDL_InitHapticRumble(void) { return 0; }
++void *SDL_LoadBMP_IO(void) { return 0; }
++void *SDL_LoadPNG_IO(void) { return 0; }
++void *SDL_LoadSurface_IO(void) { return 0; }
++void *SDL_LoadWAV_IO(void) { return 0; }
++void *SDL_MapRGBA(void) { return 0; }
++void *SDL_MaximizeWindow(void) { return 0; }
++void *SDL_Metal_DestroyView(void) { return 0; }
++void *SDL_OpenAudioDevice(void) { return 0; }
++void *SDL_OpenAudioDeviceStream(void) { return 0; }
++void *SDL_OpenHapticFromJoystick(void) { return 0; }
++void *SDL_PauseAudioDevice(void) { return 0; }
++void *SDL_PauseAudioStreamDevice(void) { return 0; }
++void *SDL_PlayHapticRumble(void) { return 0; }
++void *SDL_PutAudioStreamData(void) { return 0; }
++void *SDL_QueryGPUFence(void) { return 0; }
++void *SDL_RaiseWindow(void) { return 0; }
++void *SDL_ReleaseGPUBuffer(void) { return 0; }
++void *SDL_ReleaseGPUComputePipeline(void) { return 0; }
++void *SDL_ReleaseGPUFence(void) { return 0; }
++void *SDL_ReleaseGPUGraphicsPipeline(void) { return 0; }
++void *SDL_ReleaseGPUSampler(void) { return 0; }
++void *SDL_ReleaseGPUShader(void) { return 0; }
++void *SDL_ReleaseGPUTexture(void) { return 0; }
++void *SDL_ReleaseGPUTransferBuffer(void) { return 0; }
++void *SDL_ResumeAudioDevice(void) { return 0; }
++void *SDL_ResumeAudioStreamDevice(void) { return 0; }
++void *SDL_SaveBMP_IO(void) { return 0; }
++void *SDL_SavePNG_IO(void) { return 0; }
++void *SDL_ScreenKeyboardShown(void) { return 0; }
++void *SDL_ScreenSaverEnabled(void) { return 0; }
++void *SDL_SetAudioDeviceGain(void) { return 0; }
++void *SDL_SetAudioStreamGain(void) { return 0; }
++void *SDL_SetClipboardText(void) { return 0; }
++void *SDL_SetGPUBlendConstants(void) { return 0; }
++void *SDL_SetGPUScissor(void) { return 0; }
++void *SDL_SetGPUSwapchainParameters(void) { return 0; }
++void *SDL_SetGPUViewport(void) { return 0; }
++void *SDL_SetPaletteColors(void) { return 0; }
++void *SDL_SetPrimarySelectionText(void) { return 0; }
++void *SDL_SetSurfaceAlphaMod(void) { return 0; }
++void *SDL_SetSurfaceBlendMode(void) { return 0; }
++void *SDL_SetSurfaceColorKey(void) { return 0; }
++void *SDL_SetSurfaceColorMod(void) { return 0; }
++void *SDL_SetSurfacePalette(void) { return 0; }
++void *SDL_SetSurfaceRLE(void) { return 0; }
++void *SDL_SetTextInputArea(void) { return 0; }
++void *SDL_SetTextureAlphaMod(void) { return 0; }
++void *SDL_SetTextureBlendMode(void) { return 0; }
++void *SDL_SetTextureColorMod(void) { return 0; }
++void *SDL_SetTextureScaleMode(void) { return 0; }
++void *SDL_SetWindowBordered(void) { return 0; }
++void *SDL_SetWindowFullscreen(void) { return 0; }
++void *SDL_SetWindowKeyboardGrab(void) { return 0; }
++void *SDL_SetWindowMaximumSize(void) { return 0; }
++void *SDL_SetWindowMinimumSize(void) { return 0; }
++void *SDL_SetWindowMouseGrab(void) { return 0; }
++void *SDL_SetWindowOpacity(void) { return 0; }
++void *SDL_SetWindowPosition(void) { return 0; }
++void *SDL_SetWindowProgressState(void) { return 0; }
++void *SDL_SetWindowProgressValue(void) { return 0; }
++void *SDL_SetWindowRelativeMouseMode(void) { return 0; }
++void *SDL_SetWindowSize(void) { return 0; }
++void *SDL_SetWindowTitle(void) { return 0; }
++void *SDL_ShowWindow(void) { return 0; }
++void *SDL_StartTextInput(void) { return 0; }
++void *SDL_StartTextInputWithProperties(void) { return 0; }
++void *SDL_StopHapticRumble(void) { return 0; }
++void *SDL_StopTextInput(void) { return 0; }
++void *SDL_SubmitGPUCommandBuffer(void) { return 0; }
++void *SDL_SubmitGPUCommandBufferAndAcquireFence(void) { return 0; }
++void *SDL_SyncWindow(void) { return 0; }
++void *SDL_UpdateWindowSurface(void) { return 0; }
++void *SDL_UpdateWindowSurfaceRects(void) { return 0; }
++void *SDL_UploadToGPUBuffer(void) { return 0; }
++void *SDL_UploadToGPUTexture(void) { return 0; }
++void *SDL_Vulkan_CreateSurface(void) { return 0; }
++void *SDL_Vulkan_GetInstanceExtensions(void) { return 0; }
++void *SDL_Vulkan_GetVkGetInstanceProcAddr(void) { return 0; }
++void *SDL_Vulkan_LoadLibrary(void) { return 0; }
++void *SDL_Vulkan_UnloadLibrary(void) { return 0; }
++void *SDL_WaitAndAcquireGPUSwapchainTexture(void) { return 0; }
++void *SDL_WaitForGPUFences(void) { return 0; }

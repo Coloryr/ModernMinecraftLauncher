@@ -47,8 +47,13 @@ if ($LASTEXITCODE -ne 0) { throw '版本同步失败，已中止构建。' }
 
 # vendor 插件要先还原（cargo 解析依赖图时就要读它的 Cargo.toml，早于构建脚本）；
 # 脚本幂等，已还原过会直接跳过
-powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'mml-gui\vendor\prepare.ps1')
+powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'build\vendor\tauri-plugin-decoration\prepare.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'vendor 插件还原失败，已中止构建。' }
+
+# SDL 裁剪：还原打过补丁的 sdl3-src 到 target/vendor（只存补丁，不存第三方源码），
+# Cargo.toml 的 [patch.crates-io] 指向它。补丁没变化时脚本直接跳过。
+node (Join-Path $root 'build\vendor\sdl3-src\prepare.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'SDL 裁剪准备失败，已中止构建。' }
 
 foreach ($t in $targets) {
     rustup target add $t['triple'] | Out-Null
@@ -72,8 +77,7 @@ try {
     foreach ($t in $targets) {
         Write-Host "正在构建 prerelease $($t['arch'])（$($t['triple'])）..."
         # 必须带 custom-protocol：不带的话 tauri 把这次构建当成 dev，
-        # 前端会连接 localhost:1420；未启动开发服务时无法加载页面。
-        cargo build --profile prerelease --target $t['triple'] --features custom-protocol,prerelease
+        # 前端会连接 localhost:1420；未启动开发服务时无法加载页面。        cargo build --profile prerelease --target $t['triple'] --features custom-protocol,prerelease
         if ($LASTEXITCODE -ne 0) {
             throw "构建失败：$($t['arch'])（退出码 $LASTEXITCODE）。arm64 交叉编译需要对应架构的 MSVC 工具链。"
         }

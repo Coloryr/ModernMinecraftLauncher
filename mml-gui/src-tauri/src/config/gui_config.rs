@@ -317,6 +317,8 @@ pub struct ClientConfig {
     pub music_on: bool,
     /// 自定义音乐来源：本地音频文件路径或 http(s) 直链；空串表示没配
     pub music_source: String,
+    /// 界面动画开关：关闭后各窗口的过渡与入场动画瞬时完成
+    pub animations: bool,
     /// 窗口材质：`none` / `mica` / `acrylic`；不是 `none` 时窗口才开透明
     pub window_effect: String,
     /// 窗口底色不透明度，单位百分比；界面底色按它混透明，材质才透得出来
@@ -347,6 +349,7 @@ impl Default for ClientConfig {
             custom_page_on: false,
             music_on: false,
             music_source: String::new(),
+            animations: true,
             window_effect: String::from("none"),
             window_opacity: 85,
             program_icon: String::new(),
