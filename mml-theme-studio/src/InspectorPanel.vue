@@ -7,8 +7,6 @@ import type { InspectDeclaration, InspectNode, InspectTreeNode } from './inspect
 const props = defineProps<{
   /** 把检查协议消息发给预览页的注入脚本 */
   send: (message: Record<string, unknown>) => void;
-  /** 嵌在底部面板里时隐藏自己的标题栏，高度交给面板 */
-  embedded?: boolean;
 }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -122,13 +120,13 @@ defineExpose({ handle });
 </script>
 
 <template>
-  <section class="inspector" :class="{ 'is-embedded': embedded }" :aria-label="t('inspector')">
+  <section class="inspector" :aria-label="t('inspector')">
     <div class="panel-head">
-      <strong v-if="!embedded">{{ t('inspector') }}</strong>
+      <strong>{{ t('inspector') }}</strong>
       <code v-if="node" class="inspector-selector" :title="node.selector">{{ node.selector }}</code>
       <span class="grow" />
       <span v-if="node" class="inspector-size">{{ node.width }} × {{ node.height }}</span>
-      <button v-if="!embedded" class="ui-btn v-ghost s-sm" :aria-label="t('close')" @click="emit('close')">×</button>
+      <button class="ui-btn v-ghost s-sm" :aria-label="t('close')" @click="emit('close')">×</button>
     </div>
 
     <p v-if="node" class="inspector-path">
@@ -223,20 +221,13 @@ defineExpose({ handle });
 /* 固定在预览区底部：左边元素树，右边样式 / 计算值 */
 .inspector {
   display: flex;
-  flex: 0 0 300px;
+  flex: 0 0 280px;
   flex-direction: column;
   min-height: 0;
   border-top: 1px solid var(--border);
   background: var(--bg-side);
 }
 
-/* 嵌在底部面板里：高度交给面板，不再自带标题栏与上边框 */
-.inspector.is-embedded {
-  flex: 1;
-  height: 100%;
-  border-top: 0;
-  background: transparent;
-}
 
 .inspector-selector {
   max-width: 45%;

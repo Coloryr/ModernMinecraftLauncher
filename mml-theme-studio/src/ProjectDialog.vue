@@ -6,11 +6,12 @@ import { t } from './i18n';
 defineProps<{ busy: boolean; error: string }>();
 const emit = defineEmits<{ close: []; cancel: []; create: [options: CreateProject]; error: [error: unknown] }>();
 const name = ref('my-theme');
-const template = ref<Template>('css');
+const template = ref<Template>('home');
 const parent = ref('');
 const local = ref(false);
 const source = ref('');
-const templates: Template[] = ['css', 'page', 'home', 'html', 'home-html'];
+// 顺序与 custom/README.md 的「五个示例各自改什么」一致
+const templates: Template[] = ['home', 'home-html', 'page', 'html', 'css'];
 
 async function pick(kind: 'parent' | 'source') {
   try {

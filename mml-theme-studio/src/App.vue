@@ -8,7 +8,9 @@ import ProjectDialog from './ProjectDialog.vue';
 import CssCatalog from './CssCatalog.vue';
 import InspectorPanel from './InspectorPanel.vue';
 import GlyphIcon from '../../mml-vue/src/components/ui/GlyphIcon.vue';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { INSPECT_PROTOCOL } from './inspector';
+import { registerSnapTarget } from './decoration';
 
 const project = ref<Project | null>(null);
 const recent = ref<string[]>([]);
@@ -51,9 +53,14 @@ const editorOpen = ref(true);
 const previewWidth = ref(560);
 // 自绘标题栏是否已由插件接管
 const decorated = ref(false);
+const titlebarEl = ref<HTMLElement>();
+const maximized = ref(false);
+let unregisterSnap: (() => void) | undefined;
+let unlistenResize: (() => void) | undefined;
 const panelOpen = ref(true);
 const panelCollapsed = ref(false);
-const panelTab = ref<'output' | 'inspector'>('output');
+// 底部面板高度可拖动调整
+const panelHeight = ref(220);
 const fileName = ref('');
 const confirming = ref(false);
 let confirmResult: ((answer: boolean) => void) | undefined;
@@ -345,16 +352,10 @@ function postInspect(message: Record<string, unknown>) {
   previewFrame.value?.contentWindow?.postMessage({ __mmlInspector: INSPECT_PROTOCOL, ...payload }, '*');
 }
 
-/** 打开或收起检查模式；打开时把底部面板切到元素页 */
+/** 打开或收起检查模式；检查面板在预览面板里，预览必须开着 */
 function setInspecting(value: boolean) {
   inspecting.value = value;
-  if (value) {
-    panelOpen.value = true;
-    panelCollapsed.value = false;
-    panelTab.value = 'inspector';
-  } else if (panelTab.value === 'inspector') {
-    panelTab.value = 'output';
-  }
+  if (value) previewOpen.value = true;
   postInspect({ type: value ? 'enable' : 'disable' });
 }
 
@@ -363,21 +364,11 @@ function toggleInspector() {
   setInspecting(!inspecting.value);
 }
 
-/** 活动栏 / 面板的「元素检查」入口：打开检查并把底部面板切过去 */
+/** 活动栏 / 预览标题栏的「元素检查」入口 */
 function openInspector() {
   if (!previewUrl.value) return;
-  if (!inspecting.value) {
-    setInspecting(true);
-    return;
-  }
-  panelOpen.value = true;
-  panelCollapsed.value = false;
-  panelTab.value = 'inspector';
-}
-
-function showOutput() {
-  panelTab.value = 'output';
-  panelCollapsed.value = false;
+  previewOpen.value = true;
+  if (!inspecting.value) setInspecting(true);
 }
 
 /** 活动栏的面板按钮：收起 / 展开底部面板 */
@@ -386,13 +377,34 @@ function togglePanel() {
   if (panelOpen.value) panelCollapsed.value = false;
 }
 
+function isTauri() {
+  return '__TAURI_INTERNALS__' in window;
+}
+
+async function windowMinimize() {
+  if (!isTauri()) return;
+  await getCurrentWindow().minimize().catch(() => {});
+}
+
+async function windowToggleMaximize() {
+  if (!isTauri()) return;
+  const win = getCurrentWindow();
+  await win.toggleMaximize().catch(() => {});
+  maximized.value = await win.isMaximized().catch(() => false);
+}
+
+async function windowClose() {
+  if (!isTauri()) return;
+  await getCurrentWindow().close().catch(() => {});
+}
+
 let splitStart: { x: number; width: number } | null = null;
 
 function startSplit(event: PointerEvent) {
   if (!editorOpen.value || !previewOpen.value) return;
   event.preventDefault();
   splitStart = { x: event.clientX, width: previewWidth.value };
-  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  try { (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); } catch { /* 合成事件没有活动指针 */ }
 }
 
 /** 向左拖变宽：预览宽度等于起拖宽度减去水平位移 */
@@ -406,6 +418,29 @@ function moveSplit(event: PointerEvent) {
 function endSplit(event: PointerEvent) {
   if (!splitStart) return;
   splitStart = null;
+  const target = event.currentTarget as HTMLElement;
+  if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
+}
+
+let panelResizeStart: { y: number; height: number } | null = null;
+
+function startPanelResize(event: PointerEvent) {
+  if (panelCollapsed.value) return;
+  event.preventDefault();
+  panelResizeStart = { y: event.clientY, height: panelHeight.value };
+  try { (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); } catch { /* 合成事件没有活动指针 */ }
+}
+
+/** 向上拖变高：新高度等于起拖高度减去纵向位移 */
+function movePanelResize(event: PointerEvent) {
+  if (!panelResizeStart) return;
+  const next = panelResizeStart.height - (event.clientY - panelResizeStart.y);
+  panelHeight.value = Math.round(Math.min(Math.max(next, 120), Math.max(160, window.innerHeight - 360)));
+}
+
+function endPanelResize(event: PointerEvent) {
+  if (!panelResizeStart) return;
+  panelResizeStart = null;
   const target = event.currentTarget as HTMLElement;
   if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
 }
@@ -475,10 +510,24 @@ watch([sidebarOpen, previewOpen, panelOpen, panelCollapsed], async () => {
 });
 watch(output, () => { void nextTick(() => { if (outputHost.value) outputHost.value.scrollTop = outputHost.value.scrollHeight; }); });
 onMounted(async () => {
+  // 先交贴靠热区，再激活装饰：插件在激活流程里就要量这块矩形
+  unregisterSnap = registerSnapTarget(titlebarEl.value ?? null);
+  if (isTauri()) {
+    const win = getCurrentWindow();
+    maximized.value = await win.isMaximized().catch(() => false);
+    unlistenResize = await win.onResized(() => {
+      void win.isMaximized().then((value) => { maximized.value = value; }).catch(() => {});
+    });
+  }
+  await nextTick();
   // 自绘标题栏：窗口建出来是隐藏的，激活成功后由这个命令显示；失败退回原生 frame
   void call('activateDecoration')
     .then((mode) => { decorated.value = mode === 'custom'; })
-    .catch(() => { decorated.value = false; });
+    .catch((error) => {
+      // 激活失败会退回原生 frame，窗口照常显示；把原因露出来，便于排查
+      decorated.value = false;
+      showError(String(error));
+    });
   try {
     unsubscribe = await onEvent((event) => {
       if (event.type === 'log') output.value = (output.value + event.text).slice(-150000);
@@ -508,14 +557,13 @@ onMounted(async () => {
     if (state.project) await loadProject(state.project);
   } catch (value) { showError(value); }
 });
-onBeforeUnmount(() => { window.clearInterval(elapsedTimer); observer?.disconnect(); unsubscribe?.(); window.removeEventListener('keydown', keydown); window.removeEventListener('message', previewMessage); confirmResult?.(false); });
+onBeforeUnmount(() => { unregisterSnap?.(); unlistenResize?.(); window.clearInterval(elapsedTimer); observer?.disconnect(); unsubscribe?.(); window.removeEventListener('keydown', keydown); window.removeEventListener('message', previewMessage); confirmResult?.(false); });
 </script>
 
 <template>
   <div class="studio-shell" :class="{ 'is-decorated': decorated }">
-    <header class="titlebar" data-tauri-drag-region>
+    <header ref="titlebarEl" class="titlebar" data-tauri-drag-region>
       <div class="title-brand" data-tauri-drag-region>
-        <span class="brand-mark" data-tauri-drag-region>M²L</span>
         <div class="title-text" data-tauri-drag-region><h1 data-tauri-drag-region>{{ t('title') }}</h1><small data-tauri-drag-region>{{ project?.name || t('empty') }}</small></div>
       </div>
       <nav class="title-actions" :aria-label="t('title')">
@@ -533,6 +581,11 @@ onBeforeUnmount(() => { window.clearInterval(elapsedTimer); observer?.disconnect
           <select id="studio-theme" :value="studioTheme" class="field-select" :disabled="working" @change="run(() => updateStudioTheme($event))"><option value="Light">{{ t('light') }}</option><option value="Dark">{{ t('dark') }}</option></select>
         </label>
         <select v-model="locale" class="field-select language-select" :aria-label="t('language')" :disabled="working" @change="call('locale', locale).catch(showError)"><option value="zh-CN">中文</option><option value="en-US">English</option></select>
+      </div>
+      <div class="window-controls" role="group" aria-label="窗口控制">
+        <button type="button" class="wc-btn" data-window-control="minimize" :title="t('windowMinimize')" :aria-label="t('windowMinimize')" @click="windowMinimize"><GlyphIcon name="minus" :size="14" /></button>
+        <button type="button" class="wc-btn" data-window-control="maximize" :title="maximized ? t('windowRestore') : t('windowMaximize')" :aria-label="maximized ? t('windowRestore') : t('windowMaximize')" @click="windowToggleMaximize"><GlyphIcon :name="maximized ? 'restore' : 'maximize'" :size="14" /></button>
+        <button type="button" class="wc-btn is-close" data-window-control="close" :title="t('windowClose')" :aria-label="t('windowClose')" @click="windowClose"><GlyphIcon name="close" :size="14" /></button>
       </div>
     </header>
     <div v-if="error" class="error-banner" role="alert"><span>{{ error }}</span><button class="ui-btn v-ghost s-sm" :aria-label="t('close')" @click="error = ''">×</button></div>
@@ -605,21 +658,21 @@ onBeforeUnmount(() => { window.clearInterval(elapsedTimer); observer?.disconnect
             <div v-else class="empty-pane"><span class="empty-symbol">▷</span><p>{{ t('previewEmpty') }}</p></div>
           </div>
         </div>
+        <InspectorPanel v-if="inspecting" ref="inspectorPanel" :key="previewEpoch" :send="postInspect" @close="stopInspector" />
         <p class="preview-hint">{{ t('previewHint') }}</p>
       </aside>
     </div>
 
-    <section v-if="panelOpen" class="bottom-panel" :class="{ 'is-collapsed': panelCollapsed }">
+    <section v-if="panelOpen" class="bottom-panel" :class="{ 'is-collapsed': panelCollapsed }" :style="{ height: panelCollapsed ? '30px' : panelHeight + 'px' }">
+      <div v-if="!panelCollapsed" class="panel-resizer" @pointerdown="startPanelResize" @pointermove="movePanelResize" @pointerup="endPanelResize" @pointercancel="endPanelResize" />
       <div class="panel-bar">
-        <button class="panel-tab" :class="{ 'is-active': panelTab === 'output' }" @click="showOutput">{{ t('output') }}</button>
-        <button class="panel-tab" :class="{ 'is-active': panelTab === 'inspector' }" :disabled="!previewUrl" @click="openInspector">{{ t('inspector') }}</button>
+        <span class="panel-tab is-active">{{ t('output') }}</span>
         <span class="grow" />
-        <span v-if="panelTab === 'output' && !panelCollapsed" class="panel-meta">{{ env }}</span>
+        <span v-if="!panelCollapsed" class="panel-meta">{{ env }}</span>
         <button class="title-icon" :title="panelCollapsed ? t('expandOutput') : t('collapseOutput')" :aria-label="panelCollapsed ? t('expandOutput') : t('collapseOutput')" @click="panelCollapsed = !panelCollapsed"><GlyphIcon name="chevron-down" :size="14" :class="{ 'is-flipped': panelCollapsed }" /></button>
       </div>
       <div v-if="!panelCollapsed" class="panel-body">
-        <pre v-if="panelTab === 'output'" ref="outputHost" class="output-log" aria-live="off">{{ output || t('ready') }}</pre>
-        <InspectorPanel v-else ref="inspectorPanel" :key="previewEpoch" :send="postInspect" embedded @close="stopInspector" />
+        <pre ref="outputHost" class="output-log" aria-live="off">{{ output || t('ready') }}</pre>
       </div>
     </section>
 

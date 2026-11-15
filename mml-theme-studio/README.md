@@ -1,6 +1,6 @@
 # M²L Theme Studio
 
-独立桌面主题开发工具，使用 Tauri 2、Vue 3 与 Monaco，工作台按 IDE 组织：自绘标题栏（与启动器同一套窗口装饰）、左侧活动栏与项目文件树、中间代码编辑器、右侧实时预览、底部是可折叠面板。预览是设计画布，带 VS WPF 设计器风格的选择框和八个缩放手柄；窗口超出预览区时出现滚动条。`F12` 切换元素检查：点预览里的元素，底部面板列出元素树、命中的 CSS 规则与计算样式，行内样式可以直接改、实时生效（只作用于预览，不写回源码）。
+独立桌面主题开发工具，使用 Tauri 2、Vue 3 与 Monaco，工作台按 IDE 组织：自绘标题栏（与启动器同一套窗口装饰，最小化 / 最大化 / 关闭也自己画，Windows 贴靠布局保留）、左侧活动栏与项目文件树、中间代码编辑器、右侧实时预览、底部是可折叠面板。预览是设计画布，带 VS WPF 设计器风格的选择框和八个缩放手柄；窗口超出预览区时出现滚动条。`F12` 切换元素检查：点预览里的元素，底部面板列出元素树、命中的 CSS 规则与计算样式，行内样式可以直接改、实时生效（只作用于预览，不写回源码）。
 
 ## 启动
 
@@ -24,16 +24,16 @@ npm start
 4. 顶部「界面配色」切换工具、代码编辑器与原生标题栏的亮色 / 暗色，重启后保留选择。右侧的预览配色独立切换，可选择启动器的全部 19 个窗口，并通过八个手柄或「窗口大小」输入框调整预览窗口尺寸。预览默认按该窗口的最小客户区尺寸显示（主窗口 920×600、设置 850×600、账户 800×650 等），清单与尺寸都对着启动器窗口注册表校验；只有点「适应预览区」才铺满，调整工具窗口大小不会自动改预览尺寸，放不下时滚动查看。
 5. 「CSS 控件 / CSS 变量」读取项目 SDK 生成的清单。点击一项会把选择器骨架或变量定义追加到项目根目录的 `custom.css` 末尾并打开它；页面 / 主页主题第一次追加时，会自动在入口文件里引入 `custom.css`。
 6. 保存后点「构建 ZIP」，输出日志会给出产物路径。把 ZIP 导入启动器验证实际功能。检查面板里改的行内样式只在预览里临时生效，不会写回源码。
-7. 左侧活动栏是五个开关：项目文件、编辑器、预览、元素检查、输出。编辑器可以整个收起，把宽度让给预览；编辑器和预览中间的分隔条能左右拖动改宽度。底部面板在「输出」与「元素检查」之间切换，右侧箭头把它收成一条 30px 的标题栏；收起项目文件或预览后，活动栏按钮一直都在，点一下就能恢复。
-8. `F12` / `Ctrl+Shift+I` 切换元素检查：点一下预览，或点活动栏 / 预览标题栏的检查按钮就能开；编辑器里的 F12 仍留给 Monaco（转到定义）。进入检查模式后，预览会高亮鼠标下的元素；底部面板左边是页面元素树（逐层展开），右边「样式」页列出命中的 CSS 规则与 `element.style`，行内样式可以直接改、实时生效，「计算值」页列出解析后的样式与 CSS 变量。再按 F12 或点活动栏的检查按钮退出。
+7. 左侧活动栏是五个开关：项目文件、编辑器、预览、元素检查、输出。编辑器可以整个收起，把宽度让给预览；编辑器和预览中间的分隔条能左右拖动改宽度。底部面板是输出日志，上沿可上下拖动调高度，右侧箭头把它收成一条 30px 的标题栏；元素检查在右侧内容预览面板里；收起项目文件或预览后，活动栏按钮一直都在，点一下就能恢复。
+8. `F12` / `Ctrl+Shift+I` 切换元素检查：点一下预览，或点活动栏 / 预览标题栏的检查按钮就能开；编辑器里的 F12 仍留给 Monaco（转到定义）。进入检查模式后，预览会高亮鼠标下的元素；预览面板下半部分左边是页面元素树（逐层展开），右边「样式」页列出命中的 CSS 规则与 `element.style`，行内样式可以直接改、实时生效，「计算值」页列出解析后的样式与 CSS 变量。再按 F12 或点活动栏的检查按钮退出。
 
 | Demo | 编辑入口 | ZIP 内容入口 |
 | --- | --- | --- |
-| CSS 样式包 | `custom.css`、`src/replace.ts` | `custom.css`、`custom.js` |
-| Vue 整页主题 | `src/ReplaceWindow.vue`、`src/replace.ts` | `custom.js`、`custom.css` |
-| Vue 主页组件 | `src/App.vue`、`src/entry.ts` | `custom.js`、`custom.css` |
-| HTML 整页主题 | `src/index.html`、`src/style.css`、`src/app.js` | `index.html` |
-| HTML 自定义主页面 | `src/index.html`、`src/style.css`、`src/app.js` | `index.html` |
+| 自定义主页面 | `src/App.vue`、`src/entry.ts` | `custom.js`、`custom.css` |
+| 自定义主页面（HTML） | `src/index.html`、`src/style.css`、`src/app.js` | `index.html` |
+| 整页主题 | `src/ReplaceWindow.vue`、`src/replace.ts` | `custom.js`、`custom.css` |
+| 整页 HTML | `src/index.html`、`src/style.css`、`src/app.js` | `index.html` |
+| 自定义 CSS | `custom.css`、`src/replace.ts` | `custom.css`、`custom.js` |
 
 三个组件类 demo 在项目快照中的真实 `mml-vue` 宿主上预览，CSS 和组件加载方式与启动器相同。两个 HTML demo 使用其内置浏览器预览，只显示页面本身。预览没有启动器后端，登录、游戏启动、实例文件等操作需要导入启动器验证；需要实例参数的窗口只能展示无实例时的界面。预览窗口支持拖拽八个手柄或输入宽高；超出预览区时画布出现滚动条，可以滚动查看整窗。
 
@@ -95,6 +95,6 @@ npm run tauri build -- --debug --no-bundle
 
 An independent desktop theme editor built with Tauri 2, Vue 3 and Monaco. Install a Rust toolchain, Node.js 24+, npm and Git, then run `npm install` and `npm start` in this directory. The dev server listens on `127.0.0.1:1421`, separate from the launcher's 1420, and the Rust shell is compiled and launched by `tauri dev`.
 
-Create a project from one of the five official demos; the tool downloads a matching SDK snapshot, installs dependencies and starts preview. Save with Ctrl+S to rebuild. The preview is a design canvas with VS WPF designer-style selection handles and a size input; resize the window with the eight handles, and scroll the canvas when it is larger than the preview area. The window list covers all 19 launcher windows, and the preview enforces each window's minimum size (for example 920×600 for the main window). The window uses a custom titlebar with the same decoration plugin as the launcher. The activity bar on the left toggles the file tree, the editor, the preview panel, the element inspector and the bottom panel; the splitter between the editor and the preview can be dragged, the bottom panel switches between Output and Elements and collapses to a single 30px bar. The external editor button opens the project in VS Code or Cursor. The preview starts at the selected window's minimum size and only fills the canvas when you press Fit. F12 / Ctrl+Shift+I toggles the element inspector (the editor keeps F12 for Monaco): the preview highlights the element under the cursor, the panel shows the DOM tree on the left, matched CSS rules and an editable element.style on the Styles tab, and computed values plus CSS variables on the Computed tab. Inline edits apply to the preview only. Game launch, login and instance file operations require validation in the launcher.
+Create a project from one of the five official demos; the tool downloads a matching SDK snapshot, installs dependencies and starts preview. Save with Ctrl+S to rebuild. The preview is a design canvas with VS WPF designer-style selection handles and a size input; resize the window with the eight handles, and scroll the canvas when it is larger than the preview area. The window list covers all 19 launcher windows, and the preview enforces each window's minimum size (for example 920×600 for the main window). The window uses a custom titlebar with the same decoration plugin as the launcher. The activity bar on the left toggles the file tree, the editor, the preview panel, the element inspector and the bottom panel; the splitter between the editor and the preview can be dragged, the bottom panel is the output log and collapses to a single 30px bar; the element inspector sits at the bottom of the preview panel. The external editor button opens the project in VS Code or Cursor. The preview starts at the selected window's minimum size and only fills the canvas when you press Fit. F12 / Ctrl+Shift+I toggles the element inspector (the editor keeps F12 for Monaco): the preview highlights the element under the cursor, the panel shows the DOM tree on the left, matched CSS rules and an editable element.style on the Styles tab, and computed values plus CSS variables on the Computed tab. Inline edits apply to the preview only. Game launch, login and instance file operations require validation in the launcher.
 
 `npm run pack` builds installers under the repository's `target/release/bundle`. The user project's npm/Vite build still needs system Node.js 24+, npm and Git.

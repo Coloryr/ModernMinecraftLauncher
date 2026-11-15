@@ -30,8 +30,7 @@ small { font-size: 10.5px; }
 /* 品牌区整块可拖动：子元素不给命中，鼠标按下落在 .title-brand 上 */
 .title-brand > * { pointer-events: none; }
 .title-drag { flex: 1; align-self: stretch; }
-.title-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.brand-mark { display: grid; flex: none; width: 26px; height: 26px; place-items: center; border: 1px solid var(--accent-border); border-radius: 8px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; }
+.title-brand { display: flex; align-items: center; min-width: 0; }
 .title-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
 .title-text h1 { font-size: 12.5px; font-weight: 600; }
 .title-text small { max-width: 280px; overflow: hidden; color: var(--text-dim); text-overflow: ellipsis; white-space: nowrap; }
@@ -41,7 +40,12 @@ small { font-size: 10.5px; }
 .title-icon.is-active { background: var(--accent-soft); color: var(--accent); }
 .title-icon:disabled { opacity: 0.35; cursor: default; }
 .title-icon.is-flipped { transform: rotate(180deg); }
-.title-right { display: flex; flex: none; align-items: center; gap: 8px; }
+.title-right { display: flex; flex: none; align-items: center; gap: 8px; margin-right: 4px; }
+/* 自绘窗口按钮：与插件贴靠热区逐像素对齐，热区盖住最大化键时靠 is-snap-hover 表现悬停 */
+.window-controls { display: flex; flex: none; align-self: stretch; margin-right: -10px; }
+.wc-btn { display: grid; flex: none; width: 46px; height: 100%; padding: 0; place-items: center; border: 0; background: transparent; color: var(--text-dim); cursor: default; transition: background 0.12s, color 0.12s; }
+.wc-btn:hover, .wc-btn.is-snap-hover { background: var(--bg-card); color: var(--text); }
+.wc-btn.is-close:hover, .wc-btn.is-close.is-snap-hover { background: var(--red); color: #fff; }
 .theme-control { display: flex; flex: none; align-items: center; gap: 6px; color: var(--text-dim); font-size: 11.5px; white-space: nowrap; }
 .theme-control .field-select { width: 104px; }
 .language-select { width: 104px; }
@@ -103,7 +107,11 @@ small { font-size: 10.5px; }
 .preview-hint { flex: none; padding: 6px 10px; color: var(--text-dim); font-size: 10.5px; border-top: 1px solid var(--border); }
 
 /* ---------- 底部面板（输出 / 元素检查） ---------- */
-.bottom-panel { display: flex; flex: none; flex-direction: column; height: 220px; min-height: 0; background: var(--bg-side); border-top: 1px solid var(--border); }
+.bottom-panel { position: relative; display: flex; flex: none; flex-direction: column; height: 220px; min-height: 0; max-height: calc(100vh - 360px); background: var(--bg-side); border-top: 1px solid var(--border); }
+/* 面板上沿的拖动条：6px 命中区，悬停露出强调色细线 */
+.panel-resizer { position: absolute; top: -4px; right: 0; left: 0; z-index: 2; height: 7px; cursor: row-resize; touch-action: none; }
+.panel-resizer::after { position: absolute; top: 3px; right: 0; left: 0; height: 1px; background: transparent; content: ""; }
+.panel-resizer:hover::after, .panel-resizer:active::after { background: var(--accent); }
 .bottom-panel.is-collapsed { height: 30px; }
 .panel-bar { display: flex; flex: none; align-items: center; gap: 2px; height: 30px; padding: 0 6px; overflow: hidden; white-space: nowrap; border-bottom: 1px solid var(--border); }
 .bottom-panel.is-collapsed .panel-bar { border-bottom: 0; }

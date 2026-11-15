@@ -24,9 +24,9 @@ cargo 在**解析依赖图时**就要读这些路径下的 `Cargo.toml`，早于
 效果：SDL 在 exe 里从约 2.5 MB 降到约 0.9 MB。手柄特性（含 Misc / Paddle / Touchpad 这些额外键）
 不变。
 
-**补丁只在 Windows 上应用**：`prepare.mjs` 在 Linux / macOS 上只还原未打补丁的源码，因为补丁里的空桩
-是按 Windows 的符号集合整理的，evdev / IOKit 的引用还没有对应桩；那两边靠这份源码保证 `[patch]`
-路径存在、构建照常，只是 SDL 体积还是原来的 2.5 MB。
+**补丁在 Windows 与 Linux 上应用**：两边的引用集合都验证过（Linux 上用空桩链接通过、prerelease
+二进制从 52.1 MB 降到 50.3 MB）。macOS 的 IOKit 引用还没验证，默认只还原未打补丁的源码，
+需要时可 `MML_SDL_PATCH_ALL=1` 强制打开。
 
 ### 升级 SDL 时
 

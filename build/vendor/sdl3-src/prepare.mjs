@@ -8,8 +8,8 @@
 //   2. 否则从 static.crates.io 下载 <ver>.crate，按 Cargo.lock 的 checksum 校验后解包。
 //
 // 幂等：补丁内容和版本没变时直接跳过（不会重拷 30 MB）。
-// 目前补丁只针对 Windows 裁剪（Linux/macOS 的 evdev / IOKit 符号集合不同），
-// 但脚本本身跨平台，非 Windows 上也能跑，只是不保证链接通过。
+// 补丁在 Windows 与 Linux 上应用（两者的引用集合都已验证过）；macOS 尚未验证，
+// 默认还原原始源码，需要时用 MML_SDL_PATCH_ALL=1 强制打开。
 
 import fs from "node:fs";
 import os from "node:os";
@@ -35,10 +35,11 @@ const patches = fs.readdirSync(patchDir).filter((f) => f.endsWith(".patch")).sor
 const patchHash = crypto.createHash("sha256");
 for (const p of patches) patchHash.update(fs.readFileSync(path.join(patchDir, p)));
 
-const isWindows = process.platform === "win32";
+// macOS 的 IOKit 引用还没整理，默认不裁剪；其余平台应用补丁
+const applyPatch = process.platform !== "darwin" || process.env.MML_SDL_PATCH_ALL === "1";
 const dest = path.join(root, "target", "vendor", "sdl3-src");
 const stampFile = path.join(dest, ".mml-vendor-stamp");
-const stamp = crypto.createHash("sha256").update(version + "\n" + (isWindows ? patchHash.digest("hex") : "no-patch")).digest("hex");
+const stamp = crypto.createHash("sha256").update(version + "\n" + (applyPatch ? patchHash.digest("hex") : "no-patch")).digest("hex");
 
 if (fs.existsSync(stampFile) && fs.readFileSync(stampFile, "utf8").trim() === stamp) {
   console.log("sdl vendor: 已是最新（" + version + "），跳过");
@@ -92,9 +93,9 @@ fs.cpSync(source, dest, { recursive: true });
 
 // 非 Windows 只还原原始源码：补丁里的空桩是按 Windows 的符号集合整理的，
 // evdev / IOKit 的引用还没有对应桩，打上去会在链接阶段缺符号。
-if (!isWindows) {
+if (!applyPatch) {
   fs.writeFileSync(stampFile, stamp, "utf8");
-  console.log("sdl vendor: 非 Windows，使用未打补丁的源码（" + dest + "）");
+  console.log("sdl vendor: 当前平台不裁剪，使用原始源码（" + dest + "）");
   process.exit(0);
 }
 
@@ -132,4 +133,39 @@ for (const name of patches) {
 }
 
 fs.writeFileSync(stampFile, stamp, "utf8");
+
+// 补丁变了就清掉 sdl3-sys 的构建产物：它的 build script 不监听 SDL 源码，
+// cargo 察觉不到，只有删掉产物才会重跑 CMake。
+function clearSdlArtifacts() {
+  const targetRoot = path.join(root, "target");
+  if (!fs.existsSync(targetRoot)) return 0;
+  const dirs = new Set();
+  const add = (p) => { if (fs.existsSync(p)) dirs.add(p); };
+  const addProfile = (base) => {
+    add(path.join(base, "build"));
+    add(path.join(base, ".fingerprint"));
+    add(path.join(base, "deps"));
+  };
+  addProfile(targetRoot);
+  for (const d1 of fs.readdirSync(targetRoot, { withFileTypes: true })) {
+    if (!d1.isDirectory()) continue;
+    const p1 = path.join(targetRoot, d1.name);
+    addProfile(p1);
+    for (const d2 of fs.readdirSync(p1, { withFileTypes: true })) {
+      if (d2.isDirectory()) addProfile(path.join(p1, d2.name));
+    }
+  }
+  let removed = 0;
+  for (const dir of dirs) {
+    for (const entry of fs.readdirSync(dir)) {
+      if (/^sdl3-sys-|^sdl3_sys-/.test(entry)) {
+        fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
+        removed++;
+      }
+    }
+  }
+  return removed;
+}
+const removed = clearSdlArtifacts();
+if (removed) console.log("sdl vendor: 清掉 " + removed + " 份 sdl3-sys 产物，SDL 会重新编译");
 console.log("sdl vendor: 完成 " + dest);
