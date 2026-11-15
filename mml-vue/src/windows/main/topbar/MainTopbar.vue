@@ -169,6 +169,12 @@ const emit = defineEmits<{
   padding: 0 18px;
   background: var(--bg-side);
   border-bottom: 1px solid var(--border);
+  /* 顶栏自己叠一层：开了透明高斯模糊后 backdrop-filter 会让它成为层叠上下文，
+     顶栏里的下拉（账户切换）原本靠 z-index 压住内容区，被困在这一层里就压不住了 ——
+     内容区的卡片同样带 backdrop-filter，按文档顺序排在后面，直接盖住下拉。
+     10 是「窗口内粘性元素」那一档，见 AGENTS.md §16.6 */
+  position: relative;
+  z-index: 10;
 }
 
 /* 插件接管后原生红黄绿摆在内容上方：按插件发布的清空量让出左侧，

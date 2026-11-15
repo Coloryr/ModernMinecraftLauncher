@@ -188,6 +188,10 @@ onMounted(() => {
   padding: 0 18px;
   background: var(--bg-side);
   border-bottom: 1px solid var(--border);
+  /* 与主窗口顶栏同一条：backdrop-filter 让标题栏成为层叠上下文，标题栏里的下拉
+     （设置窗口的搜索建议、最大化菜单）必须整层压住内容区，见 MainTopbar 的同名说明 */
+  position: relative;
+  z-index: 10;
 }
 
 /* 插件接管后原生红黄绿在内容上方（window 用 Overlay 标题栏）：按插件发布的清空量
