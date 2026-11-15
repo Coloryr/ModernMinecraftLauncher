@@ -3659,6 +3659,7 @@ dependencies = [
  "sha2 0.11.1",
  "tauri",
  "tauri-build",
+ "tauri-plugin-decoration",
  "tauri-plugin-dialog",
  "tokio",
  "tokio-util",

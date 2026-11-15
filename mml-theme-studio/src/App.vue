@@ -46,6 +46,11 @@ const newFile = ref(false);
 // IDE 布局：活动栏控制项目文件 / 预览 / 检查 / 底部面板
 const sidebarOpen = ref(true);
 const previewOpen = ref(true);
+// 编辑器可以收起，把宽度让给预览；中间的分隔条可拖动
+const editorOpen = ref(true);
+const previewWidth = ref(560);
+// 自绘标题栏是否已由插件接管
+const decorated = ref(false);
 const panelOpen = ref(true);
 const panelCollapsed = ref(false);
 const panelTab = ref<'output' | 'inspector'>('output');
@@ -381,6 +386,30 @@ function togglePanel() {
   if (panelOpen.value) panelCollapsed.value = false;
 }
 
+let splitStart: { x: number; width: number } | null = null;
+
+function startSplit(event: PointerEvent) {
+  if (!editorOpen.value || !previewOpen.value) return;
+  event.preventDefault();
+  splitStart = { x: event.clientX, width: previewWidth.value };
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+}
+
+/** 向左拖变宽：预览宽度等于起拖宽度减去水平位移 */
+function moveSplit(event: PointerEvent) {
+  if (!splitStart) return;
+  const next = splitStart.width - (event.clientX - splitStart.x);
+  const max = Math.max(360, window.innerWidth - 520);
+  previewWidth.value = Math.round(Math.min(Math.max(next, 320), max));
+}
+
+function endSplit(event: PointerEvent) {
+  if (!splitStart) return;
+  splitStart = null;
+  const target = event.currentTarget as HTMLElement;
+  if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
+}
+
 function stopInspector() {
   if (!inspecting.value) return;
   setInspecting(false);
@@ -446,6 +475,10 @@ watch([sidebarOpen, previewOpen, panelOpen, panelCollapsed], async () => {
 });
 watch(output, () => { void nextTick(() => { if (outputHost.value) outputHost.value.scrollTop = outputHost.value.scrollHeight; }); });
 onMounted(async () => {
+  // 自绘标题栏：窗口建出来是隐藏的，激活成功后由这个命令显示；失败退回原生 frame
+  void call('activateDecoration')
+    .then((mode) => { decorated.value = mode === 'custom'; })
+    .catch(() => { decorated.value = false; });
   try {
     unsubscribe = await onEvent((event) => {
       if (event.type === 'log') output.value = (output.value + event.text).slice(-150000);
@@ -479,11 +512,11 @@ onBeforeUnmount(() => { window.clearInterval(elapsedTimer); observer?.disconnect
 </script>
 
 <template>
-  <div class="studio-shell">
-    <header class="titlebar">
-      <div class="title-brand">
-        <span class="brand-mark">M²L</span>
-        <div class="title-text"><h1>{{ t('title') }}</h1><small>{{ project?.name || t('empty') }}</small></div>
+  <div class="studio-shell" :class="{ 'is-decorated': decorated }">
+    <header class="titlebar" data-tauri-drag-region>
+      <div class="title-brand" data-tauri-drag-region>
+        <span class="brand-mark" data-tauri-drag-region>M²L</span>
+        <div class="title-text" data-tauri-drag-region><h1 data-tauri-drag-region>{{ t('title') }}</h1><small data-tauri-drag-region>{{ project?.name || t('empty') }}</small></div>
       </div>
       <nav class="title-actions" :aria-label="t('title')">
         <button class="title-icon" :disabled="working" :title="t('new')" :aria-label="t('new')" @click="run(() => showNew('project'))"><GlyphIcon name="plus" :size="16" /></button>
@@ -493,6 +526,7 @@ onBeforeUnmount(() => { window.clearInterval(elapsedTimer); observer?.disconnect
         <button class="title-icon" :disabled="!project || working" :title="t('build')" :aria-label="t('build')" @click="run(build)"><GlyphIcon name="export" :size="16" /></button>
         <button class="title-icon" :disabled="!project || working" :title="t('openEditorHint')" :aria-label="t('openEditor')" @click="run(() => call('openEditor'))"><GlyphIcon name="wrench" :size="16" /></button>
       </nav>
+      <div class="title-drag" data-tauri-drag-region />
       <div class="title-right">
         <label class="theme-control" for="studio-theme">
           <span>{{ t('studioTheme') }}</span>
@@ -520,7 +554,7 @@ onBeforeUnmount(() => { window.clearInterval(elapsedTimer); observer?.disconnect
         <CssCatalog v-if="catalog.controls.length || catalog.variables.length" :catalog="catalog" :enabled="!!project && !working" @insert="run(() => appendToCustomCss($event))" />
       </aside>
 
-      <main class="editor">
+      <main v-if="editorOpen" class="editor">
         <div class="editor-tabs">
           <div class="editor-tab" :class="{ 'is-empty': !active }">
             <GlyphIcon name="document" :size="12" />
@@ -534,10 +568,13 @@ onBeforeUnmount(() => { window.clearInterval(elapsedTimer); observer?.disconnect
         <div v-else class="empty-pane"><span class="empty-symbol">{ }</span><p>{{ t('chooseFile') }}</p><p class="muted">CSS · Vue · HTML · TypeScript</p></div>
       </main>
 
-      <aside v-if="previewOpen" class="preview-panel">
+      <div v-if="editorOpen && previewOpen" class="splitter" @pointerdown="startSplit" @pointermove="moveSplit" @pointerup="endSplit" @pointercancel="endSplit" />
+
+      <aside v-if="previewOpen" class="preview-panel" :class="{ 'is-full': !editorOpen }" :style="editorOpen ? { width: previewWidth + 'px' } : undefined">
         <div class="panel-head">
           <strong>{{ t('contentPreview') }}</strong>
           <span class="grow" />
+          <button class="title-icon" :class="{ 'is-active': !editorOpen }" :title="editorOpen ? t('hideEditor') : t('showEditor')" :aria-label="editorOpen ? t('hideEditor') : t('showEditor')" @click="editorOpen = !editorOpen"><GlyphIcon :name="editorOpen ? 'maximize' : 'restore'" :size="14" /></button>
           <button class="title-icon" :disabled="!project || working" :title="t('preview')" :aria-label="t('preview')" @click="run(startPreview)"><GlyphIcon name="play" :size="14" /></button>
           <button class="title-icon" :disabled="!previewUrl || working" :title="t('stop')" :aria-label="t('stop')" @click="run(() => call('stop'))"><GlyphIcon name="stop" :size="14" /></button>
           <button class="title-icon" :disabled="!previewUrl" :title="t('reload')" :aria-label="t('reload')" @click="reloadPreview"><GlyphIcon name="refresh" :size="14" /></button>

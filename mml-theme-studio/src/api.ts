@@ -41,6 +41,7 @@ interface Actions {
   preview: { input: undefined; output: string };
   stop: { input: undefined; output: undefined };
   cancel: { input: undefined; output: undefined };
+  activateDecoration: { input: undefined; output: string };
   locale: { input: Locale; output: undefined };
   theme: { input: Theme; output: Theme };
   dirty: { input: boolean; output: undefined };

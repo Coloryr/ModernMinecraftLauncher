@@ -17,12 +17,14 @@ use crate::{
     studio::Studio,
 };
 use std::{path::PathBuf, sync::Arc, time::Duration};
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent, webview::PageLoadEvent};
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 
 /// 启动桌面工具
 pub fn run() {
     tauri::Builder::default()
+        // 必须在任何 webview 创建之前注册：插件拿原生窗口句柄替换系统装饰
+        .plugin(tauri_plugin_decoration::init())
         // F12 只归预览的元素检查：关掉 WebView2 自带的浏览器快捷键（含 F12 / Ctrl+Shift+I），
         // 免得它弹出整个工具的开发者工具窗口。
         .plugin(
@@ -67,16 +69,11 @@ pub fn run() {
                 WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                     .title(render(config.locale, MessageKey::Title, &[]))
                     .inner_size(1440.0, 920.0)
-                    .min_inner_size(1000.0, 640.0)
+                    .min_inner_size(1240.0, 780.0)
                     .center()
                     .theme(Some(config.theme.native()))
                     .background_color(config.theme.color())
                     .visible(false)
-                    .on_page_load(|window, payload| {
-                        if payload.event() == PageLoadEvent::Finished {
-                            let _ = window.show();
-                        }
-                    })
                     .build()?;
             // 前端加载失败时也要能看到窗口，而不是只剩一个进程
             reveal_later(window.clone());
@@ -141,6 +138,7 @@ pub fn run() {
             commands::studio_preview,
             commands::studio_stop,
             commands::studio_cancel,
+            commands::studio_activate_decoration,
             commands::studio_locale,
             commands::studio_theme,
             commands::studio_dirty,

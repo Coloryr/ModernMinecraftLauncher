@@ -3,5 +3,10 @@
   "identifier": "default",
   "description": "编辑器窗口的默认权限；预览窗口不在这张表里，因此拿不到 IPC",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "decoration:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize"
+  ]
 }

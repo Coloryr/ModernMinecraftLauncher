@@ -161,6 +161,33 @@ pub async fn studio_dirty(studio: State<'_, Arc<Studio>>, input: bool) -> Result
     Ok(())
 }
 
+/// 激活自绘标题栏并显示窗口；失败时退回原生 frame 再显示
+///
+/// # 返回值
+///
+/// 成功返回 `custom`
+#[tauri::command]
+pub async fn studio_activate_decoration(
+    window: tauri::WebviewWindow,
+) -> Result<&'static str, String> {
+    use tauri_plugin_decoration::WebviewWindowExt;
+
+    if let Err(error) = window.activate_decoration().await {
+        let _ = window.restore_decoration().await;
+        let _ = window.show();
+        return Err(format!("decoration: {error}"));
+    }
+    // 原生红黄绿的位置要在激活之后、显示之前定好
+    #[cfg(target_os = "macos")]
+    if let Err(error) = window.set_traffic_lights_inset(12.0, 16.0).await {
+        let _ = window.restore_decoration().await;
+        let _ = window.show();
+        return Err(format!("traffic lights: {error}"));
+    }
+    window.show().map_err(|error| error.to_string())?;
+    Ok("custom")
+}
+
 /// 在外部编辑器里打开项目；顺序是 VS Code、Cursor、文件管理器
 #[tauri::command]
 pub async fn studio_open_editor(studio: State<'_, Arc<Studio>>) -> Result<String, String> {

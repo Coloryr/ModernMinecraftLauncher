@@ -21,7 +21,15 @@ small { font-size: 10.5px; }
 .studio-shell .inspector { user-select: text; -webkit-user-select: text; }
 
 /* ---------- 标题栏 ---------- */
-.titlebar { display: flex; flex: none; align-items: center; gap: 12px; height: 46px; padding: 0 10px; background: var(--bg-side); border-bottom: 1px solid var(--border); }
+/* 自绘装饰的控件由插件叠加在窗口右上角，高度与标题栏一致 */
+:root {
+  --tauri-plugin-decoration-titlebar-height: 46px;
+  --tauri-plugin-decoration-z-index: 3;
+}
+.titlebar { position: relative; z-index: 2; display: flex; flex: none; align-items: center; gap: 12px; height: 46px; padding-left: max(10px, var(--tauri-plugin-decoration-left-clearance, 0px)); padding-right: max(10px, var(--tauri-plugin-decoration-right-clearance, 0px)); background: var(--bg-side); border-bottom: 1px solid var(--border); }
+/* 品牌区整块可拖动：子元素不给命中，鼠标按下落在 .title-brand 上 */
+.title-brand > * { pointer-events: none; }
+.title-drag { flex: 1; align-self: stretch; }
 .title-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .brand-mark { display: grid; flex: none; width: 26px; height: 26px; place-items: center; border: 1px solid var(--accent-border); border-radius: 8px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; }
 .title-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
@@ -33,10 +41,10 @@ small { font-size: 10.5px; }
 .title-icon.is-active { background: var(--accent-soft); color: var(--accent); }
 .title-icon:disabled { opacity: 0.35; cursor: default; }
 .title-icon.is-flipped { transform: rotate(180deg); }
-.title-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.theme-control { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 11.5px; white-space: nowrap; }
-.theme-control .field-select { width: 84px; }
-.language-select { width: 84px; }
+.title-right { display: flex; flex: none; align-items: center; gap: 8px; }
+.theme-control { display: flex; flex: none; align-items: center; gap: 6px; color: var(--text-dim); font-size: 11.5px; white-space: nowrap; }
+.theme-control .field-select { width: 104px; }
+.language-select { width: 104px; }
 
 /* ---------- 工作台：活动栏 / 侧栏 / 编辑器 / 预览 ---------- */
 .workbench { display: flex; flex: 1; min-height: 0; }
@@ -57,7 +65,11 @@ small { font-size: 10.5px; }
 .file-list .recent-entry { width: 100%; height: auto; word-break: break-all; text-align: left; white-space: normal; }
 .file-list p { margin: 8px 4px 16px; }
 
-.editor { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.editor { display: flex; flex: 1; flex-direction: column; min-width: 320px; min-height: 0; }
+/* 编辑器与预览之间的拖动分隔条：4px 命中区，中间一条 1px 的线 */
+.splitter { position: relative; z-index: 2; flex: none; width: 5px; margin: 0 -2px; cursor: col-resize; touch-action: none; }
+.splitter::after { position: absolute; inset: 0 2px; background: var(--border); content: ""; }
+.splitter:hover::after, .splitter:active::after { background: var(--accent); }
 .editor-tabs { display: flex; flex: none; align-items: center; gap: 4px; height: 36px; padding: 0 6px; background: var(--bg-side); border-bottom: 1px solid var(--border); }
 .editor-tab { display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 10px; border-bottom: 1px solid transparent; color: var(--text-dim); font-size: 11.5px; }
 .editor-tab.is-empty { color: var(--text-dim); }
@@ -65,7 +77,9 @@ small { font-size: 10.5px; }
 .dirty-mark { color: var(--yellow); }
 .editor-host { flex: 1; min-height: 0; }
 
-.preview-panel { display: flex; flex: none; flex-direction: column; width: 46%; min-width: 340px; max-width: 780px; min-height: 0; background: var(--bg-side); border-left: 1px solid var(--border); }
+.preview-panel { display: flex; flex: none; flex-direction: column; width: 560px; min-width: 0; min-height: 0; background: var(--bg-side); border-left: 1px solid var(--border); }
+/* 编辑器收起后预览吃掉剩余宽度 */
+.preview-panel.is-full { flex: 1; width: auto; }
 .preview-tools { display: flex; flex: none; gap: 6px; padding: 5px 8px; border-bottom: 1px solid var(--border); }
 .preview-tools .field-select { flex: 1; min-width: 0; }
 .preview-size { display: flex; flex: none; align-items: center; gap: 6px; padding: 4px 8px; border-bottom: 1px solid var(--border); color: var(--text-dim); font-size: 10.5px; }
