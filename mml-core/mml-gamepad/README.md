@@ -40,8 +40,12 @@ cargo test -p mml-gamepad --lib
 设备探测：
 
 ```sh
-cargo run -p mml-gamepad --example probe
+cargo run -p mml-gamepad --example probe          # 只枚举
+cargo run -p mml-gamepad --example probe -- 10    # 枚举后采集 10 秒输入
 ```
+
+macOS 的 GameController 要进程跑 run loop 才会返回已连接手柄，示例在枚举与采集期间会驱动一下；
+Windows / Linux 直接读 SDL 事件。
 
 物理验收仍需连接手柄后检查热插拔、摇杆方向与死区、各按钮、游戏和菜单切换。
 自动测试不能替代驱动和实际手感验证；接上手柄后跑 `cargo run -p mml-gamepad --example gamepad_demo`

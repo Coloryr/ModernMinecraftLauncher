@@ -8,9 +8,11 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
-    thread,
     time::{Duration, Instant},
 };
+
+#[path = "support/run_loop.rs"]
+mod run_loop;
 
 /// 每段刷新的间隔
 const TICK: Duration = Duration::from_millis(500);
@@ -44,7 +46,8 @@ fn main() {
     let started = Instant::now();
     while !stop.load(Ordering::SeqCst) && started.elapsed() < Duration::from_secs(seconds) {
         dump(started.elapsed().as_secs_f64());
-        thread::sleep(TICK);
+        // macOS 靠 run loop 收 GameController 的连接通知，命令行要自己驱动
+        run_loop::run(TICK.as_secs_f64());
     }
 
     println!("\n=== 结束（已跑 {:.1} 秒）===", started.elapsed().as_secs_f64());
