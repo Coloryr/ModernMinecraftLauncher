@@ -21,16 +21,16 @@ cargo 在**解析依赖图时**就要读这些路径下的 `Cargo.toml`，早于
    `haptic` / `sensor` / `power`（我们只用 joystick / gamepad / hidapi），并强制只编静态库；
 3. 新增 `SDL/src/mml_stubs.c`：保留代码里对被移除 API 的引用所需的空实现。
 
-效果：SDL 在 exe 里从约 2.5 MB 降到约 0.9 MB。手柄特性（含 Misc / Paddle / Touchpad 这些额外键）
-不变。
+效果：Windows 上 SDL 在 exe 里从约 2.5 MB 降到约 0.9 MB。手柄特性（含 Misc / Paddle / Touchpad
+这些额外键）不变。
 
-**补丁在 Windows 与 Linux 上应用**：两边的引用集合都验证过（Linux 上用空桩链接通过、prerelease
-二进制从 52.1 MB 降到 50.3 MB）。macOS 的 IOKit 引用还没验证，默认只还原未打补丁的源码，
-需要时可 `MML_SDL_PATCH_ALL=1` 强制打开。
+**补丁在 Windows、Linux 与 macOS 上应用**：三边的引用集合都验证过（Linux 上用空桩链接通过、
+prerelease 二进制从 52.1 MB 降到 50.3 MB；macOS 上手柄探测与读取线程通过，调试版静态库
+8.1 MB 降到 3.9 MB）。
 
 ### 升级 SDL 时
 
 1. 改 `sdl3-sys` 版本 → `cargo update -p sdl3-sys`，确认 `Cargo.lock` 里的 `sdl3-src` 版本；
 2. 跑 `node build/vendor/sdl3-src/prepare.mjs`，脚本会把新版本源码还原出来并按旧补丁尝试应用；
 3. 补丁冲突时按新源码更新 `sdl3-src/patches/sdl-trim.patch`（保持 `MML` 标记，脚本靠它校验补丁是否真的落地）；
-4. 链接报 `LNK2019` 时，把缺失的符号补进 `mml_stubs.c` 对应的补丁块，重新生成补丁。
+4. 链接报缺符号时（Windows 是 `LNK2019`），把缺失的符号补进 `mml_stubs.c` 对应的补丁块，重新生成补丁。

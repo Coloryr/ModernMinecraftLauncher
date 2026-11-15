@@ -8,8 +8,7 @@
 //   2. 否则从 static.crates.io 下载 <ver>.crate，按 Cargo.lock 的 checksum 校验后解包。
 //
 // 幂等：补丁内容和版本没变时直接跳过（不会重拷 30 MB）。
-// 补丁在 Windows 与 Linux 上应用（两者的引用集合都已验证过）；macOS 尚未验证，
-// 默认还原原始源码，需要时用 MML_SDL_PATCH_ALL=1 强制打开。
+// 补丁在 Windows、Linux 与 macOS 上应用，三者的引用集合都已验证过。
 
 import fs from "node:fs";
 import os from "node:os";
@@ -35,11 +34,9 @@ const patches = fs.readdirSync(patchDir).filter((f) => f.endsWith(".patch")).sor
 const patchHash = crypto.createHash("sha256");
 for (const p of patches) patchHash.update(fs.readFileSync(path.join(patchDir, p)));
 
-// macOS 的 IOKit 引用还没整理，默认不裁剪；其余平台应用补丁
-const applyPatch = process.platform !== "darwin" || process.env.MML_SDL_PATCH_ALL === "1";
 const dest = path.join(root, "target", "vendor", "sdl3-src");
 const stampFile = path.join(dest, ".mml-vendor-stamp");
-const stamp = crypto.createHash("sha256").update(version + "\n" + (applyPatch ? patchHash.digest("hex") : "no-patch")).digest("hex");
+const stamp = crypto.createHash("sha256").update(version + "\n" + patchHash.digest("hex")).digest("hex");
 
 if (fs.existsSync(stampFile) && fs.readFileSync(stampFile, "utf8").trim() === stamp) {
   console.log("sdl vendor: 已是最新（" + version + "），跳过");
@@ -90,14 +87,6 @@ console.log("sdl vendor: 源 " + source + " → " + dest);
 fs.rmSync(dest, { recursive: true, force: true });
 fs.mkdirSync(path.dirname(dest), { recursive: true });
 fs.cpSync(source, dest, { recursive: true });
-
-// 非 Windows 只还原原始源码：补丁里的空桩是按 Windows 的符号集合整理的，
-// evdev / IOKit 的引用还没有对应桩，打上去会在链接阶段缺符号。
-if (!applyPatch) {
-  fs.writeFileSync(stampFile, stamp, "utf8");
-  console.log("sdl vendor: 当前平台不裁剪，使用原始源码（" + dest + "）");
-  process.exit(0);
-}
 
 // 应用补丁：git apply 在仓库内以仓库根为基准，显式 --directory 指到产物目录。
 const rel = path.relative(root, dest).split(path.sep).join("/");
