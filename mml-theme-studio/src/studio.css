@@ -1,6 +1,6 @@
 /* 工具布局：VS Code 式工作台。控件与颜色沿用启动器的样式变量（mml-vue 的 themes.css / controls.css）。 */
 * { box-sizing: border-box; }
-body { margin: 0; font: 12.5px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); }
+body { margin: 0; font: 12.5px/1.5 var(--app-font, "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, sans-serif); background: var(--bg); color: var(--text); }
 button, input, select { font-family: inherit; }
 button { cursor: pointer; }
 h1, h2, p { margin: 0; }
@@ -23,10 +23,10 @@ small { font-size: 10.5px; }
 /* ---------- 标题栏 ---------- */
 /* 自绘装饰的控件由插件叠加在窗口右上角，高度与标题栏一致 */
 :root {
-  --tauri-plugin-decoration-titlebar-height: 46px;
+  --tauri-plugin-decoration-titlebar-height: var(--titlebar-h);
   --tauri-plugin-decoration-z-index: 3;
 }
-.titlebar { position: relative; z-index: 2; display: flex; flex: none; align-items: center; gap: 12px; height: 46px; padding-left: max(10px, var(--tauri-plugin-decoration-left-clearance, 0px)); padding-right: max(10px, var(--tauri-plugin-decoration-right-clearance, 0px)); background: var(--bg-side); border-bottom: 1px solid var(--border); }
+.titlebar { position: relative; z-index: 2; display: flex; flex: none; align-items: center; gap: 12px; height: var(--titlebar-h); padding-left: max(10px, var(--tauri-plugin-decoration-left-clearance, 0px)); padding-right: max(10px, var(--tauri-plugin-decoration-right-clearance, 0px)); background: var(--bg-side); border-bottom: 1px solid var(--border); }
 /* 品牌区整块可拖动：子元素不给命中，鼠标按下落在 .title-brand 上 */
 .title-brand > * { pointer-events: none; }
 .title-drag { flex: 1; align-self: stretch; }
@@ -35,17 +35,17 @@ small { font-size: 10.5px; }
 .title-text h1 { font-size: 12.5px; font-weight: 600; }
 .title-text small { max-width: 280px; overflow: hidden; color: var(--text-dim); text-overflow: ellipsis; white-space: nowrap; }
 .title-actions { display: flex; align-items: center; gap: 2px; margin-left: 6px; }
-.title-icon { display: grid; flex: none; width: 28px; height: 28px; padding: 0; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--text-dim); transition: background 0.12s, color 0.12s; }
-.title-icon:hover:not(:disabled) { background: var(--bg-card); color: var(--text); }
+.title-icon { display: grid; flex: none; width: 32px; height: 32px; padding: 0; place-items: center; border: 0; border-radius: var(--ctl-radius); background: transparent; color: var(--text-dim); transition: background 0.12s, color 0.12s; }
+.title-icon:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .title-icon.is-active { background: var(--accent-soft); color: var(--accent); }
 .title-icon:disabled { opacity: 0.35; cursor: default; }
 .title-icon.is-flipped { transform: rotate(180deg); }
 .title-right { display: flex; flex: none; align-items: center; gap: 8px; margin-right: 4px; }
-/* 自绘窗口按钮：与插件贴靠热区逐像素对齐，热区盖住最大化键时靠 is-snap-hover 表现悬停 */
-.window-controls { display: flex; flex: none; align-self: stretch; margin-right: -10px; }
-.wc-btn { display: grid; flex: none; width: 46px; height: 100%; padding: 0; place-items: center; border: 0; background: transparent; color: var(--text-dim); cursor: default; transition: background 0.12s, color 0.12s; }
-.wc-btn:hover, .wc-btn.is-snap-hover { background: var(--bg-card); color: var(--text); }
-.wc-btn.is-close:hover, .wc-btn.is-close.is-snap-hover { background: var(--red); color: #fff; }
+/* 自绘窗口按钮：尺寸 / 圆角 / 悬停沿用 mml 的窗口按钮；热区盖住最大化键时靠 is-snap-hover 表现悬停 */
+.window-controls { display: flex; flex: none; align-items: center; align-self: center; gap: 2px; margin-right: 4px; }
+.wc-btn { display: flex; flex: none; width: 34px; height: 34px; padding: 0; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: transparent; color: var(--text-dim); cursor: default; transition: background 0.12s, color 0.12s; }
+.wc-btn:hover, .wc-btn.is-snap-hover { background: var(--bg-hover); color: var(--text); }
+.wc-btn.is-close:hover, .wc-btn.is-close.is-snap-hover { background: var(--window-close); color: var(--on-accent); }
 .theme-control { display: flex; flex: none; align-items: center; gap: 6px; color: var(--text-dim); font-size: 11.5px; white-space: nowrap; }
 .theme-control .field-select { width: 104px; }
 .language-select { width: 104px; }
@@ -54,7 +54,7 @@ small { font-size: 10.5px; }
 .workbench { display: flex; flex: 1; min-height: 0; }
 .activity-bar { display: flex; flex: none; flex-direction: column; align-items: center; gap: 2px; width: 46px; padding: 6px 0; background: var(--bg-side); border-right: 1px solid var(--border); }
 .activity-btn { display: grid; width: 36px; height: 36px; padding: 0; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--text-dim); transition: background 0.12s, color 0.12s; }
-.activity-btn:hover:not(:disabled) { background: var(--bg-card); color: var(--text); }
+.activity-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .activity-btn.is-active { background: var(--accent-soft); color: var(--accent); }
 .activity-btn:disabled { opacity: 0.35; cursor: default; }
 
@@ -66,7 +66,17 @@ small { font-size: 10.5px; }
 .file-list .file-entry { display: flex; justify-content: start; gap: 6px; width: 100%; overflow: hidden; font-weight: normal; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .file-entry span { color: var(--text-dim); }
 .file-list .selected, .catalog .selected { color: var(--accent); background: var(--accent-soft); }
-.file-list .recent-entry { width: 100%; height: auto; word-break: break-all; text-align: left; white-space: normal; }
+/* 最近项目：一条一张卡，图标说明"这是个项目"，名字一行、路径小字一行、类型标签一行 */
+.file-list .recent-entry { display: flex; gap: 8px; align-items: flex-start; width: 100%; padding: 7px 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; }
+.file-list .recent-entry + .recent-entry { margin-top: 2px; }
+.file-list .recent-entry:hover:not(:disabled) { background: var(--bg-hover); }
+.file-list .recent-entry:disabled { opacity: 0.5; cursor: default; }
+.file-list .recent-icon { display: grid; flex: none; width: 26px; height: 26px; place-items: center; border-radius: 8px; background: var(--accent-soft); color: var(--accent); }
+.file-list .recent-text { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
+.file-list .recent-name { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.file-list .recent-path { overflow: hidden; color: var(--text-dim); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+/* 类型单独一行：与名字同排会把名字挤成省略号，路径那排又会挤掉文件夹名 */
+.file-list .recent-kind { align-self: flex-start; margin-top: 2px; padding: 1px 6px; border-radius: 999px; background: var(--bg-hover); color: var(--text-dim); font-size: 10.5px; white-space: nowrap; }
 .file-list p { margin: 8px 4px 16px; }
 
 .editor { display: flex; flex: 1; flex-direction: column; min-width: 320px; min-height: 0; }
@@ -115,7 +125,7 @@ small { font-size: 10.5px; }
 .bottom-panel.is-collapsed { height: 30px; }
 .panel-bar { display: flex; flex: none; align-items: center; gap: 2px; height: 30px; padding: 0 6px; overflow: hidden; white-space: nowrap; border-bottom: 1px solid var(--border); }
 .bottom-panel.is-collapsed .panel-bar { border-bottom: 0; }
-.panel-tab { height: 100%; padding: 0 10px; border: 0; border-bottom: 1px solid transparent; background: transparent; color: var(--text-dim); font: inherit; font-size: 11px; cursor: pointer; }
+.panel-tab { display: inline-flex; align-items: center; height: 100%; padding: 0 10px; border: 0; border-bottom: 1px solid transparent; background: transparent; color: var(--text-dim); font: inherit; font-size: 11px; cursor: pointer; }
 .panel-tab.is-active { color: var(--text); border-bottom-color: var(--accent); }
 .panel-tab:disabled { opacity: 0.4; cursor: default; }
 .panel-meta { margin-right: 8px; overflow: hidden; color: var(--text-dim); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
@@ -155,6 +165,3 @@ small { font-size: 10.5px; }
 .modal-actions { display: flex; justify-content: end; gap: 8px; margin-top: 24px; }
 .path-line { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .path-line output { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--text-dim); font-size: 11.5px; }
-
-/* 下拉沿用系统弹层，避免被预览子视图遮挡。 */
-select.field-select, select.field-select::picker(select) { appearance: auto; background-image: none; }

@@ -191,6 +191,27 @@ async fn open_project_requires_manifest_and_build_script() {
     );
 }
 
+/// 最近项目条目：名字与类型从 theme.json 读，目录没了只留路径与目录名
+#[tokio::test]
+async fn recent_projects_keep_name_and_type() {
+    let root = temp("recent");
+    let project = root.join("custom-home");
+    fixture(&project, "home").await;
+    let entry = recent_project(&project.to_string_lossy()).await;
+    assert_eq!(entry.name, "Studio test");
+    assert_eq!(entry.template, Some(Template::Home));
+
+    std::fs::write(project.join("src/index.html"), "<!doctype html>").unwrap();
+    assert_eq!(
+        recent_project(&project.to_string_lossy()).await.template,
+        Some(Template::HomeHtml)
+    );
+
+    let entry = recent_project(&root.join("moved-away").to_string_lossy()).await;
+    assert_eq!(entry.name, "moved-away");
+    assert_eq!(entry.template, None);
+}
+
 /// 主页带 index.html 时按 HTML 路线识别，没有则是组件路线
 #[tokio::test]
 async fn open_project_detects_home_routes() {

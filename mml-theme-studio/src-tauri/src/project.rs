@@ -86,6 +86,18 @@ pub struct Project {
     pub revision: String,
 }
 
+/// 最近项目列表里的一条
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentProject {
+    /// 项目根目录
+    pub path: String,
+    /// 显示名，取 theme.json 的 name；读不到时用目录名
+    pub name: String,
+    /// demo 类型；目录被移走或 theme.json 损坏时为空
+    pub template: Option<Template>,
+}
+
 /// 新建项目请求
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -322,6 +334,54 @@ async fn prepare(
     Ok(prepared)
 }
 
+/// 按 theme.json 的 type 与 src/index.html 判断 demo 类型
+///
+/// - `root`: 项目根目录
+/// - `kind`: theme.json 里的 type
+async fn template_of(root: &Path, kind: &str) -> Option<Template> {
+    // 整页与主页都可能走 index.html；Vue 主页没有 index.html，按这个区分两条路线
+    let has_html = tokio::fs::try_exists(root.join("src/index.html"))
+        .await
+        .unwrap_or(false);
+    match kind {
+        "page" if has_html => Some(Template::Html),
+        "home" if has_html => Some(Template::HomeHtml),
+        _ => Template::parse(kind),
+    }
+}
+
+/// 最近项目条目的展示信息，目录已经不在时照样给出路径与目录名
+///
+/// - `path`: 配置里记的项目根目录
+pub async fn recent_project(path: &str) -> RecentProject {
+    let root = Path::new(path);
+    let manifest = read_json(&root.join("src/theme.json")).await.ok();
+    let kind = manifest
+        .as_ref()
+        .and_then(|value| value.get("type"))
+        .and_then(Value::as_str);
+    let template = match kind {
+        Some(kind) => template_of(root, kind).await,
+        None => None,
+    };
+    let name = manifest
+        .as_ref()
+        .and_then(|value| value.get("name"))
+        .and_then(Value::as_str)
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            root.file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+        })
+        .unwrap_or_else(|| path.to_string());
+    RecentProject {
+        path: path.to_string(),
+        name,
+        template,
+    }
+}
+
 /// 打开项目并识别模板
 pub async fn open_project(root: &Path) -> Result<Project, StudioError> {
     let invalid = || StudioError::new(MessageKey::InvalidProject);
@@ -336,15 +396,7 @@ pub async fn open_project(root: &Path) -> Result<Project, StudioError> {
         .get("type")
         .and_then(Value::as_str)
         .ok_or_else(invalid)?;
-    // 整页与主页都可能走 index.html；Vue 主页没有 index.html，按这个区分两条路线
-    let has_html = tokio::fs::try_exists(root.join("src/index.html"))
-        .await
-        .unwrap_or(false);
-    let template = match kind {
-        "page" if has_html => Template::Html,
-        "home" if has_html => Template::HomeHtml,
-        _ => Template::parse(kind).ok_or_else(invalid)?,
-    };
+    let template = template_of(&root, kind).await.ok_or_else(invalid)?;
     if !package
         .get("scripts")
         .and_then(|scripts| scripts.get("build"))

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { asset, respond } from './assets.mjs';
 import { INSPECTOR_SCRIPT } from './inspector.mjs';
 
-export async function htmlPreview(root) {
+export async function htmlPreview(root, template = 'html') {
   const clients = new Set();
   const server = createServer(async (request, response) => {
     const path = new URL(request.url, 'http://127.0.0.1').pathname;
@@ -16,7 +16,9 @@ export async function htmlPreview(root) {
       return;
     }
     const file = await asset(join(root, 'src'), path === '/' ? 'index.html' : path.slice(1));
-    if (file?.mime.startsWith('text/html')) file.data = Buffer.from(file.data.toString('utf8').replace(/<\/head>/i, `<script>new EventSource("/__reload").onmessage=()=>location.reload();${INSPECTOR_SCRIPT}</script></head>`));
+    // 自定义主页面整页就是内容区，元素树从 body 开始；整页 HTML 仍是整页，保持默认根
+    const inspectRoot = template === 'home-html' ? 'window.__mmlInspectRoot="body";' : '';
+    if (file?.mime.startsWith('text/html')) file.data = Buffer.from(file.data.toString('utf8').replace(/<\/head>/i, `<script>new EventSource("/__reload").onmessage=()=>location.reload();${inspectRoot}${INSPECTOR_SCRIPT}</script></head>`));
     respond(response, file);
   });
   const watcher = watch(join(root, 'src'), { recursive: true }, () => { for (const client of clients) client.write('data: reload\n\n'); });

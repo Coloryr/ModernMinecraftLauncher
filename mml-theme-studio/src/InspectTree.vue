@@ -8,8 +8,8 @@ defineProps<{
   depth: number;
   /** 已展开节点的 path key */
   expanded: Set<string>;
-  /** 当前选中节点的 path key */
-  selected: string;
+  /** 当前选中节点的 path key；还没选中时为空 */
+  selected: string | null;
 }>();
 const emit = defineEmits<{
   toggle: [node: InspectTreeNode];

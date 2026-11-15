@@ -77,7 +77,8 @@ try {
     foreach ($t in $targets) {
         Write-Host "正在构建 prerelease $($t['arch'])（$($t['triple'])）..."
         # 必须带 custom-protocol：不带的话 tauri 把这次构建当成 dev，
-        # 前端会连接 localhost:1420；未启动开发服务时无法加载页面。        cargo build --profile prerelease --target $t['triple'] --features custom-protocol,prerelease
+        # 前端会连接 localhost:1420；未启动开发服务时无法加载页面。
+        cargo build --profile prerelease --target $t['triple'] --features custom-protocol,prerelease
         if ($LASTEXITCODE -ne 0) {
             throw "构建失败：$($t['arch'])（退出码 $LASTEXITCODE）。arm64 交叉编译需要对应架构的 MSVC 工具链。"
         }

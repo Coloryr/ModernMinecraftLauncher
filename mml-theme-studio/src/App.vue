@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { bootstrap, call, onEvent, type Catalog, type CreateProject, type Project, type SourceFile, type Theme } from './api';
+import { bootstrap, call, onEvent, type Catalog, type CreateProject, type Project, type RecentProject, type SourceFile, type Theme } from './api';
 import { locale, t } from './i18n';
 import EditorPane from './EditorPane.vue';
 import FileTree from './FileTree.vue';
@@ -13,7 +13,7 @@ import { INSPECT_PROTOCOL } from './inspector';
 import { registerSnapTarget } from './decoration';
 
 const project = ref<Project | null>(null);
-const recent = ref<string[]>([]);
+const recent = ref<RecentProject[]>([]);
 const files = ref<string[]>([]);
 const active = ref<SourceFile | null>(null);
 const draft = ref('');
@@ -151,7 +151,7 @@ async function loadProject(value: Project) {
   active.value = null;
   draft.value = '';
   catalog.value = { controls: [], variables: [] };
-  recent.value = [value.root, ...recent.value.filter((path) => path !== value.root)].slice(0, 8);
+  recent.value = [{ path: value.root, name: value.name, template: value.template }, ...recent.value.filter((entry) => entry.path !== value.root)].slice(0, 8);
   await refresh();
   const first = [value.template === 'css' ? 'custom.css' : 'src/App.vue', 'src/ReplaceWindow.vue', 'src/index.html', 'src/theme.json'].find((path) => files.value.includes(path));
   if (first) await loadFile(first);
@@ -583,9 +583,9 @@ onBeforeUnmount(() => { unregisterSnap?.(); unlistenResize?.(); window.clearInte
         <select v-model="locale" class="field-select language-select" :aria-label="t('language')" :disabled="working" @change="call('locale', locale).catch(showError)"><option value="zh-CN">中文</option><option value="en-US">English</option></select>
       </div>
       <div class="window-controls" role="group" aria-label="窗口控制">
-        <button type="button" class="wc-btn" data-window-control="minimize" :title="t('windowMinimize')" :aria-label="t('windowMinimize')" @click="windowMinimize"><GlyphIcon name="minus" :size="14" /></button>
-        <button type="button" class="wc-btn" data-window-control="maximize" :title="maximized ? t('windowRestore') : t('windowMaximize')" :aria-label="maximized ? t('windowRestore') : t('windowMaximize')" @click="windowToggleMaximize"><GlyphIcon :name="maximized ? 'restore' : 'maximize'" :size="14" /></button>
-        <button type="button" class="wc-btn is-close" data-window-control="close" :title="t('windowClose')" :aria-label="t('windowClose')" @click="windowClose"><GlyphIcon name="close" :size="14" /></button>
+        <button type="button" class="wc-btn" data-window-control="minimize" :title="t('windowMinimize')" :aria-label="t('windowMinimize')" @click="windowMinimize"><GlyphIcon name="minus" :size="12" /></button>
+        <button type="button" class="wc-btn" data-window-control="maximize" :title="maximized ? t('windowRestore') : t('windowMaximize')" :aria-label="maximized ? t('windowRestore') : t('windowMaximize')" @click="windowToggleMaximize"><GlyphIcon :name="maximized ? 'restore' : 'maximize'" :size="12" /></button>
+        <button type="button" class="wc-btn is-close" data-window-control="close" :title="t('windowClose')" :aria-label="t('windowClose')" @click="windowClose"><GlyphIcon name="close" :size="12" /></button>
       </div>
     </header>
     <div v-if="error" class="error-banner" role="alert"><span>{{ error }}</span><button class="ui-btn v-ghost s-sm" :aria-label="t('close')" @click="error = ''">×</button></div>
@@ -603,7 +603,20 @@ onBeforeUnmount(() => { unregisterSnap?.(); unlistenResize?.(); window.clearInte
         <div class="panel-head"><strong>{{ t('files') }}</strong><span class="grow" /><button class="title-icon" :disabled="!project || working" :title="t('newFile')" :aria-label="t('newFile')" @click="run(() => showNew('file'))"><GlyphIcon name="plus" :size="14" /></button><button class="title-icon" :disabled="!project || working" :title="t('refreshFiles')" :aria-label="t('refreshFiles')" @click="run(refresh)"><GlyphIcon name="refresh" :size="14" /></button></div>
         <div class="file-list" :aria-label="t('files')">
           <FileTree v-if="project" :key="project.root" :files="files" :active-path="active?.path ?? ''" :disabled="working" @select="run(() => loadFile($event))" />
-          <template v-if="!project"><p class="muted">{{ t('empty') }}</p><p v-if="recent.length" class="muted">{{ t('recent') }}</p><button v-for="path in recent" :key="path" class="recent-entry ui-btn v-ghost s-sm" :title="path" :disabled="working" @click="run(() => openProject(path))">{{ path }}</button></template>
+          <template v-if="!project">
+            <p class="muted">{{ t('empty') }}</p>
+            <template v-if="recent.length">
+              <p class="muted">{{ t('recent') }}</p>
+              <button v-for="entry in recent" :key="entry.path" class="recent-entry" :title="entry.name + ' — ' + entry.path" :disabled="working" @click="run(() => openProject(entry.path))">
+                <span class="recent-icon"><GlyphIcon name="package" :size="16" /></span>
+                <span class="recent-text">
+                  <span class="recent-name">{{ entry.name }}</span>
+                  <span class="recent-path">{{ entry.path }}</span>
+                  <span v-if="entry.template" class="recent-kind">{{ t(entry.template) }}</span>
+                </span>
+              </button>
+            </template>
+          </template>
         </div>
         <CssCatalog v-if="catalog.controls.length || catalog.variables.length" :catalog="catalog" :enabled="!!project && !working" @insert="run(() => appendToCustomCss($event))" />
       </aside>
@@ -618,7 +631,7 @@ onBeforeUnmount(() => { unregisterSnap?.(); unlistenResize?.(); window.clearInte
           <span class="grow" />
           <button class="title-icon" :disabled="!active || working" :title="t('reopenFile')" :aria-label="t('reopenFile')" @click="run(() => loadFile(active!.path))"><GlyphIcon name="refresh" :size="14" /></button>
         </div>
-        <EditorPane v-if="active" v-model="draft" :path="project!.root + '/' + active.path" :read-only="working" :theme="studioTheme" @save="save" />
+        <EditorPane v-if="active" v-model="draft" :path="project!.root + '/' + active.path" :read-only="working" :theme="studioTheme" :catalog="catalog" @save="save" />
         <div v-else class="empty-pane"><span class="empty-symbol">{ }</span><p>{{ t('chooseFile') }}</p><p class="muted">CSS · Vue · HTML · TypeScript</p></div>
       </main>
 

@@ -16,8 +16,8 @@ const node = ref<InspectNode | null>(null);
 const treeNodes = ref<InspectTreeNode[]>([]);
 /** 已展开节点的 path key */
 const expanded = reactive(new Set<string>());
-/** 当前选中节点的 path key */
-const selected = ref('');
+/** 当前选中节点的 path key；没选过时为空 */
+const selected = ref<string | null>(null);
 /** 右侧面板显示哪一页 */
 const tab = ref<'styles' | 'computed'>('styles');
 /** 新增行内样式的草稿 */
@@ -48,6 +48,8 @@ function handle(data: unknown) {
   if (!message || typeof message !== 'object') return;
   if (message.type === 'tree' && Array.isArray(message.nodes)) {
     treeNodes.value = message.nodes;
+    // 元素树只有一个内容区根节点时直接展开，省得再点一次
+    if (message.nodes.length === 1) expanded.add(keyOf(message.nodes[0].path));
     return;
   }
   if ((message.type === 'pick' || message.type === 'node') && message.node) {

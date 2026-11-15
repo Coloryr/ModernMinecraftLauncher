@@ -5,6 +5,13 @@ export type Locale = 'zh-CN' | 'en-US';
 export type Theme = 'Dark' | 'Light';
 export type Template = 'css' | 'page' | 'home' | 'html' | 'home-html';
 export interface Project { root: string; name: string; template: Template; revision: string }
+export interface RecentProject {
+  path: string;
+  /** 显示名，取 theme.json 的 name；读不到时是目录名 */
+  name: string;
+  /** demo 类型；目录被移走或 theme.json 损坏时为空 */
+  template: Template | null;
+}
 export interface SourceFile { path: string; text: string; hash: string }
 export interface CreateProject { parent: string; name: string; template: Template; source: string }
 export interface Catalog {
@@ -15,7 +22,7 @@ export interface StudioState {
   project: Project | null;
   locale: Locale;
   theme: Theme;
-  recent: string[];
+  recent: RecentProject[];
   environment: { nodeVersion?: string; git?: string; error?: string };
   windowKinds: string[];
   windowMinSizes: Record<string, { width: number; height: number }>;

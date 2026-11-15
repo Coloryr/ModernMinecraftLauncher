@@ -8,7 +8,7 @@ use crate::{
     messages::{Locale, MessageKey, StudioError, render},
     preview::{self, PreviewState, WindowMinSize, WorkerEvent},
     process::{self, Environment, LogFn, RunOptions, environment, no_log, run},
-    project::{self, CreateProjectInput, Project, Template},
+    project::{self, CreateProjectInput, Project, RecentProject, Template},
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -48,8 +48,8 @@ pub struct StudioState {
     pub locale: Locale,
     /// 界面配色
     pub theme: Theme,
-    /// 最近项目
-    pub recent: Vec<String>,
+    /// 最近项目，路径、显示名与类型都在这里算好，前端不再自己拆
+    pub recent: Vec<RecentProject>,
     /// 外部工具环境
     pub environment: EnvironmentView,
     /// 预览可选的窗口 kind，顺序与启动器前端注册表一致
@@ -287,11 +287,15 @@ impl Studio {
                 error: Some(error.text(config.locale)),
             },
         };
+        let mut recent = Vec::with_capacity(config.recent.len());
+        for path in &config.recent {
+            recent.push(project::recent_project(path).await);
+        }
         StudioState {
             project,
             locale: config.locale,
             theme: config.theme,
-            recent: config.recent,
+            recent,
             environment,
             window_kinds: preview::WINDOW_KINDS.to_vec(),
             window_min_sizes: preview::min_sizes(),

@@ -3311,7 +3311,7 @@ dependencies = [
 
 [[package]]
 name = "mml-core"
-version = "0.1.0"
+version = "0.1.14"
 dependencies = [
  "chrono",
  "crossbeam-queue",
@@ -6050,7 +6050,6 @@ version = "3.0.5"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
- "block2",
  "gtk",
  "objc2",
  "objc2-app-kit",

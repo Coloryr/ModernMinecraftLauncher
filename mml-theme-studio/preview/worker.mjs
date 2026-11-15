@@ -81,6 +81,7 @@ async function vuePreview() {
               const color=new URLSearchParams(location.search).get('theme');
               if(color==='Dark'||color==='Light') writeString(KEYS.theme,color);
               ${template === 'home' ? "writeString(KEYS.startupPage,'Home');" : ''}
+              ${template === 'home' ? "window.__mmlInspectRoot='.mml-home';" : ''}
               ${INSPECTOR_SCRIPT}
               await import('/src/main.ts');` });
             return;
@@ -129,7 +130,7 @@ process.stdin.on('close', shutdown);
 process.on('SIGTERM', shutdown);
 
 try {
-  const preview = staticPreview ? await htmlPreview(root) : await vuePreview();
+  const preview = staticPreview ? await htmlPreview(root, template) : await vuePreview();
   close = preview.close;
   process.stdout.write(READY + JSON.stringify({ type: 'ready', url: preview.url }) + '\n');
 } catch (error) {

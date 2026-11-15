@@ -23,6 +23,8 @@ test('HTML 实时预览与静态资源不能越出 src', async () => {
     const page = await (await fetch(preview.url)).text();
     assert.match(page, /EventSource/);
     assert.match(page, /Preview/);
+    // 整页 HTML 不限定检查范围，元素树仍从 html 开始
+    assert.doesNotMatch(page, /__mmlInspectRoot\s*=\s*["']/);
     assert.equal((await fetch(preview.url + 'theme.css')).status, 200);
     assert.equal((await fetch(preview.url + 'link/secret.txt')).status, 404);
     const controller = new AbortController();
@@ -33,6 +35,12 @@ test('HTML 实时预览与静态资源不能越出 src', async () => {
     const update = await reader.read();
     assert.match(new TextDecoder().decode(update.value), /data: reload/);
     controller.abort();
+
+    // 自定义主页面整页就是内容区，检查范围收到 body
+    const scoped = await htmlPreview(root, 'home-html');
+    try {
+      assert.match(await (await fetch(scoped.url)).text(), /__mmlInspectRoot="body"/);
+    } finally { await scoped.close(); }
   } finally { await preview.close(); }
 });
 
@@ -66,7 +74,9 @@ test('预览 worker 通过 stdout 报告就绪，stdin 关闭后退出', async (
       child.stdout.on('data', onData);
       child.once('exit', () => { clearTimeout(timer); reject(new Error('worker exited: ' + stderr)); });
     });
-    assert.match(await (await fetch(url)).text(), /Worker preview/);
+    const page = await (await fetch(url)).text();
+    assert.match(page, /Worker preview/);
+    assert.doesNotMatch(page, /__mmlInspectRoot\s*=\s*["']/);
   } finally {
     if (child.exitCode === null) {
       child.stdin.end();

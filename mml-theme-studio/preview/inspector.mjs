@@ -13,6 +13,14 @@ export const INSPECTOR_SCRIPT = `(() => {
   var hovered = null;
   var selected = null;
 
+  var ROOT_SELECTOR = typeof window.__mmlInspectRoot === 'string' ? window.__mmlInspectRoot : '';
+
+  // 检查范围可以限定在某个容器里：自定义主页面只有内容区可改，元素树不从 html 开始
+  function root() {
+    if (!ROOT_SELECTOR) return document.documentElement;
+    return document.querySelector(ROOT_SELECTOR) || document.body;
+  }
+
   var CSS =
     '.__mml-inspect-on, .__mml-inspect-on * { cursor: crosshair !important; }' +
     '.__mml-inspect-box { position: fixed; z-index: 2147483646; pointer-events: none; box-sizing: border-box;' +
@@ -81,8 +89,9 @@ export const INSPECTOR_SCRIPT = `(() => {
 
   function pathOf(el) {
     var path = [];
+    var top = root();
     var node = el;
-    while (node && node !== document.documentElement) {
+    while (node && node !== top) {
       var parent = node.parentElement;
       if (!parent) return [];
       path.unshift(Array.prototype.indexOf.call(parent.children, node));
@@ -92,7 +101,7 @@ export const INSPECTOR_SCRIPT = `(() => {
   }
 
   function elementAt(path) {
-    var node = document.documentElement;
+    var node = root();
     for (var i = 0; i < path.length; i += 1) {
       node = node.children[path[i]];
       if (!node) return null;
@@ -131,11 +140,16 @@ export const INSPECTOR_SCRIPT = `(() => {
   function sendTree() {
     var nodes = [];
     var budget = { count: 0 };
-    var root = document.documentElement;
-    for (var i = 0; i < root.children.length; i += 1) {
-      if (budget.count >= TREE_LIMIT) break;
-      budget.count += 1;
-      nodes.push(treeNode(root.children[i], [i], budget));
+    var top = root();
+    // 默认根保持原样（html 的两子树）；限定范围时从容器本身开始，路径 [] 就是容器
+    if (top === document.documentElement) {
+      for (var i = 0; i < top.children.length; i += 1) {
+        if (budget.count >= TREE_LIMIT) break;
+        budget.count += 1;
+        nodes.push(treeNode(top.children[i], [i], budget));
+      }
+    } else {
+      nodes.push(treeNode(top, [], budget));
     }
     send({ type: 'tree', nodes: nodes });
   }
@@ -143,26 +157,34 @@ export const INSPECTOR_SCRIPT = `(() => {
   function selectorOf(el) {
     // 只把规范的 id 当选择器；带空格等字符的 id 走结构路径，免得拼出非法选择器
     if (el.id && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(el.id)) return '#' + el.id;
+    var top = root();
     var parts = [];
     var node = el;
-    while (node && node.nodeType === 1 && node !== document.documentElement) {
-      var name = node.tagName.toLowerCase();
+    while (node && node.nodeType === 1) {
+      var classes = classesOf(node).filter(function (name) {
+        return /^[A-Za-z_][A-Za-z0-9_-]*$/.test(name);
+      }).slice(0, 2);
+      var name = node.tagName.toLowerCase() + (classes.length ? '.' + classes.join('.') : '');
       var parent = node.parentElement;
-      if (!parent) {
-        parts.unshift(name);
-        break;
-      }
-      var same = Array.prototype.filter.call(parent.children, function (child) {
+      var same = parent ? Array.prototype.filter.call(parent.children, function (child) {
         return child.tagName === node.tagName;
-      });
-      var index = same.length > 1 ? ':nth-of-type(' + (same.indexOf(node) + 1) + ')' : '';
+      }) : [];
+      // 类名已经能唯一确定这个兄弟时不再加 :nth-of-type，选择器短一点
+      var unique = classes.length > 0 && same.filter(function (child) {
+        return classes.every(function (name) { return child.classList.contains(name); });
+      }).length === 1;
+      var index = same.length > 1 && !unique ? ':nth-of-type(' + (same.indexOf(node) + 1) + ')' : '';
       parts.unshift(name + index);
+      if (!parent || node === top) break;
+      // 默认根是 html 时不把它写进选择器，与原来的 body > div 保持一致
+      if (top === document.documentElement && parent === top) break;
       node = parent;
     }
     return parts.join(' > ');
   }
 
   function ancestorsOf(el) {
+    var top = root();
     var list = [];
     var node = el;
     while (node && node.nodeType === 1) {
@@ -172,6 +194,7 @@ export const INSPECTOR_SCRIPT = `(() => {
         classes: classesOf(node).slice(0, 4),
         path: pathOf(node),
       });
+      if (node === top) break;
       node = node.parentElement;
     }
     return list;
@@ -284,6 +307,7 @@ export const INSPECTOR_SCRIPT = `(() => {
   }
 
   function select(el) {
+    if (!el || !root().contains(el)) return;
     selected = el;
     draw(el);
     send({ type: 'pick', node: nodeInfo(el) });
@@ -292,6 +316,8 @@ export const INSPECTOR_SCRIPT = `(() => {
   function targetAt(x, y) {
     var el = document.elementFromPoint(x, y);
     if (!el || el === box || el === label || el === style) return null;
+    // 容器外的启动器界面不归主题管，点它不选中任何元素
+    if (!root().contains(el)) return null;
     return el;
   }
 
@@ -329,7 +355,7 @@ export const INSPECTOR_SCRIPT = `(() => {
     if (enabled) return;
     enabled = true;
     ensureUi();
-    document.documentElement.classList.add('__mml-inspect-on');
+    root().classList.add('__mml-inspect-on');
     addEventListener('mousemove', onMove, true);
     addEventListener('mousedown', onPress, true);
     addEventListener('click', onPress, true);
@@ -344,7 +370,7 @@ export const INSPECTOR_SCRIPT = `(() => {
     enabled = false;
     hovered = null;
     selected = null;
-    document.documentElement.classList.remove('__mml-inspect-on');
+    root().classList.remove('__mml-inspect-on');
     removeEventListener('mousemove', onMove, true);
     removeEventListener('mousedown', onPress, true);
     removeEventListener('click', onPress, true);
