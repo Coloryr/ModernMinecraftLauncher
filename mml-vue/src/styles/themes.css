@@ -534,8 +534,11 @@ html.has-bg .tab-content {
    弹窗内部的卡片不用加，弹窗底色不透明，模糊看不出来。
    数量不必太担心：列表都由虚拟列表撑着，同时参与合成的只有视口里那几行。 */
 html.has-bg.bg-frosted :is(
-  /* 外壳：标题栏、左侧栏、各类导航栏 */
-  .frame-head, .topbar, .sidebar, .boot-head, .tab-rail, .cat-rail, .si-rail,
+  /* 外壳：标题栏、左侧栏、各类导航栏。这几条里只有本身**有底色**的才收 ——
+     .cat-rail 是透明栏，整条加模糊会在分类按钮背后糊出一整列方斑；它只让选中色块
+     .cat-thumb 与悬停态参与模糊，见下面第二张表 */
+  .frame-head, .topbar, .sidebar, .boot-head, .tab-rail, .si-rail,
+  .cat-thumb,
   /* 通用控件：卡片、折叠头、分段、分页、整行添加、开关、步进器 */
   .collapse-head, .icon-btn, .seg-tabs, .tab-btn,
   .ui-btn.v-plain, .ui-btn.v-accent, .ui-btn.v-danger,

@@ -167,13 +167,9 @@ opt-level = 3
 [profile.dev.package.digest]
 opt-level = 3
 
-# 体积优化：release 下所有依赖都按体积优化（opt-level = "z"）。
-# 实测 Windows 正式版 exe 从 33.4 MB 降到约 21 MB；代价是纯计算代码略慢，
-# 方块图标渲染 / 压缩这类离线批处理体感无差。要保性能的 crate 在下单列 opt-level = 3。
 [profile.release.package."*"]
 opt-level = "z"
 
-# 自研 crate 显式再列一遍：部分 cargo 版本里 `"*"` 不覆盖 workspace 成员。
 [profile.release.package.mml-gui]
 opt-level = "z"
 
@@ -243,8 +239,6 @@ opt-level = "z"
 [profile.release.package.mml-upgrade]
 opt-level = "z"
 
-
-# 纯计算的热点 crate 保持 -O3：实测 z 下 deflate 压缩慢 ~40%、正则扫描慢 ~50%
 [profile.release.package.flate2]
 opt-level = 3
 
@@ -268,7 +262,6 @@ opt-level = 3
 
 [profile.release.package.ryu]
 opt-level = 3
-
 
 [profile.release]
 codegen-units = 1
