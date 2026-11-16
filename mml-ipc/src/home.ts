@@ -9,6 +9,35 @@ import { GameExit, GameLog, InstanceChange, LaunchError, LaunchState, type Event
 /** 主题：启动器把「跟随系统」解析成这两档后下发 */
 export type MmlTheme = "Dark" | "Light";
 
+/**
+ * 主题变量下发（父 → iframe）
+ *
+ * iframe 是独立文档，拿不到宿主 `<html>` 上的 CSS 变量。启动器在握手后、以及主题 /
+ * 强调色 / 纯色模式变化时发这一条，页面把它写进自己的 `:root`，就能直接用
+ * `mml-vue/tailwind.css` 那套 token。整页 iframe 主题（`custom_ui/page.zip`）
+ * 走同一个桥接，消息相同。
+ *
+ * 页面侧监听见 custom/README.md「iframe 主题拿主题色」。
+ */
+export interface MmlThemeTokens {
+  /** 协议标记，与其它桥接消息一致 */
+  __mml: 1;
+  /** 消息类型 */
+  type: "theme-tokens";
+  /** 当前实际主题，与 `window.mml.theme` 同源 */
+  theme: MmlTheme;
+  /** 变量名 → 计算值；为空的不下发，页面按 key 取即可 */
+  tokens: Record<string, string>;
+}
+
+/** iframe → 父：主动要一次主题变量，父窗口回 {@link MmlThemeTokens} */
+export interface MmlThemeTokensRequest {
+  /** 协议标记，与其它桥接消息一致 */
+  __mml: 1;
+  /** 消息类型 */
+  type: "theme-tokens?";
+}
+
 /** 白名单事件与 payload：从生成的 EventPayloads 里挑，与 mml-vue 的 customHomeBridge.ts 一致 */
 export type MmlHomeEvents = Pick<
   EventPayloads,

@@ -47,28 +47,10 @@ watch(
 </script>
 
 <template>
-  <div class="img-view">
-    <AsyncImage v-if="src" class="img-view-img" :src="src" :alt="file" :title="file" />
+  <div class="img-view flex items-center justify-center h-full min-h-0 p-2.5 overflow-auto">
+    <AsyncImage v-if="src" class="img-view-img max-w-full max-h-full object-contain" :src="src" :alt="file"
+      :title="file" />
     <p v-else-if="!loading" class="empty-tip">{{ t("config.imageEmpty") }}</p>
   </div>
 </template>
 
-<style scoped>
-/* 不描边、不垫底：图片直接站在窗口底色上居中，只留一圈小内边距 */
-.img-view {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  min-height: 0;
-  padding: 10px;
-  overflow: auto;
-}
-
-/* 等比缩放塞进可视区；图片比容器小时按原尺寸居中，不放大糊掉 */
-.img-view-img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-</style>

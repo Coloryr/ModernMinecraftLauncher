@@ -107,14 +107,18 @@ const DEMO_INSTANCES: InstanceInfoDto[] = [
     loaderVersion: "0.15.11",
     dir: "（示例数据）",
     running: false,
+    launching: false,
     modpackType: null,
     pid: null,
     fid: null,
     serverUrl: "play.example.com",
     lang: null,
+    renderer: null,
     logEncoding: null,
     source: null,
     order: 0,
+    busy: false,
+    preparing: null,
   },
   {
     uuid: "demo-2",
@@ -128,14 +132,18 @@ const DEMO_INSTANCES: InstanceInfoDto[] = [
     loaderVersion: null,
     dir: "（示例数据）",
     running: false,
+    launching: false,
     modpackType: null,
     pid: null,
     fid: null,
     serverUrl: null,
     lang: null,
+    renderer: null,
     logEncoding: null,
     source: null,
     order: 1,
+    busy: false,
+    preparing: null,
   },
 ];
 
@@ -185,7 +193,8 @@ async function launch(inst: InstanceInfoDto | null) {
   launching.value = inst.uuid;
   error.value = "";
   try {
-    await commands.main.launchGame(inst.uuid, null, null, null);
+    // 参数与 main_launch_game 对齐：存档 / 强开 / 自动存档 / 服务端包与调试项都留空
+    await commands.main.launchGame(inst.uuid, null, null, null, null, null, null, null, null, null);
     inst.running = true;
     log(`已请求启动：${inst.name}`);
   } catch (err) {
@@ -282,7 +291,7 @@ onUnmounted(() => {
     <div class="grid">
       <div class="col">
         <!-- 活动日历 -->
-        <section class="card">
+        <section class="card bg-card">
           <h2>最近活动</h2>
           <ul class="events">
             <li v-for="ev in EVENTS" :key="ev.title" class="event">
@@ -296,16 +305,16 @@ onUnmounted(() => {
         </section>
 
         <!-- 服务器规则：进服前必读 -->
-        <section class="card">
+        <section class="card bg-card">
           <h2>进服必读</h2>
-          <ul class="rules">
+          <ul class="rules text-title">
             <li v-for="r in SERVER.rules" :key="r">{{ r }}</li>
           </ul>
         </section>
 
         <!-- 游戏实例（来自启动器，可按需切换） -->
-        <section class="card">
-          <div class="card-head">
+        <section class="card bg-card">
+          <div class="flex items-center justify-between gap-3">
             <h2>选择客户端</h2>
             <button class="btn ghost" :disabled="loading || host !== 'ready'" @click="refreshInstances">
               {{ loading ? "读取中…" : "刷新列表" }}
@@ -341,7 +350,7 @@ onUnmounted(() => {
 
       <aside class="col side">
         <!-- 进服方式 -->
-        <section class="card">
+        <section class="card bg-card">
           <h2>怎么进服</h2>
           <p v-for="row in SERVER.join" :key="row.k" class="kv">
             <span>{{ row.k }}</span><b>{{ row.v }}</b>
@@ -350,13 +359,13 @@ onUnmounted(() => {
         </section>
 
         <!-- 开服时间 -->
-        <section class="card">
+        <section class="card bg-card">
           <h2>开服时间</h2>
           <p class="hint">{{ SERVER.schedule }}</p>
         </section>
 
         <!-- 赞助名单 -->
-        <section class="card">
+        <section class="card bg-card">
           <h2>赞助名单</h2>
           <ul class="sponsors">
             <li v-for="s in SERVER.sponsors" :key="s">{{ s }}</li>
@@ -492,7 +501,7 @@ onUnmounted(() => {
 }
 
 .card {
-  background: var(--bg-card);
+  /* 底色走 Tailwind 的 bg-card（映射到 --bg-card），见模板 */
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 16px 18px;
@@ -503,12 +512,7 @@ onUnmounted(() => {
   font-size: 15px;
 }
 
-.card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
+/* .card-head 的排版已改用工具类，见模板里「选择客户端」那一行 */
 
 /* 活动 */
 .events {
@@ -553,7 +557,7 @@ onUnmounted(() => {
   margin: 12px 0 0;
   padding-left: 18px;
   color: var(--fg);
-  font-size: 13px;
+  /* 字号走 Tailwind 的 text-title（13px），见模板 */
 }
 
 .rules li+li {

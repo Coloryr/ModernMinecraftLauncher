@@ -121,8 +121,8 @@ function toggleCustomPage(on: boolean) {
 <template>
   <SettingsGroup id="general" title-key="winSettings.secGeneral" :flash="flashGroup === 'general'">
     <!-- 语言 / 字体：两个下拉并排一行 -->
-    <div class="general-row">
-      <div class="general-col">
+    <div class="general-row flex gap-3.5">
+      <div class="general-col flex-1 min-w-0">
         <label class="field-label">{{ t("winSettings.language") }}</label>
         <select class="field-select lang-select" :value="locale"
           @change="onLangChange(($event.target as HTMLSelectElement).value)">
@@ -130,10 +130,10 @@ function toggleCustomPage(on: boolean) {
           <option value="en_us">{{ t("winSettings.langEnUs") }}</option>
         </select>
       </div>
-      <div class="general-col">
+      <div class="general-col flex-1 min-w-0">
         <label class="field-label">{{ t("winSettings.font") }}</label>
-        <div class="font-row">
-          <select v-model="fontPick" class="field-select font-select" @change="setFontFamily(fontPick)">
+        <div class="font-row flex items-center gap-2.5">
+          <select v-model="fontPick" class="field-select font-select flex-1" @change="setFontFamily(fontPick)">
             <option value="">{{ t("winSettings.fontDefault") }}</option>
             <!-- 每个名字用它自己的字体渲染：挑字体时直接看字形，不用先选中再试 -->
             <option v-for="f in fonts" :key="f" :value="f" :style="{ fontFamily: fontStack(f) }">{{ f }}</option>
@@ -157,8 +157,10 @@ function toggleCustomPage(on: boolean) {
     <!-- 强调色 -->
     <label class="field-label">{{ t("winSettings.accent") }}</label>
     <p class="field-desc">{{ t("winSettings.accentDesc") }}</p>
-    <div class="accent-list">
-      <button v-for="a in ACCENTS" :key="a.id" class="accent-swatch" :class="{ active: accent === a.id }"
+    <div class="accent-list flex flex-wrap gap-3">
+      <button v-for="a in ACCENTS" :key="a.id"
+        class="accent-swatch w-ctl h-ctl rounded-full border-2 border-border cursor-pointer flex items-center justify-center p-0"
+        :class="{ active: accent === a.id }"
         :style="{ background: a.color }" :aria-label="t(`winSettings.accent.${a.id}`)"
         v-tip="t(`winSettings.accent.${a.id}`)" @click="setAccent(a.id)">
         <svg v-if="accent === a.id" viewBox="0 0 24 24" width="16" height="16" fill="none" :stroke="a.check"
@@ -168,13 +170,15 @@ function toggleCustomPage(on: boolean) {
       </button>
 
       <!-- 自定义：彩虹色块，点击弹出系统取色器 -->
-      <label class="accent-swatch accent-custom" :class="{ active: accent === 'custom' }"
+      <label class="accent-swatch accent-custom w-ctl h-ctl rounded-full border-2 border-border cursor-pointer flex items-center justify-center p-0"
+        :class="{ active: accent === 'custom' }"
         v-tip="t('winSettings.accent.custom')">
         <svg v-if="accent === 'custom'" viewBox="0 0 24 24" width="16" height="16" fill="none"
           class="accent-icon accent-check" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="m5 13 4 4L19 7" />
         </svg>
-        <input type="color" :value="customAccent" @input="setCustomAccent(($event.target as HTMLInputElement).value)" />
+        <input class="absolute inset-0 opacity-0 cursor-pointer" type="color" :value="customAccent"
+          @input="setCustomAccent(($event.target as HTMLInputElement).value)" />
       </label>
     </div>
 
@@ -191,10 +195,10 @@ function toggleCustomPage(on: boolean) {
     </div>
 
     <!-- 已安装的样式：一行一条，开关 / 文件名 / 上移下移 / 删除；列表顺序即注入顺序 -->
-    <ul v-if="client.customCss.length" class="custom-css-list">
-      <li v-for="(item, index) in client.customCss" :key="item.id" class="custom-css-item">
+    <ul v-if="client.customCss.length" class="custom-css-list mt-2 p-0 list-none flex flex-col gap-1.5">
+      <li v-for="(item, index) in client.customCss" :key="item.id" class="custom-css-item flex items-center gap-2.5">
         <BaseSwitch :model-value="item.enabled" @update:model-value="(v) => setCustomCssEnabled(item.id, v)" />
-        <span class="custom-css-name" :title="item.name">{{ item.name }}</span>
+        <span class="custom-css-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-body" :title="item.name">{{ item.name }}</span>
         <!-- 上移 / 下移：排在第一个 / 最后一个时对应的按钮禁用 -->
         <button class="ui-btn-icon" :disabled="index === 0" v-tip="t('winSettings.customCssMoveUp')"
           :aria-label="t('winSettings.customCssMoveUp')" @click="moveCustomCss(item.id, -1)">
@@ -212,7 +216,7 @@ function toggleCustomPage(on: boolean) {
     </ul>
     <p v-else class="field-desc">{{ t("winSettings.customCssEmpty") }}</p>
 
-    <div class="custom-ui-actions">
+    <div class="custom-ui-actions flex items-center gap-2 mt-2.5 flex-wrap">
       <BaseButton size="sm" variant="accent" @click="addCustomCss">
         {{ t("winSettings.customCssImport") }}
       </BaseButton>
@@ -231,7 +235,7 @@ function toggleCustomPage(on: boolean) {
       <BaseSwitch :model-value="client.customPageOn" @update:model-value="toggleCustomPage" />
     </div>
 
-    <div class="custom-ui-actions">
+    <div class="custom-ui-actions flex items-center gap-2 mt-2.5 flex-wrap">
       <BaseButton size="sm" variant="accent" :disabled="importingCustomPage" @click="importCustomPage">
         {{ importingCustomPage ? t("winSettings.customUiImporting") : t("winSettings.customPageImport") }}
       </BaseButton>
@@ -239,7 +243,7 @@ function toggleCustomPage(on: boolean) {
         {{ t("winSettings.customPageRemove") }}
       </BaseButton>
       <BaseButton size="sm" @click="openCustomUiDir">{{ t("winSettings.customUiOpenDir") }}</BaseButton>
-      <span class="custom-ui-state">{{ customPageState }}</span>
+      <span class="custom-ui-state text-meta text-dim">{{ customPageState }}</span>
     </div>
   </SettingsGroup>
 
@@ -326,9 +330,10 @@ function toggleCustomPage(on: boolean) {
 
   <SettingsGroup v-if="!locked" id="bgImage" title-key="winSettings.bgImage" :flash="flashGroup === 'bgImage'">
     <p class="field-desc">{{ t("winSettings.bgImageDesc") }}</p>
-    <div class="bg-buttons">
+    <div class="bg-buttons flex items-stretch gap-2.5">
       <!-- 图片地址：本地文件路径或网址 -->
-      <input v-model="bgSourceInput" class="field-input bg-url-input" :placeholder="t('winSettings.bgUrlPlaceholder')"
+      <input v-model="bgSourceInput" class="field-input bg-url-input flex-1 min-w-0"
+        :placeholder="t('winSettings.bgUrlPlaceholder')"
         spellcheck="false" autocomplete="off" @keydown.enter="loadBgSource" />
       <BaseButton size="sm" variant="accent" :disabled="bgLoading" @click="loadBgSource">
         {{ bgLoading ? t("winSettings.bgLoading") : t("winSettings.bgLoad") }}
@@ -339,31 +344,34 @@ function toggleCustomPage(on: boolean) {
       <BaseButton size="sm" variant="accent" :disabled="bgLoading" @click="pickBgImage">{{ t("winSettings.bgPick") }}
       </BaseButton>
     </div>
-    <input :ref="(el) => (bgFileInput = el as HTMLInputElement | null)" class="bg-file" type="file" accept="image/*"
+    <input :ref="(el) => (bgFileInput = el as HTMLInputElement | null)" class="bg-file hidden" type="file"
+      accept="image/*"
       @change="onBgFile" />
 
     <template v-if="bgImage">
-      <div class="range-row row-card is-plain">
-        <span class="range-label">{{ t("winSettings.bgOpacity") }}</span>
+      <div class="range-row row-card is-plain flex items-center gap-3">
+        <span class="range-label w-[72px] shrink-0 text-body text-dim">{{ t("winSettings.bgOpacity") }}</span>
         <input class="range" type="range" min="5" max="100" :value="bgOpacity"
           @input="setBgOpacity(Number(($event.target as HTMLInputElement).value))" />
-        <span class="range-value">{{ bgOpacity }}%</span>
+        <span class="range-value w-[52px] shrink-0 text-right text-[12px] [font-variant-numeric:tabular-nums] text-dim">{{ bgOpacity }}%</span>
       </div>
-      <div class="range-row row-card is-plain">
-        <span class="range-label">{{ t("winSettings.bgBlur") }}</span>
+      <div class="range-row row-card is-plain flex items-center gap-3">
+        <span class="range-label w-[72px] shrink-0 text-body text-dim">{{ t("winSettings.bgBlur") }}</span>
         <input class="range" type="range" min="0" max="40" :value="bgBlur"
           @input="setBgBlur(Number(($event.target as HTMLInputElement).value))" />
-        <span class="range-value">{{ bgBlur }}px</span>
+        <span class="range-value w-[52px] shrink-0 text-right text-[12px] [font-variant-numeric:tabular-nums] text-dim">{{ bgBlur }}px</span>
       </div>
       <!-- 原始大小：后端把图片分辨率缩放到原图的百分之多少；点「应用」才生效，
            且只改分辨率，不改变图在窗口里的显示大小 -->
-      <div class="range-row row-card is-plain">
-        <span class="range-label">{{ t("winSettings.bgNativeSize") }}</span>
+      <div class="range-row row-card is-plain flex items-center gap-3">
+        <span class="range-label w-[72px] shrink-0 text-body text-dim">{{ t("winSettings.bgNativeSize") }}</span>
         <input class="range" type="range" min="10" max="100" :value="bgSizeDraft"
           @input="bgSizeDraft = Number(($event.target as HTMLInputElement).value)" />
-        <span class="range-value">{{ bgSizeDraft }}%</span>
+        <span class="range-value w-[52px] shrink-0 text-right text-[12px] [font-variant-numeric:tabular-nums] text-dim">{{ bgSizeDraft }}%</span>
         <!-- 行内文字按钮：标准按钮 32px 会把这一行撑高，三条滑杆的 4px 行距就乱了 -->
-        <button type="button" class="range-apply" :disabled="bgLoading || bgSizeDraft === bgNativeSize"
+        <button type="button"
+          class="range-apply shrink-0 h-5 px-0.5 border-0 bg-transparent text-accent text-body [font-family:inherit] cursor-pointer transition-[color] duration-[120ms]"
+          :disabled="bgLoading || bgSizeDraft === bgNativeSize"
           @click="applyBgSize">{{ bgLoading ? t("winSettings.bgLoading") : t("winSettings.bgApply") }}</button>
       </div>
     </template>
@@ -382,19 +390,7 @@ function toggleCustomPage(on: boolean) {
 </template>
 
 <style scoped>
-/* 行内文字按钮：放在滑杆行末尾，高度与行内文字一致，不把行撑高 */
-.range-apply {
-  flex-shrink: 0;
-  height: 20px;
-  padding: 0 2px;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font-size: 12.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: color 0.12s;
-}
+/* 排版都在模板的工具类上，这里只留状态与两处非 token 的装饰 */
 
 .range-apply:hover:not(:disabled) {
   text-decoration: underline;
@@ -409,46 +405,5 @@ function toggleCustomPage(on: boolean) {
 /* 自定义强调色色块上的对勾：描边取深色块上的白 */
 .accent-icon {
   stroke: var(--on-accent);
-}
-
-/* 已安装的样式：一行一条，开关 / 文件名 / 上移下移 / 删除；列表顺序即注入顺序 */
-.custom-css-list {
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.custom-css-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-/* 文件名可能很长，占满剩余宽度并省略，不把删除按钮挤走 */
-.custom-css-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12.5px;
-}
-
-/* 自定义界面：按钮一行排开，状态跟在后面，窄窗口自动换行 */
-.custom-ui-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-
-/* 状态行是按钮的补充说明，不抢按钮的视觉重量 */
-.custom-ui-state {
-  font-size: 11.5px;
-  color: var(--text-dim);
 }
 </style>

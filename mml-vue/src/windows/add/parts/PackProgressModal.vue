@@ -35,8 +35,8 @@ const subRolling = computed(() => !!props.progress.subText && props.progress.sub
 
 <template>
   <BaseModal :title="shownTitle" :closable="false">
-    <div class="install-progress">
-      <div class="install-state">{{ t(`add.packState.${progress.state}`) }}</div>
+    <div class="install-progress flex flex-col gap-2">
+      <div class="install-state text-title font-semibold text-fg">{{ t(`add.packState.${progress.state}`) }}</div>
 
       <div class="progress-track" role="progressbar" aria-valuemin="0" :aria-valuemax="progress.total || 1"
         :aria-valuenow="progress.now">
@@ -44,7 +44,7 @@ const subRolling = computed(() => !!props.progress.subText && props.progress.sub
           :style="mainRolling ? undefined : { width: percent + '%' }" />
       </div>
       <template v-if="progress.subText || progress.subTotal">
-        <div class="install-sub" v-tip="progress.subText || ''">{{ shortPath(progress.subText || "") }}</div>
+        <div class="install-sub mt-1 truncate text-[12px] text-dim" v-tip="progress.subText || ''">{{ shortPath(progress.subText || "") }}</div>
         <div class="progress-track sub">
           <div class="progress-fill" :class="{ 'is-roll': subRolling }"
             :style="subRolling ? undefined : { width: subPercent + '%' }" />
@@ -55,17 +55,6 @@ const subRolling = computed(() => !!props.progress.subText && props.progress.sub
 </template>
 
 <style scoped>
-.install-progress {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.install-state {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text);
-}
 
 .progress-track {
   height: 8px;
@@ -83,14 +72,5 @@ const subRolling = computed(() => !!props.progress.subText && props.progress.sub
 
 .progress-track.sub {
   height: 6px;
-}
-
-.install-sub {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-top: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 </style>

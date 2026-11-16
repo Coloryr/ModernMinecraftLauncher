@@ -221,8 +221,8 @@ function metaLabel(item: SchematicItemDto): string {
             @change.stop="toggleSelect(item)" @click.stop />
         </template>
         <template #badges>
-          <span class="badge badge-dim">{{ item.typeName }}</span>
-          <span v-if="item.fail" class="badge badge-red">{{ t("resource.modFail") }}</span>
+          <span class="badge badge-dim shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ item.typeName }}</span>
+          <span v-if="item.fail" class="badge badge-red shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modFail") }}</span>
         </template>
         <!--
           描述单独铺在后面、且走 FormattedText：litematic 的 `Metadata.Description` 是作者
@@ -248,37 +248,37 @@ function metaLabel(item: SchematicItemDto): string {
     那是列表行里放不下的部分（行里只有"多少个方块 · 多少种"两个总数）
   -->
   <BaseModal v-if="detail" :title="t('resource.detailTitle')" :closable="false" @close="detail = null">
-    <p class="schem-name">
+    <p class="schem-name m-0 mb-0.5 text-title text-fg">
       <FormattedText :text="detail.name || detail.file" />
     </p>
-    <p class="schem-file" :title="detail.file">{{ detail.file }}</p>
+    <p class="schem-file m-0 overflow-hidden text-ellipsis whitespace-nowrap text-meta text-dim" :title="detail.file">{{ detail.file }}</p>
 
     <p v-if="detail.fail" class="error-text">{{ t("resource.modFail") }}</p>
     <template v-else>
-      <p class="schem-meta">{{ t("resource.detailType", { name: detail.typeName }) }}</p>
-      <p class="schem-meta">
+      <p class="schem-meta m-0 mb-[3px] text-body text-dim">{{ t("resource.detailType", { name: detail.typeName }) }}</p>
+      <p class="schem-meta m-0 mb-[3px] text-body text-dim">
         {{ t("resource.dims", { w: detail.width, h: detail.height, l: detail.length }) }}
       </p>
-      <p class="schem-meta">
+      <p class="schem-meta m-0 mb-[3px] text-body text-dim">
         {{ t("resource.blockCount", { count: detail.blockCount }) }} ·
         {{ t("resource.blockTypes", { count: detail.blockTypes }) }}
       </p>
-      <p v-if="detail.author" class="schem-meta">
+      <p v-if="detail.author" class="schem-meta m-0 mb-[3px] text-body text-dim">
         {{ t("resource.detailAuthor", { name: detail.author }) }}
       </p>
 
       <template v-if="detail.description">
         <label class="field-label">{{ t("resource.detailDescription") }}</label>
-        <p class="schem-desc">
+        <p class="schem-desc m-0 text-body text-fg leading-[1.5]">
           <FormattedText :text="detail.description" />
         </p>
       </template>
 
       <label class="field-label">{{ t("resource.detailBlocks") }}</label>
-      <div v-if="detail.blocks.length" class="schem-blocks">
-        <div v-for="block in detail.blocks" :key="block.id" class="schem-block">
-          <span class="schem-block-id" :title="block.id">{{ block.id }}</span>
-          <span class="schem-block-count">{{ block.count }}</span>
+      <div v-if="detail.blocks.length" class="schem-blocks mr-[-8px] flex max-h-[260px] flex-col gap-0.5 overflow-y-auto pr-2">
+        <div v-for="block in detail.blocks" :key="block.id" class="schem-block flex items-center gap-2.5 rounded-ctl p-[4px_8px] text-body hover:bg-hover">
+          <span class="schem-block-id min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-fg" :title="block.id">{{ block.id }}</span>
+          <span class="schem-block-count shrink-0 text-dim [font-variant-numeric:tabular-nums]">{{ block.count }}</span>
         </div>
       </div>
       <p v-else class="empty-tip">{{ t("resource.detailNoBlocks") }}</p>
@@ -291,75 +291,3 @@ function metaLabel(item: SchematicItemDto): string {
 </template>
 
 <!-- 弹窗样式走 scoped：BaseModal 是 Teleport 到 body 的，窗口级 resource.css 够不着它 -->
-<style scoped>
-/* 名称与文件名两行，与其它弹窗（存档编辑 / 模组备注）同一口径 */
-.schem-name {
-  margin: 0 0 2px;
-  font-size: 13px;
-  color: var(--text);
-}
-
-.schem-file {
-  margin: 0;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.schem-meta {
-  margin: 0 0 3px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-}
-
-.schem-desc {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--text);
-  line-height: 1.5;
-}
-
-/* 逐种方块：整行两列，左 ID 右数量；方块种类可能上百，给个上限自己滚 */
-.schem-blocks {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 260px;
-  overflow-y: auto;
-  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
-     行的右边缘仍落在弹窗内容区里，滚动条画在这 8px 上
-     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
-  margin-right: -8px;
-  padding-right: 8px;
-}
-
-.schem-block {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 8px;
-  border-radius: 8px;
-  font-size: 12px;
-}
-
-.schem-block:hover {
-  background: var(--bg-hover);
-}
-
-.schem-block-id {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text);
-}
-
-.schem-block-count {
-  flex-shrink: 0;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-</style>

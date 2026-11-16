@@ -1,120 +1,14 @@
-.collect-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  flex: 1;
-  min-height: 0;
-}
+/* 窗口排版已改到模板上的工具类（语义类名都留着：.collect-card / .collect-grid / .item-card
+   这些在 themes.css 的毛玻璃表里，主题包也按类名覆盖）。
+   这里只留工具类压不住的四类规则：全局类覆盖、伪类状态、:deep 穿透、::checked 兄弟选择器。 */
 
-/* ----- 多选条：外观走 styles/parts/multi-bar.css，这里只管与标题栏的距离 ----- */
-
-/* 内容区上内边距是 22px，条子往上探 12px 就落在标题栏下沿 10px 处 */
+/* 多选条与标题栏的距离：.multi-bar 的底色 / 圆角来自无层全局样式，工具类压不住，只能留 CSS */
 .multi-bar {
   margin-top: -12px;
 }
 
-/* ----- 空状态：占满窗口的白框，两个入口放在里面（与账户窗口的空状态同一套） ----- */
-
-.collect-empty-box {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 32px 24px;
-  border: 1px dashed var(--accent-border);
-  border-radius: 12px;
-  background: var(--bg-side);
-  color: var(--text-dim);
-  text-align: center;
-}
-
-.empty-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.empty-title {
-  margin: 0;
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.empty-hint {
-  margin: 0;
-  max-width: 360px;
-  font-size: 12.5px;
-  line-height: 1.6;
-}
-
-.collect-empty-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-/* ----- 左栏 + 卡片区（与方块窗口同一套两栏布局） ----- */
-
-.collect-main {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  gap: 16px;
-}
-
-.collect-content {
-  /* 卡片区自己滚：左栏与上面的搜索框不跟着走 */
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.collect-scroll {
-  flex: 1;
-  min-height: 0;
-  /* 常驻滚动槽，见 styles/scrollbar.css 的 WebKit 例外 */
-  overflow-y: scroll;
-  /* 见 styles/scrollbar.css */
-  scrollbar-gutter: stable;
-  /* 右边缘顶到窗口边：抵消 .frame-body 的 26px 右内边距，滚动条才贴着窗口右边，
-     不然它会停在离窗口边 26px 的地方 */
-  margin-right: -26px;
-  /* 与上面的 scrollbar-gutter 成对：扣掉常驻的那 9px，卡片右缘仍与搜索框对齐 */
-  padding-right: calc(26px - 9px);
-  /* 上下各留 2px：卡片悬停上浮 2px，而滚动容器会把自己的溢出裁掉，
-     不留这一截第一排卡片的顶边就被切掉。上边那 2px 用负外边距借回来，
-     卡片起始位置不变，与搜索框的间距仍是 12px */
-  margin-top: -2px;
-  padding-top: 2px;
-  padding-bottom: 2px;
-}
-
 /* 卡片上的勾选框：原生样式在暗色主题下偏灰、各平台大小也不一致，统一自己画一个。
-   勾由 GlyphIcon 的 check 画，并用 flex 居中，不依赖手算坐标。
-   绝对定位压在图标左上角：放进流里会挤掉项目 ID 那一行，卡片尺寸也就跟着变了 */
-.card-box {
-  position: absolute;
-  left: 6px;
-  top: 6px;
-  z-index: 2;
-  display: inline-flex;
-  width: 15px;
-  height: 15px;
-  flex: 0 0 auto;
-}
-
+   勾由 GlyphIcon 的 check 画，并用 flex 居中，不依赖手算坐标 */
 .card-check {
   position: absolute;
   inset: 0;
@@ -155,27 +49,15 @@
   opacity: 1;
 }
 
-.collect-grid {
-  /* 卡片随窗口宽度拉伸：340px 是最小宽度，窗口变宽时同排的卡片一起变宽，
-     不会在右边留一大块空白。min() 保证窄窗时也不会撑出横向滚动 */
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
-  gap: 12px;
-  align-content: start;
+/* 图标槽：AsyncImage 的根是个 span，撑满 60×60；里面的 img 是子组件里的元素，只能穿透 */
+.card-icon :deep(.async-img),
+.card-icon :deep(img) {
+  width: 100%;
+  height: 100%;
 }
 
-.collect-card {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  /* 修掉不存在的 --bg-panel：全仓没有定义，等于这行无效 → 卡片一直没底色 */
-  background: var(--bg-card);
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+.card-icon :deep(img) {
+  object-fit: cover;
 }
 
 /* 悬停：与方块列表的格子一致（强调色描边 + 抬起 2px） */
@@ -189,118 +71,16 @@
   background: var(--accent-soft);
 }
 
-/* 正被拖着的卡片：留在原位但淡下去；卡片网格去掉一张会整片重排，反而看不清拖的是哪个，
-   落点由左栏那一组的虚线框 + 跟手的幽灵卡片表达 */
+/* 正被拖着的卡片：留在原位但淡下去；落点由左栏那一组的虚线框 + 跟手的幽灵卡片表达 */
 .collect-card.dragging {
   opacity: 0.4;
-}
-
-.card-icon {
-  flex: 0 0 auto;
-  width: 60px;
-  height: 60px;
-  /* 与方块列表的图标同规格：.block-img 是 8px */
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--bg-hover);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 图标槽：AsyncImage 的根是个 span，撑满 60×60；里面的 img 走 :deep，它是子组件里的元素 */
-.card-icon :deep(.async-img),
-.card-icon :deep(img) {
-  width: 100%;
-  height: 100%;
-}
-
-.card-icon :deep(img) {
-  object-fit: cover;
-}
-
-.card-icon-none {
-  /* 没有图标时的占位（原来是文字 "?"）：与 imageFallback 那张破图占位同一套画法 */
-  color: var(--text-dim);
-}
-
-.card-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.card-name {
-  font-size: 13.5px;
-  /* 与全仓卡片标题一致：标题比下面那行说明重 */
-  font-weight: 600;
-  line-height: 1.35;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.card-meta {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-/* 卡片最后一行：项目 ID 贴左、收藏时间贴右。ID 可能是长串，交给省略号收 */
-.card-sub {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-.card-pid {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  /* 等宽：ID 是给对源用的，字符形近时更容易认 */
-  font-family: "Cascadia Code", Consolas, monospace;
-}
-
-.card-time {
-  flex: none;
-  white-space: nowrap;
-}
-
-/* 卡片右端的悬浮操作：**不要底色**，悬停只把自己那枚图标的颜色点亮 */
-.card-acts {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.card-act {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--ctl-h);
-  height: var(--ctl-h);
-  padding: 0;
-  border: none;
-  border-radius: var(--ctl-radius);
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-  transition: color 0.12s;
 }
 
 .card-act:hover {
   color: var(--accent);
 }
 
-/* 分组里没有收藏：只留一句居中提示。
-   原先铺了一层卡片底，空分组看着像"这里有一块内容"，反而比空白更碍眼 */
+/* 空分组提示：覆盖全局 .empty-tip 的内边距，无层规则优先，工具类压不住 */
 .collect-empty {
   padding: 24px 16px;
 }
-

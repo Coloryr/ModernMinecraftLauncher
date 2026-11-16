@@ -328,8 +328,8 @@ watch(key, () => void activate(), { immediate: true });
 </script>
 
 <template>
-  <div class="nbt-view">
-    <div class="nbt-head">
+  <div class="nbt-view flex flex-col h-full min-h-0">
+    <div class="nbt-head shrink-0 px-2.5 pt-2 pb-1.5">
       <SearchBox v-model="query" :placeholder="t('config.nbtSearch')" :clear-label="t('config.nbtSearchClear')"
         width="100%" @update:model-value="focus = null" />
     </div>
@@ -346,20 +346,8 @@ watch(key, () => void activate(), { immediate: true });
 </template>
 
 <style scoped>
-.nbt-view {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-
-/* 搜索固定在树上方：与配置窗口左栏的搜索同一处位置口径 */
-.nbt-head {
-  flex-shrink: 0;
-  padding: 8px 10px 6px;
-}
-
-/* 树自己滚；不描边、不垫底，直接站在窗口底色上 */
+/* 树自己滚；不描边、不垫底，直接站在窗口底色上。
+   .nbt-tree 的左右内边距与 .nbt-split 的 left 计算绑着，属于口径型几何，留在 CSS */
 .nbt-tree {
   flex: 1;
   min-height: 0;

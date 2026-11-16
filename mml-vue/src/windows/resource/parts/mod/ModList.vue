@@ -154,24 +154,24 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
       <template #badges>
         <!-- 支持的加载器：一个包可能不止一个，比如同时带 fabric.mod.json 与 mods.toml；
               后端已汇总去重，这里逐个显示 -->
-        <span v-for="name in row.item.loaders" :key="name" class="badge badge-loader"
+        <span v-for="name in row.item.loaders" :key="name" class="badge badge-loader shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent"
           :class="`loader-${name}`">{{ t(`resource.loader.${name}`) }}</span>
         <!-- 内置的**库**：没有模组元数据的内置 jar，如 asm / mixinextras。
               它不是模组，标出来免得和真正的内置模组混在一起 -->
-        <span v-if="row.item.library" class="badge badge-dim">{{ t("resource.modLibrary") }}</span>
-        <span v-if="row.depth > depth && !row.item.library" class="badge badge-dim">
+        <span v-if="row.item.library" class="badge badge-dim shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modLibrary") }}</span>
+        <span v-if="row.depth > depth && !row.item.library" class="badge badge-dim shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">
           {{ t("resource.modBuiltin") }}
         </span>
         <!-- 「有更新」：这一行在更新检查里查到了新版本；下不下由更新弹窗里勾 -->
-        <span v-if="updateKeys?.has(modSelectKey(row.item))" class="badge">{{ t("resource.updateTag") }}</span>
-        <span v-if="row.item.disable" class="badge badge-off">{{ t("resource.modDisabled") }}</span>
-        <span v-if="row.item.fail" class="badge badge-red">{{ t("resource.modFail") }}</span>
-        <span v-if="row.item.core" class="badge">{{ t("resource.modCore") }}</span>
-        <span v-if="row.depth === depth && row.item.jarInJar.length" class="badge">
+        <span v-if="updateKeys?.has(modSelectKey(row.item))" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.updateTag") }}</span>
+        <span v-if="row.item.disable" class="badge badge-off shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modDisabled") }}</span>
+        <span v-if="row.item.fail" class="badge badge-red shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modFail") }}</span>
+        <span v-if="row.item.core" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modCore") }}</span>
+        <span v-if="row.depth === depth && row.item.jarInJar.length" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">
           {{ t("resource.modBuiltinCount", { n: row.item.jarInJar.length }) }}
         </span>
         <!-- 硬链接：这个文件还挂在公共目录，多实例共用一份 -->
-        <span v-if="row.item.hardLink" class="badge badge-link">{{ t("resource.modHardLink") }}</span>
+        <span v-if="row.item.hardLink" class="badge badge-link shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modHardLink") }}</span>
       </template>
 
       <!--

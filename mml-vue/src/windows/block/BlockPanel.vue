@@ -508,18 +508,19 @@ async function onDetailRemove() {
 </script>
 
 <template>
-  <div class="block-panel">
+  <div class="block-panel relative -mb-[22px] -mr-[26px] flex min-h-0 flex-1 flex-col gap-3">
     <!-- 渲染中：顶部一行进度；不挤掉下方内容，取消后立即消失 -->
-    <div v-if="running" class="block-progress">
-      <span class="block-progress-text">
+    <div v-if="running"
+      class="block-progress mr-[26px] flex shrink-0 items-center gap-2.5 rounded-panel border border-border bg-card px-3 py-2 text-body">
+      <span class="block-progress-text max-w-[45%] shrink-0 truncate text-fg">
         {{ status?.text || (preparing ? t("blocks.downloadingCore") : t("blocks.rendering")) }}
       </span>
       <div class="block-progress-bar">
         <div class="block-progress-fill" :class="{ 'is-roll': preparing }"
           :style="preparing ? undefined : { width: percent + '%' }"></div>
       </div>
-      <span class="block-progress-percent">{{ preparing ? "—" : percent.toFixed(1) + "%" }}</span>
-      <span v-if="!preparing" class="block-progress-num">
+      <span class="block-progress-percent shrink-0 font-semibold text-accent [font-variant-numeric:tabular-nums]">{{ preparing ? "—" : percent.toFixed(1) + "%" }}</span>
+      <span v-if="!preparing" class="block-progress-num shrink-0 whitespace-nowrap text-dim [font-variant-numeric:tabular-nums]">
         {{ status?.now ?? 0 }} / {{ status?.total ?? 0 }}
       </span>
       <BaseButton size="sm" :disabled="cancelling" @click="cancelRender">
@@ -541,13 +542,13 @@ async function onDetailRemove() {
 
     <!-- 内容区工具条：搜索与玩家皮肤入口都放这里，不占标题栏。
          它和网格一起放在分类栏右边，分类栏的「全部」才与搜索框同一条顶线 -->
-    <div v-if="rendered" class="block-main">
+    <div v-if="rendered" class="block-main flex min-h-0 flex-1 gap-4">
       <CategoryRail :all-label="t('blocks.catAll')" :all-count="blocks.length" :items="catItems" :active="cat"
         :sortable="true" :new-label="t('blocks.groupAdd')" flush @pick="cat = $event" @reorder="setOrder"
         @group-menu="openGroupMenu" @new-group="openNewGroup()" />
 
-      <div class="block-content">
-        <div class="block-filters">
+      <div class="block-content flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+        <div class="block-filters mr-[26px] flex items-center gap-2.5">
           <SearchBox v-model="keyword" :placeholder="t('blocks.search')" :clear-label="t('blocks.searchClear')"
             width="100%" />
           <BaseButton v-if="inSkinCat" size="sm" variant="accent" @click="skinOpen = true">
@@ -564,16 +565,18 @@ async function onDetailRemove() {
     </div>
 
     <!-- 尺寸滑杆：右下角，小 → 大连续调图标大小 -->
-    <div v-if="rendered" class="size-dock">
-      <span class="size-edge">{{ t("blocks.size.sm") }}</span>
+    <div v-if="rendered"
+      class="size-dock absolute bottom-[30px] right-[34px] z-20 flex items-center gap-2 rounded-pill border border-border bg-card px-3 py-1.5 shadow-[var(--shadow-md)]">
+      <span class="size-edge text-meta text-dim">{{ t("blocks.size.sm") }}</span>
       <input class="size-range" type="range" min="0" max="2" step="1" :value="sizeIndex"
         :aria-label="t('blocks.size.title')" :title="t('blocks.size.title')" @input="onSizeSlider" />
-      <span class="size-edge">{{ t("blocks.size.lg") }}</span>
+      <span class="size-edge text-meta text-dim">{{ t("blocks.size.lg") }}</span>
     </div>
 
     <!-- 未渲染：提示卡；渲染中显示进度说明，不再给按钮 -->
-    <div v-if="!rendered" class="block-prompt">
-      <div class="block-prompt-icon">
+    <div v-if="!rendered"
+      class="block-prompt mb-[22px] mr-[26px] flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-panel border border-dashed border-accent-border bg-card px-5 pt-8 pb-6">
+      <div class="block-prompt-icon mb-2 flex h-[84px] w-[84px] items-center justify-center rounded-panel bg-accent-soft text-accent">
         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3 4.5 7.5v9L12 21l7.5-4.5v-9L12 3z" />
@@ -581,10 +584,10 @@ async function onDetailRemove() {
           <path d="M12 12v9" />
         </svg>
       </div>
-      <h2 class="block-prompt-title">
+      <h2 class="block-prompt-title text-display font-bold">
         {{ status?.error ? t("blocks.renderFailed") : running ? t("blocks.rendering") : t("blocks.renderPromptTitle") }}
       </h2>
-      <p v-if="descText" class="block-prompt-desc">{{ descText }}</p>
+      <p v-if="descText" class="block-prompt-desc max-w-[420px] text-center text-title text-dim">{{ descText }}</p>
       <BaseButton v-if="!running" variant="primary" @click="startRender(false)">
         {{ status?.error ? t("blocks.retry") : t("blocks.renderNow") }}
       </BaseButton>
@@ -615,7 +618,7 @@ async function onDetailRemove() {
     <!-- 设置分组：下拉选一个分组，空串表示未分组；多选时一次应用到所有勾选的方块 -->
     <BaseModal v-if="groupPickOpen" :title="t('blocks.menuSetGroup')" :width="380" :closable="false"
       @close="groupTargets = []">
-      <p class="group-pick-name">{{ groupPickName }}</p>
+      <p class="group-pick-name mb-2.5 break-all text-body text-dim">{{ groupPickName }}</p>
       <label class="field-label">{{ t("blocks.detailGroups") }}</label>
       <select class="field-select" :value="groupPickMixed ? '__mixed__' : groupPickValue"
         @change="onGroupPickChange(($event.target as HTMLSelectElement).value)">
@@ -623,9 +626,9 @@ async function onDetailRemove() {
         <option value="">{{ t("blocks.groupNone") }}</option>
         <option v-for="g in groupList" :key="g.uuid" :value="g.uuid">{{ g.name }}</option>
       </select>
-      <p v-if="!groupList.length" class="group-pick-empty">{{ t("blocks.groupEmpty") }}</p>
+      <p v-if="!groupList.length" class="group-pick-empty mt-1.5 text-meta text-dim">{{ t("blocks.groupEmpty") }}</p>
       <div class="modal-actions">
-        <BaseButton size="sm" class="group-pick-new" @click="openNewGroup(groupTargets)">
+        <BaseButton size="sm" class="group-pick-new mr-auto" @click="openNewGroup(groupTargets)">
           {{ t("blocks.groupAdd") }}
         </BaseButton>
         <BaseButton @click="groupTargets = []">{{ t("blocks.close") }}</BaseButton>
@@ -647,7 +650,7 @@ async function onDetailRemove() {
 
     <!-- 删除分组确认 -->
     <BaseModal v-if="groupRemove" :title="t('blocks.groupRemove')" :closable="false" @close="groupRemove = null">
-      <p class="group-tip">{{ t("blocks.groupRemoveConfirm", { name: groupRemove.label }) }}</p>
+      <p class="group-tip m-0 text-title text-dim">{{ t("blocks.groupRemoveConfirm", { name: groupRemove.label }) }}</p>
       <div class="modal-actions">
         <BaseButton @click="groupRemove = null">{{ t("add.cancel") }}</BaseButton>
         <BaseButton variant="danger" @click="confirmRemoveGroup">{{ t("blocks.groupRemove") }}</BaseButton>
@@ -659,75 +662,21 @@ async function onDetailRemove() {
 <style scoped src="../../styles/parts/multi-bar.css"></style>
 
 <style scoped>
-/* 多选条：外观走 styles/parts/multi-bar.css，这里只管位置。
-   内容区上内边距是 22px，往上探 12px 就落在标题栏下沿 10px 处；
-   面板右侧通栏了 26px，补回来它才在窗口里真正居中 */
+/* 面板排版已改到模板上的工具类（语义类名都留着：.block-panel / .block-progress / .block-prompt /
+   .size-dock 这些在 themes.css 的毛玻璃表里，主题包也按类名覆盖）。
+   这里只留工具类压不住的部分：全局类覆盖、:deep 穿透、滑块与进度条的控件外观。 */
+
+/* 多选条位置：.multi-bar 的外观来自无层全局样式，工具类压不住 */
 .multi-bar {
   margin: -12px 26px 0 0;
 }
 
-.block-panel {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  flex: 1;
-  min-height: 0;
-  /* 右侧与下侧抵消 WindowFrame .frame-body 的 26 / 22 内边距：网格与它的滚动条顶到
-     窗口右边、一直延伸到窗口底，滚动条是整条。上边不抵消 —— 分类栏与搜索框要落在
-     内容区的同一条顶线上，与资源收藏窗口一致；分类栏因此传 flush，不再自带上下留白 */
-  margin-right: -26px;
-  margin-bottom: -22px;
-  padding-right: 0;
-}
-
-/* ---------- 右列：搜索条 + 网格 ---------- */
-
-/* 分类栏右边那一列：搜索条在上、网格撑满剩余高度 */
-.block-content {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.block-filters {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  /* 面板右侧是通栏的，这里补回窗口内边距 */
-  margin-right: 26px;
-}
-
-/* 搜索框占满整行，右侧的「添加皮肤」按内容宽度跟在后面（与资源收藏窗口一致） */
+/* 搜索框占满整行，右侧的「添加皮肤」按内容宽度跟在后面 */
 .block-filters :deep(.search-box) {
   flex: 1;
 }
 
-/* ---------- 尺寸滑杆（右下角） ---------- */
-
-.size-dock {
-  position: absolute;
-  right: 34px;
-  bottom: 30px;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg-card);
-  box-shadow: var(--shadow-md);
-}
-
-.size-edge {
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
+/* 尺寸滑杆：accent-color 与光标不属于排版，留 CSS */
 .size-range {
   width: 120px;
   margin: 0;
@@ -735,109 +684,7 @@ async function onDetailRemove() {
   cursor: pointer;
 }
 
-/* ---------- 设置分组弹窗 ---------- */
-
-/* 方块名跟在标题下面，与分组列表拉开一点 */
-.group-pick-name {
-  margin: 0 0 10px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-  word-break: break-all;
-}
-
-/* 还没有分组时，下拉框下面补一句怎么建 */
-.group-pick-empty {
-  margin: 6px 0 0;
-  font-size: 11.5px;
-  color: var(--text-dim);
-}
-
-/* 新建分组靠左，其余操作留在右侧 */
-.group-pick-new {
-  margin-right: auto;
-}
-
-.group-tip {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
-/* 只有网格 / 分类栏区域是"通栏"的，其余卡片保持和网格一致的留白。
-   右边距取 26 而不是网格那 16：网格的缩进 16 之外还有约 9px 的滚动条槽，
-   卡片没有那条槽，按 16 补会让卡片右边比左边多空出去 16px，看着左右不一样宽 */
-.block-progress,
-.block-prompt {
-  margin-right: 26px;
-}
-
-/* 面板底部是通栏的，提示卡补回窗口下内边距 */
-.block-prompt {
-  margin-bottom: 22px;
-}
-
-/* ---------- 提示卡（未渲染 / 失败） ---------- */
-.block-prompt {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 32px 20px 24px;
-  border: 1px dashed var(--accent-border);
-  border-radius: 12px;
-  background: var(--bg-card);
-}
-
-.block-prompt-icon {
-  width: 84px;
-  height: 84px;
-  border-radius: 12px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 8px;
-}
-
-.block-prompt-title {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.block-prompt-desc {
-  font-size: 13px;
-  color: var(--text-dim);
-  text-align: center;
-  max-width: 420px;
-}
-
-/* ---------- 进度（渲染中，顶部一行） ---------- */
-.block-progress {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-card);
-  font-size: 12.5px;
-}
-
-.block-progress-text {
-  flex-shrink: 0;
-  max-width: 45%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text);
-}
-
-/* 进度条占满中段，两端文字按内容宽度 */
+/* 渲染进度条：两端文字按内容宽度，条子占满中段 */
 .block-progress-bar {
   flex: 1;
   min-width: 60px;
@@ -852,27 +699,5 @@ async function onDetailRemove() {
   border-radius: 999px;
   background: var(--accent);
   transition: width 0.3s;
-}
-
-.block-progress-percent {
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.block-progress-num {
-  flex-shrink: 0;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-/* ---------- 主体：分类栏 + 右列 ---------- */
-.block-main {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  gap: 16px;
 }
 </style>

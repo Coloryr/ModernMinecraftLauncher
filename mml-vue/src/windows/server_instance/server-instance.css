@@ -1,9 +1,7 @@
 /* 左导航 + 右内容，与设置窗口同一套骨架：外壳 body-fill + body-flush，这里 flex: 1 就占满 */
-.si-layout {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
+/* 骨架（.si-layout / .si-page / .si-content / .si-head / .si-title / .si-sub）的排版
+   已改到模板上的工具类，类名保留给主题与毛玻璃表。这里从左侧导航往下都是本窗自己的
+   状态与控件外观（.si-thumb 滑动色块、:hover / .active / :disabled、:deep 等）。 */
 
 .si-rail {
   position: relative;
@@ -106,63 +104,10 @@
   color: inherit;
 }
 
-/* 右侧内容：每页自己滚。
-   右侧**不留内边距**：滚动条是子元素（.si-section）画的，只有让它贴着内容区右缘，
-   滚动条才贴着窗口右边；留白改由下面两条按"26px - 9px 槽位"补回来 */
-/* 分页面包层：让面板继续以 flex 列铺满剩余高度 */
-.si-page {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.si-content {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  /* 自己不出滚动条：滚的都是下面的 .si-section，这样滚动条才贴着窗口右边 */
-  overflow: hidden;
-  padding: 22px 0 22px 26px;
-}
-
 /* 页头不在滚动容器里，没有槽位，直接留 26px，与下方内容的右缘对齐 */
 .si-head,
 .si-content>.empty-tip {
   padding-right: 26px;
-}
-
-.si-head {
-  margin-bottom: 14px;
-}
-
-.si-title {
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.si-sub {
-  font-size: 12.5px;
-  color: var(--text-dim);
-  margin-top: 4px;
-}
-
-/* 每页一块：默认整页滚；带 .stretch 的页把剩余高度交给列表。
-   右内边距 = 26 - 9：9px 是常驻的滚动条槽位，内容右缘因此仍在 26px 上，
-   而滚动条贴在窗口右边（见 .si-content 的说明） */
-.si-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-  min-height: 0;
-  /* 常驻滚动槽，见 styles/scrollbar.css 的 WebKit 例外 */
-  overflow-y: scroll;
-  scrollbar-gutter: stable;
-  padding-right: calc(26px - 9px);
 }
 
 /* 撑满的页自己不滚（滚动交给里面的列表 / 表格），没有槽位，右缘直接留 26px。
@@ -224,35 +169,9 @@
   width: 140px;
 }
 
-.si-section-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 /* 计数靠左、按钮靠右：第一个元素吃掉剩余宽度 */
 .si-section-head> :first-child {
   flex: 1;
-}
-
-.si-counter {
-  flex-shrink: 0;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-/* 列表：吃掉这一页剩下的高度；滚动与行虚拟化交给 VirtualList，这里只管外观。
-   行间距由 :row-gap 传进去，别再写 gap —— 虚拟化按行高算窗口，写死的 gap 会算偏 */
-.si-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: scroll;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-card);
-  scrollbar-gutter: stable;
 }
 
 .si-row-item {

@@ -470,11 +470,11 @@ function onMenuPick(id: string) {
             @change.stop="toggle(item)" @click.stop />
         </template>
         <template #badges>
-          <span v-if="item.acceptTextures" class="badge badge-dim">
+          <span v-if="item.acceptTextures" class="badge badge-dim shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">
             {{ t("resource.acceptTextures") }}
           </span>
           <!-- 在线人数：查到了才显示；查不到时那一行下面会写连不上的原因 -->
-          <span v-if="isOnline(item)" class="badge">
+          <span v-if="isOnline(item)" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">
             {{
               t("server.players", {
                 now: motdOf(item)?.playersOnline ?? 0,
@@ -493,7 +493,7 @@ function onMenuPick(id: string) {
           <span v-if="isLoading(item)" class="sv-state wait">{{ t("server.refreshing") }}</span>
           <span v-else-if="isOnline(item)" class="sv-state ok">{{ t("server.online") }}</span>
           <span v-else class="sv-state off">{{ motdOf(item)?.message || t("server.offline") }}</span>
-          <span class="sep">·</span>
+          <span class="sep mx-[5px] text-dim opacity-70">·</span>
           <span>{{ item.ip }}</span>
         </template>
       </ResourceRow>
@@ -510,14 +510,7 @@ function onMenuPick(id: string) {
 
 <!-- 副标题里的分隔号：与模组行的 `·` 同一套观感；行内间距靠 CSS，不靠空格 -->
 <style scoped>
-.sep {
-  margin: 0 5px;
-  color: var(--text-dim);
-  opacity: 0.7;
-}
-
-/* 行里的连接状态：能连上给绿、连不上给红、查询中压暗。
-   MOTD 搬去上方卡片之后，这一句就是整行的主要信息，得能一眼扫出来 */
+/* 连接状态是三种状态类的颜色，留在 CSS（状态类按 §16.11 不拆）。 */
 .sv-state.ok {
   color: var(--green);
 }

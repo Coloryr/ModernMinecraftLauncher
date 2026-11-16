@@ -5,6 +5,8 @@
 
 import type { WindowPageRegistry } from "mml-ipc";
 import ReplaceWindow from "./ReplaceWindow.vue";
+// 主题的样式入口：Tailwind 工具类（见 theme.css）
+import "./theme.css";
 
 /**
  * 按窗口 kind 返回要替换的页面

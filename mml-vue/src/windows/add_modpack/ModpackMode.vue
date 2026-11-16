@@ -374,23 +374,23 @@ watch(source, loadSource);
 </script>
 
 <template>
-  <div class="modpack-mode" ref="bodyRef">
+  <div class="modpack-mode flex h-full flex-col gap-2.5" ref="bodyRef">
     <!-- 过滤条件 + 搜索：同一块白底卡片。加载期间整条锁死，避免半途改条件与在途请求打架 -->
-    <div class="modpack-top">
-      <div class="modpack-filters">
+    <div class="modpack-top flex flex-col gap-2.5 rounded-panel border border-border bg-card px-[18px] py-2.5">
+      <div class="modpack-filters flex flex-wrap items-center gap-2.5">
         <SegmentedTabs v-model="source" :options="sources" :disabled="searching" />
-        <select v-model="version" class="field-select sel-version" :disabled="searching" @change="submitSearch">
+        <select v-model="version" class="field-select sel-version flex-[1_1_110px] min-w-[110px]" :disabled="searching" @change="submitSearch">
           <option value="">{{ t("modpack.allVersions") }}</option>
           <option v-for="v in versions" :key="v" :value="v">{{ v }}</option>
         </select>
-        <select v-model="sort" class="field-select sel-sort" :disabled="searching" @change="submitSearch">
+        <select v-model="sort" class="field-select sel-sort flex-[1_1_110px] min-w-[110px]" :disabled="searching" @change="submitSearch">
           <option v-for="s in sorts" :key="s" :value="s">{{ t(`modpack.sort.${s}`) }}</option>
         </select>
-        <select v-model="category" class="field-select sel-category" :disabled="searching" @change="submitSearch">
+        <select v-model="category" class="field-select sel-category flex-[1_1_110px] min-w-[110px]" :disabled="searching" @change="submitSearch">
           <option value="">{{ t("modpack.allCategories") }}</option>
           <option v-for="c in categories" :key="c.value" :value="c.value">{{ c.label }}</option>
         </select>
-        <div class="group-combo sel-group">
+        <div class="group-combo sel-group relative min-w-[110px] flex-[1_1_110px] p-0">
           <input :value="props.group" class="field-input" :placeholder="t('modpack.groupPlaceholder')"
             spellcheck="false" :disabled="searching" @focus="groupOpen = true" @input="onGroupInput"
             @blur="groupOpen = false" />
@@ -405,7 +405,7 @@ watch(source, loadSource);
       </div>
 
       <!-- 搜索 -->
-      <div class="modpack-search">
+      <div class="modpack-search flex gap-2">
         <input v-model="filter" class="field-input search-input" :placeholder="t('modpack.searchHint')"
           spellcheck="false" :disabled="searching" @keydown.enter="submitSearch" />
         <button class="search-btn" :disabled="searching" @click="submitSearch">
@@ -419,7 +419,8 @@ watch(source, loadSource);
     <div class="list-bar" :class="{ on: searching }" aria-hidden="true"><span /></div>
 
     <!-- 结果列表：加载状态内联在本区，旧内容保留并压暗 -->
-    <div class="modpack-list" :class="{ 'is-loading-dim': searching }">
+    <div class="modpack-list -mx-2 flex min-h-[120px] flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2"
+      :class="{ 'is-loading-dim': searching }">
       <!-- 首次加载（还没有内容）：骨架行 -->
       <template v-if="searching && items.length === 0">
         <div v-for="n in 6" :key="n" class="sk-row">
@@ -441,7 +442,7 @@ watch(source, loadSource);
     </div>
 
     <!-- 分页 -->
-    <div v-if="maxPage > 0" class="modpack-page">
+    <div v-if="maxPage > 0" class="modpack-page flex items-center justify-center gap-3">
       <button class="page-btn" :disabled="page === 0 || searching" @click="turnPage(-1)">
         {{ t("modpack.prevPage") }}
       </button>

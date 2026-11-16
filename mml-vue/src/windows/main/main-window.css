@@ -53,13 +53,8 @@
 
 /* ================= 主体 ================= */
 
-.main {
-  position: relative;
-  flex: 1;
-  display: flex;
-  min-height: 0;
-}
-
+/* 主体：定位与 flex 走模板上的工具类（relative flex flex-1 min-h-0），
+   这里只留随状态变的排列与内容区几何 */
 .main.side-right {
   flex-direction: row-reverse;
 }
@@ -275,24 +270,10 @@
   transform: translateY(-8px);
 }
 
-/* 实例详情分支的包裹层：复刻 .detail 的纵向 flex 间距，避免包一层后间距丢失 */
-.detail-content {
-  /* 撑满 .detail 剩下的高度：未选中实例时里面只有一个 .placeholder，
-     它靠 flex:1 上下居中 —— 这一层不撑开，提示语就贴在顶部 */
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* 单个实例的详情：按 uuid 做 key，切换实例时触发动画；同样复刻纵向 flex 间距 */
-.detail-instance {
-  display: flex;
-  flex-direction: column;
-  /* 底部这几块（实例设置 / 自定义执行 / 自定义服务器 / 游戏内代理）原本 16px，
-     连成一串后显得空，收到 10px */
-  gap: 10px;
-}
+/* 实例详情分支的包裹层与单个实例（.detail-content / .detail-instance）：
+   纵向 flex 与间距在模板上（flex flex-1 flex-col gap-4 / gap-2.5）。
+   .detail-content 靠 flex-1 撑满 .detail 剩下的高度，未选中实例时 .placeholder
+   才能在剩余空间里上下居中 */
 
 .news-page {
   flex: 1;
@@ -309,30 +290,11 @@
 }
 
 /* 自定义主页面占位块：整块铺满内容区，内边距与底部留白都不给（页面自己负责排版与滚动）。
-   高度必须走 flex 而不能只靠 height:100%：.detail 只有主轴上的确定尺寸，
-   子元素 height:100% 解析不出高度，会把 iframe 压扁 */
-.custom-home-page {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-/* 兜底分支里的自定义主页面：.detail 带 padding 且自身可滚动，要在它内部撑满，
-   得有一层确定高度的容器把 padding 抵消掉 */
+   flex / min-height 在模板上；高度必须走 flex 而不能只靠 height:100%：.detail 只有主轴上的
+   确定尺寸，子元素 height:100% 解析不出高度，会把 iframe 压扁。
+   .custom-home-fill 还要抵消 .detail 的三边内边距，数字全取 .detail 的变量 */
 .custom-home-fill {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  /* 抵消 .detail 的三边内边距，让自定义主页面满铺；数字全取 .detail 的变量，改那边这里跟着走 */
   margin: calc(-1 * var(--detail-pad-top)) calc(-1 * var(--content-pad-x)) calc(-1 * var(--content-pad-bottom));
-}
-
-.detail-top {
-  display: flex;
-  align-items: flex-start;
-  gap: 18px;
 }
 
 /* 实例图标：悬停时整块压暗，中间露出改图标入口（列表模式与详情模式共用）。

@@ -502,8 +502,8 @@ function saveTip(item: SaveItemDto): string {
   <VirtualList v-else class="item-list" :count="saves.length" :row-gap="RESOURCE_ROW_GAP">
     <!-- 自动进入存档：整个实例只有一个目标，列表上方直接选；对应那行有「自动进入」徽标 -->
     <template v-if="quickPlay && saves.length" #header>
-      <div class="auto-enter-row">
-        <span class="auto-enter-label">{{ t("resource.autoEnter") }}</span>
+      <div class="auto-enter-row mb-2 flex items-center gap-2">
+        <span class="auto-enter-label shrink-0 whitespace-nowrap text-body text-dim">{{ t("resource.autoEnter") }}</span>
         <select class="field-select auto-enter-select" :value="autoEnterDir" :disabled="busy"
           @change="onAutoEnterChange">
           <option value="">{{ t("resource.autoEnterNone") }}</option>
@@ -531,11 +531,11 @@ function saveTip(item: SaveItemDto): string {
         </template>
         <template #badges>
           <!-- 实例配了启动后自动进入这个存档，给个标记 -->
-          <span v-if="item.autoEnter" class="badge badge-on">{{ t("resource.autoEnter") }}</span>
-          <span v-if="item.broken" class="badge badge-red">{{ t("resource.broken") }}</span>
-          <span v-if="item.hardCore" class="badge badge-red">Hardcore</span>
+          <span v-if="item.autoEnter" class="badge badge-on shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.autoEnter") }}</span>
+          <span v-if="item.broken" class="badge badge-red shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.broken") }}</span>
+          <span v-if="item.hardCore" class="badge badge-red shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">Hardcore</span>
           <!-- 有备份才给还原入口：没有备份的存档点还原只会弹一句"还没有备份" -->
-          <span v-if="item.backups" class="badge">
+          <span v-if="item.backups" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">
             {{ t("resource.backupCount", { n: item.backups }) }}
           </span>
         </template>
@@ -562,10 +562,10 @@ function saveTip(item: SaveItemDto): string {
     名字与种子的红框与提示在碰过之后才出现，与分组名弹窗同一口径。
   -->
   <BaseModal v-if="editForm" :title="t('resource.saveEdit')" :closable="false" @close="editForm = null">
-    <p class="save-edit-name">
+    <p class="save-edit-name m-0 mb-0.5 text-title text-fg">
       <FormattedText :text="editForm.item.levelName || editForm.item.dir" />
     </p>
-    <p class="save-edit-dir" :title="editForm.item.dir">{{ editForm.item.dir }}</p>
+    <p class="save-edit-dir m-0 overflow-hidden text-ellipsis whitespace-nowrap text-meta text-dim" :title="editForm.item.dir">{{ editForm.item.dir }}</p>
 
     <label class="field-label">{{ t("resource.saveNameField") }}</label>
     <input v-model="editForm.levelName" class="field-input" :class="{ 'is-invalid': editTouched && !!editNameError }"
@@ -611,7 +611,7 @@ function saveTip(item: SaveItemDto): string {
     </div>
     <p v-if="editTouched && editSeedError" class="error-text">{{ editSeedError }}</p>
 
-    <div class="save-edit-switch">
+    <div class="save-edit-switch mt-3.5 flex items-center justify-between gap-3">
       <span class="field-label">{{ t("resource.saveHardcoreField") }}</span>
       <BaseSwitch v-model="editForm.hardCore" />
     </div>
@@ -626,11 +626,11 @@ function saveTip(item: SaveItemDto): string {
 
   <!-- 选一个备份来还原（破坏性，选中后还会再确认一次） -->
   <BaseModal v-if="restorePick" :title="t('resource.restorePickTitle')" :closable="false" @close="restorePick = null">
-    <div class="backup-pick-list">
-      <button v-for="b in restorePick.list" :key="b.file" class="backup-pick-row" :disabled="busy"
+    <div class="backup-pick-list mr-[-8px] flex max-h-[320px] flex-col gap-1 overflow-y-auto pr-2">
+      <button v-for="b in restorePick.list" :key="b.file" class="backup-pick-row flex w-full cursor-pointer items-center gap-2.5 rounded-ctl border border-border bg-hover p-[8px_12px] text-left text-body text-fg transition-all duration-100 [font-family:inherit] enabled:hover:border-accent enabled:hover:bg-accent-soft enabled:hover:text-accent disabled:cursor-default disabled:opacity-50" :disabled="busy"
         @click="pickRestore(b.file)">
-        <span class="backup-pick-name" :title="b.file">{{ b.file }}</span>
-        <span class="backup-pick-meta">{{ formatTime(b.time) }} · {{ formatSize(b.size) }}</span>
+        <span class="backup-pick-name min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" :title="b.file">{{ b.file }}</span>
+        <span class="backup-pick-meta shrink-0 text-meta text-dim">{{ formatTime(b.time) }} · {{ formatSize(b.size) }}</span>
       </button>
     </div>
     <div class="modal-actions">
@@ -642,113 +642,15 @@ function saveTip(item: SaveItemDto): string {
 <!-- 编辑弹窗与备份弹窗的样式都走 scoped：BaseModal 是 Teleport 到 body 的，
      窗口级 resource.css 那套 .resource-layout 前缀够不着它（备注弹窗同理） -->
 <style scoped>
-/* 存档名（作者可能带 `§` 格式码，过一遍显示期解析）与它的目录名，一行一条 */
-.save-edit-name {
-  margin: 0 0 2px;
-  font-size: 13px;
-  color: var(--text);
-}
+/* 排版已移到模板上的工具类，这里只留两类必须留在 CSS 的规则：
+   覆盖全局 .field-label / .field-select 的复合选择器（无层优先级才压得住）。 */
 
-.save-edit-dir {
-  margin: 0;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 极限模式：标签 + 开关一行，标签不要 .field-label 的上下外边距 */
-.save-edit-switch {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 14px;
-}
-
+/* 极限模式的标签不要 .field-label 的上下外边距 */
 .save-edit-switch .field-label {
   margin: 0;
 }
 
-.backup-pick-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  /* 备份可能很多：给个上限自己滚，别把弹窗撑出屏幕 */
-  max-height: 320px;
-  overflow-y: auto;
-  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
-     行的右边缘仍落在弹窗内容区里，滚动条画在这 8px 上
-     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
-  margin-right: -8px;
-  padding-right: 8px;
-}
-
-/* 一行一个备份：整行可点，点下去弹确认框。
-   底色取 `--bg-hover` 而不是 `--bg-raised` —— 亮色主题下后者与弹窗底 `--bg-card`
-   都是纯白，行就只剩一圈浅边框，"看不出是个能点的项目" */
-.backup-pick-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-hover);
-  color: var(--text);
-  font-size: 12.5px;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.12s;
-}
-
-.backup-pick-row:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.backup-pick-row:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* 文件名可被挤压，时间 / 体积不缩 */
-.backup-pick-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.backup-pick-meta {
-  flex-shrink: 0;
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
-
-/* 列表上方的「自动进入存档」选择行：标签不缩，下拉吃满剩余宽度。
-   .field-select 自带 width: 100%，用复合选择器压过它 */
-.auto-enter-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.auto-enter-label {
-  flex-shrink: 0;
-  white-space: nowrap;
-  font-size: 12.5px;
-  color: var(--text-dim);
-}
-
-/* 只收横向尺寸：上下内边距与行高保持全局那一份（5px + 20px 行高，内容盒正好一行），
-   改了纵向内边距 <select> 的文字就会贴到上边 */
+/* 只收横向尺寸：.field-select 自带 width: 100%，用复合选择器压过它 */
 .auto-enter-row .field-select.auto-enter-select {
   flex: 1;
   width: auto;

@@ -2008,7 +2008,7 @@ onBeforeUnmount(() => {
         所以它的可滚动区域正好等于内容，滚到头就是内容边缘，不会多出一块空白。
       滚动条因此落在白色底里面（用户口径）。
     -->
-    <div class="mod-table-panel">
+    <div class="mod-table-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card">
       <div ref="tableScrollEl" class="mod-table-scroll">
         <template v-for="(sec, idx) in sections" :key="sec.id">
           <div v-if="showSectionLine(idx)" class="mod-group-insert">
@@ -2082,9 +2082,9 @@ onBeforeUnmount(() => {
           </p>
           <!-- 「modid 重复」块按 modid 分区，每个 modid 一个小标题；其它块只有一区、不画小标题 -->
           <div v-for="part in partsOf(sec)" :key="part.key">
-            <div v-if="part.label" class="mod-part-head">
+            <div v-if="part.label" class="mod-part-head flex items-center gap-2 px-2 pb-1 pt-0.5 text-body font-semibold opacity-75">
               <span class="mod-part-name">{{ part.label }}</span>
-              <span class="mod-part-count">{{ part.items.length }}</span>
+              <span class="mod-part-count font-normal">{{ part.items.length }}</span>
             </div>
             <ModList :items="part.items" :busy="busy" :selected-keys="selected" :update-keys="updateKeys" :query="query"
               @toggle="toggle" @remove="remove" @note="openNote" @open-folder="openFolder('mods', $event.file)"
@@ -2128,8 +2128,8 @@ onBeforeUnmount(() => {
   <!-- 模组备注：文件名只读展示；用户认的是名字，落盘的键是文件名 -->
   <BaseModal v-if="noteForm" :title="t('resource.modNoteTitle')" :closable="false" @close="noteForm = null">
     <label class="field-label">{{ noteForm.item.name || noteForm.item.file }}</label>
-    <p class="mod-note-file" :title="noteForm.item.file">{{ noteForm.item.file }}</p>
-    <textarea v-model="noteForm.text" class="field-input mod-note-input" :placeholder="t('resource.modNotePlaceholder')"
+    <p class="mod-note-file m-0 mb-2 overflow-hidden text-ellipsis whitespace-nowrap text-meta text-dim" :title="noteForm.item.file">{{ noteForm.item.file }}</p>
+    <textarea v-model="noteForm.text" class="field-input mod-note-input min-h-[96px] resize-y leading-[1.5]" :placeholder="t('resource.modNotePlaceholder')"
       spellcheck="false" @keydown.ctrl.enter="saveNote(noteForm.text)" />
     <div class="modal-actions">
       <BaseButton v-if="noteForm.item.note" :disabled="noteBusy" @click="saveNote('')">
@@ -2153,12 +2153,12 @@ onBeforeUnmount(() => {
     一个分组都没有时列表位置写「无分组」，下面用「新建分组」建一个
   -->
   <BaseModal v-if="groupPickOpen" :closable="false" @close="closeGroupPick" :title="groupPickTitle">
-    <div class="group-pick-list">
-      <button v-for="g in groupPickTargets" :key="g.uuid" class="group-pick-row" :disabled="busy"
+    <div class="group-pick-list mr-[-8px] flex max-h-[320px] flex-col gap-1 overflow-y-auto pr-2">
+      <button v-for="g in groupPickTargets" :key="g.uuid" class="group-pick-row flex w-full cursor-pointer items-center gap-2 rounded-ctl border border-border bg-hover p-[9px_11px] text-left text-body text-fg transition-all duration-100 [font-family:inherit] enabled:hover:border-accent enabled:hover:bg-accent-soft enabled:hover:text-accent disabled:cursor-default disabled:opacity-50" :disabled="busy"
         @click="pickGroup(g.uuid)">
         <GlyphIcon name="folder" :size="14" />
-        <span class="group-pick-name">{{ g.name }}</span>
-        <span class="group-pick-count">
+        <span class="group-pick-name min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ g.name }}</span>
+        <span class="group-pick-count shrink-0 text-meta text-dim">
           {{ t("resource.groupCountItems", { n: g.mods.length }) }}
         </span>
       </button>
@@ -2191,7 +2191,7 @@ onBeforeUnmount(() => {
   <BaseModal v-if="stateAsk" :width="460" :closable="false"
     :title="t(stateAsk.wantDisable ? 'resource.disableDepsTitle' : 'resource.enableDepsTitle')"
     @close="stateAsk = null">
-    <p class="dep-note">
+    <p class="dep-note break-all text-meta text-dim">
       {{t(stateAsk.wantDisable ? "resource.disableDepsHint" : "resource.enableDepsHint", {
         name: stateAsk.picked.map((item) => item.name || item.file).join(", "),
         list: stateAsk.related.map((item) => item.name || item.file).join(", "),
@@ -2221,27 +2221,27 @@ onBeforeUnmount(() => {
     **有问题才开这个弹窗**，没问题在 runDepTest 里用一条轻提示，不留空弹窗
   -->
   <BaseModal v-if="depOpen" :title="t('resource.depTitle')" :closable="false" @close="depOpen = false">
-    <div class="dep-list">
+    <div class="dep-list mr-[-8px] flex max-h-[52vh] flex-col gap-2.5 overflow-y-auto pr-2">
       <div v-for="g in depGroups" :key="g.kind" class="dep-group">
-        <button class="dep-group-head" :class="{ collapsed: !isDepOpen(g.kind) }" @click="toggleDepGroup(g.kind)">
-          <GlyphIcon class="dep-group-caret" name="chevron-down" :size="13" :weight="2.4" />
+        <button class="dep-group-head flex w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-0 py-0.5 text-left text-body font-semibold text-fg" :class="{ collapsed: !isDepOpen(g.kind) }" @click="toggleDepGroup(g.kind)">
+          <GlyphIcon class="dep-group-caret transition-transform duration-100" name="chevron-down" :size="13" :weight="2.4" />
           <span class="dep-group-label">{{ t(DEP_KIND_LABEL[g.kind]) }}</span>
-          <span class="dep-group-count">{{ g.items.length }}</span>
+          <span class="dep-group-count text-meta font-normal text-dim">{{ g.items.length }}</span>
         </button>
 
-        <div v-show="isDepOpen(g.kind)" class="dep-rows">
-          <div v-for="(p, i) in g.items" :key="`${p.modid}-${i}`" class="dep-row">
-            <div class="dep-body">
-              <div class="dep-head">
-                <span class="dep-modid">{{ p.modid }}</span>
-                <span v-if="p.installed" class="dep-meta">
+        <div v-show="isDepOpen(g.kind)" class="dep-rows flex flex-col gap-2.5 pb-0.5 pl-[21px] pt-1.5">
+          <div v-for="(p, i) in g.items" :key="`${p.modid}-${i}`" class="dep-row flex items-start gap-2.5">
+            <div class="dep-body min-w-0">
+              <div class="dep-head flex flex-wrap items-baseline gap-x-2.5 gap-y-[3px]">
+                <span class="dep-modid break-all text-body font-semibold text-fg">{{ p.modid }}</span>
+                <span v-if="p.installed" class="dep-meta text-body text-dim">
                   {{ t("resource.depInstalled", { version: p.installed }) }}
                 </span>
-                <span v-if="p.required !== '*'" class="dep-meta">
+                <span v-if="p.required !== '*'" class="dep-meta text-body text-dim">
                   {{ t("resource.depRequired", { range: p.required }) }}
                 </span>
               </div>
-              <div v-if="p.requiredBy.length" class="dep-note">
+              <div v-if="p.requiredBy.length" class="dep-note break-all text-meta text-dim">
                 {{ t("resource.depBy", { list: p.requiredBy.join(", ") }) }}
               </div>
             </div>
@@ -2270,12 +2270,12 @@ onBeforeUnmount(() => {
   -->
   <BaseModal v-if="modDuplicates.length" :title="t('resource.modDupTitle')" :width="640" :closable="false"
     @close="dismissModDuplicates">
-    <p class="dep-note">{{ t("resource.modDupHint") }}</p>
-    <div class="dep-list mod-dup-list">
-      <div v-for="d in modDuplicates" :key="d.modid" class="dep-row">
-        <span class="dep-modid">{{ d.modid }}</span>
-        <div class="dep-body">
-          <div v-for="f in d.files" :key="f.file" class="dep-note">{{ f.file }}</div>
+    <p class="dep-note break-all text-meta text-dim">{{ t("resource.modDupHint") }}</p>
+    <div class="dep-list mod-dup-list mr-[-8px] flex max-h-[52vh] flex-col gap-2.5 overflow-y-auto pr-2 max-h-[46vh]">
+      <div v-for="d in modDuplicates" :key="d.modid" class="dep-row flex items-start gap-2.5">
+        <span class="dep-modid break-all text-body font-semibold text-fg">{{ d.modid }}</span>
+        <div class="dep-body min-w-0">
+          <div v-for="f in d.files" :key="f.file" class="dep-note break-all text-meta text-dim">{{ f.file }}</div>
         </div>
       </div>
     </div>
@@ -2294,8 +2294,8 @@ onBeforeUnmount(() => {
     没勾上就只补还没有在线信息的那批
   -->
   <BaseModal v-if="markAsk" :title="t('resource.autoMarkTitle')" :closable="false" @close="markAsk = false">
-    <div class="switch-row">
-      <span class="switch-label">{{ t("resource.autoMarkOverwrite") }}</span>
+    <div class="switch-row flex select-none items-center justify-between gap-3 text-body">
+      <span class="switch-label text-body font-semibold">{{ t("resource.autoMarkOverwrite") }}</span>
       <BaseSwitch v-model="markOverwrite" />
     </div>
     <div class="modal-actions">
@@ -2321,107 +2321,15 @@ onBeforeUnmount(() => {
      `.resource-layout` 里，窗口级 resource.css 那套前缀规则够不着它。
      同窗口的 ServerFormModal 也是这么处理的 -->
 <style scoped>
-/* 文件名（落盘的键）压暗一行 */
-.mod-note-file {
-  margin: 0 0 8px;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* 弹窗在 body 下，样式走 scoped。排版已移到模板上的工具类，
+   这里只留工具类表达不了的两处。 */
+
+/* 收起的组：箭头转 -90°，依赖父级的 .collapsed 状态 */
+.dep-group-head.collapsed .dep-group-caret {
+  transform: rotate(-90deg);
 }
 
-.mod-note-input {
-  min-height: 96px;
-  resize: vertical;
-  line-height: 1.5;
-}
-
-/* ---------- 批量「移到分组」弹窗 ---------- */
-
-/* 分组列表：整行可点，一行一组（比下拉一次只看得见一项强） */
-.group-pick-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  /* 分组可能很多：给个上限自己滚，别把弹窗撑出屏幕 */
-  max-height: 320px;
-  overflow-y: auto;
-  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
-     行的右边缘仍落在弹窗内容区里，滚动条画在这 8px 上
-     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
-  margin-right: -8px;
-  padding-right: 8px;
-}
-
-/* 一行一个分组：整行可点。
-   底色取 `--bg-hover` 而不是 `--bg-raised` —— 亮色主题下后者与弹窗底 `--bg-card`
-   都是纯白，行就只剩一圈浅边框，"看不出是个能点的项目" */
-.group-pick-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 9px 11px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-hover);
-  color: var(--text);
-  font-size: 12.5px;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.12s;
-}
-
-.group-pick-row:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.group-pick-row:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* 分组名可被挤压，数量不缩 */
-.group-pick-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.group-pick-count {
-  flex-shrink: 0;
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
-
-/* ---------- 依赖检测 / 重复安装结果 ---------- */
-
-/* 问题多时弹窗自己滚，别把动作按钮顶出屏幕 */
-.dep-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 52vh;
-  overflow-y: auto;
-  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
-     行的右边缘仍落在弹窗内容区里，滚动条画在这 8px 上
-     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
-  margin-right: -8px;
-  padding-right: 8px;
-}
-
-/* 重复那一档上面还有一行说明：列表再收一点，保证说明与按钮都留在视野里 */
-.mod-dup-list {
-  max-height: 46vh;
-}
-
-/* 依赖检测跑起来时图标转起来：要重扫一遍模组，几秒里得让人看出是在跑 */
+/* 依赖检测进行中：图标转圈，@keyframes 只能写在 CSS 里 */
 .dep-spin {
   animation: dep-spin 0.8s linear infinite;
 }
@@ -2430,112 +2338,5 @@ onBeforeUnmount(() => {
   to {
     transform: rotate(360deg);
   }
-}
-
-.dep-row {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-
-/* 下拉组的组头：箭头 + 种类名 + 条数；点整行收起 / 展开 */
-.dep-group-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 2px 0;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  text-align: left;
-}
-
-.dep-group-caret {
-  transition: transform 0.12s;
-}
-
-.dep-group-head.collapsed .dep-group-caret {
-  transform: rotate(-90deg);
-}
-
-.dep-group-count {
-  color: var(--text-dim);
-  font-size: 11.5px;
-  font-weight: 400;
-}
-
-.dep-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 6px 0 2px 21px;
-}
-
-.dep-body {
-  min-width: 0;
-}
-
-.dep-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 3px 10px;
-}
-
-.dep-modid {
-  color: var(--text);
-  font-size: 12.5px;
-  font-weight: 600;
-  word-break: break-all;
-}
-
-.dep-meta {
-  color: var(--text-dim);
-  font-size: 12px;
-}
-
-.dep-note {
-  color: var(--text-dim);
-  font-size: 11.5px;
-  word-break: break-all;
-}
-
-/* ---------- 自动标记弹窗的开关行 ---------- */
-
-/* 弹窗 Teleport 到 body、不在 `.resource-layout` 里，窗口级 resource.css 的前缀规则够不着，
-   所以这里补一份；数值取 settings.css 里同名的那一套 */
-.switch-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12.5px;
-  user-select: none;
-}
-
-.switch-label {
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-/* ---------- 「modid 重复」块里的小标题 ---------- */
-
-/* 组内的组：比分组头轻一档，只把同一个 modid 的那几条框在一起 */
-.mod-part-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 8px 4px;
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.75;
-}
-
-.mod-part-count {
-  font-weight: 400;
 }
 </style>

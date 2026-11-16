@@ -33,17 +33,17 @@ function updateForm<K extends keyof ServerFormDraft>(key: K, value: ServerFormDr
 <template>
   <BaseModal :title="form.edit ? t('resource.serverEdit') : t('resource.serverAdd')" :closable="false"
     @close="emit('close')">
-    <div class="form-grid">
-      <label class="form-label">{{ t("resource.serverName") }}</label>
-      <input :value="form.name" class="form-input" type="text"
+    <div class="form-grid grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2.5">
+      <label class="form-label text-body text-dim">{{ t("resource.serverName") }}</label>
+      <input :value="form.name" class="form-input min-h-ctl min-w-0 rounded-ctl border border-border bg-side px-2.5 py-[3px] text-ctl text-fg [font-family:inherit]" type="text"
         @input="updateForm('name', ($event.target as HTMLInputElement).value)" />
-      <label class="form-label">{{ t("resource.serverIp") }}</label>
-      <input :value="form.ip" class="form-input" type="text"
+      <label class="form-label text-body text-dim">{{ t("resource.serverIp") }}</label>
+      <input :value="form.ip" class="form-input min-h-ctl min-w-0 rounded-ctl border border-border bg-side px-2.5 py-[3px] text-ctl text-fg [font-family:inherit]" type="text"
         @input="updateForm('ip', ($event.target as HTMLInputElement).value)" />
       <!-- 接受材质是客户端选项，只在编辑已有条目时出现（新增走客户端默认） -->
       <template v-if="form.edit">
-        <label class="form-label">{{ t("resource.acceptTextures") }}</label>
-        <input :checked="form.acceptTextures" class="form-check" type="checkbox"
+        <label class="form-label text-body text-dim">{{ t("resource.acceptTextures") }}</label>
+        <input :checked="form.acceptTextures" class="form-check m-0 h-[15px] w-[15px] cursor-pointer justify-self-start accent-accent" type="checkbox"
           @change="updateForm('acceptTextures', ($event.target as HTMLInputElement).checked)" />
       </template>
     </div>
@@ -58,45 +58,9 @@ function updateForm<K extends keyof ServerFormDraft>(key: K, value: ServerFormDr
 
 <!-- 弹窗内容是 Teleport 到 body 的，不在 .resource-layout 里，所以这几条自带 scoped 样式 -->
 <style scoped>
-.form-grid {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 10px 12px;
-}
-
-.form-label {
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-.form-input {
-  padding: 3px 10px;
-  /* 尺寸与全 app 控件同档；只靠 padding 撑的话这里会比同排控件矮一头 */
-  min-height: var(--ctl-h);
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-side);
-  color: var(--text);
-  font-size: var(--ctl-font);
-  font-family: inherit;
-  min-width: 0;
-}
-
+/* 聚焦态留在 CSS：伪类是工具类表达不了的那一档。 */
 .form-input:focus {
   outline: none;
   border-color: var(--accent);
-}
-
-/* 复选框：grid 里默认 `justify-self: normal` 会把它**拉伸**到整列宽，
-   浏览器又把那个小方框画在拉伸框的正中间 —— 看着就是"开关居中"。
-   钉到列首，与上面两个输入框左对齐 */
-.form-check {
-  justify-self: start;
-  width: 15px;
-  height: 15px;
-  margin: 0;
-  cursor: pointer;
-  accent-color: var(--accent);
 }
 </style>

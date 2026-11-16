@@ -46,21 +46,21 @@ withDefaults(
       没有图标就让名字直接靠左，版面更干净。图标列的对齐由 `.item-name` 自己保证，
       不依赖这一格存在，见 resource.css 里的说明。
     -->
-    <img v-if="icon" class="item-icon" :src="icon" alt="" />
-    <div class="item-main">
-      <div class="item-name-line">
+    <img v-if="icon" class="item-icon h-9 w-9 shrink-0 rounded-[7px] bg-hover object-cover" :src="icon" alt="" />
+    <div class="item-main flex min-w-0 flex-1 flex-col gap-0.5">
+      <div class="item-name-line flex min-w-0 items-center gap-1.5">
         <!-- 名字**之前**的位置：模组列表把备注放这儿，用户要求"备注放在名字前面"。
              单独开一个插槽而不是复用 badges：badges 在名字**之后**，
              读起来是"名字 + 一串标记"，与"先看到备注"的诉求相反 -->
         <slot name="name-lead" />
         <!-- 名字默认按纯文本渲染；需要过 `§` 格式码的（存档名）走 name 插槽，
              换 FormattedText 铺进来 —— 与 sub 插槽同一套做法 -->
-        <span class="item-name">
+        <span class="item-name overflow-hidden text-ellipsis whitespace-nowrap text-title font-semibold text-fg">
           <slot name="name">{{ name }}</slot>
         </span>
         <slot name="badges" />
       </div>
-      <span class="item-sub">
+      <span class="item-sub overflow-hidden text-ellipsis whitespace-nowrap text-meta text-dim">
         <slot name="sub" />
       </span>
     </div>

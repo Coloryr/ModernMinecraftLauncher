@@ -1,90 +1,14 @@
-/* 不写 height：内容自己撑高，滚动交给窗口框架的 .frame-body（与整合包窗口一致），
-   滚动条因此贴窗口右缘、贯穿整窗，而不是只在列表那一段里。
-   顶部卡片齐着窗口内容边距，不额外回缩 —— 那 8px 是项目列表给悬停阴影留的，
-   列表用负外边距自己抵掉，卡片边缘因此和筛选卡落在同一条竖线上 */
-.res-mode {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.res-top {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 18px;
-}
-
-.res-filters {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
+/* 顶部筛选与结果区的排版已改到模板上的工具类（.res-mode / .res-top / .res-filters /
+   .res-list / .res-page 这些类名仍保留，主题包与毛玻璃表按类名覆盖）。
+   这里只留工具类压不住的三类规则：
+   1. :deep() 穿透到分段控件；
+   2. 覆盖全局 .empty-tip（无层规则优先级高于 @layer utilities）；
+   3. 存档 / 前置两个弹窗内部的行：混着 :hover、:disabled、[type=] 与省略号，
+      留在 CSS 里比拆成十几个带变体的工具类更稳。 */
 
 /* 类型一栏（5 项）可能比窗口宽：允许换行 */
 .res-filters> :deep(.seg-tabs) {
   flex-wrap: wrap;
-}
-
-/* 第二行的三个下拉（排序 / 分类 / 加载器）：固定 150px 且不参与拉伸，
-   同行剩余宽度留给搜索框；第一行那个独占剩余的版本下拉见 .sel-version */
-.sel-filter {
-  flex: 0 1 150px;
-  min-width: 150px;
-  /* 纵向内边距与字号不写，交给 .field-select（5px + 行高 20 + 边框 2 = 32 = --ctl-h），
-     这样几个筛选下拉才与同排搜索框等高 */
-}
-
-/* 第一行的版本下拉独占该行剩余宽度；第二行那三个固定 150px，把宽度让给同行的搜索框 */
-.sel-version {
-  flex: 1 1 110px;
-}
-
-/* 存档类型：源锁定为 CurseForge 的占位块（与同排的分段控件页签同高，全 app 那一档 32px） */
-.res-source-lock {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: var(--ctl-h);
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 13px;
-}
-
-.res-source-name {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.res-source-hint {
-  color: var(--text-dim);
-  font-size: 12px;
-}
-
-/* 与左边几个下拉同一行：吃掉剩余宽度，搜索框因此尽量宽（按钮固定宽） */
-.res-search {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-  min-width: 220px;
-}
-.res-list {
-  flex: 1;
-  min-height: 120px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  /* 左右与下方留 8px：滚动容器会把自己的溢出裁掉，不留余量卡片悬停阴影会被齐边切掉。
-     这 8px 用负外边距从外面借回来：滚动容器向外扩 8px、内边距再收回 8px，
-     卡片边缘就与上方筛选卡对齐，而不是整体往里缩 8px */
-  margin: 0 -8px;
-  padding: 0 8px 8px;
 }
 
 .empty-tip {
@@ -92,13 +16,6 @@
   text-align: center;
   font-size: 12.5px;
   color: var(--text-dim);
-}
-
-.res-page {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
 }
 @keyframes res-spin {
   to {

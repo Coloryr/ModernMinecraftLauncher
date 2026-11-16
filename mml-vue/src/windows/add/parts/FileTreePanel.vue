@@ -33,16 +33,16 @@ const total = computed(() => collectFileKeys(props.tree).length);
 </script>
 
 <template>
-  <div class="files-panel">
-    <div class="files-head">
-      <span class="files-label">{{ t("add.files") }}</span>
-      <span class="files-note">{{ t("add.filesSelected", { n: checked.size, total }) }}</span>
-      <span class="files-actions">
-        <button type="button" class="files-btn" @click="emit('set-all', true)">{{ t("add.filesAll") }}</button>
-        <button type="button" class="files-btn" @click="emit('set-all', false)">{{ t("add.filesNone") }}</button>
+  <div class="files-panel flex min-h-0 flex-1 flex-col">
+    <div class="files-head mx-0 mb-1.5 mt-2.5 flex items-center gap-2.5">
+      <span class="files-label shrink-0 text-body font-semibold text-fg">{{ t("add.files") }}</span>
+      <span class="files-note min-w-0 flex-1 truncate text-[12px] text-dim">{{ t("add.filesSelected", { n: checked.size, total }) }}</span>
+      <span class="files-actions flex shrink-0 gap-2">
+        <button type="button" class="files-btn h-ctl cursor-pointer rounded-ctl border border-border bg-raised px-3.5 text-ctl font-semibold text-accent transition-[border-color,background] duration-150" @click="emit('set-all', true)">{{ t("add.filesAll") }}</button>
+        <button type="button" class="files-btn h-ctl cursor-pointer rounded-ctl border border-border bg-raised px-3.5 text-ctl font-semibold text-accent transition-[border-color,background] duration-150" @click="emit('set-all', false)">{{ t("add.filesNone") }}</button>
       </span>
     </div>
-    <div class="file-list">
+    <div class="file-list -mb-2 min-h-0 flex-1 overflow-y-scroll rounded-card border border-border bg-bg p-1.5 [scrollbar-gutter:stable]">
       <FileTree :nodes="tree" :checked="checked" :expanded="expanded" @toggle-file="emit('toggle-file', $event)"
         @toggle-dir="(n: FileNode, on: boolean) => emit('toggle-dir', n, on)"
         @toggle-expand="emit('toggle-expand', $event)" @lazy-load="emit('lazy-load', $event)" />
@@ -51,58 +51,6 @@ const total = computed(() => collectFileKeys(props.tree).length);
 </template>
 
 <style scoped>
-/* 列表撑满卡片剩余高度：窗口多大，文件树就多高 */
-.files-panel {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.files-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 10px 0 6px;
-}
-
-.files-label {
-  font-weight: 600;
-  font-size: 12.5px;
-  color: var(--text);
-  flex-shrink: 0;
-}
-
-/* 已选计数：贴着标题，右对齐的两个按钮留在最右 */
-.files-note {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-.files-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.files-btn {
-  border: 1px solid var(--border);
-  border-radius: var(--ctl-radius);
-  background: var(--bg-raised);
-  color: var(--accent);
-  font-size: var(--ctl-font);
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  height: var(--ctl-h);
-  padding: 0 14px;
-  transition: border-color 0.15s, background 0.15s;
-}
 
 .files-btn:hover {
   border-color: var(--accent);
@@ -112,18 +60,5 @@ const total = computed(() => collectFileKeys(props.tree).length);
 .files-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
-}
-
-.file-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: scroll;
-  scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 6px;
-  background: var(--bg);
-  margin-bottom: 8px;
 }
 </style>

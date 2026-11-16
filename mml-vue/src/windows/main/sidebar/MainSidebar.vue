@@ -553,9 +553,9 @@ defineExpose({ scrollToInstance });
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ 'is-max': maximized }">
+  <aside class="sidebar flex min-h-0 w-full min-w-0 flex-col border-r border-border bg-side" :class="{ 'is-max': maximized }">
     <!-- 搜索框与收起按钮同一行：侧栏顶部只占一行，下面整段留给列表 -->
-    <div class="sidebar-head">
+    <div class="sidebar-head flex items-center gap-2 pb-2.5 pl-[var(--side-pad-x)] pr-[var(--side-pad-x)] pt-3">
       <div class="search-box">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round">
@@ -582,7 +582,7 @@ defineExpose({ scrollToInstance });
     </div>
 
     <!-- 虚拟列表外包一层：粘滞分组头绝对定位在列表顶部，不跟着列表滚走 -->
-    <div class="sidebar-list-wrap">
+    <div class="sidebar-list-wrap relative flex min-h-0 flex-1 flex-col">
       <!-- 分组列表的虚拟列表：行表由脚本按分组铺好，这里只按行种画 -->
       <VirtualList ref="listRef" class="sidebar-list group-list"
         :count="rows.length" :heights="rowHeights" :row-gap="0">
@@ -590,7 +590,7 @@ defineExpose({ scrollToInstance });
           <template v-for="row in rows.slice(start, end)" :key="row.key">
             <!-- 分组标题：收起 / 展开只影响行表里有没有组内那几行 -->
             <div v-if="row.kind === 'group'" class="vrow vrow-group" :data-group="row.group.id" :data-gi="row.gi">
-              <div class="group-title-row" @contextmenu.prevent="onGroupContext($event, row.group.id)"
+              <div class="group-title-row flex w-full items-center gap-1.5" @contextmenu.prevent="onGroupContext($event, row.group.id)"
                 @pointerdown="onDragPointerDown($event, { kind: 'group', groupId: row.group.id, groupName: row.group.name })">
                 <button class="group-title" v-tip="t('group.collapse')" @click="onGroupTitleClick(row.group.id)">
                   <svg class="group-chevron" :class="{ collapsed: isCollapsed(row.group.id) }" viewBox="0 0 24 24"
@@ -600,7 +600,7 @@ defineExpose({ scrollToInstance });
                   <span>
                     <HighlightText :text="row.group.name" :query="searchText" />
                   </span>
-                  <span class="group-count">{{ row.group.items.length }}</span>
+                  <span class="group-count ml-auto rounded-pill border border-border bg-card px-2 py-0 text-meta font-medium text-dim">{{ row.group.items.length }}</span>
                 </button>
               </div>
             </div>
@@ -634,7 +634,7 @@ defineExpose({ scrollToInstance });
 
             <!-- 多列行：向右占满时一组实例仍用原来的行外观，一行排多个 -->
             <div v-else-if="row.kind === 'grid'" class="vrow vrow-grid" :style="rowStyle(row)">
-              <div class="inst-grid" :style="gridStyle">
+              <div class="inst-grid grid w-full items-stretch" :style="gridStyle">
                 <template v-for="(cell, ci) in row.cells" :key="ci">
                   <button v-if="cell.kind === 'add'" class="add-inst-row"
                     :disabled="dragActive?.kind === 'instance'" @click="emit('add-instance')">
@@ -716,7 +716,7 @@ defineExpose({ scrollToInstance });
           <span>
             <HighlightText :text="stickyGroup.name" :query="searchText" />
           </span>
-          <span class="group-count">{{ stickyGroup.items.length }}</span>
+          <span class="group-count ml-auto rounded-pill border border-border bg-card px-2 py-0 text-meta font-medium text-dim">{{ stickyGroup.items.length }}</span>
         </button>
       </div>
     </div>
@@ -736,20 +736,18 @@ defineExpose({ scrollToInstance });
 </template>
 
 <style scoped>
+/* 侧栏外壳：宽度 / 底色 / 描边 / 纵向 flex 都在模板上（flex min-h-0 w-full min-w-0 flex-col
+   border-r border-border bg-side）。宽度始终跟着槽位走：占满时槽位是 flex 增长的，收起时也能连续
+   缩回去，不会在 .is-max 被摘掉的瞬间把内容从整宽拍回 300px。这里只剩左右内边距这一个口径 ——
+   搜索行与分组列表共用，两处各写一个数时搜索框 / 收起按钮与下面的实例对不齐 */
 .sidebar {
-  /* 宽度始终跟着槽位走：占满时槽位是 flex 增长的，收起时也能连续缩回去，
-     不会在 .is-max 被摘掉的瞬间把内容从整宽拍回 300px */
-  width: 100%;
-  min-width: 0;
-  background: var(--bg-side);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  /* 侧栏左右内边距：搜索行与分组列表共用一处 ——
-     两处各写一个数时搜索框 / 收起按钮与下面的实例对不齐。
-     取值以顶部那一行为准（收起按钮到右边的距离） */
+  /* 取值以顶部那一行为准：收起按钮到右边的距离 */
   --side-pad-x: 12px;
+}
+
+/* 顶部留白写成无层规则：模板上的 pt-3 在 @layer utilities 里，压不过无层同名声明 */
+.sidebar-head {
+  padding-top: 12px;
 }
 
 /* 占满：宽度跟着槽位走，两侧边框都不要 —— 这时它已经铺到窗口边缘 */
@@ -767,13 +765,7 @@ defineExpose({ scrollToInstance });
   border-left: none;
 }
 
-/* 搜索框 + 收起按钮同一行：行内间距由这里给，搜索框自己不留外边距 */
-.sidebar-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px var(--side-pad-x) 10px;
-}
+/* 搜索框 + 收起按钮同一行：行内间距走模板上的工具类，搜索框自己不留外边距 */
 
 /* 实例搜索框：吃掉按钮之外的那一段宽度 */
 .search-box {
@@ -847,14 +839,7 @@ defineExpose({ scrollToInstance });
 
 /* ----- 虚拟列表 ----- */
 
-/* 虚拟列表外包一层：粘滞分组头相对它定位，列表自己滚 */
-.sidebar-list-wrap {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
+/* 虚拟列表外包一层：粘滞分组头相对它定位（relative），列表自己滚；布局在模板上 */
 
 /* 滚动与"只渲染视口附近那几行"由 VirtualList 负责，这里只管左右内边距 */
 .sidebar-list.vlist {
@@ -912,16 +897,12 @@ defineExpose({ scrollToInstance });
   height: 56px;
 }
 
-/* 多列行：占满时一行排多个，每个仍是原来的实例行 */
+/* 多列行：占满时一行排多个，每个仍是原来的实例行（行高与脚本的 ROW_H 常量绑定，留在 CSS） */
 .vrow-grid {
   height: 60px;
 }
 
-.inst-grid {
-  display: grid;
-  align-items: stretch;
-  width: 100%;
-}
+/* 网格容器本身在模板上（grid w-full items-stretch） */
 
 .inst-grid .inst-row,
 .inst-grid .add-inst-row,
@@ -931,12 +912,7 @@ defineExpose({ scrollToInstance });
   height: 56px;
 }
 
-.group-title-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-}
+/* 分组标题行：排列在模板上（flex w-full items-center gap-1.5） */
 
 .group-title {
   flex: 1;
@@ -972,16 +948,7 @@ defineExpose({ scrollToInstance });
   transform: rotate(-90deg);
 }
 
-.group-count {
-  font-size: 11px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 0 8px;
-  color: var(--text-dim);
-  font-weight: 500;
-  margin-left: auto;
-}
+/* 分组计数胶囊：外观在模板上（ml-auto rounded-pill border border-border bg-card px-2 text-meta） */
 
 /* 添加实例行（与实例行同尺寸，位于实例上方）。
    边框也占布局位置：内边距减掉那 1px，内容左右 / 上下才和**不带边框**的实例行对齐 */

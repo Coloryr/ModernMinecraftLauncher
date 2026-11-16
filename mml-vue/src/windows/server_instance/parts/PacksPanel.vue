@@ -35,9 +35,9 @@ const {
 </script>
 
 <template>
-<section class="si-section stretch">
-  <div class="si-section-head">
-    <span class="si-counter">{{ pickedPacks.size }} / {{ packs.length }}</span>
+<section class="si-section stretch flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pr-[26px]">
+  <div class="si-section-head flex items-center gap-2">
+    <span class="si-counter shrink-0 text-meta text-dim [font-variant-numeric:tabular-nums]">{{ pickedPacks.size }} / {{ packs.length }}</span>
     <BaseButton size="sm" :disabled="busy" @click="pickAllPacks(true)">
       {{ t("serverInstance.pickAll") }}
     </BaseButton>

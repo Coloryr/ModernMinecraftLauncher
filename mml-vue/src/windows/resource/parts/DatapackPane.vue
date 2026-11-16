@@ -255,7 +255,7 @@ function formatLabel(item: DataPackItemDto): string {
             @change.stop="toggleSelect(item)" @click.stop />
         </template>
         <template #badges>
-          <span class="badge" :class="item.enable === false ? 'badge-off' : 'badge-on'">
+          <span class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent" :class="item.enable === false ? 'badge-off' : 'badge-on'">
             {{ state(item) }}
           </span>
         </template>

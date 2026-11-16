@@ -75,7 +75,9 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <header class="topbar" :class="[titleBarStyle, {
+  <header
+    class="topbar relative z-10 flex shrink-0 items-center gap-3 border-b border-border bg-side px-[18px] h-[var(--titlebar-h)] max-h-[var(--titlebar-h)] min-h-[var(--titlebar-h)]"
+    :class="[titleBarStyle, {
     'is-macos': isMac,
     'is-plugin-decorated': pluginDecorated,
     'is-plugin-controls': pluginControls,
@@ -84,7 +86,7 @@ const emit = defineEmits<{
     <!-- 品牌块与加载期间的标题栏共用，见 MainBrand.vue -->
     <MainBrand />
 
-    <div class="topbar-right">
+    <div class="topbar-right ml-auto flex items-center gap-1.5">
       <!-- 进度指示器：排在主页按钮左边（整排的最前面）。
            主页面在两种窗口模式下都是这个顶栏，所以两种模式都挂；
            功能页用的是 WindowFrame 那套标题栏，那边也有同名组件，跟着当时的标题栏走。
@@ -154,28 +156,12 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-/* 高度即标题栏高度：与子窗口框架 WindowFrame 的 .frame-head 共用 --titlebar-h，
-   两边必须一致，否则单窗口模式切换页面时标题栏会跳高。
-   顶栏是 .main-window 的第一个 flex 子节点，改高度会让顶栏以下的所有内容（含侧栏）整体下移 */
-.topbar {
-  height: var(--titlebar-h);
-  /* 高度锁死：内容比它高时 flex 仍会按内容撑开，实测量出来会多出两三个像素 */
-  min-height: var(--titlebar-h);
-  max-height: var(--titlebar-h);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 18px;
-  background: var(--bg-side);
-  border-bottom: 1px solid var(--border);
-  /* 顶栏自己叠一层：开了透明高斯模糊后 backdrop-filter 会让它成为层叠上下文，
-     顶栏里的下拉（账户切换）原本靠 z-index 压住内容区，被困在这一层里就压不住了 ——
-     内容区的卡片同样带 backdrop-filter，按文档顺序排在后面，直接盖住下拉。
-     10 是「窗口内粘性元素」那一档，见 AGENTS.md §16.6 */
-  position: relative;
-  z-index: 10;
-}
+/* 顶栏的排版已改用工具类（见模板）：高度 / 间距 / 底色 / 边框都在 class 上，
+   这里只留状态变体 —— 它们要么改子组件（:deep），要么叠了多层状态。
+   顶栏高度与子窗口框架 WindowFrame 的 .frame-head 共用 --titlebar-h，两边必须一致，
+   否则单窗口模式切换页面时标题栏会跳高；高度锁死在 min/max 上，内容再高也不撑开。
+   顶栏还叠了 z-index: 10：开了透明高斯模糊后 backdrop-filter 让它成为层叠上下文，
+   顶栏里的下拉靠这一层压住内容区，见 AGENTS.md §16.6 */
 
 /* 插件接管后原生红黄绿摆在内容上方：按插件发布的清空量让出左侧，
    此时自己的 WindowControls 已被 v-if 掉，不会重复占位。
@@ -232,15 +218,6 @@ const emit = defineEmits<{
    视觉与占位都由 M²L 自己的 WindowControls 提供，再让一次宽度会多出一段空白 */
 .topbar.windows {
   padding-right: 10px;
-}
-
-/* 右侧集群自己顶到最右：窗口按钮在 macos 下插在头部、windows 下插在尾部，
-   都不会被布局挤到中间 */
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
 }
 
 /* 尺寸与圆角走标题栏标准（styles/titlebar.css 的方形图标键），这里只留外观 */

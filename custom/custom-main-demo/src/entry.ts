@@ -5,5 +5,7 @@
 import type { HomePageRegistry } from "mml-ipc";
 import App from "./App.vue";
 import "./style.css";
+// 主题样式入口：Tailwind 工具类（见 theme.css）
+import "./theme.css";
 
 (window as unknown as { __mmlHomePages: HomePageRegistry }).__mmlHomePages.push(() => App);

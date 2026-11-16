@@ -81,70 +81,35 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <nav ref="rootEl" class="tab-rail" :class="{ ready: thumbReady }" role="tablist" aria-orientation="vertical">
-    <span class="tab-thumb" :style="thumbStyle" aria-hidden="true"></span>
-    <button v-for="item in tabs" :key="item.id" type="button" role="tab" class="tab-item"
+  <nav ref="rootEl" class="tab-rail relative w-44 shrink-0 flex flex-col gap-1 py-3.5 pl-4 pr-2.5 border-r border-border bg-side"
+    :class="{ ready: thumbReady }" role="tablist" aria-orientation="vertical">
+    <span class="tab-thumb absolute top-0 left-0 z-0 rounded-card bg-accent-soft opacity-0 pointer-events-none"
+      :style="thumbStyle" aria-hidden="true"></span>
+    <button v-for="item in tabs" :key="item.id" type="button" role="tab"
+      class="tab-item relative z-[1] flex items-center gap-2.5 px-3 py-[9px] border-0 rounded-card bg-transparent text-dim cursor-pointer text-left transition-[background-color,color] duration-[120ms]"
       :class="{ active: modelValue === item.id }" :aria-selected="modelValue === item.id"
       @click="emit('update:modelValue', item.id)">
-      <span class="tab-icon">
+      <span class="tab-icon shrink-0 flex">
         <GlyphIcon :name="item.icon" :size="16" :weight="1.8" />
       </span>
-      <span class="tab-text">
-        <span class="tab-title">{{ t(`winSettings.tab.${item.id}`) }}</span>
-        <span class="tab-desc">{{ t(`winSettings.tabDesc.${item.id}`) }}</span>
+      <span class="tab-text flex flex-col leading-[1.3] min-w-0">
+        <span class="tab-title text-title font-semibold">{{ t(`winSettings.tab.${item.id}`) }}</span>
+        <span class="tab-desc text-caption text-dim opacity-80 whitespace-nowrap overflow-hidden text-ellipsis">{{ t(`winSettings.tabDesc.${item.id}`) }}</span>
       </span>
     </button>
   </nav>
 </template>
 
 <style scoped>
-.tab-rail {
-  position: relative;
-  width: 176px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px 10px 14px 16px;
-  border-right: 1px solid var(--border);
-  background: var(--bg-side);
-}
+/* 排版都在模板的工具类上；这里只留状态：选中色块的滑动过渡、悬停 / 选中 / 焦点 */
 
 /* 选中色块：切换标签时在导航里上下滑动 */
-.tab-thumb {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 0;
-  border-radius: 10px;
-  background: var(--accent-soft);
-  opacity: 0;
-  pointer-events: none;
-  transition: none;
-}
-
 .tab-rail.ready .tab-thumb {
   opacity: 1;
   transition:
     transform 0.18s var(--ease-out),
     width 0.18s var(--ease-out),
     height 0.18s var(--ease-out);
-}
-
-.tab-item {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s, color 0.12s;
 }
 
 .tab-item:hover:not(.active) {
@@ -167,29 +132,4 @@ onBeforeUnmount(() => {
   background: var(--accent-soft);
 }
 
-.tab-icon {
-  flex-shrink: 0;
-  display: flex;
-}
-
-.tab-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.3;
-  min-width: 0;
-}
-
-.tab-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.tab-desc {
-  font-size: 10.5px;
-  color: var(--text-dim);
-  opacity: 0.8;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 </style>

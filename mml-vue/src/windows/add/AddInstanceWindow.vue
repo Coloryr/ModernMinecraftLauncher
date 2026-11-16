@@ -1096,11 +1096,11 @@ onUnmounted(() => {
   <WindowFrame enter=":scope > *" :title="t('add.title')" :body-fill="addMode === 'archive' || addMode === 'folder'" body-gutter
     @close="$emit('close')">
     <!-- 内容区：撑满窗口，底部按钮靠 margin-top:auto 钉在右下角 -->
-    <div class="add-body">
+    <div class="add-body flex min-h-full flex-1 flex-col">
       <IconTabs :model-value="addMode" :tabs="ADD_TABS" :disabled="busy" @update:model-value="onTabChange" />
 
       <!-- 实例名称 + 分组 -->
-      <div class="add-card">
+      <div class="add-card mb-3.5 rounded-[14px] border border-border bg-card px-[18px] py-4">
         <div class="field-row-2">
           <div class="add-field">
             <label class="field-label" for="add-name">
@@ -1123,7 +1123,8 @@ onUnmounted(() => {
       </div>
 
       <!-- 模式内容（各模式组件见 modes/ 目录） -->
-      <div class="add-card add-card-content" :class="{ fill: addMode === 'archive' || addMode === 'folder' }">
+      <div class="add-card add-card-content mb-3.5 min-h-[180px] rounded-[14px] border border-border bg-card px-[18px] py-4"
+        :class="{ 'flex min-h-0 flex-1 flex-col': addMode === 'archive' || addMode === 'folder' }">
         <NewMode v-if="addMode === 'new'" :versions="filteredVersions" :versions-loaded="versions.length > 0"
           :ver-loading="verLoading" :ver-types="verTypes" :version-types="versionTypes" :new-version="newVersion"
           :loader="loader" :loaders="loaders" :loader-loading="loaderLoading" :query-step="queryStep"
@@ -1156,7 +1157,7 @@ onUnmounted(() => {
       <!-- 不属于某个输入框的错误（创建失败、读包失败这类）落在这里 -->
       <p v-if="addError && !addErrorField" class="error-text" role="alert">{{ addError }}</p>
 
-      <div class="modal-actions">
+      <div class="modal-actions mt-auto">
         <BaseButton variant="primary" :disabled="busy" @click="create">
           {{ createLabel }}
         </BaseButton>
@@ -1173,7 +1174,7 @@ onUnmounted(() => {
 
     <!-- 选完目录的二次确认：读目录 = 读磁盘，先问一句再扫 -->
     <BaseModal v-if="scanAsk" :title="t('add.folderAskTitle')" :closable="false" @close="scanAsk = ''">
-      <p class="confirm-text">{{ t("add.folderAskText", { path: scanAsk }) }}</p>
+      <p class="confirm-text m-0 break-all text-title leading-[1.6] text-fg">{{ t("add.folderAskText", { path: scanAsk }) }}</p>
       <div class="modal-actions">
         <BaseButton variant="accent" @click="scanAsk = ''">{{ t("actions.cancel") }}</BaseButton>
         <BaseButton variant="primary" @click="confirmScan">{{ t("add.folderAllow") }}</BaseButton>
@@ -1183,7 +1184,7 @@ onUnmounted(() => {
     <!-- 导入文件夹前：源目录带 assets / libraries，问是否合并进启动器自己的目录 -->
     <BaseModal v-if="folderDataAsk" :title="t('add.folderDataTitle')" :closable="false"
       @close="folderDataAsk = null">
-      <p class="confirm-text">{{ folderDataText }}</p>
+      <p class="confirm-text m-0 break-all text-title leading-[1.6] text-fg">{{ folderDataText }}</p>
       <div class="modal-actions">
         <BaseButton @click="resolveFolderData(false)">{{ t("add.folderDataSkip") }}</BaseButton>
         <BaseButton variant="primary" @click="resolveFolderData(true)">{{ t("add.folderDataCopy") }}</BaseButton>
@@ -1203,47 +1204,4 @@ onUnmounted(() => {
   </WindowFrame>
 </template>
 
-<style scoped>
-/* 内容区撑满窗口高度，底部按钮靠 margin-top:auto 钉在右下角（跟随窗口大小） */
-.add-body {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 100%;
-}
 
-.add-body>.modal-actions {
-  margin-top: auto;
-}
-
-/* 内容卡片 */
-.add-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px 18px;
-  margin-bottom: 14px;
-}
-
-/* 模式内容卡片：四个模式保持同一高度，切换时不跳动 */
-.add-card-content {
-  min-height: 180px;
-}
-
-/* 压缩包 / 文件夹模式：内容卡片吃满窗口剩余高度，文件列表在里面自己滚 */
-.add-card-content.fill {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-/* 确认弹窗正文如"是否允许读取目录 xxx"：路径可能很长，允许换行 */
-.confirm-text {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text);
-  line-height: 1.6;
-  word-break: break-all;
-}
-</style>

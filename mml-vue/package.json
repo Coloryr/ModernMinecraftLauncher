@@ -9,7 +9,8 @@
     "./ui-kit/controls": "./src/generated/controls.ts",
     "./ui-kit/windows": "./src/generated/windows.ts",
     "./ui-kit/components": "./src/generated/components.ts",
-    "./ipc": "./src/ipc.ts"
+    "./ipc": "./src/ipc.ts",
+    "./tailwind.css": "./src/styles/tailwind-theme.css"
   },
   "scripts": {
     "dev": "vite",
@@ -35,11 +36,13 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "^4.3.5",
     "@types/node": "^26.6.6",
     "@vitejs/plugin-vue": "^6.0.10",
     "eslint": "^10.14.0",
     "eslint-plugin-vue": "^10.12.0",
     "globals": "^17.14.0",
+    "tailwindcss": "^4.3.5",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",
     "vite": "^8.3.6",

@@ -20,6 +20,19 @@
   切换亮 / 暗主题，按钮本身不是直接写 `window.mml.invoke`。
 - 只替换 `main`，设置 / 下载 / 资源管理等窗口返回 `null`，继续用内置页面。
 
+## 样式
+
+面板是用 Tailwind 工具类写的，样式入口是 `src/theme.css`：
+
+```css
+@import "mml-vue/tailwind.css";
+```
+
+这个入口**不含 preflight**（主题 CSS 是挂进启动器页面的，重置会把启动器自己的界面打乱），
+token 映射到启动器当前主题的 CSS 变量：`bg-card` / `text-dim` / `border-border` /
+`rounded-panel` / `text-meta` 这些，换明暗主题、换强调色都会跟着变。构建时 Tailwind 只把
+用到的工具类打进 `custom.css`，产物约 6 KB。
+
 ## 构建
 
 ```bash

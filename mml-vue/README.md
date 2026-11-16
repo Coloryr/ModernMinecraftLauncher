@@ -66,3 +66,6 @@ cd ../mml-gui && cargo check --manifest-path src-tauri/Cargo.toml
   激活，以保留 Win11 贴靠布局（见 `src/lib/decoration.ts`）。
 - 自定义主页面走 iframe + `src/lib/customHomeBridge.ts` 的 `postMessage` 桥接，
   事件有白名单限制。
+- 样式：全局在 `src/styles/`（主题变量 / 控件外观 / 毛玻璃表），窗口自己的排版留在窗口 css。
+  Tailwind 只出工具类，入口是 `src/styles/tailwind.css`，也作为 `mml-vue/tailwind.css`
+  暴露给主题工程；token 映射在 `src/styles/tailwind-tokens.css`，颜色一律指回主题变量。

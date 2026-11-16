@@ -729,7 +729,7 @@ onBeforeUnmount(() => {
   <WindowFrame enter=":scope > *" :title="title" body-fill hide-download-indicator @close="$emit('close')">
     <!-- 日志来源与操作都放标题栏：不占内容区高度；除「测试启动」外只留图标，文字进提示 -->
     <template #head-right>
-      <div class="head-log">
+      <div class="head-log flex min-w-0 shrink items-center gap-2">
         <!-- 当前实例：与资源管理窗口同一个 chip，名字后面带游戏版本 -->
         <InstanceChip :instance="instanceChip" />
         <select v-model="file" class="field-select head-select" v-tip="t('logWindow.sourceTip')"
@@ -785,7 +785,7 @@ onBeforeUnmount(() => {
           :aria-label="launching ? t('launch.cancel') : t('logWindow.testLaunch')"
           @click="launching ? cancelLaunch() : testLaunch()">
           <!-- 启动中：平时是阶段 + 进度，悬停换成「取消启动」（同主窗口的启动键） -->
-          <span v-if="launching" class="launch-busy">
+          <span v-if="launching" class="launch-busy relative flex min-w-0 items-center justify-center">
             <LaunchProgress :text="stageText" :percent="stagePct" />
             <span class="launch-hover">
               <GlyphIcon name="close" :size="14" />
@@ -797,35 +797,35 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <div class="log-window">
+    <div class="log-window flex h-full min-h-0 flex-col gap-2.5">
       <!-- 第一行：换行 / 自动下拉 / 等级。等级也走开关，与旁边两个同款；
            "等级"这行标签与第二行的"线程 / 分组"同一套 -->
-      <div class="bar">
-        <label class="sw">
+      <div class="bar flex shrink-0 flex-wrap items-center gap-2">
+        <label class="sw flex cursor-pointer select-none items-center gap-1.5 text-body text-fg">
           <!-- 开关读的是全局换行偏好（lib/editorWrap），与配置编辑器共用一份 -->
           <BaseSwitch :model-value="wordWrap" @update:model-value="toggleWordWrap" />
           <span>{{ t("logWindow.wordWrap") }}</span>
         </label>
-        <label class="sw">
+        <label class="sw flex cursor-pointer select-none items-center gap-1.5 text-body text-fg">
           <BaseSwitch v-model="setting.auto" />
           <span>{{ t("logWindow.autoScroll") }}</span>
         </label>
-        <span class="lbl">{{ t("logWindow.level") }}</span>
-        <label v-for="lv in LEVELS" :key="lv.key" class="sw">
+        <span class="lbl text-body text-dim">{{ t("logWindow.level") }}</span>
+        <label v-for="lv in LEVELS" :key="lv.key" class="sw flex cursor-pointer select-none items-center gap-1.5 text-body text-fg">
           <BaseSwitch v-model="setting[lv.key]" />
           <span>{{ t(lv.label) }}</span>
         </label>
       </div>
 
       <!-- 第二行：线程 / 分组 -->
-      <div class="bar">
-        <span class="lbl">{{ t("logWindow.thread") }}</span>
-        <select v-model="thread" class="field-select pick">
+      <div class="bar flex shrink-0 flex-wrap items-center gap-2">
+        <span class="lbl text-body text-dim">{{ t("logWindow.thread") }}</span>
+        <select v-model="thread" class="field-select pick min-w-[140px] flex-1">
           <option value="">{{ t("logWindow.filterAll") }}</option>
           <option v-for="th in threads" :key="th" :value="th">{{ th }}</option>
         </select>
-        <span class="lbl">{{ t("logWindow.category") }}</span>
-        <select v-model="category" class="field-select pick">
+        <span class="lbl text-body text-dim">{{ t("logWindow.category") }}</span>
+        <select v-model="category" class="field-select pick min-w-[140px] flex-1">
           <option value="">{{ t("logWindow.filterAll") }}</option>
           <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
         </select>
@@ -885,49 +885,11 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.log-window {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  height: 100%;
-  min-height: 0;
-  /* 四周留白交给外壳的 .frame-body（上下 22 / 左右 26），
-     这里**不能再加一份 padding**，否则顶部 34、左右 40，比别的窗口鼓一圈
-     —— 与导出窗口同一条规矩，见 ExportWindow 的 .export-window */
-  box-sizing: border-box;
-}
-
-/* 工具条：内容不换行，宽度不够时下拉自己缩 */
-.bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-
-/* ---------- 标题栏里的一组控件（head-right 插槽） ---------- */
-
-/* 与方块窗口的工具条同一条规矩：标题栏里空间紧，这一组整体可收缩，先挤下拉不裁按钮 */
-.head-log {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 1;
-  min-width: 0;
-}
-
-/* 按钮不缩、图标键方正化、chip 可压、下拉宽度与省略号：都在 styles/titlebar.css 的标题栏标准里 */
+/* 外壳排版（.log-window / .bar / .head-log / .sw / .lbl / .pick / .launch-busy）
+   已改到模板上的工具类，类名保留给主题与毛玻璃表。
+   这里只剩工具类表达不了的部分：悬停切换与 keyframes。 */
 
 /* 启动中悬停换成「取消启动」：进度与动作叠在同一位置，只切透明度，按钮宽度不变 */
-.launch-busy {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-}
-
 .launch-busy .launch-in {
   transition: opacity 0.12s;
 }

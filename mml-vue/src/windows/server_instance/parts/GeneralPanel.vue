@@ -9,7 +9,7 @@ const { busy, name, version, text, url, folder, pickFolder } = ctx;
 </script>
 
 <template>
-<section class="si-section">
+<section class="si-section flex min-h-0 flex-1 flex-col gap-2 overflow-y-scroll pr-[17px] [scrollbar-gutter:stable]">
   <div class="field-row-2">
     <div>
       <label class="field-label" for="si-name">{{ t("serverInstance.name") }}</label>

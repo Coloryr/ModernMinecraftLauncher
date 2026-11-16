@@ -105,7 +105,7 @@ function clearImage() {
       <!-- 主页面样式：两张卡并排，选中即生效 -->
       <section class="run-sec">
         <h4 class="run-title">{{ t("firstRun.modeTitle") }}</h4>
-        <div class="mode-grid">
+        <div class="mode-grid grid grid-cols-2 gap-2.5">
           <button v-for="m in MODES" :key="m.value" type="button" class="mode-card"
             :class="{ active: viewMode === m.value }" @click="pickMode(m.value)">
             <GlyphIcon :name="m.icon" :size="18" :weight="1.8" />
@@ -118,10 +118,10 @@ function clearImage() {
       <!-- 背景图：缩略图 + 选择 / 清除 -->
       <section class="run-sec">
         <h4 class="run-title">{{ t("firstRun.bgTitle") }}</h4>
-        <div class="bg-row">
+        <div class="bg-row flex items-center gap-3">
           <div class="bg-preview" :class="{ empty: !bgImage }" :style="bgStyle"></div>
-          <div class="bg-actions">
-            <div class="bg-btns">
+          <div class="bg-actions min-w-0 flex-1">
+            <div class="bg-btns flex gap-2">
               <BaseButton size="sm" variant="accent" :disabled="bgLoading" @click="pickImage">
                 {{ t("firstRun.bgPick") }}
               </BaseButton>
@@ -174,13 +174,7 @@ function clearImage() {
   color: var(--text-dim);
 }
 
-/* 主页面样式：两张等宽卡，图标在上、名字与说明在下 */
-.mode-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
+/* 主页面样式：两张等宽卡（grid grid-cols-2 gap-2.5 在模板上），图标在上、名字与说明在下 */
 .mode-card {
   display: flex;
   flex-direction: column;
@@ -225,13 +219,7 @@ function clearImage() {
   line-height: 1.5;
 }
 
-/* 背景图：左边缩略图，右边按钮与说明 */
-.bg-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
+/* 背景图：左边缩略图，右边按钮与说明（排列在模板上） */
 .bg-preview {
   width: 132px;
   height: 74px;
@@ -248,13 +236,5 @@ function clearImage() {
   background-image: repeating-linear-gradient(45deg, var(--bg-hover) 0 8px, transparent 8px 16px);
 }
 
-.bg-actions {
-  min-width: 0;
-  flex: 1;
-}
-
-.bg-btns {
-  display: flex;
-  gap: 8px;
-}
+/* .bg-actions / .bg-btns 的排版在模板上 */
 </style>

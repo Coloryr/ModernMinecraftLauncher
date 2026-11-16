@@ -343,26 +343,26 @@ function onKeyDown(e: KeyboardEvent) {
       <SettingsSearch @select="onSearchSelect" />
     </template>
 
-    <div class="settings-layout">
+    <div class="settings-layout flex flex-1 min-h-0">
       <SettingsRail v-model="tab" :tabs="visibleTabs" />
 
       <!-- 右侧内容区：每个标签一个面板，独立滚动 -->
-      <div class="tab-content">
+      <div class="tab-content flex-1 min-w-0 overflow-y-scroll [scrollbar-gutter:stable] pt-0 pr-[17px] pb-[22px] pl-[26px]">
         <Transition :css="false" mode="out-in" @enter="enterPage" @leave="leavePage">
-          <div :key="tab" class="set-page">
+          <div :key="tab" class="set-page pt-[22px]">
         <!-- 当前页大标题 + 恢复本页默认（整页只保留这一个重置入口） -->
-        <header class="set-content-head">
+        <header class="set-content-head flex items-start justify-between gap-4">
           <div>
-            <h2 class="set-content-title">{{ t(`winSettings.tab.${tab}`) }}</h2>
-            <p class="set-content-sub">{{ t(`winSettings.tabDesc.${tab}`) }}</p>
+            <h2 class="set-content-title text-[19px] font-extrabold">{{ t(`winSettings.tab.${tab}`) }}</h2>
+            <p class="set-content-sub text-[12px] text-dim mt-[3px]">{{ t(`winSettings.tabDesc.${tab}`) }}</p>
           </div>
-          <BaseButton v-if="canResetPage" size="sm" v-tip="t('winSettings.resetPageHint')"
+          <BaseButton v-if="canResetPage" size="sm" class="shrink-0" v-tip="t('winSettings.resetPageHint')"
             @click="confirmResetPage = true">
             {{ t("winSettings.resetPage") }}
           </BaseButton>
         </header>
 
-        <section class="set-panel">
+        <section class="set-panel pb-2">
           <UiTab v-if="tab === 'ui'" :settings="ui" :look="client" :locked="locked" :flash-group="flashGroup" />
           <JavaTab v-else-if="tab === 'java'" :settings="java" :flash-group="flashGroup" />
           <NetworkTab v-else-if="tab === 'network'" :settings="network" :flash-group="flashGroup" />

@@ -101,10 +101,8 @@ body::after {
 /* ---------- 标题栏 ---------- */
 
 .titlebar {
-  display: flex;
+  /* 横向排布与两端对齐走模板上的工具类（flex items-center justify-between） */
   flex: none;
-  align-items: center;
-  justify-content: space-between;
   height: 42px;
   padding: 0 8px 0 14px;
   border-bottom: 1px solid var(--line-soft);
@@ -113,9 +111,7 @@ body::after {
 }
 
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  /* 排布与间距走工具类（flex items-center gap-2.5），这里只留伸缩约束 */
   min-width: 0;
 }
 
@@ -148,9 +144,7 @@ body::after {
 }
 
 .titlebar-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+  /* 排布走工具类（flex items-center gap-0.5） */
 }
 
 .icon-btn,

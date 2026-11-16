@@ -605,7 +605,7 @@ useWindowRefresh(() => {
     <!-- 标题栏右侧：实例名 + 来源下拉 + 刷新 + 保存状态 + 保存键。
          当前文件由左侧树的选中行表示，标题栏不再重复文件名 -->
     <template #head-right>
-      <div class="head-cfg">
+      <div class="head-cfg flex items-center gap-2 shrink min-w-0">
         <InstanceChip :instance="instanceChip" />
         <select class="field-select head-select" :value="source" :disabled="loading || busy || !instanceUuid"
           v-tip="t('config.sourceTip')" :aria-label="t('config.sourceTip')" @change="onSourceChange">
@@ -618,7 +618,8 @@ useWindowRefresh(() => {
           v-tip="t('config.refresh')" :aria-label="t('config.refresh')" @click="loadFiles()">
           <GlyphIcon name="refresh" :size="15" :weight="1.8" />
         </BaseButton>
-        <span class="head-status" :class="{ 'is-dirty': canSave && unsaved }" role="status">
+        <span class="head-status shrink-0 text-dim text-meta whitespace-nowrap"
+          :class="{ 'is-dirty': canSave && unsaved }" role="status">
           <template v-if="loading">{{ t("config.loading") }}</template>
           <template v-else-if="canSave && unsaved">{{ t("config.unsaved") }}</template>
           <!-- 区域文件在区块视图内保存，不属于只读视图 -->
@@ -635,10 +636,11 @@ useWindowRefresh(() => {
       </div>
     </template>
 
-    <div ref="configBody" class="cfg-body">
+    <div ref="configBody" class="cfg-body flex flex-1 min-w-0 min-h-0">
       <!-- 搜索与查找固定在上，文件树独立滚动 -->
-      <aside id="config-file-tree" class="cfg-list" :style="{ width: `${visibleTreeWidth}px` }">
-        <div class="cfg-list-head">
+      <aside id="config-file-tree"
+        class="cfg-list flex flex-col max-w-[50%] shrink-0 min-h-0 overflow-hidden bg-side border-r border-border" :style="{ width: `${visibleTreeWidth}px` }">
+        <div class="cfg-list-head shrink-0 flex flex-col gap-2 px-3 pt-3 pb-2.5">
           <SearchBox v-model="query" :placeholder="t('config.search')" :clear-label="t('config.searchClear')"
             width="100%" />
           <BaseButton v-if="source" size="sm" variant="ghost" block :disabled="loading || busy || !mcaFiles.length"
@@ -648,25 +650,30 @@ useWindowRefresh(() => {
           </BaseButton>
         </div>
 
-        <div class="cfg-tree" :aria-busy="loading">
+        <div class="cfg-tree flex flex-col gap-1 flex-1 min-h-0 overflow-y-scroll [scrollbar-gutter:stable] px-2.5 pt-0.5 pb-3.5"
+          :aria-busy="loading">
           <template v-for="row in rows" :key="row.key">
             <!-- 目录：按侧栏的分组标题写，缩进由层级给 -->
-            <button v-if="row.isDir" class="cfg-dir" :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
+            <button v-if="row.isDir"
+              class="cfg-dir flex items-center gap-2 w-full shrink-0 px-3 border-0 rounded-ctl bg-transparent text-fg text-body text-left cursor-pointer transition-[background-color] duration-[120ms] [font-family:inherit]"
+              :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
               :aria-expanded="row.expanded" @click="toggleExpand(row.key)"
               @contextmenu.prevent="openRowMenu($event, row.key)">
               <GlyphIcon class="cfg-chevron" :class="{ 'is-expanded': row.expanded }" name="chevron-down" :size="14"
                 :weight="2.4" />
-              <span class="cfg-dir-name" :title="row.key">
+              <span class="cfg-dir-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" :title="row.key">
                 <HighlightText :text="row.name" :query="query" />
               </span>
             </button>
             <!-- 文件：按侧栏的实例行写 -->
-            <button v-else class="cfg-row" :class="{ 'is-active': selected?.name === row.key }"
+            <button v-else
+              class="cfg-row flex items-center gap-2 w-full shrink-0 px-3 border-0 rounded-ctl bg-transparent text-fg text-body text-left cursor-pointer transition-[background-color] duration-[120ms] [font-family:inherit]"
+              :class="{ 'is-active': selected?.name === row.key }"
               :aria-current="selected?.name === row.key ? 'true' : undefined"
               :style="{ paddingLeft: `${8 + row.depth * 14}px` }" :title="row.key" @click="openFile(row.key)"
               @contextmenu.prevent="openRowMenu($event, row.key)">
-              <span class="cfg-chevron-spacer"></span>
-              <span class="cfg-file-name">
+              <span class="cfg-chevron-spacer shrink-0 w-3.5"></span>
+              <span class="cfg-file-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
                 <HighlightText :text="row.name" :query="query" />
               </span>
             </button>
@@ -675,12 +682,14 @@ useWindowRefresh(() => {
         </div>
       </aside>
 
-      <div class="cfg-split" :class="{ 'is-resizing': resizing }" role="separator" tabindex="0"
+      <div class="cfg-split grow-0 shrink-0 basis-[6px] -mx-0.5 -ml-1 cursor-col-resize touch-none z-[1] bg-transparent transition-[background-color] duration-150"
+        :class="{ 'is-resizing': resizing }" role="separator" tabindex="0"
         aria-orientation="vertical" aria-controls="config-file-tree" :aria-label="t('config.treeResize')"
         :aria-valuemin="treeMinWidth" :aria-valuemax="treeMaxWidth" :aria-valuenow="visibleTreeWidth"
         @pointerdown="startResize" @keydown="onResizeKeydown" />
 
-      <section class="cfg-view" :aria-busy="loading || deleting">
+      <section class="cfg-view flex flex-col flex-1 min-w-0 min-h-0 bg-bg-solid overflow-hidden"
+        :aria-busy="loading || deleting">
         <!-- 占位编辑器与文件编辑器使用独立实例，隔离只读状态 -->
         <MonacoText v-if="!selected || (isText && (loading || deleting))" key="empty"
           :model-value="deleting ? text : ''" readonly />
@@ -715,88 +724,21 @@ useWindowRefresh(() => {
 <style scoped>
 /* 标题栏这一排：实例名 / 来源 / 刷新 / 状态 / 保存。
    整排可收缩，窗口窄时先省略实例名，按钮不裁 */
-.head-cfg {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 1;
-  min-width: 0;
-}
-
-.head-status {
-  flex-shrink: 0;
-  color: var(--text-dim);
-  font-size: 11.5px;
-  white-space: nowrap;
-}
-
+/* 标题栏那一排在工具类上；这里只留"有未保存改动"的状态色 */
 .head-status.is-dirty {
   color: var(--yellow);
 }
 
-/* 两栏均需允许收缩，滚动才会留在文件树与编辑器内部 */
-.cfg-body {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-}
-
-/* 侧栏贴窗口边缘，宽度由用户偏好与拖动状态决定 */
+/* 侧栏：只留"统一行高"这个与脚本/实测对齐的口径变量 */
 .cfg-list {
-  display: flex;
-  flex-direction: column;
-  max-width: 50%;
-  flex-shrink: 0;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--bg-side);
-  border-right: 1px solid var(--border);
   /* 密集文件树使用统一行高，单位像素 */
   --row-h: 24px;
-}
-
-.cfg-list-head {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 12px 10px;
-}
-
-/* 树的滚动区：内边距与侧栏的 .group-list 一致 */
-.cfg-tree {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: scroll;
-  scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
-  padding: 2px 10px 14px;
 }
 
 /* 目录与文件同高，展开目录时保持行距稳定 */
 .cfg-dir,
 .cfg-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
   height: var(--row-h);
-  /* 条目多时由容器滚动，不能压缩行高 */
-  flex-shrink: 0;
-  padding: 0 12px;
-  border: none;
-  border-radius: var(--ctl-radius);
-  background: transparent;
-  color: var(--text);
-  font-family: inherit;
-  font-size: var(--ctl-font);
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.12s;
 }
 
 /* 目录：只差颜色与字重，就是"分组标题"那个观感；缩进由模板按层级给 */
@@ -834,31 +776,10 @@ useWindowRefresh(() => {
   transform: rotate(0);
 }
 
-/* 文件行里占住箭头那一格：同一层的文件名才与目录名对齐 */
-.cfg-chevron-spacer {
-  flex-shrink: 0;
-  width: 14px;
-}
-
-.cfg-dir-name,
-.cfg-file-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 编辑区不再有独立工具条：路径与保存都搬去了标题栏，视图直接占满剩下的高度 */
+/* 不透明底：区块 / 二进制是密排文本，半透明底会和窗口背景图叠在一起。
+   写成无层规则而不是只靠模板上的 bg-bg-solid：工具类赢不过无层声明，这里必须稳 */
 .cfg-view {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  /* 不透明底：区块 / 二进制是密排文本，半透明底会和窗口背景图叠在一起 */
   background: var(--bg-solid, var(--bg-card));
-  overflow: hidden;
 }
 
 /* 视图占满容器，滚动交给各视图内部 */
@@ -867,17 +788,7 @@ useWindowRefresh(() => {
   min-height: 0;
 }
 
-/* 透明热区覆盖侧栏边框，不占用两栏的可见空间 */
-.cfg-split {
-  flex: 0 0 6px;
-  margin: 0 -2px 0 -4px;
-  cursor: col-resize;
-  touch-action: none;
-  z-index: 1;
-  background: transparent;
-  transition: background 0.15s;
-}
-
+/* 拖动分隔条：热区透明，只在悬停 / 聚焦 / 拖动时出底色 */
 .cfg-split:hover,
 .cfg-split:focus-visible,
 .cfg-split.is-resizing {

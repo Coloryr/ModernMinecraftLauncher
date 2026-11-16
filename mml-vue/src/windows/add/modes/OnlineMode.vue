@@ -63,10 +63,10 @@ function fillManifest() {
   <p v-else-if="!probing && !probeError" class="field-hint">{{ t("add.urlHint") }}</p>
 
   <!-- 填完地址自动读一次清单：先让人看清会装成什么，再决定要不要下载 -->
-  <p v-if="probing" class="probe-tip">{{ t("add.probeReading") }}</p>
-  <p v-else-if="probeError" class="probe-tip is-error">{{ probeError }}</p>
-  <div v-else-if="probe" class="probe-card">
-    <div class="probe-name">{{ probe.name }}</div>
+  <p v-if="probing" class="probe-tip mt-2.5 text-body text-dim">{{ t("add.probeReading") }}</p>
+  <p v-else-if="probeError" class="probe-tip is-error mt-2.5 text-body">{{ probeError }}</p>
+  <div v-else-if="probe" class="probe-card mt-2.5 flex flex-col gap-1 rounded-panel border border-border bg-card px-3.5 py-3">
+    <div class="probe-name mb-0.5 text-title font-semibold">{{ probe.name }}</div>
     <div class="probe-row">
       <span>{{ t("meta.version") }}</span><b>{{ probe.version }}</b>
     </div>
@@ -82,7 +82,7 @@ function fillManifest() {
       <span>{{ t("add.probeContents") }}</span>
       <b>{{ t("add.probeCounts", { files: probe.fileCount, archives: probe.archiveCount }) }}</b>
     </div>
-    <p v-if="probe.text" class="probe-text">{{ probe.text }}</p>
+    <p v-if="probe.text" class="probe-text mt-1.5 text-meta leading-[1.6] text-dim">{{ probe.text }}</p>
   </div>
 </template>
 
@@ -92,33 +92,8 @@ function fillManifest() {
   margin-top: 0;
 }
 
-/* 清单摘要：读的时候一句提示，失败时同一位置换成红字 */
-.probe-tip {
-  margin: 10px 0 0;
-  font-size: 12.5px;
-  color: var(--text-dim);
-}
-
 .probe-tip.is-error {
   color: var(--red);
-}
-
-/* 摘要卡：与窗口里其它卡片同一副外观 */
-.probe-card {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 10px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-card);
-}
-
-.probe-name {
-  margin-bottom: 2px;
-  font-size: 13px;
-  font-weight: 600;
 }
 
 /* 标签列定宽：几行的值才能对齐 */
@@ -140,12 +115,5 @@ function fillManifest() {
   font-weight: 500;
   line-height: 20px;
   word-break: break-all;
-}
-
-.probe-text {
-  margin: 6px 0 0;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  line-height: 1.6;
 }
 </style>

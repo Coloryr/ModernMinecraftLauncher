@@ -11,16 +11,41 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `custom.css` | 示例皮肤：换主题色 + 替换后启动按钮的外观 |
+| `src/custom.css` | 示例皮肤**源码**：换主题色 + 替换后启动按钮的外观；可写 `@apply` 与 mml-vue 的工具类 |
 | `src/replace.ts` | 入口函数：选实例启动按钮，用 `ctx.replace` 挂 Vue 组件 |
 | `src/ReplaceButton.vue` | 用 Vue 写的替换按钮 |
 | `src/theme.json` | 包清单（`type` 为 `css`），开发者手写，打包时复制到包根 |
-| `scripts/pack.ts` | 先 `vite build` 入口，再把 `custom.js` 与 `custom.css` 打成 zip |
+| `scripts/pack.ts` | 先 `vite build` 入口与样式，再把 `custom.js` 与编译好的 `custom.css` 打成 zip |
 | `scripts/controls.ts` | 开发期工具：列控件清单、生成 CSS 骨架 |
 | `vite.config.ts` | 入口按 IIFE 打包，Vue 走页面全局 `__mmlVue` |
 
 `scripts/` 与 `src/` 的源码不进 zip（`src/theme.json` 会复制成包根清单）。
-`custom.js` 与 `dist/` 是 `npm run pack` 的临时产物，打完就删，不提交。
+包根的 `custom.js` / `custom.css` 与 `dist/` 都是 `npm run pack` 的产物，打完就删，不提交
+（所以仓库里没有根目录的 `custom.css`，改样式改 `src/custom.css`）。
+
+## 用 Tailwind 写样式
+
+`src/theme.css` 是 Tailwind 入口（`@import "mml-vue/tailwind.css";`），
+`src/custom.css` 是这份皮肤自己的规则，两个都由 Vite 编译进包根 `custom.css`：
+
+```css
+/* src/custom.css */
+.mml-custom-launch {
+  @apply inline-flex items-center gap-2 text-heading font-bold cursor-pointer;
+}
+```
+
+也可以把排版直接写进模板的 class（示例里的启动按钮就是这么做的）：
+
+```vue
+<button class="mml-custom-launch inline-flex items-center gap-2 text-heading font-bold">
+```
+
+- 颜色 / 字号 / 圆角映射到启动器主题变量（`bg-card` / `text-dim` / `rounded-panel` /
+  `text-meta` …），换深浅色与强调色都跟着变。
+- 入口**不含 preflight**：它是挂进启动器页面的，重置会把内置界面打乱。
+- 不用 Tailwind 也完全可以：删掉 `src/theme.css` 与 `replace.ts` 里的引用，
+  `src/custom.css` 就是普通 CSS。
 
 控件清单由 `mml-vue/scripts/gen-ui.ts` 生成，不在这里手抄：mml-vue 里的控件改名后，
 重跑 `node mml-vue/scripts/gen-ui.ts`，这里跟着更新。
@@ -125,7 +150,7 @@ npm run pack         # vite build 入口 + 打出 custom-ui-css-demo.zip
 
 zip 根目录：
 
-- `custom.css`：必需，入口样式表
+- `custom.css`：必需，入口样式表（由 `src/custom.css` 编译而来）
 - `theme.json`：声明 `type` 为 `css`；源文件在 `src/theme.json`，由开发者手写，
   打包时复制到包根。带 `custom.js` 的包没有它会被当成类型不明
 - `custom.js`：可选，入口脚本；IIFE，Vue 从页面全局 `__mmlVue` 取

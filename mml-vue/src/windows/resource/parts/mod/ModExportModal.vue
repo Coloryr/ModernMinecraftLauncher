@@ -55,25 +55,25 @@ async function saveList() {
 
 <template>
   <BaseModal :title="t('modExport.title')" :width="520" :closable="!busy" @close="emit('close')">
-    <fieldset class="export-options" :disabled="busy">
+    <fieldset class="export-options m-0 min-w-0 border-0 p-0" :disabled="busy">
       <!-- 格式：标签与下拉同一行，下拉定宽 —— 三个短选项撑满整行没有必要 -->
-      <div class="export-format">
-        <label class="field-label" for="mod-export-format">{{ t('modExport.format') }}</label>
-        <select id="mod-export-format" v-model="format" class="field-select">
+      <div class="export-format flex items-center gap-2.5">
+        <label class="field-label m-0 flex-none" for="mod-export-format">{{ t('modExport.format') }}</label>
+        <select id="mod-export-format" v-model="format" class="field-select w-[180px]">
           <option value="txt">TXT</option>
           <option value="csv">CSV</option>
           <option value="json">JSON</option>
         </select>
       </div>
 
-      <label v-if="selectedIds.length || onlySelected" class="export-check export-only-selected">
-        <input v-model="onlySelected" type="checkbox" />{{ t('modExport.selected') }}
+      <label v-if="selectedIds.length || onlySelected" class="export-check export-only-selected mt-3">
+        <input v-model="onlySelected" type="checkbox" class="m-0 h-[15px] w-[15px] shrink-0 cursor-pointer accent-accent" />{{ t('modExport.selected') }}
       </label>
 
       <p class="field-label">{{ t('modExport.fields') }}</p>
-      <div class="export-fields">
-        <label v-for="field in options" :key="field" class="export-check">
-          <input v-model="fields" type="checkbox" :value="field" />{{ t(`modExport.${field}`) }}
+      <div class="export-fields grid grid-cols-3 gap-x-4 gap-y-3">
+        <label v-for="field in options" :key="field" class="export-check flex min-w-0 cursor-pointer items-center gap-2 text-body text-fg">
+          <input v-model="fields" type="checkbox" :value="field" class="m-0 h-[15px] w-[15px] shrink-0 cursor-pointer accent-accent" />{{ t(`modExport.${field}`) }}
         </label>
       </div>
     </fieldset>
@@ -85,58 +85,3 @@ async function saveList() {
   </BaseModal>
 </template>
 
-<style scoped>
-/* 弹窗在 body 下，样式走 scoped（与 ModUpdateModal / ModDepsPage 同一处理） */
-.export-options {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  min-width: 0;
-}
-
-/* 格式：标签与下拉同一行；标签 flex: none 才不会被下拉挤成竖排 */
-.export-format {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.export-format .field-label {
-  margin: 0;
-  flex: none;
-}
-
-.export-format .field-select {
-  width: 180px;
-}
-
-.export-only-selected {
-  margin-top: 12px;
-}
-
-/* 导出字段：三列，15 项正好五行 */
-.export-fields {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px 16px;
-}
-
-.export-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  color: var(--text);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.export-check input {
-  flex: none;
-  width: 15px;
-  height: 15px;
-  margin: 0;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-</style>

@@ -1,0 +1,38 @@
+/* Tailwind 入口：启动器自己用，自定义主题也用它
+ *
+ * 主题工程里的用法（改完后打包成 custom.css）：
+ *   npm i -D tailwindcss @tailwindcss/vite
+ *   vite.config.ts: plugins: [vue(), tailwindcss()]
+ *   custom.css 第一行: @import "mml-vue/tailwind.css";
+ * 之后照常写工具类：bg-card / text-dim / border-border / rounded-ctl / text-meta。
+ * 颜色与档位取自启动器当前主题，跟着明暗、强调色一起变。
+ *
+ * 不引 preflight：这个 CSS 是挂进启动器页面里的，preflight 会把启动器自己的
+ * 按钮、边距、列表整套重置掉。需要重置就在自己的样式里局部写。
+ *
+ * 整页 iframe 主题（index.html）也能用：iframe 是独立文档，拿不到宿主的 --* 变量，
+ * 但启动器会把变量值 postMessage 过去（消息形状见 custom/README.md「iframe 主题拿主题色」），
+ * 页面侧收到后写进 document.documentElement.style 即可，工具类照常生效。
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+/* source(none) 关掉自动扫描：默认会从 css 所在目录一路扫到 git 根，把 custom/ 里的示例、
+   mml-theme-studio 这些**别的应用**的类名也当成工具类生成（container / table / col-* 之类），
+   白涨十几 KB。下面只扫本应用源码。主题工程的入口是 tailwind-theme.css，不套这条限制 */
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./tailwind-tokens.css";
+/* 只扫本应用源码。v4 的自动探测会从 css 所在目录一路扫到 git 根，把 custom/ 下的示例、
+   mml-theme-studio 这些**别的应用**的类名（container / table / col-* 之类）也当工具类生成，
+   白涨十几 KB。source(none) 对拆开的 utilities.css 不生效，只能逐个排除兄弟目录 */
+@source not "../../custom";
+@source not "../../mml-theme-studio";
+@source not "../../mml-ipc";
+@source not "../../mml-gui";
+@source not "../../mml-core";
+@source not "../../mml-cloud-server";
+@source not "../../ipc-gen";
+@source not "../../docs";
+@source not "../../build";
+@source not "../../design";
+/* 构建产物也排除：custom 下每个示例的 dist-theme、以及本包的 dist */
+@source not "../dist";

@@ -317,9 +317,9 @@ function onMenuPick(id: string) {
 
   <div ref="listEl" class="shot-list">
     <!-- 截图可能上千张：只渲染视口附近那几排格子，其余用上下内边距撑住高度 -->
-    <div v-if="shots.length" ref="gridEl" class="shot-grid"
+    <div v-if="shots.length" ref="gridEl" class="shot-grid grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]"
       :style="{ paddingTop: padTop + 'px', paddingBottom: padBottom + 'px' }">
-      <div v-for="item in shots.slice(from, to)" :key="item.name" class="shot-cell" :class="{
+      <div v-for="item in shots.slice(from, to)" :key="item.name" class="shot-cell relative overflow-hidden rounded-[9px] border border-border bg-card" :class="{
         'row-selected': isSelected(item),
         'row-anchor': anchorKey === item.name,
         'row-selecting': selected.size > 0,
@@ -329,7 +329,7 @@ function onMenuPick(id: string) {
           <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
             @change.stop="toggle(item)" @click.stop />
         </label>
-        <AsyncImage class="shot-img" :src="shotUrl(item)" :alt="item.name" :title="item.name" />
+        <AsyncImage class="shot-img block w-full cursor-zoom-in object-cover [aspect-ratio:16/9]" :src="shotUrl(item)" :alt="item.name" :title="item.name" />
       </div>
     </div>
     <div v-else-if="!loading" class="empty-tip">{{ t("resource.empty") }}</div>

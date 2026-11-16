@@ -12,7 +12,10 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <button type="button" class="mml-custom-launch" @click="emit('launch')">
+  <!-- 排版走工具类：字号 / 间距取的是启动器主题的档位，颜色仍由 custom.css 的渐变负责 -->
+  <button type="button"
+    class="mml-custom-launch inline-flex items-center justify-center gap-2 text-heading font-bold cursor-pointer"
+    @click="emit('launch')">
     <span class="mml-custom-launch-icon" aria-hidden="true">▶</span>
     <span>{{ text }}</span>
   </button>

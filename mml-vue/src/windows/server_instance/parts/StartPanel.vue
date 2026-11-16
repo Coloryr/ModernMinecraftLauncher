@@ -30,7 +30,7 @@ const {
 </script>
 
 <template>
-<section class="si-section">
+<section class="si-section flex min-h-0 flex-1 flex-col gap-2 overflow-y-scroll pr-[17px] [scrollbar-gutter:stable]">
   <div class="si-summary">
     <div class="si-line">
       {{ t("serverInstance.summaryInstance") }}{{ t("common.detailSep") }}

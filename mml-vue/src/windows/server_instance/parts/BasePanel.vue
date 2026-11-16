@@ -11,9 +11,9 @@ const { baseEntries, pickedBase, pickAllBase, toggleBase, refreshBase, busy, loa
 </script>
 
 <template>
-<section class="si-section stretch">
-  <div class="si-section-head">
-    <span class="si-counter">{{ t("serverInstance.baseCount", { n: pickedBase.size }) }}</span>
+<section class="si-section stretch flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pr-[26px]">
+  <div class="si-section-head flex items-center gap-2">
+    <span class="si-counter shrink-0 text-meta text-dim [font-variant-numeric:tabular-nums]">{{ t("serverInstance.baseCount", { n: pickedBase.size }) }}</span>
     <BaseButton size="sm" :disabled="busy || !baseEntries.length" @click="pickAllBase(true)">
       {{ t("serverInstance.pickAll") }}
     </BaseButton>
@@ -27,7 +27,7 @@ const { baseEntries, pickedBase, pickAllBase, toggleBase, refreshBase, busy, loa
     </button>
   </div>
   <div v-if="!baseEntries.length" class="empty-tip">{{ t("serverInstance.baseEmpty") }}</div>
-  <div v-else class="si-list">
+  <div v-else class="si-list min-h-0 flex-1 overflow-y-scroll rounded-card border border-border bg-card p-1 [scrollbar-gutter:stable]">
     <BaseFileTree :uuid="currentUuid" :root="baseEntries" :picked="pickedBase"
       :disabled="busy" @toggle="toggleBase" />
   </div>

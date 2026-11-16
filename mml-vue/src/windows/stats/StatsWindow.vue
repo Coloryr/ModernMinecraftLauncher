@@ -36,7 +36,7 @@ const { enter: statsEnter } = useStaggerEnter(
 /** 行容器的根元素 */
 const rowsEl = ref<HTMLElement | null>(null);
 
-/** 表格一行的高度，单位 px；与 .stats-row 的 height 同源 */
+/** 表格一行的高度，单位 px；与模板里 .stats-row 的 h-12（48px）同源 */
 const STATS_ROW_H = 48;
 
 /** 整页滚动交给行虚拟化：几百个实例时只渲染视口附近那几行 */
@@ -602,42 +602,42 @@ function instanceLabel(inst: StatsInstanceDto): string {
 
 <template>
   <WindowFrame ref="frame" :title="t('features.stats')" body-gutter @close="$emit('close')">
-    <div class="summary">
-      <div class="summary-card">
-        <span class="summary-num">{{ currentCount }}</span>
-        <span class="summary-label">{{ t("winStats.instances") }}</span>
+    <div class="summary mb-4 flex flex-wrap gap-3.5">
+      <div class="summary-card flex min-w-[120px] flex-1 flex-col items-center gap-1.5 rounded-panel border border-border bg-card p-4">
+        <span class="summary-num text-display font-extrabold tabular-nums text-accent transition-colors duration-[0.12s]">{{ currentCount }}</span>
+        <span class="summary-label text-meta text-dim">{{ t("winStats.instances") }}</span>
       </div>
-      <div class="summary-card">
-        <span class="summary-num">{{ deletedCount }}</span>
-        <span class="summary-label">{{ t("winStats.deletedInstances") }}</span>
+      <div class="summary-card flex min-w-[120px] flex-1 flex-col items-center gap-1.5 rounded-panel border border-border bg-card p-4">
+        <span class="summary-num text-display font-extrabold tabular-nums text-accent transition-colors duration-[0.12s]">{{ deletedCount }}</span>
+        <span class="summary-label text-meta text-dim">{{ t("winStats.deletedInstances") }}</span>
       </div>
-      <div class="summary-card">
-        <span class="summary-num">{{ data?.launchCount ?? 0 }}</span>
-        <span class="summary-label">{{ t("winStats.totalLaunch") }}</span>
+      <div class="summary-card flex min-w-[120px] flex-1 flex-col items-center gap-1.5 rounded-panel border border-border bg-card p-4">
+        <span class="summary-num text-display font-extrabold tabular-nums text-accent transition-colors duration-[0.12s]">{{ data?.launchCount ?? 0 }}</span>
+        <span class="summary-label text-meta text-dim">{{ t("winStats.totalLaunch") }}</span>
       </div>
-      <div class="summary-card">
-        <span class="summary-num" :class="{ danger: (data?.launchErrorCount ?? 0) > 0 }">{{
+      <div class="summary-card flex min-w-[120px] flex-1 flex-col items-center gap-1.5 rounded-panel border border-border bg-card p-4">
+        <span class="summary-num text-display font-extrabold tabular-nums text-accent transition-colors duration-[0.12s]" :class="{ danger: (data?.launchErrorCount ?? 0) > 0 }">{{
           data?.launchErrorCount ?? 0 }}</span>
-        <span class="summary-label">{{ t("winStats.totalFailed") }}</span>
+        <span class="summary-label text-meta text-dim">{{ t("winStats.totalFailed") }}</span>
       </div>
-      <div class="summary-card">
-        <span class="summary-num">{{ totalPlay }}</span>
-        <span class="summary-label">{{ t("winStats.totalPlay") }}</span>
+      <div class="summary-card flex min-w-[120px] flex-1 flex-col items-center gap-1.5 rounded-panel border border-border bg-card p-4">
+        <span class="summary-num text-display font-extrabold tabular-nums text-accent transition-colors duration-[0.12s]">{{ totalPlay }}</span>
+        <span class="summary-label text-meta text-dim">{{ t("winStats.totalPlay") }}</span>
       </div>
     </div>
 
     <!-- 游玩时间图：工具条里选实例与时间段，图表跟着两者变 -->
-    <section class="play-panel">
+    <section class="play-panel relative mb-4 rounded-panel border border-border bg-card p-4">
       <!-- 工具条固定两行：第一行标题 + 实例 + 时间区间，第二行三个区间统计。
            标题与两个控件组各占自己的格子，谁都不按内容去挤别人，换实例时版式不动 -->
-      <div class="play-bar">
-        <div class="play-top">
-          <h2 class="play-title">{{ t("winStats.playTitle") }}</h2>
-          <InstanceSelect class="inst-picker" :instances="instanceOptions" :model-value="selectedUuid"
+      <div class="play-bar flex flex-col gap-3 pb-3">
+        <div class="play-top flex flex-wrap items-center gap-3">
+          <h2 class="play-title m-0 flex-none text-heading font-bold text-fg">{{ t("winStats.playTitle") }}</h2>
+          <InstanceSelect class="inst-picker min-w-[120px] flex-[1_1_auto]" :instances="instanceOptions" :model-value="selectedUuid"
             :empty-label="t('winStats.allInstances')" :menu-min-width="240"
             @update:model-value="pickInstance" />
-          <div class="range-controls">
-            <label class="range-custom">
+          <div class="range-controls flex flex-none flex-wrap items-center gap-2">
+            <label class="range-custom flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-body text-fg select-none">
               <BaseSwitch :model-value="customRange" @update:model-value="setCustomRange" />
               <span>{{ t("winStats.customRange") }}</span>
             </label>
@@ -645,11 +645,11 @@ function instanceLabel(inst: StatsInstanceDto): string {
           </div>
           <!-- 自定义时间段：日期框跟在开关后面，缩窄后与第一行同排；窄窗才整组换行 -->
           <Transition name="range-in">
-            <div v-if="customRange" class="range-row">
-              <BaseDatePicker v-model="fromDate" class="range-date" :min="minDate" :max="toDate || maxDate || todayDate"
+            <div v-if="customRange" class="range-row flex flex-none items-center gap-2">
+              <BaseDatePicker v-model="fromDate" class="range-date w-[120px]" :min="minDate" :max="toDate || maxDate || todayDate"
                 :aria-label="t('winStats.dateFrom')" />
-              <span class="range-sep">–</span>
-              <BaseDatePicker v-model="toDate" class="range-date" :min="fromDate || minDate" :max="maxDate || todayDate"
+              <span class="range-sep text-dim">–</span>
+              <BaseDatePicker v-model="toDate" class="range-date w-[120px]" :min="fromDate || minDate" :max="maxDate || todayDate"
                 :aria-label="t('winStats.dateTo')" />
             </div>
           </Transition>
@@ -658,28 +658,28 @@ function instanceLabel(inst: StatsInstanceDto): string {
             icon-only />
         </div>
 
-        <div class="play-stats">
-          <div class="play-stat">
-            <span class="play-num">{{ hoursShort(playtime?.totalSeconds ?? 0) }}</span>
-            <span class="play-cap">{{ t("winStats.rangePlay") }}</span>
+        <div class="play-stats flex items-end gap-6">
+          <div class="play-stat flex flex-col gap-0.5">
+            <span class="play-num text-display font-extrabold tabular-nums text-fg">{{ hoursShort(playtime?.totalSeconds ?? 0) }}</span>
+            <span class="play-cap text-meta text-dim">{{ t("winStats.rangePlay") }}</span>
           </div>
-          <div class="play-stat">
-            <span class="play-num">{{ playtime?.activeDays ?? 0 }}</span>
-            <span class="play-cap">{{ t("winStats.activeDays") }}</span>
+          <div class="play-stat flex flex-col gap-0.5">
+            <span class="play-num text-display font-extrabold tabular-nums text-fg">{{ playtime?.activeDays ?? 0 }}</span>
+            <span class="play-cap text-meta text-dim">{{ t("winStats.activeDays") }}</span>
           </div>
-          <div class="play-stat">
-            <span class="play-num">{{ hoursShort((playtime?.totalSeconds ?? 0) / Math.max(1, dayCount)) }}</span>
-            <span class="play-cap">{{ t("winStats.dailyAverage") }}</span>
+          <div class="play-stat flex flex-col gap-0.5">
+            <span class="play-num text-display font-extrabold tabular-nums text-fg">{{ hoursShort((playtime?.totalSeconds ?? 0) / Math.max(1, dayCount)) }}</span>
+            <span class="play-cap text-meta text-dim">{{ t("winStats.dailyAverage") }}</span>
           </div>
           <!-- 累计口径贴在统计行右端：选中实例时是该实例的累计，全部实例时是全局合计 -->
-          <p v-if="data" class="play-total" :title="playSub">{{ playSub }}</p>
+          <p v-if="data" class="play-total m-0 mb-px ml-auto overflow-hidden text-ellipsis whitespace-nowrap text-meta text-dim" :title="playSub">{{ playSub }}</p>
         </div>
       </div>
 
       <!-- 图表区：只选一天时换成饼图看实例占比，多天时是柱状图。
            零记录与还没读到时各给一句说明，不留空框 -->
-      <div v-if="showPie && dayRows.length > 0" class="day-share">
-        <div :key="chartKey" class="ring-row">
+      <div v-if="showPie && dayRows.length > 0" class="day-share flex flex-col gap-3.5">
+        <div :key="chartKey" class="ring-row flex justify-around gap-4 py-1">
           <DaySharePie :items="dayRows.map((r) => ({ uuid: r.uuid, name: r.name, value: r.seconds }))"
             :title="t('winStats.colHours')" kind="hours" />
           <DaySharePie :items="dayRows.map((r) => ({ uuid: r.uuid, name: r.name, value: r.count }))"
@@ -688,18 +688,18 @@ function instanceLabel(inst: StatsInstanceDto): string {
             :title="t('winStats.colFailed')" kind="count" />
         </div>
         <!-- 三个环共用一份图例：同一实例在三个环里是同一个颜色，图例列也对齐 -->
-        <div class="day-legend">
-          <div class="legend-head">
+        <div class="day-legend flex flex-col gap-1.5">
+          <div class="legend-head grid grid-cols-[minmax(0,1fr)_92px_72px_72px] items-center gap-2 text-meta tabular-nums text-dim">
             <span>{{ t("winStats.colInstance") }}</span>
             <span>{{ t("winStats.colHours") }}</span>
             <span>{{ t("winStats.colCount") }}</span>
             <span>{{ t("winStats.colFailed") }}</span>
           </div>
-          <div v-for="(row, index) in dayRows" :key="row.uuid" class="legend-item"
+          <div v-for="(row, index) in dayRows" :key="row.uuid" class="legend-item grid grid-cols-[minmax(0,1fr)_92px_72px_72px] items-center gap-2 text-body tabular-nums"
             :style="{ animationDelay: Math.min(index * 12, 180) + 'ms' }">
-            <span class="legend-name">
-              <span class="legend-dot" :style="{ background: instanceColor(row.uuid) }"></span>
-              <span class="legend-text" :title="row.name">{{ row.name }}</span>
+            <span class="legend-name flex min-w-0 items-center gap-2">
+              <span class="legend-dot h-2.5 w-2.5 shrink-0 rounded-full" :style="{ background: instanceColor(row.uuid) }"></span>
+              <span class="legend-text min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" :title="row.name">{{ row.name }}</span>
             </span>
             <span>{{ hoursOf(row.seconds) }}</span>
             <span>{{ timesOf(row.count) }}</span>
@@ -707,33 +707,34 @@ function instanceLabel(inst: StatsInstanceDto): string {
           </div>
         </div>
       </div>
-      <div v-else-if="playtime && playtime.totalSeconds > 0" class="chart">
-        <div class="chart-y">
+      <div v-else-if="playtime && playtime.totalSeconds > 0" class="chart flex gap-2">
+        <div class="chart-y flex h-[var(--chart-h)] w-10 flex-col items-end justify-between whitespace-nowrap text-caption text-dim">
           <span>{{ axisTop }}</span>
           <span>{{ axisMid }}</span>
           <span>{{ axisBottom }}</span>
         </div>
-        <div class="chart-main">
-          <div class="chart-body">
-            <div class="chart-lines" aria-hidden="true">
-              <span></span>
-              <span></span>
-              <span></span>
+        <div class="chart-main min-w-0 flex-1 overflow-hidden">
+          <div class="chart-body relative h-[var(--chart-h)]">
+            <div class="chart-lines pointer-events-none absolute inset-0 flex flex-col justify-between" aria-hidden="true">
+              <span class="border-t border-dashed border-border"></span>
+              <span class="border-t border-dashed border-border"></span>
+              <span class="border-t border-dashed border-border"></span>
             </div>
-            <div :key="chartKey" class="chart-bars" :style="{ gridTemplateColumns: chartColumns, gap: chartGap }">
-              <div v-for="(bar, index) in chartBars" :key="bar.from" class="chart-slot">
-                <div class="chart-bar" :class="{ empty: bar.seconds === 0 }" :style="{
+            <div :key="chartKey" class="chart-bars absolute inset-0 grid items-end" :style="{ gridTemplateColumns: chartColumns, gap: chartGap }">
+              <div v-for="(bar, index) in chartBars" :key="bar.from" class="chart-slot flex h-full items-end justify-center">
+                <div class="chart-bar relative w-full max-w-[34px] overflow-hidden rounded-t-[3px] bg-accent" :class="{ empty: bar.seconds === 0 }" :style="{
                   height: bar.seconds > 0 ? barHeight(bar.seconds) : undefined,
                   animationDelay: Math.min(index * 6, 360) + 'ms',
                 }" v-tip="barTip(bar)" @dblclick="pickRange(bar.from, bar.to)">
-                  <span v-if="bar.failed > 0" class="chart-bar-fail" :style="{ height: failHeight(bar) }"></span>
+                  <span v-if="bar.failed > 0" class="chart-bar-fail absolute bottom-0 left-0 right-0 bg-red" :style="{ height: failHeight(bar) }"></span>
                 </div>
               </div>
             </div>
           </div>
-          <div class="chart-x" :style="{ gridTemplateColumns: chartColumns, gap: chartGap }">
-            <span v-for="(bar, index) in chartBars" :key="bar.from">
-              <i v-if="showXLabel(index)">{{ xLabel(bar.from) }}</i>
+          <div class="chart-x mt-1.5 grid" :style="{ gridTemplateColumns: chartColumns, gap: chartGap }">
+            <span v-for="(bar, index) in chartBars" :key="bar.from" class="relative h-[15px]">
+              <i v-if="showXLabel(index)"
+                class="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-caption not-italic text-dim">{{ xLabel(bar.from) }}</i>
             </span>
           </div>
         </div>
@@ -750,71 +751,71 @@ function instanceLabel(inst: StatsInstanceDto): string {
         </div>
       </div>
       <div v-else-if="!playtimeLoaded" class="chart" role="status" :aria-label="t('winStats.loading')">
-        <div class="chart-y">
-          <span v-for="i in 3" :key="i" class="sk sk-tick"></span>
+        <div class="chart-y flex h-[var(--chart-h)] w-10 flex-col items-end justify-between whitespace-nowrap text-caption text-dim">
+          <span v-for="i in 3" :key="i" class="sk sk-tick block h-2.5 w-[22px] rounded-ctl"></span>
         </div>
-        <div class="chart-main">
-          <div class="sk-bars">
-            <span v-for="(height, i) in SKELETON_BARS" :key="i" class="sk sk-bar"
+        <div class="chart-main min-w-0 flex-1 overflow-hidden">
+          <div class="sk-bars grid h-[var(--chart-h)] grid-cols-12 items-end gap-0.5">
+            <span v-for="(height, i) in SKELETON_BARS" :key="i" class="sk sk-bar w-full max-w-[34px] justify-self-center rounded-t-[3px]"
               :style="{ height: height + '%' }"></span>
           </div>
-          <div class="sk-x">
-            <span v-for="i in 6" :key="i" class="sk sk-tick"></span>
+          <div class="sk-x mt-1.5 flex h-[15px] justify-between">
+            <span v-for="i in 6" :key="i" class="sk sk-tick block h-2.5 w-[22px] rounded-ctl"></span>
           </div>
         </div>
       </div>
-      <div v-else class="chart-empty">{{ t("winStats.chartEmpty") }}</div>
+      <div v-else class="chart-empty flex h-[var(--chart-h)] items-center justify-center rounded-card border border-dashed border-border text-body text-dim">{{ t("winStats.chartEmpty") }}</div>
 
       <!-- 双击是隐藏操作，给一句话提示；单日已经是饼图，不用再说 -->
-      <p v-if="!showPie && playtime && playtime.totalSeconds > 0" class="chart-hint">
+      <p v-if="!showPie && playtime && playtime.totalSeconds > 0" class="chart-hint m-0 mt-2 text-meta text-dim">
         {{ t("winStats.dblHint") }}
       </p>
     </section>
 
     <!-- 实例汇总：行虚拟化，几百个实例也只渲染视口附近那几行。
          滚动容器是 WindowFrame 的内容区（整页滚动不变），上下留白撑住总高度 -->
-    <div class="stats-table" role="table">
-      <div class="stats-head" role="row">
+    <div class="stats-table overflow-hidden rounded-panel border border-border bg-card" role="table">
+      <div class="stats-head grid h-10 grid-cols-[minmax(0,1fr)_88px_64px_104px_132px] items-center gap-4 border-b border-border bg-side px-4 text-meta font-semibold text-dim" role="row">
         <span role="columnheader" :aria-sort="ariaSort('name')">
-          <button type="button" class="sort-btn" @click="toggleSort('name')">
+          <button type="button" class="sort-btn inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-left text-inherit transition-colors duration-[0.12s] hover:text-fg [font:inherit]" @click="toggleSort('name')">
             {{ t("winStats.colInstance") }}
-            <span v-if="sortKey === 'name'" class="sort-arrow">{{ sortDesc ? "▼" : "▲" }}</span>
+            <span v-if="sortKey === 'name'" class="sort-arrow inline-block w-2.5 text-[9px] text-accent">{{ sortDesc ? "▼" : "▲" }}</span>
           </button>
         </span>
         <span role="columnheader" :aria-sort="ariaSort('count')">
-          <button type="button" class="sort-btn" @click="toggleSort('count')">
+          <button type="button" class="sort-btn inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-left text-inherit transition-colors duration-[0.12s] hover:text-fg [font:inherit]" @click="toggleSort('count')">
             {{ t("winStats.colCount") }}
-            <span v-if="sortKey === 'count'" class="sort-arrow">{{ sortDesc ? "▼" : "▲" }}</span>
+            <span v-if="sortKey === 'count'" class="sort-arrow inline-block w-2.5 text-[9px] text-accent">{{ sortDesc ? "▼" : "▲" }}</span>
           </button>
         </span>
         <span role="columnheader" :aria-sort="ariaSort('failed')">
-          <button type="button" class="sort-btn" @click="toggleSort('failed')">
+          <button type="button" class="sort-btn inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-left text-inherit transition-colors duration-[0.12s] hover:text-fg [font:inherit]" @click="toggleSort('failed')">
             {{ t("winStats.colFailed") }}
-            <span v-if="sortKey === 'failed'" class="sort-arrow">{{ sortDesc ? "▼" : "▲" }}</span>
+            <span v-if="sortKey === 'failed'" class="sort-arrow inline-block w-2.5 text-[9px] text-accent">{{ sortDesc ? "▼" : "▲" }}</span>
           </button>
         </span>
         <span role="columnheader" :aria-sort="ariaSort('seconds')">
-          <button type="button" class="sort-btn" @click="toggleSort('seconds')">
+          <button type="button" class="sort-btn inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-left text-inherit transition-colors duration-[0.12s] hover:text-fg [font:inherit]" @click="toggleSort('seconds')">
             {{ t("winStats.colHours") }}
-            <span v-if="sortKey === 'seconds'" class="sort-arrow">{{ sortDesc ? "▼" : "▲" }}</span>
+            <span v-if="sortKey === 'seconds'" class="sort-arrow inline-block w-2.5 text-[9px] text-accent">{{ sortDesc ? "▼" : "▲" }}</span>
           </button>
         </span>
         <span role="columnheader" :aria-sort="ariaSort('last')">
-          <button type="button" class="sort-btn" @click="toggleSort('last')">
+          <button type="button" class="sort-btn inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-left text-inherit transition-colors duration-[0.12s] hover:text-fg [font:inherit]" @click="toggleSort('last')">
             {{ t("winStats.colLast") }}
-            <span v-if="sortKey === 'last'" class="sort-arrow">{{ sortDesc ? "▼" : "▲" }}</span>
+            <span v-if="sortKey === 'last'" class="sort-arrow inline-block w-2.5 text-[9px] text-accent">{{ sortDesc ? "▼" : "▲" }}</span>
           </button>
         </span>
       </div>
-      <div v-if="!data || data.instances.length === 0" class="empty-cell">{{ t("winStats.noData") }}</div>
+      <div v-if="!data || data.instances.length === 0" class="empty-cell p-6 text-center text-body text-dim">{{ t("winStats.noData") }}</div>
       <div v-else ref="rowsEl" class="stats-rows"
         :style="{ paddingTop: padTop + 'px', paddingBottom: padBottom + 'px' }">
-        <div v-for="inst in visibleInstances" :key="inst.uuid" class="stats-row" role="row">
-          <div class="cell-inst inst-cell" role="cell">
+        <div v-for="inst in visibleInstances" :key="inst.uuid" class="stats-row grid h-12 grid-cols-[minmax(0,1fr)_88px_64px_104px_132px] items-center gap-4 px-4 text-body tabular-nums shadow-[inset_0_-1px_0_var(--border)]" role="row">
+          <div class="cell-inst inst-cell flex min-w-0 items-center gap-2.5 font-semibold" role="cell">
             <InstanceIcon :name="inst.name" :uuid="inst.uuid" :size="30" />
-            <span class="inst-name">{{ inst.name }}</span>
-            <span v-if="inst.deleted" class="deleted-tag">{{ t("winStats.deleted") }}</span>
-            <span v-else-if="inst.running" class="running-tag">{{ t("winStats.running") }}</span>
+            <span class="inst-name overflow-hidden text-ellipsis whitespace-nowrap">{{ inst.name }}</span>
+            <span v-if="inst.deleted" class="deleted-tag shrink-0 whitespace-nowrap rounded-pill border border-border px-1.5 py-0.5 text-caption font-semibold text-dim">{{ t("winStats.deleted") }}</span>
+            <span v-else-if="inst.running" class="running-tag shrink-0 whitespace-nowrap rounded-pill border border-accent px-1.5 py-0.5 text-caption font-semibold text-accent">{{ t("winStats.running") }}</span>
           </div>
           <span role="cell">{{ inst.count }}</span>
           <span :class="{ danger: inst.failed > 0 }" role="cell">{{ inst.failed }}</span>
@@ -824,308 +825,47 @@ function instanceLabel(inst: StatsInstanceDto): string {
       </div>
     </div>
 
-    <p class="foot-note">{{ t("winStats.foot") }}</p>
+    <p class="foot-note mt-2.5 text-meta text-dim">{{ t("winStats.foot") }}</p>
   </WindowFrame>
 </template>
 
 <style scoped>
-.summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-bottom: 16px;
+/* 排版 / 间距 / 字号 / 颜色都在模板的工具类上；这里只留动画、状态与伪类 ——
+   关键帧名会被 scoped 重写，工具类里引用不到，所以动效整条留在 CSS */
+.play-panel {
+  /* 图表区高度：纵轴、柱状区、空状态与骨架四处共用，改一处四处一起变 */
+  --chart-h: 150px;
 }
 
-.summary-card {
-  flex: 1;
-  min-width: 120px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-
-.summary-num {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--accent);
-  /* 数字每 5 秒刷新一次，等宽数字才不会让卡片跟着抖 */
-  font-variant-numeric: tabular-nums;
-  transition: color 0.12s;
-}
-
-/* 有失败时把这一个数字标红，扫一眼就知道统计里有失败 */
+/* 有失败时把这一个数字标红 */
 .summary-num.danger {
   color: var(--red);
 }
 
-.summary-label {
-  font-size: 11.5px;
-  color: var(--text-dim);
-}
-
-/* ---------- 游玩时间图 ---------- */
-
-.play-panel {
-  /* 图表区高度：纵轴、柱状区与空状态三处共用，改一处三处一起变 */
-  --chart-h: 150px;
-  position: relative;
-  margin-bottom: 16px;
-  padding: 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-
-/* 工具条：第一行标题 / 实例 / 时间区间（含自定义日期），第二行三个区间统计 */
-.play-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-bottom: 12px;
-}
-
-/* 第一行：标题 / 实例下拉 / 时间区间（含自定义日期）/ 形态切换。
-   下拉吃掉标题与区间控件之间的剩余宽度，宽度只由窗口决定，不随选中项的长短变。
-   日期框缩到 120px 后与开关同排；窄窗时整组换行，别把形态切换挤到面板外面 */
-.play-top {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.play-title {
-  flex: 0 0 auto;
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-/* 时间区间控件：开关 + 预设分段（或两个日期框）。不参与伸缩，宽度只由组内控件决定 */
-.range-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  flex: 0 0 auto;
-}
-
-/* 形态切换不参与伸缩：它排在行尾，被挤的话只会换行，不会跑到面板外面 */
-.chart-mode {
-  flex: none;
-}
-
-/* 自定义时间段的两个日期框：跟在时间开关后面，不参与伸缩 */
-.range-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-
-/* 自定义时间段：开关 + 文案；选预设时这一对保留，7 / 30 / 90 隐藏 */
-.range-custom {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  color: var(--text);
-  user-select: none;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-/* 日期选择器：宽度挂在组件根元素上，外观由组件自己管；120px 够放 YYYY-MM-DD */
-.range-date {
-  width: 120px;
-}
-
-.range-sep {
-  color: var(--text-dim);
-}
-
-/* 自定义日期行：开关打开时淡入并轻微下落，收起时快速淡出 */
-.range-in-enter-active,
-.range-in-leave-active {
-  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
-}
-
-.range-in-enter-from,
-.range-in-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
-}
-
-/* 实例下拉吃掉第一行的剩余宽度：原生 <select> 的宽度由最长选项文字决定，
-   实例名一长就把后面的控件挤走。文字在按钮里省略，完整名字进悬停提示 */
-.inst-picker {
-  /* 剩余宽度归它；下限保证窄窗时还认得出是哪个实例 */
-  flex: 1 1 auto;
-  min-width: 120px;
-}
-
-.play-stats {
-  display: flex;
-  align-items: flex-end;
-  gap: 24px;
-}
-
-/* 选中实例的累计口径：贴统计行右端，太长省略，完整值在悬停提示里 */
-.play-total {
-  margin: 0 0 1px auto;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.play-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.play-num {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-.play-cap {
-  font-size: 11.5px;
-  color: var(--text-dim);
-}
-
-.chart {
-  display: flex;
-  gap: 8px;
-}
-
-/* 纵轴：与柱状区同高，三档刻度分别贴着上 / 中 / 下 */
-.chart-y {
-  width: 40px;
-  height: var(--chart-h);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-end;
-  font-size: 10.5px;
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-
-.chart-main {
-  flex: 1;
-  /* 不横向滚动：天数再多也只压缩柱宽，一屏看完 */
-  min-width: 0;
-  overflow: hidden;
-}
-
-.chart-body {
-  position: relative;
-  height: var(--chart-h);
-}
-
-/* 背景网格：只在柱状区画，不挡鼠标（提示挂在柱子上） */
-.chart-lines {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  pointer-events: none;
-}
-
-.chart-lines span {
-  border-top: 1px dashed var(--border);
-}
-
-.chart-bars {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  align-items: end;
-  /* 间距按天数给，见 chartGap */
-}
-
-.chart-slot {
-  height: 100%;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
+/* 柱子只留动画与过渡：几何与底色在模板的工具类上，.empty 态要盖过它们所以留着 */
 .chart-bar {
-  position: relative;
-  width: 100%;
-  max-width: 34px;
-  border-radius: 3px 3px 0 0;
-  background: var(--accent);
-  /* 从底部长出来：换实例 / 换时间段时柱子重挂载，动画跟着重播；
-     5 秒轮询只改 height，走上面的过渡而不是重播动画 */
   transform-origin: bottom center;
   animation: stats-bar-rise 0.3s var(--ease-out) backwards;
   transition: height 0.3s var(--ease-out), background-color 0.12s;
-  overflow: hidden;
 }
 
-/* 启动失败段：贴在当天柱子的底部，高度按失败次数占比给 */
-.chart-bar-fail {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--red);
-}
-
-/* 双击柱子能钻到那一天，给个手型提示它可点 */
+/* 双击柱子能钻到那一天，给个手型 */
 .chart-bar:not(.empty) {
   cursor: pointer;
 }
 
-/* 悬停当天柱子提亮一档，与提示一起说明"这根柱子是哪天" */
 .chart-bar:not(.empty):hover {
   background: var(--accent-hover);
 }
 
-/* 没记录的那天留一条基线，图里不至于看不出格子 */
+/* 没记录的那天留一条基线 */
 .chart-bar.empty {
   height: 2px;
   background: var(--border);
   border-radius: 1px;
 }
 
-.chart-x {
-  display: grid;
-  margin-top: 6px;
-}
-
-/* 标签比格子宽，参与布局就会把容器撑出横向滚动、最后一天还被裁掉，
-   所以让它绝对定位居中，不占网格宽度 */
-.chart-x span {
-  position: relative;
-  height: 15px;
-}
-
-.chart-x i {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-style: normal;
-  font-size: 10.5px;
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-
-/* 首尾贴边：居中会让第一个字探出左边、最后一个被右边界裁掉 */
+/* 首尾日期标签贴边：居中会让第一个字探出左边、最后一个被右边界裁掉 */
 .chart-x span:first-child i {
   left: 0;
   transform: none;
@@ -1137,150 +877,46 @@ function instanceLabel(inst: StatsInstanceDto): string {
   transform: none;
 }
 
-/* 单日：三个环并排，下面一份共享图例 */
-.day-share {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.ring-row {
-  display: flex;
-  justify-content: space-around;
-  gap: 16px;
-  padding: 4px 0;
-}
-
-/* 三个环错开淡入：同一实例在三个环里的颜色一样，一起出现会糊成一片 */
-.ring-row>* {
+/* 三个环错开淡入：同一实例在三个环里颜色一样，一起出现会糊成一片 */
+.ring-row > * {
   animation: stats-ring-in 0.3s var(--ease-out) backwards;
 }
 
-.ring-row>*:nth-child(2) {
+.ring-row > *:nth-child(2) {
   animation-delay: 60ms;
 }
 
-.ring-row>*:nth-child(3) {
+.ring-row > *:nth-child(3) {
   animation-delay: 120ms;
 }
 
-.day-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-/* 表头与数据行共用同一套列宽：实例名占满剩余，后三列定宽 */
-.legend-head,
-.legend-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 92px 72px 72px;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-}
-
-.legend-head {
-  font-size: 11.5px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-.legend-head>span:not(:first-child),
-.legend-item>span:not(:first-child) {
+/* 图例末三列右对齐，跟着表头一起 */
+.legend-head > span:not(:first-child),
+.legend-item > span:not(:first-child) {
   text-align: right;
 }
 
 .legend-item {
-  font-variant-numeric: tabular-nums;
   animation: stats-fade-in 0.18s var(--ease-out) backwards;
-}
-
-.legend-name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.legend-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .legend-item .danger {
   color: var(--red);
 }
 
-.chart-hint {
-  margin: 8px 0 0;
-  font-size: 11.5px;
-  color: var(--text-dim);
+/* 自定义日期行：开关打开时淡入并轻微下落 */
+.range-in-enter-active,
+.range-in-leave-active {
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
 }
 
-.chart-empty {
-  height: var(--chart-h);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  color: var(--text-dim);
-  font-size: 12.5px;
+.range-in-enter-from,
+.range-in-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
-/* ---------- 图表加载骨架 ----------
- * 形状照真图摆：柱状图是「左纵轴刻度 + 一排柱子 + 横轴日期」，饼图是「三个环 + 图例」。
- * 占位块复用全局 .sk 的呼吸动画，数据到了原地替换，面板高度不会先塌再撑开。
- */
-
-/* 柱状图骨架：与真图同一套网格与底线，柱子从底部对齐 */
-.sk-bars {
-  height: var(--chart-h);
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 2px;
-  align-items: end;
-}
-
-.sk-bar {
-  width: 100%;
-  max-width: 34px;
-  justify-self: center;
-  border-radius: 3px 3px 0 0;
-}
-
-/* 刻度占位：纵轴三条、横轴六个，高度与真图的文字行一致 */
-.sk-tick {
-  display: block;
-  width: 22px;
-  height: 10px;
-  border-radius: 4px;
-}
-
-.sk-x {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 6px;
-  height: 15px;
-}
-
-/* 饼图骨架：三个圆环 + 图例占位行 */
-.day-share-sk {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
+/* 环骨架：先落位，再开始呼吸；动画属性会被 .ring-row > * 覆盖，所以整条留在这里 */
 .sk-ring {
   display: block;
   width: 96px;
@@ -1288,136 +924,12 @@ function instanceLabel(inst: StatsInstanceDto): string {
   border-radius: 50%;
   background: transparent;
   border: 16px solid var(--bg-hover);
-  /* 环是 .ring-row 的子元素，那条规则只给了淡入（动画属性会被覆盖），
-     这里把淡入与 .sk 的呼吸一起写：先落位，再开始呼吸 */
   animation:
     stats-ring-in 0.3s var(--ease-out) backwards,
     sk-pulse 1.2s ease-in-out 0.3s infinite;
 }
 
-.sk-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/* ---------- 每实例汇总表（行虚拟化） ---------- */
-
-.stats-table {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-/* 表头与行共用同一套列宽：两边分开写，改一处要改两处 */
-.stats-head,
-.stats-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px 64px 104px 132px;
-  align-items: center;
-  gap: 16px;
-  padding: 0 16px;
-}
-
-.stats-head {
-  height: 40px;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  font-weight: 600;
-  background: var(--bg-side);
-  border-bottom: 1px solid var(--border);
-}
-
-/* 表头可点击排序：按钮只借表格的排版，外观仍是一行文字 */
-.sort-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-weight: inherit;
-  cursor: pointer;
-  text-align: left;
-  transition: color 0.12s;
-}
-
-.sort-btn:hover {
-  color: var(--text);
-}
-
-/* 当前排序列的箭头：只标方向，不改变列宽（固定宽度，翻转时不抖） */
-.sort-arrow {
-  display: inline-block;
-  width: 10px;
-  font-size: 9px;
-  color: var(--accent);
-}
-
-/* 行高必须固定：隐藏的行按它估着撑高，见 composables/useVirtualRows.ts。
-   分隔线用 box-shadow 画，不占高度；用 border 会随虚拟化窗口边界忽有忽无 */
-.stats-row {
-  height: 48px;
-  font-size: 12.5px;
-  font-variant-numeric: tabular-nums;
-  box-shadow: inset 0 -1px 0 var(--border);
-}
-
-.inst-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  font-weight: 600;
-}
-
-/* 实例名过长时省略：列宽被 grid 定死，不省略会顶破相邻列 */
-.inst-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.running-tag,
-.deleted-tag {
-  flex-shrink: 0;
-  white-space: nowrap;
-  font-size: 10.5px;
-  font-weight: 600;
-  border-radius: 999px;
-  padding: 2px 6px;
-}
-
-.running-tag {
-  color: var(--accent);
-  border: 1px solid var(--accent);
-}
-
-.deleted-tag {
-  color: var(--text-dim);
-  border: 1px solid var(--border);
-}
-
-.empty-cell {
-  text-align: center;
-  color: var(--text-dim);
-  padding: 24px;
-  font-size: 12.5px;
-}
-
-.foot-note {
-  font-size: 11.5px;
-  color: var(--text-dim);
-  margin-top: 10px;
-}
-
-/* ---------- 动效 ----------
- * 只管"这个窗口自己的反馈"：进场分层见 useStaggerEnter，柱子 / 环 / 图例在下面几个类上。
- * 关掉「界面动画」时由 base.css 的 html.no-anim 统一禁用，这里不写判断。
- */
+/* ---------- 动效关键帧 ---------- */
 
 /* 柱子从底部长出来 */
 @keyframes stats-bar-rise {

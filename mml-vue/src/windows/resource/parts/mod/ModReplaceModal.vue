@@ -76,23 +76,23 @@ function pick(item: FileListItemDto) {
 <template>
   <BaseModal :title="t('resource.replaceVersion')" :width="560" fixed-height="520px" :closable="false"
     @close="emit('close')">
-    <p class="rep-title">{{ target.name || target.file }}</p>
-    <p v-if="target.version" class="rep-sub">{{ t("resource.updateCurrent", { version: target.version }) }}</p>
+    <p class="rep-title m-0 break-all text-title font-semibold text-fg">{{ target.name || target.file }}</p>
+    <p v-if="target.version" class="rep-sub mb-0 mt-[3px] text-body text-dim">{{ t("resource.updateCurrent", { version: target.version }) }}</p>
 
     <p v-if="error" class="error-text">{{ error }}</p>
     <p v-else-if="!list.length" class="empty-tip">
       {{ loading ? t("resource.replaceWait") : t("resource.replaceEmpty") }}
     </p>
 
-    <div v-else class="rep-list">
-      <button v-for="item in list" :key="item.source.fid" class="rep-row"
-        :class="{ 'rep-row-current': isCurrent(item) }" :disabled="isCurrent(item)" @click="pick(item)">
-        <span class="rep-body">
-          <span class="rep-head">
-            <span class="rep-name">{{ item.name }}</span>
-            <span v-if="isCurrent(item)" class="rep-tag">{{ t("resource.replaceCurrent") }}</span>
+    <div v-else class="rep-list mr-[-8px] mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-2">
+      <button v-for="item in list" :key="item.source.fid" class="rep-row flex w-full cursor-pointer items-start gap-2.5 rounded-ctl border border-border bg-card px-2.5 py-2 text-left text-fg transition-all duration-100 [font-family:inherit] enabled:hover:border-accent enabled:hover:bg-accent-soft"
+        :class="{ 'rep-row-current cursor-default opacity-60': isCurrent(item) }" :disabled="isCurrent(item)" @click="pick(item)">
+        <span class="rep-body flex min-w-0 flex-col">
+          <span class="rep-head flex flex-wrap items-baseline gap-x-2.5 gap-y-[3px]">
+            <span class="rep-name break-all text-body font-semibold text-fg">{{ item.name }}</span>
+            <span v-if="isCurrent(item)" class="rep-tag rounded-[6px] border border-accent-border px-1.5 text-meta text-accent">{{ t("resource.replaceCurrent") }}</span>
           </span>
-          <span class="rep-meta">
+          <span class="rep-meta mt-[3px] flex flex-wrap gap-x-2.5 gap-y-[3px] text-meta text-dim">
             <span v-if="item.time">{{ t("resource.updateDate", { date: isoDate(item.time) }) }}</span>
             <span v-if="item.size > 0">{{ formatSize(item.size) }}</span>
           </span>
@@ -100,7 +100,7 @@ function pick(item: FileListItemDto) {
       </button>
     </div>
 
-    <div v-if="!error && page < maxPage" class="rep-more">
+    <div v-if="!error && page < maxPage" class="rep-more mt-2.5 text-center">
       <BaseButton size="sm" :disabled="loading" @click="fetchPage(true)">
         {{ t("resource.replaceMore") }}
       </BaseButton>
@@ -113,111 +113,12 @@ function pick(item: FileListItemDto) {
 </template>
 
 <style scoped>
-/* 弹窗在 body 下，样式走 scoped（与 ModUpdateModal / ModDepsPage 同一处理） */
-.rep-title {
-  margin: 0;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
-  word-break: break-all;
-}
+/* 弹窗在 body 下，样式走 scoped（与 ModUpdateModal / ModDepsPage 同一处理）。
+   排版全在模板上的工具类里；这里只留这条对 BaseModal 内 .modal-body 子元素的规则，
+   让加载 / 出错提示吃掉剩余高度，动作按钮才贴底。 */
 
-.rep-sub {
-  margin: 3px 0 0;
-  color: var(--text-dim);
-  font-size: 12px;
-}
-
-/* 加载中 / 出错 / 空：这几档没有可滚的列表，让提示吃掉剩余高度，
-   动作按钮才会贴底，而不是浮在面板中间 */
 .modal-body>.empty-tip,
 .modal-body>.error-text {
   flex: 1;
-}
-
-/* 弹窗高度被 fixed-height 锁死，这里吃掉剩余高度自己滚 ——
-   **不能再给 max-height**：那样面板与列表会各滚一层，右边出现两条滚动条 */
-.rep-list {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-  overflow-y: auto;
-  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
-     行的右边缘仍落在弹窗内容区里，滚动条画在这 8px 上 */
-  margin-right: -8px;
-  padding-right: 8px;
-}
-
-/* 一行一个版本，整行可点 */
-.rep-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-card);
-  color: var(--text);
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.12s;
-}
-
-.rep-row:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-/* 当前装着的那份：点不动，也别看着像个能点的行 */
-.rep-row-current {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.rep-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.rep-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 3px 10px;
-}
-
-.rep-name {
-  color: var(--text);
-  font-size: 12.5px;
-  font-weight: 600;
-  word-break: break-all;
-}
-
-.rep-tag {
-  padding: 0 6px;
-  border: 1px solid var(--accent-border);
-  border-radius: 6px;
-  color: var(--accent);
-  font-size: 11px;
-}
-
-.rep-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px 10px;
-  margin-top: 3px;
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
-
-.rep-more {
-  margin-top: 10px;
-  text-align: center;
 }
 </style>

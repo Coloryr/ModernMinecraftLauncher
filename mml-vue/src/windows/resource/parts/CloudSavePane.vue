@@ -135,8 +135,8 @@ watch(() => props.uuid, () => {
 <template>
   <BaseButton size="sm" :disabled="disabled" @click="show">{{ t("cloud.title") }}</BaseButton>
   <BaseModal v-if="open" :title="t('cloud.title')" :width="820" :close-disabled="busy" @close="open = false">
-    <div class="cloud-layout">
-      <aside v-if="config" class="cloud-connection">
+    <div class="cloud-layout grid grid-cols-[minmax(200px,260px)_minmax(0,1fr)] gap-6">
+      <aside v-if="config" class="cloud-connection flex flex-col gap-2 border-r border-border pr-5">
         <h4>{{ t("cloud.connection") }}</h4>
         <label class="field-label" for="cloud-server">{{ t("cloud.server") }}</label>
         <input id="cloud-server" v-model="config.server" class="field-input" :disabled="busy" type="url"
@@ -155,8 +155,8 @@ watch(() => props.uuid, () => {
         </BaseButton>
         <p class="field-hint">{{ t("cloud.manualHint") }}</p>
       </aside>
-      <section class="cloud-worlds" :aria-label="t('cloud.worlds')">
-        <div v-if="status" class="cloud-status">
+      <section class="cloud-worlds flex min-w-0 flex-col gap-3" :aria-label="t('cloud.worlds')">
+        <div v-if="status" class="cloud-status flex items-center justify-between gap-3 rounded-card bg-accent-soft p-3">
           <div>
             <strong>{{ t(status.enabled ? "cloud.enabled" : "cloud.paused") }}</strong>
             <p class="field-hint">{{ t("cloud.storage", {
@@ -167,7 +167,7 @@ watch(() => props.uuid, () => {
             {{ t(status.enabled ? "cloud.pause" : "cloud.enable") }}
           </BaseButton>
         </div>
-        <div class="cloud-toolbar">
+        <div class="cloud-toolbar flex items-center justify-between gap-3">
           <h4>{{ t("cloud.worlds") }}</h4>
           <BaseButton size="sm" :disabled="busy || !config?.server || !!dirty" @click="refresh">{{ t("cloud.refresh") }}
           </BaseButton>
@@ -175,16 +175,16 @@ watch(() => props.uuid, () => {
         <p v-if="dirty && status" class="field-hint">{{ t("cloud.unsaved") }}</p>
         <p v-if="!status" class="empty-tip">{{ t("cloud.connectHint") }}</p>
         <p v-else-if="!status.enabled" class="empty-tip">{{ t("cloud.enableHint") }}</p>
-        <div v-else class="cloud-list">
+        <div v-else class="cloud-list flex max-h-[360px] flex-col gap-2.5 overflow-y-auto">
           <p v-if="!rows.length" class="empty-tip">{{ t("cloud.empty") }}</p>
-          <article v-for="row in rows" :key="row.name" class="cloud-world">
+          <article v-for="row in rows" :key="row.name" class="cloud-world flex flex-col gap-1.5 rounded-card border border-border p-3 [overflow-wrap:anywhere]">
             <strong>{{ stripFormatting(row.local?.levelName || row.name) }}</strong>
-            <span class="cloud-dir">{{ row.name }}</span>
+            <span class="cloud-dir text-meta text-dim">{{ row.name }}</span>
             <p class="field-hint">{{ t(row.local ? "cloud.localPresent" : "cloud.localAbsent") }} ·
               {{ row.remote ? t("cloud.remoteTime", { time: formatTime(Date.parse(row.remote.time)) }) :
                 t("cloud.remoteAbsent") }}
             </p>
-            <div class="cloud-actions">
+            <div class="cloud-actions flex flex-wrap gap-2">
               <BaseButton size="sm" :disabled="busy || !!dirty || !row.local" @click="request(row.name, 'upload')">{{
                 t("cloud.upload") }}</BaseButton>
               <BaseButton size="sm" :disabled="busy || !!dirty || !row.remote" @click="request(row.name, 'download')">{{
@@ -198,97 +198,23 @@ watch(() => props.uuid, () => {
       </section>
     </div>
     <p v-if="busy" class="field-hint" role="status">{{ t("cloud.working") }}</p>
-    <p v-if="error" class="cloud-error" role="alert">{{ error }}</p>
+    <p v-if="error" class="cloud-error mt-3 text-ctl text-red" role="alert">{{ error }}</p>
   </BaseModal>
   <BaseModal v-if="open && pending" :title="t('cloud.confirmTitle')" :close-disabled="busy" @close="pending = null">
     <p>{{ t(`cloud.confirm.${pending.direction}`, { name: pending.name }) }}</p>
-    <div class="cloud-actions cloud-confirm">
+    <div class="cloud-actions cloud-confirm flex flex-wrap gap-2 mt-5 justify-end">
       <BaseButton :disabled="busy" @click="pending = null">{{ t("actions.cancel") }}</BaseButton>
       <BaseButton :disabled="busy" @click="transfer">{{ t(busy ? "cloud.working" : "cloud.continue") }}</BaseButton>
     </div>
-    <p v-if="error" class="cloud-error" role="alert">{{ error }}</p>
+    <p v-if="error" class="cloud-error mt-3 text-ctl text-red" role="alert">{{ error }}</p>
   </BaseModal>
 </template>
 
 <style scoped>
-.cloud-layout {
-  display: grid;
-  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
-  gap: 24px;
-}
-
-.cloud-connection {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-right: 20px;
-  border-right: 1px solid var(--border);
-}
-
+/* 小标题是后代选择器、窄窗是媒体查询，两类都留在 CSS；其余排版在模板上的工具类。 */
 .cloud-layout h4 {
   margin: 0 0 8px;
   font-size: 13px;
-}
-
-.cloud-worlds {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.cloud-status,
-.cloud-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.cloud-status {
-  background: var(--accent-soft);
-  padding: 12px;
-  border-radius: 10px;
-}
-
-.cloud-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 360px;
-  overflow-y: auto;
-}
-
-.cloud-world {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow-wrap: anywhere;
-}
-
-.cloud-dir {
-  font-size: 11.5px;
-  color: var(--text-dim);
-}
-
-.cloud-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.cloud-confirm {
-  justify-content: flex-end;
-  margin-top: 20px;
-}
-
-.cloud-error {
-  color: var(--red);
-  font-size: var(--ctl-font);
-  margin-top: 12px;
 }
 
 @media (max-width: 620px) {

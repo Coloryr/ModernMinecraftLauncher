@@ -588,33 +588,33 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="skin-page">
-    <div class="skin-layout">
+  <div class="skin-page flex min-h-0 flex-1 py-[22px] pl-[26px]">
+    <div class="skin-layout flex min-h-0 min-w-0 flex-1 gap-[18px]">
       <!-- 预览区：2D / 3D 切换在展示区上方 -->
-      <div class="preview">
+      <div class="preview flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[14px] border border-border bg-card p-3">
         <!-- 2D / 3D 分段切换（统一 SegmentedTabs） -->
-        <SegmentedTabs class="mode-toggle" :model-value="mode" :options="MODE_OPTIONS"
+        <SegmentedTabs class="mode-toggle mb-2.5 self-start" :model-value="mode" :options="MODE_OPTIONS"
           @update:model-value="mode = $event as Mode" />
 
-        <div ref="stage" class="preview-stage" :class="{ pan: mode === '2d', grabbing: panning }"
+        <div ref="stage" class="preview-stage relative flex min-h-[280px] flex-1 items-center justify-center overflow-hidden" :class="{ pan: mode === '2d', grabbing: panning }"
           @wheel.prevent="onWheel" @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerup="onPointerUp"
           @pointercancel="onPointerUp" @dblclick="resetView">
           <canvas v-show="mode === '3d'" ref="canvas" class="gl-canvas"></canvas>
-          <div v-if="mode === '2d'" class="pan-wrap"
+          <div v-if="mode === '2d'" class="pan-wrap flex h-full w-full items-center justify-center will-change-transform"
             :style="{ transform: `translate(${viewX}px, ${viewY}px) scale(${viewScale})` }">
-            <img v-if="skin2dUrl" :src="skin2dUrl" class="flat-skin" draggable="false" @load="loading = false"
+            <img v-if="skin2dUrl" :src="skin2dUrl" class="flat-skin max-h-full max-w-[70%] [image-rendering:pixelated]" draggable="false" @load="loading = false"
               @error="noSkin = true, (loading = false)" />
-            <img v-if="showCape && cape2dUrl" :src="cape2dUrl" class="flat-cape" draggable="false" alt="" />
+            <img v-if="showCape && cape2dUrl" :src="cape2dUrl" class="flat-cape max-h-[60%] max-w-[25%] [image-rendering:pixelated]" draggable="false" alt="" />
           </div>
-          <div v-if="(loading || (listLoading && !selectedSkin)) && !noSkin" class="preview-loading">
+          <div v-if="(loading || (listLoading && !selectedSkin)) && !noSkin" class="preview-loading pointer-events-none absolute inset-0 flex items-center justify-center">
             <span class="spinner"></span>
           </div>
-          <p v-if="noSkin" class="preview-tip">{{ t("winSkin.noSkin") }}</p>
+          <p v-if="noSkin" class="preview-tip absolute bottom-4 left-0 right-0 text-center text-[12px] text-dim">{{ t("winSkin.noSkin") }}</p>
         </div>
       </div>
 
       <!-- 右侧面板：皮肤类型 + 控制器 + 纹理列表 -->
-      <div class="skin-side">
+      <div class="skin-side w-[280px] flex-none overflow-y-scroll pr-[17px] [scrollbar-gutter:stable]">
         <label class="field-label first">{{ t("winSkin.skinType") }}</label>
         <select v-model="skinType" class="field-select" @change="skinTypeTouched = true">
           <option v-for="opt in SKIN_TYPES" :key="opt.value" :value="opt.value">
@@ -622,8 +622,8 @@ onBeforeUnmount(() => {
           </option>
         </select>
 
-        <h2 class="info-title ctl-title">{{ t("winSkin.controls") }}</h2>
-        <div class="ctl-row">
+        <h2 class="info-title ctl-title mb-2.5 mt-[18px] text-[14px] font-bold">{{ t("winSkin.controls") }}</h2>
+        <div class="ctl-row flex items-center justify-between gap-3 py-[7px] text-title text-fg">
           <span>{{ t("winSkin.showCape") }}</span>
           <BaseSwitch v-model="showCape" />
         </div>
@@ -635,20 +635,20 @@ onBeforeUnmount(() => {
               {{ t(opt.labelKey) }}
             </option>
           </select>
-          <div class="ctl-row">
+          <div class="ctl-row flex items-center justify-between gap-3 py-[7px] text-title text-fg">
             <span>{{ t("winSkin.autoRotate") }}</span>
             <BaseSwitch v-model="autoRotate" />
           </div>
-          <div class="ctl-row">
+          <div class="ctl-row flex items-center justify-between gap-3 py-[7px] text-title text-fg">
             <span>{{ t("winSkin.showNametag") }}</span>
             <BaseSwitch v-model="showNametag" />
           </div>
         </template>
 
         <!-- 纹理列表：点击切换预览，正版可设为装备 -->
-        <h2 class="info-title ctl-title list-head">
+        <h2 class="info-title ctl-title list-head mb-2.5 mt-[18px] flex items-center justify-between gap-2 text-[14px] font-bold">
           {{ t("account.skinsList") }}
-          <span class="list-actions">
+          <span class="list-actions flex items-center gap-1.5">
             <BaseButton v-if="isOauth && base" variant="accent" size="sm" :disabled="listLoading || uploading"
               @click="pickSkinFile">
               {{ t("account.uploadSkin") }}
@@ -664,8 +664,8 @@ onBeforeUnmount(() => {
           </span>
         </h2>
         <!-- 待上传文件：选型号直传 -->
-        <div v-if="uploadFile" class="tex-item upload-row">
-          <span class="tex-name" v-tip="uploadFile">
+        <div v-if="uploadFile" class="tex-item upload-row flex cursor-default items-center gap-2.5 rounded-card border border-border bg-card px-2 py-1.5">
+          <span class="tex-name overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-fg" v-tip="uploadFile">
             {{ uploadFile.split("\\").pop()?.split("/").pop() }}
           </span>
           <BaseButton size="sm" :disabled="uploading" @click="doUpload('classic')">
@@ -678,38 +678,38 @@ onBeforeUnmount(() => {
             <GlyphIcon name="close" :size="14" :weight="2.2" />
           </BaseButton>
         </div>
-        <div class="tex-list">
-          <div v-for="item in textures?.skins ?? []" :key="item.sha1" class="tex-item"
+        <div class="tex-list flex flex-col gap-1.5">
+          <div v-for="item in textures?.skins ?? []" :key="item.sha1" class="tex-item flex cursor-pointer items-center gap-2.5 rounded-card border border-border bg-card px-2 py-1.5"
             :class="{ selected: item.sha1 === previewSkinSha1 }" @click="previewSkinSha1 = item.sha1">
-            <img :src="skinThumbUrl(item)" class="tex-thumb skin" draggable="false" alt="" />
-            <div class="tex-meta">
-              <span class="tex-name" v-tip="item.name">{{ item.name }}</span>
-              <span class="tex-model">{{ modelLabel(item.model) }}</span>
+            <img :src="skinThumbUrl(item)" class="tex-thumb skin h-11 w-[26px] shrink-0 bg-page object-contain [image-rendering:pixelated]" draggable="false" alt="" />
+            <div class="tex-meta flex min-w-0 flex-1 flex-col gap-0.5">
+              <span class="tex-name overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-fg" v-tip="item.name">{{ item.name }}</span>
+              <span class="tex-model text-[11px] text-dim">{{ modelLabel(item.model) }}</span>
             </div>
             <BaseButton v-if="isOauth" size="sm" :disabled="item.active || equipBusy === item.sha1"
               @click.stop="equip('skin', item)">
               {{ item.active ? t("account.equipped") : t("account.equip") }}
             </BaseButton>
           </div>
-          <p v-if="listLoading" class="tex-empty">{{ t("account.loadingTextures") }}</p>
-          <p v-else-if="!(textures?.skins ?? []).length" class="tex-empty">{{ t("winSkin.noSkin") }}</p>
+          <p v-if="listLoading" class="tex-empty px-0.5 py-1 text-[12px] text-dim">{{ t("account.loadingTextures") }}</p>
+          <p v-else-if="!(textures?.skins ?? []).length" class="tex-empty px-0.5 py-1 text-[12px] text-dim">{{ t("winSkin.noSkin") }}</p>
         </div>
 
-        <h2 class="info-title ctl-title">{{ t("account.capesList") }}</h2>
-        <div class="tex-list">
-          <div v-for="item in textures?.capes ?? []" :key="item.sha1" class="tex-item"
+        <h2 class="info-title ctl-title mb-2.5 mt-[18px] text-[14px] font-bold">{{ t("account.capesList") }}</h2>
+        <div class="tex-list flex flex-col gap-1.5">
+          <div v-for="item in textures?.capes ?? []" :key="item.sha1" class="tex-item flex cursor-pointer items-center gap-2.5 rounded-card border border-border bg-card px-2 py-1.5"
             :class="{ selected: item.sha1 === previewCapeSha1 }" @click="previewCapeSha1 = item.sha1">
-            <img :src="capeThumbUrl(item)" class="tex-thumb cape" draggable="false" alt="" />
-            <div class="tex-meta">
-              <span class="tex-name" v-tip="item.name">{{ item.name }}</span>
+            <img :src="capeThumbUrl(item)" class="tex-thumb cape h-11 w-10 shrink-0 bg-page object-contain [image-rendering:pixelated]" draggable="false" alt="" />
+            <div class="tex-meta flex min-w-0 flex-1 flex-col gap-0.5">
+              <span class="tex-name overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-fg" v-tip="item.name">{{ item.name }}</span>
             </div>
             <BaseButton v-if="isOauth" size="sm" :disabled="item.active || equipBusy === item.sha1"
               @click.stop="equip('cape', item)">
               {{ item.active ? t("account.equipped") : t("account.equip") }}
             </BaseButton>
           </div>
-          <p v-if="listLoading" class="tex-empty">{{ t("account.loadingTextures") }}</p>
-          <p v-else-if="!(textures?.capes ?? []).length" class="tex-empty">{{ t("account.noCape") }}</p>
+          <p v-if="listLoading" class="tex-empty px-0.5 py-1 text-[12px] text-dim">{{ t("account.loadingTextures") }}</p>
+          <p v-else-if="!(textures?.capes ?? []).length" class="tex-empty px-0.5 py-1 text-[12px] text-dim">{{ t("account.noCape") }}</p>
         </div>
       </div>
     </div>
@@ -717,65 +717,14 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* 皮肤子页面：占满窗口内容区，预览与右侧列表各自管理滚动。
-   账户窗口在子页面态切 body-flush（与资源窗口的依赖图同一做法），所以留白在这里补：
-   右边不留——右侧面板要顶到窗口边缘，滚动条才贴着窗口右边 */
-.skin-page {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  padding: 22px 0 22px 26px;
-}
-
-.skin-layout {
-  display: flex;
-  gap: 18px;
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-}
-
-/* 左侧整块白底：3D / 2D 开关与预览共用同一张卡片，不再各占一块 */
-.preview {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  overflow: hidden;
-}
-
-/* SegmentedTabs（3D / 2D）只占自身宽度，下方留缝；
-   不写 align-self 会按 flex 列容器的默认拉伸铺满整行 */
-.mode-toggle {
-  align-self: flex-start;
-  margin-bottom: 10px;
-}
-
-/* 预览区直接铺在白底卡片里：开关已经在卡片内，这里不再套第二层边框 */
-.preview-stage {
-  flex: 1;
-  min-height: 280px;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-}
-
+/* 排版 / 间距 / 字号 / 颜色在模板的工具类上；这里留画布、状态类、伪类与不在六档里的字号 */
+/* 3D 画布跟着容器走：尺寸由 skinview3d 自己改，样式只兜底 */
 .gl-canvas {
   width: 100%;
   height: 100%;
 }
 
-/* 2D 平移 / 缩放：拖拽光标 + 变换容器 */
+/* 2D 平移 / 缩放：拖拽光标与手势 */
 .preview-stage.pan {
   cursor: grab;
   touch-action: none;
@@ -785,47 +734,7 @@ onBeforeUnmount(() => {
   cursor: grabbing;
 }
 
-.pan-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  will-change: transform;
-}
-
-.flat-skin {
-  max-width: 70%;
-  max-height: 100%;
-  image-rendering: pixelated;
-}
-
-.flat-cape {
-  max-width: 25%;
-  max-height: 60%;
-  image-rendering: pixelated;
-}
-
-.preview-tip {
-  position: absolute;
-  bottom: 16px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-/* 加载指示：贴图 / 模型未就绪时盖在预览区中央 */
-.preview-loading {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
+/* 加载转圈：伪元素 + 关键帧 */
 .spinner {
   width: 28px;
   height: 28px;
@@ -841,128 +750,14 @@ onBeforeUnmount(() => {
   }
 }
 
-/* 右侧面板自己滚：预览区不会跟着滚走 */
-.skin-side {
-  width: 280px;
-  flex: none;
-  /* 常驻滚动槽，见 styles/scrollbar.css 的 WebKit 例外 */
-  overflow-y: scroll;
-  /* 面板右边缘即窗口右边缘（子页面态 body-flush），滚动条就画在最右边；
-     见 styles/scrollbar.css */
-  scrollbar-gutter: stable;
-  /* 与上面的 scrollbar-gutter 成对：扣掉常驻的 9px，行右缘仍落在 26px 上 */
-  padding-right: calc(26px - 9px);
-}
-
-.info-title {
-  font-size: 14px;
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-
-/* 面板顶部第一个标签不用给上边距 */
+/* 面板顶部第一个标签不用上边距：覆盖全局 .field-label，必须在无层里 */
 .field-label.first {
   margin-top: 0;
 }
 
-/* 控制器区：披风 / 动画 / 自转 / 名牌 */
-.ctl-title {
-  margin-top: 18px;
-}
-
-.ctl-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--text);
-  padding: 7px 0;
-}
-
-/* 纹理列表 */
-.tex-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-/* 列表标题行：标题 + 右侧动作按钮 */
-.list-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-/* 标题右侧的动作按钮组：上传 / 保存到本地 / 打开皮肤站 */
-.list-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* 待上传文件行 */
-.upload-row {
-  cursor: default;
-}
-
-.tex-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  cursor: pointer;
-}
-
+/* 选中的纹理条目 */
 .tex-item.selected {
   border-color: var(--accent);
 }
 
-.tex-thumb {
-  flex: none;
-  image-rendering: pixelated;
-  object-fit: contain;
-  background: var(--bg);
-}
-
-.tex-thumb.skin {
-  width: 26px;
-  height: 44px;
-}
-
-.tex-thumb.cape {
-  width: 40px;
-  height: 44px;
-}
-
-.tex-meta {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.tex-name {
-  font-size: 12px;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tex-model {
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-.tex-empty {
-  font-size: 12px;
-  color: var(--text-dim);
-  padding: 4px 2px;
-}
 </style>

@@ -166,14 +166,14 @@ function onLoaderPathPick(e: Event) {
     <div class="add-field">
       <label class="field-label">{{ t("add.verType") }}</label>
       <!-- 多选下拉：展开后是复选项，勾选不关闭，点外部关闭 -->
-      <div ref="comboEl" class="type-combo">
+      <div ref="comboEl" class="type-combo relative">
         <!-- 查询期间不给改：与版本下拉同一口径，见 versionBusy -->
-        <button type="button" class="field-select type-trigger" :aria-expanded="typeOpen" :disabled="versionBusy"
+        <button type="button" class="field-select type-trigger flex w-full cursor-pointer items-center justify-between gap-1.5 text-left" :aria-expanded="typeOpen" :disabled="versionBusy"
           @click="typeOpen = !typeOpen">
-          <span class="type-label">{{ typeLabel }}</span>
+          <span class="type-label truncate">{{ typeLabel }}</span>
         </button>
-        <div v-if="typeOpen" class="type-drop" role="listbox" aria-multiselectable="true">
-          <button v-for="vt in versionTypes" :key="vt" type="button" class="type-opt" role="option"
+        <div v-if="typeOpen" class="type-drop absolute left-0 right-0 top-[calc(100%+4px)] z-20 max-h-[220px] overflow-y-auto rounded-card border border-border bg-bg-solid p-[5px] shadow-[var(--shadow-lg)]" role="listbox" aria-multiselectable="true">
+          <button v-for="vt in versionTypes" :key="vt" type="button" class="type-opt m-0 block w-full cursor-pointer rounded-ctl border-0 bg-transparent px-3 py-2 text-left text-title text-fg" role="option"
             :aria-selected="verTypes.includes(vt)" :disabled="versionBusy" :class="{ selected: verTypes.includes(vt) }"
             @click="toggleType(vt)">
             {{ t(`add.type.${vt}`) }}
@@ -259,58 +259,6 @@ function onLoaderPathPick(e: Event) {
 </template>
 
 <style scoped>
-/* 版本类型多选下拉 */
-.type-combo {
-  position: relative;
-}
-
-.type-trigger {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  cursor: pointer;
-  text-align: left;
-}
-
-.type-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 弹层与原生下拉的 ::picker(select) 保持同一套尺寸与配色，
-   差异只在"这里能多选、勾选不收起" */
-.type-drop {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  background: var(--bg-solid, var(--bg-card));
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow-lg);
-  padding: 5px;
-  max-height: 220px;
-  overflow-y: auto;
-}
-
-.type-opt {
-  display: block;
-  width: 100%;
-  margin: 0;
-  padding: 8px 12px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  font-size: 13px;
-  font-family: inherit;
-  text-align: left;
-}
 
 .type-opt:hover {
   background: var(--bg-hover);

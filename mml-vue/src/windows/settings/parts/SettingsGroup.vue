@@ -16,8 +16,11 @@ defineProps<{
 </script>
 
 <template>
-  <section :id="`set-${id}`" class="setting-group" :class="{ flash }">
-    <h3 v-if="titleKey" class="group-title">{{ t(titleKey) }}</h3>
+  <section :id="`set-${id}`" class="setting-group" :class="{
+    flash,
+    'rounded-panel px-3 py-2.5 -mx-3 -my-2.5': flash,
+  }">
+    <h3 v-if="titleKey" class="group-title flex items-center gap-2 text-[13.5px] font-bold mt-6 mb-3 pb-[9px] border-b border-border">{{ t(titleKey) }}</h3>
     <slot />
   </section>
 </template>

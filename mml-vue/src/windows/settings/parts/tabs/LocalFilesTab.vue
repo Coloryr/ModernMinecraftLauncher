@@ -91,10 +91,10 @@ async function onConfirmClear() {
 
 <template>
   <SettingsGroup id="localFiles" title-key="winSettings.secLocalFiles" :flash="flashGroup === 'localFiles'">
-    <div class="local-files-head">
-      <span class="local-files-total" v-tip="t('winSettings.localFilesLinkHint')">
+    <div class="local-files-head flex items-center justify-between gap-3">
+      <span class="local-files-total text-body text-dim" v-tip="t('winSettings.localFilesLinkHint')">
         {{ t("winSettings.localFilesTotal") }}
-        <b :class="{ 'is-scanning': loading }">
+        <b class="text-fg [font-variant-numeric:tabular-nums]" :class="{ 'is-scanning': loading }">
           {{ loading && entries.length === 0 ? t("winSettings.localFilesScanning") : formatSize(total) }}
         </b>
       </span>
@@ -106,14 +106,14 @@ async function onConfirmClear() {
 
     <!-- 首次统计：骨架行占位，形状贴着真行，数完直接换内容不跳版。
          行数固定为后端那六项，高度一致，换内容时整页不会上下跳 -->
-    <div v-if="loading && entries.length === 0" class="local-files-list">
-      <div v-for="n in 6" :key="n" class="local-file-row">
-        <div class="local-file-main">
-          <span class="sk sk-name" />
-          <span class="sk sk-path" />
+    <div v-if="loading && entries.length === 0" class="local-files-list flex flex-col gap-2">
+      <div v-for="n in 6" :key="n" class="local-file-row flex items-center gap-3 py-2.5 px-3 bg-raised border border-border rounded-card">
+        <div class="local-file-main flex-1 min-w-0 flex flex-col gap-[2px]">
+          <span class="sk sk-name h-[17px] w-[42%]" />
+          <span class="sk sk-path h-[14px] w-[62%]" />
         </div>
-        <span class="sk sk-size" />
-        <div class="local-file-actions">
+        <span class="sk sk-size shrink-0 w-[88px] h-3" />
+        <div class="local-file-actions shrink-0 flex items-center gap-2">
           <span class="sk sk-btn" />
           <span class="sk sk-btn" />
         </div>
@@ -121,25 +121,27 @@ async function onConfirmClear() {
     </div>
     <!-- 重新统计：旧数据压暗不可点，避免拿着过期结果去清理。
          清理流程里不压暗 —— 那一行自己有转圈，压暗只会把它一起糊掉 -->
-    <div v-else class="local-files-list" :class="{ 'is-loading-dim': loading && !clearing }">
-      <div v-for="e in entries" :key="e.id" class="local-file-block">
-        <div class="local-file-row">
-          <div class="local-file-main">
-            <span class="local-file-title">
+    <div v-else class="local-files-list flex flex-col gap-2" :class="{ 'is-loading-dim': loading && !clearing }">
+      <div v-for="e in entries" :key="e.id" class="local-file-block flex flex-col">
+        <div class="local-file-row flex items-center gap-3 py-2.5 px-3 bg-raised border border-border rounded-card">
+          <div class="local-file-main flex-1 min-w-0 flex flex-col gap-[2px]">
+            <span class="local-file-title flex items-center gap-[6px] min-w-0">
               <!-- 游戏实例与下载内容带明细，可展开查看各子项占用 -->
-              <button v-if="e.children.length" class="local-file-expand" :class="{ flip: isExpanded(e.id) }"
+              <button v-if="e.children.length"
+                class="local-file-expand inline-flex items-center justify-center w-6 h-6 shrink-0 p-0 border-0 rounded-[6px] bg-transparent text-dim cursor-pointer transition-[transform,color,background-color] duration-150 hover:text-accent hover:bg-hover"
+                :class="{ flip: isExpanded(e.id) }"
                 :aria-expanded="isExpanded(e.id)"
                 v-tip="isExpanded(e.id) ? t('winSettings.localFileChildrenCollapse') : t('winSettings.localFileChildrenExpand')"
                 :aria-label="isExpanded(e.id) ? t('winSettings.localFileChildrenCollapse') : t('winSettings.localFileChildrenExpand')"
                 @click="toggle(e.id)">
                 <GlyphIcon name="chevron-down" :size="14" :weight="2.4" />
               </button>
-              <span class="local-file-name">{{ t(`winSettings.localFile.${e.id}`) }}</span>
+              <span class="local-file-name text-title font-semibold">{{ t(`winSettings.localFile.${e.id}`) }}</span>
             </span>
-            <span class="local-file-path" :title="e.path">{{ e.path }}</span>
+            <span class="local-file-path text-[11px] text-dim [font-family:Cascadia_Code,Consolas,monospace] overflow-hidden text-ellipsis whitespace-nowrap" :title="e.path">{{ e.path }}</span>
           </div>
           <!-- 清理中：数字让位给转圈，删完且重新统计完才换回新数字 -->
-          <span class="local-file-size">
+          <span class="local-file-size shrink-0 flex items-center justify-end w-[88px] text-right text-body [font-variant-numeric:tabular-nums]">
             <span v-if="clearing === e.id" class="loading-spin sm" />
             <template v-else>{{ formatSize(e.size) }}</template>
           </span>
@@ -154,12 +156,15 @@ async function onConfirmClear() {
         </div>
 
         <!-- 每条明细：名字贴左、大小靠右；实例多时只渲染视口附近的行 -->
-        <VirtualList v-if="e.children.length && isExpanded(e.id)" class="local-file-children" :count="e.children.length"
+        <VirtualList v-if="e.children.length && isExpanded(e.id)"
+          class="local-file-children flex flex-col max-h-60 mt-[6px] mr-3 ml-[42px] border border-border rounded-card bg-page overflow-y-auto overscroll-contain"
+          :count="e.children.length"
           :row-h="CHILD_ROW_H" :row-gap="0">
           <template #default="{ start, end }">
-            <div v-for="child in e.children.slice(start, end)" :key="child.id" class="local-file-child">
-              <span class="local-file-child-name" :title="child.path">{{ childName(child) }}</span>
-              <span class="local-file-size">{{ formatSize(child.size) }}</span>
+            <div v-for="child in e.children.slice(start, end)" :key="child.id"
+              class="local-file-child flex items-center gap-3 h-[34px] shrink-0 px-2.5 border-b border-border text-body hover:bg-hover">
+              <span class="local-file-child-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" :title="child.path">{{ childName(child) }}</span>
+              <span class="local-file-size shrink-0 flex items-center justify-end w-[88px] text-right text-body [font-variant-numeric:tabular-nums]">{{ formatSize(child.size) }}</span>
             </div>
           </template>
         </VirtualList>
@@ -181,78 +186,8 @@ async function onConfirmClear() {
 </template>
 
 <style scoped>
-/* 展开后的实例明细与展开键：只属于这一屏，跟组件走 */
-.local-file-block {
-  display: flex;
-  flex-direction: column;
-}
-
-.local-file-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-/* 24px 的可点区域，但不画外框；悬停只给一点底色 */
-.local-file-expand {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-  transition: transform 0.15s ease, color 0.12s ease, background 0.12s ease;
-}
-
-.local-file-expand:hover {
-  color: var(--accent);
-  background: var(--bg-hover);
-}
-
+/* 排版都在模板的工具类上；这里只留展开键的翻转状态（绑定在 :class 上） */
 .local-file-expand.flip {
   transform: rotate(180deg);
-}
-
-/* 明细是一条条的行：外框只负责分组，行与行之间用分隔线；超过上限自己滚 */
-.local-file-children {
-  display: flex;
-  flex-direction: column;
-  max-height: 240px;
-  margin: 6px 12px 0 42px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.local-file-child {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 34px;
-  flex-shrink: 0;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--border);
-  font-size: 12.5px;
-}
-
-.local-file-child:hover {
-  background: var(--bg-hover);
-}
-
-.local-file-child-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>

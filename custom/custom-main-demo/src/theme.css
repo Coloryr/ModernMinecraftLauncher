@@ -1,0 +1,4 @@
+/* 主题样式入口：Tailwind 的 token 与层级都由 mml-vue 提供
+ * 颜色 / 字号 / 圆角映射到启动器主题变量，换深浅色与强调色时工具类跟着变。
+ */
+@import "mml-vue/tailwind.css";

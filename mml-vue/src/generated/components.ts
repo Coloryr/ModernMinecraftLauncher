@@ -15,6 +15,8 @@ export { default as CompCustomJsonPanel } from "../components/CustomJsonPanel.vu
 export { default as CompCustomUiPage } from "../components/CustomUiPage.vue";
 export { default as CompDownloadTitleIndicator } from "../components/DownloadTitleIndicator.vue";
 export { default as CompFileTree } from "../components/FileTree.vue";
+export { default as CompGamepadAsmModal } from "../components/GamepadAsmModal.vue";
+export { default as CompGamepadPopup } from "../components/GamepadPopup.vue";
 export { default as CompHomePage } from "../components/HomePage.vue";
 export { default as CompInstanceIcon } from "../components/InstanceIcon.vue";
 export { default as CompInstanceLogPanel } from "../components/InstanceLogPanel.vue";

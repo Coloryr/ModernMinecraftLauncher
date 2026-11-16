@@ -1,52 +1,18 @@
+
 /* 资源管理窗口的窗口级样式（**非 scoped**）
  *
- * 这个窗口拆成了「薄外壳 + 十个 parts + 两个 composable」，而 scoped 样式跨不过组件边界
- * 各 pane 里的 .item-row / .badge / .mini-btn 拿不到外壳的 scoped 规则，所以公共样式集中
- * 放这里，由 ResourceWindow.vue 注入一次 —— 与 windows/settings/settings.css 同一做法。
+ * 这个窗口拆成「薄外壳 + 十个 parts + 两个 composable」，scoped 样式跨不过组件边界，
+ * 公共样式集中在这里，由 ResourceWindow.vue 注入一次。
  *
- * 反外溢：**所有规则都挂在 `.resource-layout` 之下**（这个类只属于本窗口），
- * 因此即使类名很通用，如 .badge / .mini-btn / .item-row，也不会影响其它窗口里同名的
- * scoped 类。新增规则请保持这个前缀。
+ * 排版已迁到各组件模板上的 Tailwind 工具类；这里只留工具类表达不了的三类：
+ * - 状态与主题：.cat-item:hover / .active / .dragging、选中色块的 .ready 过渡、
+ *   分类切换动画。现有 CSS 是**无层**的，优先级高于 @layer utilities，压得住工具类；
+ * - :deep() 覆盖、@keyframes；
+ * - 仍以本表为准的列表 / 行 / 徽标外观（下一步再迁）。
  *
- * 例外：弹窗内容是 Teleport 到 body 的，不在 .resource-layout 里 —— 那几处的样式由各自
- * 的弹窗组件自带，即 ConfirmModal / ServerFormModal / ScreenshotPane 的大图预览，
- * 按钮一律用全仓通用的 BaseButton + 全局 .modal-actions。
+ * 反外溢：所有规则都挂在 `.resource-layout` 之下（这个类只属于本窗口）。
+ * 弹窗内容 Teleport 到 body，样式由各自组件自带。
  */
-
-.resource-layout {
-  display: flex;
-  gap: 18px;
-  height: 100%;
-  /* 右边**不加**滚动条宽度的内边距：滚动条占位交给 `.item-list` 的
-     `scrollbar-gutter: stable` 处理（常驻占位），这里加死宽度会在"没有滚动条"
-     时把内容顶出去（用户看到的：右边被切掉）。
-     窗口内边距（.frame-body 的 22px 26px）由内容区用负外边距还回来，
-     于是内容右边缘顶到窗口右边、滚动条正好落在最右。 */
-}
-
-/* ---------- 左侧分类栏 ---------- */
-
-.resource-layout .cat-nav {
-  position: relative;
-  width: var(--rail-w);
-  min-width: var(--rail-w);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* 选中色块：分类切换时在栏内上下滑动 */
-.resource-layout .cat-thumb {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 0;
-  border-radius: 9px;
-  background: var(--accent-soft);
-  opacity: 0;
-  pointer-events: none;
-  transition: none;
-}
 
 .resource-layout .cat-nav.ready .cat-thumb {
   opacity: 1;
@@ -54,25 +20,6 @@
     transform 0.18s var(--ease-out),
     width 0.18s var(--ease-out),
     height 0.18s var(--ease-out);
-}
-
-.resource-layout .cat-item {
-  position: relative;
-  z-index: 1;
-  text-align: left;
-  padding: 10px 12px;
-  border: none;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 13px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.12s;
-  /* 图标 + 分类名摆成一行：按钮默认块级，不这样会各占一行 */
-  display: flex;
-  align-items: center;
-  gap: 9px;
 }
 
 .resource-layout .cat-item:hover:not(.active) {
@@ -96,45 +43,6 @@
   opacity: 0.45;
 }
 
-/* 拖拽落点占位：虚线框 + 被拖分类的名字与数量，画在"松手后落到的位置" */
-.resource-layout .cat-insert {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 2px 0;
-  padding: 8px 11px;
-  border: 1px dashed var(--accent-border);
-  border-radius: var(--ctl-radius);
-  background: var(--accent-soft);
-  opacity: 0.7;
-}
-
-/* ---------- 右侧内容区 ---------- */
-
-/*
-  右边缘的三层关系（**改之前先读这段**，这里踩过两次坑）：
-
-  1. 窗口内边距 26px（`.frame-body` 的 `22px 26px`）—— 用 `margin-right: -26px` 抵消，
-     内容区右边缘才顶得到窗口边（否则整块离右边一道 26px 的缝）；
-  2. 滚动条占位 9px —— 交给 `.item-list` / `.shot-list` 的 `scrollbar-gutter: stable`
-     （常驻占位）。**不要手写 `padding-right: 9px`**：那个值只在"有滚动条"时成立，
-     没滚动条时会把内容顶出去（踩过一次）；
-  3. 卡片自己的留白 26px —— 由**滚动容器的 `padding-right`** 给（见 `.item-list`），
-     不是给 `.cat-content`。这一步是"滚动条贴窗口边"的关键：
-     留白若加在 `.cat-content` 上，滚动条会跟着缩到留白里侧（离窗口边 26px）；
-     加在滚动容器上，滚动条仍贴在容器最右 = 窗口右边，而**内容盒**才向内收 26px。
-
-  别把 1 和 3 合并成"都不做"：那样卡片就**直接贴到窗口边**（踩过的第二次）。
-*/
-.resource-layout .cat-content {
-  flex: 1;
-  min-width: 0;
-  margin-right: -26px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 /* 分类切换动画：ResourceWindow 的 `<Transition name="pane-swap">`，
    淡入淡出 + 轻微上收，数值与主窗口的 `.view-swap` 一致，全应用观感统一。
    `mode="out-in"` 保证同一时刻只有一个子节点，避免两块 `flex:1` 叠在一起 */
@@ -151,19 +59,6 @@
   transform: translateY(-8px);
 }
 
-/* 包裹层：`<Transition>` 本身不产生 DOM，但每个分类的 pane 有多个根节点
-   （`.content-head` + `.item-list`），必须包一层才能整体做动画。
-   这一层要**复刻** `.cat-content` 原本给「顶栏 + 列表」的纵向间距（gap 12px），
-   否则包一层后间距丢失；`flex: 1` + `min-height: 0` 保证 `.item-list`
-   仍是那个可滚动、且高度被父级约束住的块（少了 min-height 它会被内容撑开而不滚动） */
-.resource-layout .pane-swap {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 /* 工具条下面那条进度：右端要与顶栏按钮、下方卡片**同一条右边线**。
    它是 .pane-swap 的直接子节点，默认铺满整宽（含滚动条槽位），条子会一路顶到窗口右边，
    所以在窗口级补一份右边距，口径与 .content-head 的 padding-right 相同。
@@ -173,45 +68,6 @@
    用后代选择器会让它再叠一份 35px，右端比顶栏和下方骨架行多缩一倍（踩过）。 */
 .resource-layout .pane-swap>.load-progress {
   padding-right: calc(26px + 9px);
-}
-
-.resource-layout .content-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  /* 顶栏不是滚动容器，自己让出留白（26px，与下方卡片左对齐），
-     再加 9px 让开滚动条 —— 滚动条贴在窗口最右，正好压在顶栏这一条的右侧；
-     不让开的话「刷新」会紧贴 / 压住滚动条（用户要求"往左一点"）。
-     9px 与 styles/scrollbar.css 的滚动条宽度同源，那边改了这里要一起改。 */
-  padding-right: calc(26px + 9px);
-}
-
-/* 左侧的标题 + 搜索框 + 视图切换可被挤压，按钮组不缩 */
-.resource-layout .content-head> :first-child {
-  flex: 1;
-  min-width: 0;
-}
-
-/* 顶栏左侧：放该分类自己的前置内容（存档与数据包页的子页切换）。
-   顶栏**不再写分类名** —— 左侧导航已高亮当前分类，写两遍是同一份信息（用户点名） */
-.resource-layout .head-lead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-/* 右侧按钮组：`margin-left: auto` 把它顶到最右 ——
-   `.content-head` 虽是 space-between，但模组那页左边还有搜索框 + 视图切换 + 新建分组，
-   加起来会把按钮组挤在中间（用户看到"刷新没贴在分组右侧"）。
-   整组靠右、组内顺序不变，刷新才真正贴住右边缘 */
-.resource-layout .head-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  margin-left: auto;
 }
 
 /* 存档 / 数据包那条顶栏挂在窗口层，切分类进来时它不在 <Transition> 里，自己淡入一次；
@@ -228,14 +84,6 @@
   to {
     opacity: 1;
   }
-}
-
-/* 子页操作条的落点：存档 / 数据包两个子页把自己的按钮 Teleport 进来，
-   这里照 .head-actions 的排布摆一行，刷新按钮仍在最右 */
-.resource-layout .head-pane-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 /* 工具条里的按钮：高度与同行的视图切换（SegmentedTabs）一样是全 app 那一档 32px，
@@ -306,49 +154,6 @@
   border-style: dashed;
 }
 
-/* 行图标：**没有图标时这一格整个不渲染**，见 ResourceRow 的模板，
-   所以这里不需要"占位"样式 —— 名字会直接靠左，不再有大片灰框 */
-.resource-layout .item-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 7px;
-  object-fit: cover;
-  flex-shrink: 0;
-  background: var(--bg-hover);
-}
-
-.resource-layout .item-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.resource-layout .item-name-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.resource-layout .item-name {
-  font-size: 13px;
-  color: var(--text);
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.resource-layout .item-sub {
-  font-size: 11px;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* 资源列表的骨架行 —— **各分类的通用加载占位**（形状见 parts/ListSkeleton.vue，
    呼吸动画在 styles/skeleton.css）：
    图标换成真行的 36×36 / 7px 圆角（.sk-icon 默认 48），左右内边距也照真行来 ——
@@ -361,15 +166,6 @@
   width: 36px;
   height: 36px;
   border-radius: 7px;
-}
-
-.resource-layout .badge {
-  flex-shrink: 0;
-  padding: 1px 7px;
-  border-radius: 6px;
-  font-size: 10px;
-  background: var(--accent-soft);
-  color: var(--accent);
 }
 
 .resource-layout .badge-dim {
@@ -481,28 +277,6 @@
   scrollbar-gutter: stable;
 }
 
-.resource-layout .shot-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
-}
-
-.resource-layout .shot-cell {
-  position: relative;
-  border-radius: 9px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-}
-
-.resource-layout .shot-img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  cursor: zoom-in;
-}
-
 /* 截图格子的多选：类名与列表行同一套（row-selected / row-anchor / row-selecting），
    但格子自带边框与圆角，所以选中直接改边框色，不叠行底那种底色 */
 .resource-layout .shot-cell.row-selected {
@@ -571,23 +345,6 @@
   padding: 0;
   scrollbar-gutter: auto;
   margin-right: 26px;
-}
-
-/* 整张表共用**一块白底**（用户要求：不要一行一个白底）：白底 + 圆角 + 描边，
-   **自己不滚、也不带内边距**，滚动交给里面那层 `.mod-table-scroll`，
-   两条滚动条都贴住白底的右边与下边。
-   `overflow: hidden` 只为圆角：滚动容器与滚动条都是方的，不裁的话内容会把
-   白底的右下圆角盖成直角。 */
-.resource-layout .mod-table-panel {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 /* 真正的滚动容器：铺满卡片，滚动条落在**白色底里面**、且贴住右边框与下边框。

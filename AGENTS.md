@@ -605,6 +605,7 @@ i18n 表，**不写死中文或英文字面量**。三张表各管一摊，改�
 - 跨窗口共用的尺寸（标题栏高度、分类栏宽度）必须提成 `themes.css` 的变量：两个窗口并排看，
   数字不一致就是 bug。
 - 判断新样式该放哪：**换个窗口还用得上吗？** 用得上 → `styles/`；只属于这一屏 → 该窗口的 css。
+- 工具类（Tailwind）只写纯排版与间距，哪些该用工具类、哪些必须留 CSS，见 §16.11。
 
 ### 16.2 颜色只用变量
 
@@ -746,6 +747,45 @@ i18n 表，**不写死中文或英文字面量**。三张表各管一摊，改�
 - 图标按钮的尺寸、圆角、悬停由全局 `styles/titlebar.css` 的 `.icon-btn-head` 统一给，
   窗口自己的 scoped 样式不要再抄一套方形按钮外观；只允许按需覆盖宽度 / 特例，并注明理由。
 - 标题栏下拉用 `.head-select`，宽度特例写窗口自己的 scoped 样式并注明理由。
+
+### 16.11 Tailwind 与 CSS 的分工
+
+两套写法并存：工具类负责"纯排版"，语义类 + 无层 CSS 负责"有名字、带状态、带口径"的部分。
+判据是**这条样式有没有名字、会不会被别处覆盖**，不是个人喜好。
+
+**写成工具类**：
+
+- 布局与间距：`flex` / `grid` / `gap-*` / `p-*` / `m-*` / `items-*` / `justify-*`；
+- 字号只用 §16.3 六档（`text-caption` … `text-display`），圆角只用五档
+  （`rounded-ctl` / `rounded-card` / `rounded-panel` / `rounded-pill`）；
+- 颜色只用 token：`bg-page` / `bg-side` / `bg-card` / `bg-hover` / `bg-raised` /
+  `bg-modal`、`text-fg` / `text-dim` / `text-sub`、`border-border`、`text-accent` /
+  `bg-accent-soft` / `border-accent-border`、`text-green` / `text-red` / `text-yellow`；
+- 长名（`bg-bg-card`）与短名等价，新代码用短名。
+
+**留在 CSS**：
+
+- 状态与伪类组合：`:hover` / `:active` / `:disabled` / `.is-*` / 父类状态（`.pane-max .x`）；
+- 后代与兄弟选择器、`:deep()`、`@keyframes`、媒体查询；
+- **会覆盖全局类的规则**：现有 CSS 是**无层**的，优先级高于 `@layer utilities`，想压住
+  `styles/` 里的东西只能写无层 CSS；
+- 带口径注释的几何：绝对定位组合、变量内边距（`--content-pad-*`）、`scrollbar-gutter`、
+  与脚本常量绑定的行高（`ROW_H_*`）；
+- 多态 `:class` 的结构性样式：拆开就得把状态写成模板里的布尔表达式，属于改结构。
+
+**两条硬约束**：
+
+- **语义类名一个不能删**：毛玻璃表（`themes.css`）、主题包、`ui-kit` 清单都按类名覆盖。
+  迁排版时是"语义类 + 工具类"并存，不是替换。
+- 同一串视觉组合出现第三次就抽回具名类（或在该类里 `@apply`），别复制到十个模板里。
+
+**任意值**：`text-[19px]` / `rounded-[4px]` / `z-[200]` 只允许用在"原值不在档位上"的场合，
+改到该文件时顺手归并到档位；模板里的 `[...]` 变多就是档位纪律松了。
+
+**全局重置必须进 `@layer base`**：`styles/base.css` 里那条 `* { margin: 0; padding: 0 }` 如果留在无层，
+它是无层规则、优先级高于 `@layer utilities`，会把**所有** `p-*` / `m-*` 工具类静默压成 0
+（实测：设置页、侧栏、配置视图的留白全部消失，且不报任何错）。同理，任何"底座"级重置都要分层，
+只有真正要压过工具类的组件覆盖才留在无层。
 
 ## 17. 版本控制
 

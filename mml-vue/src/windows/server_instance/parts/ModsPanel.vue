@@ -51,9 +51,9 @@ const viewOptions = computed(() => [
 </script>
 
 <template>
-<section class="si-section stretch">
-  <div class="si-section-head">
-    <span class="si-counter">{{ pickedMods.size }} / {{ mods.length }}</span>
+<section class="si-section stretch flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pr-[26px]">
+  <div class="si-section-head flex items-center gap-2">
+    <span class="si-counter shrink-0 text-meta text-dim [font-variant-numeric:tabular-nums]">{{ pickedMods.size }} / {{ mods.length }}</span>
     <span class="si-head-tools">
       <SearchBox v-model="modQuery" :placeholder="t('serverInstance.modSearch')" width="200px" />
       <SegmentedTabs v-model="modView" :options="viewOptions" />

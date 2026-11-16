@@ -42,11 +42,14 @@ async function onThemeClick() {
 
     <!-- 主题自己新增的内容：右下角按钮 + 小面板 -->
     <button class="theme-fab" type="button" @click="onThemeClick">主题按钮</button>
-    <div v-if="open" class="theme-panel">
-      <p class="theme-title">这是主题新增的内容</p>
-      <p class="theme-text">主窗口本身没有改，还是启动器的 MainWindow；其它窗口也不受影响。</p>
-      <p v-if="commandError" class="theme-text">{{ commandError }}</p>
-      <button class="theme-close" type="button" @click="open = false">关闭</button>
+    <!-- 面板用 Tailwind 写：颜色 / 圆角 / 字号取 mml-vue/tailwind.css 映射的主题变量 -->
+    <div v-if="open"
+      class="fixed right-5 bottom-[70px] z-40 w-60 rounded-panel border border-border bg-card px-4 py-3.5 shadow-[0_10px_30px_rgb(0_0_0/30%)]">
+      <p class="mb-1.5 text-title font-semibold">这是主题新增的内容</p>
+      <p class="mb-3 text-body leading-[1.6] text-dim">主窗口本身没有改，还是启动器的 MainWindow；其它窗口也不受影响。</p>
+      <p v-if="commandError" class="mb-3 text-body leading-[1.6] text-dim">{{ commandError }}</p>
+      <button class="cursor-pointer border-0 bg-transparent p-0 text-body text-accent" type="button"
+        @click="open = false">关闭</button>
     </div>
   </div>
 </template>
@@ -79,37 +82,5 @@ async function onThemeClick() {
   box-shadow: 0 6px 22px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
-.theme-panel {
-  position: fixed;
-  right: 20px;
-  bottom: 70px;
-  z-index: 40;
-  width: 240px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-card);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 30%);
-}
-
-.theme-title {
-  margin: 0 0 6px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.theme-text {
-  margin: 0 0 12px;
-  color: var(--text-dim);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.theme-close {
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font-size: 12.5px;
-  cursor: pointer;
-}
+/* 面板与按钮的样式已改到模板上的工具类：见 .theme-panel 那段注释 */
 </style>

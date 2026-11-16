@@ -163,28 +163,28 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <aside ref="navEl" class="cat-nav" :class="{ ready: thumbReady }">
-    <span class="cat-thumb" :style="thumbStyle" aria-hidden="true"></span>
+  <aside ref="navEl" class="cat-nav relative flex w-[var(--rail-w)] min-w-[var(--rail-w)] flex-col gap-1" :class="{ ready: thumbReady }">
+    <span class="cat-thumb pointer-events-none absolute left-0 top-0 z-0 rounded-[9px] bg-accent-soft opacity-0 transition-none" :style="thumbStyle" aria-hidden="true"></span>
     <template v-for="(c, idx) in items" :key="c.id">
       <!-- 插入线：松手后这一项会落到这里 -->
-      <div v-if="showLine(idx) && dragged" class="cat-insert">
+      <div v-if="showLine(idx) && dragged" class="cat-insert my-0.5 flex items-center gap-[9px] rounded-ctl border border-dashed border-accent-border bg-accent-soft px-[11px] py-2 opacity-70">
         <GlyphIcon :name="dragged.icon" :size="15" />
         <span class="cat-name">{{ t(dragged.labelKey) }}</span>
       </div>
-      <button class="cat-item" :class="{ active: category === c.id, dragging: dragging === c.id }"
+      <button class="cat-item relative z-[1] flex cursor-pointer items-center gap-[9px] rounded-[9px] border-0 bg-transparent p-[10px_12px] text-left text-title text-dim transition-all duration-100 [font-family:inherit]" :class="{ active: category === c.id, dragging: dragging === c.id }"
         @pointerdown="onPointerDown($event, c.id)" @click="onClick(c.id)">
         <GlyphIcon :name="c.icon" :size="15" />
         {{ t(c.labelKey) }}
       </button>
     </template>
-    <div v-if="showLine(items.length) && dragged" class="cat-insert">
+    <div v-if="showLine(items.length) && dragged" class="cat-insert my-0.5 flex items-center gap-[9px] rounded-ctl border border-dashed border-accent-border bg-accent-soft px-[11px] py-2 opacity-70">
       <GlyphIcon :name="dragged.icon" :size="15" />
       <span class="cat-name">{{ t(dragged.labelKey) }}</span>
     </div>
 
     <!-- 拖动时的浮起副本：跟着指针走，位置见 ghost；列表里那一项留在原位淡出 -->
     <Teleport to="body">
-      <div v-if="dragged" class="cat-ghost" :style="{ left: `${ghost.x}px`, top: `${ghost.y}px` }">
+      <div v-if="dragged" class="cat-ghost pointer-events-none fixed z-[200] flex w-[calc(var(--rail-w)-2px)] items-center gap-[9px] rounded-card border border-accent-border bg-modal p-[10px_12px] text-title font-semibold text-accent shadow-[var(--shadow-lg)] [transform:translate(-40%,-50%)_scale(1.04)]" :style="{ left: `${ghost.x}px`, top: `${ghost.y}px` }">
         <GlyphIcon :name="dragged.icon" :size="15" />
         {{ t(dragged.labelKey) }}
       </div>
@@ -192,27 +192,3 @@ onUnmounted(() => {
   </aside>
 </template>
 
-<style scoped>
-/* 拖动时那份跟手的副本：底色 + 强调色描边 + 大阴影做出"被拿起来"的观感。
-   它 Teleport 到 body，摸不到 resource.css 里 .resource-layout 前缀那套，
-   尺寸与排版在这里自己写一份。
-   位置拿到的是**指针坐标**，所以整体往左上挪一截，别被光标盖住 */
-.cat-ghost {
-  position: fixed;
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: calc(var(--rail-w) - 2px);
-  padding: 10px 12px;
-  border: 1px solid var(--accent-border);
-  border-radius: 10px;
-  background: var(--bg-modal);
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 600;
-  box-shadow: var(--shadow-lg);
-  transform: translate(-40%, -50%) scale(1.04);
-  pointer-events: none;
-}
-</style>

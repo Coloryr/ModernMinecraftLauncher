@@ -59,7 +59,7 @@ const tip = computed(() => {
 </script>
 
 <template>
-  <div class="dep-node" :class="{
+  <div class="dep-node box-border flex items-center gap-2 overflow-hidden rounded-card border border-border bg-card px-[9px] py-1.5" :class="{
     'dep-node-root': props.data.node.root,
     'dep-node-mandatory': props.data.node.mandatory,
     'dep-node-optional': !props.data.node.root && !props.data.node.mandatory,
@@ -67,39 +67,26 @@ const tip = computed(() => {
     'dep-node-disabled': props.data.node.disabled,
     'dep-node-virtual': props.data.node.virtual,
   }" :style="{ width: NODE_W + 'px', height: NODE_H + 'px' }" v-tip="tip">
-    <Handle type="target" :position="Position.Left" class="dep-handle" />
+    <Handle type="target" :position="Position.Left" class="dep-handle h-px w-px min-h-0 min-w-0 border-0 bg-transparent opacity-0" />
 
-    <img v-if="props.data.node.icon" class="dep-node-icon" :src="props.data.node.icon" alt="" />
-    <div class="dep-node-body">
-      <span class="dep-node-name">{{ props.data.node.label }}</span>
-      <span class="dep-node-sub">{{ sub }}</span>
+    <img v-if="props.data.node.icon" class="dep-node-icon h-6 w-6 shrink-0 rounded-ctl object-contain" :src="props.data.node.icon" alt="" />
+    <div class="dep-node-body flex min-w-0 flex-1 flex-col leading-[1.25]">
+      <span class="dep-node-name overflow-hidden text-ellipsis whitespace-nowrap text-body font-semibold text-fg">{{ props.data.node.label }}</span>
+      <span class="dep-node-sub overflow-hidden text-ellipsis whitespace-nowrap text-caption text-dim">{{ sub }}</span>
     </div>
 
     <!-- 装没装：装了打勾，装了但版本对不上（或只有禁用包提供）打感叹号 -->
-    <span v-if="props.data.mark" class="dep-node-mark" :class="props.data.mark">
+    <span v-if="props.data.mark" class="dep-node-mark inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full" :class="props.data.mark">
       <GlyphIcon :name="props.data.mark === 'ok' ? 'check' : 'alert'" :size="11" :weight="2.8" />
     </span>
 
-    <Handle type="source" :position="Position.Right" class="dep-handle" />
+    <Handle type="source" :position="Position.Right" class="dep-handle h-px w-px min-h-0 min-w-0 border-0 bg-transparent opacity-0" />
   </div>
 </template>
 
 <style scoped>
-.dep-node {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-sizing: border-box;
-  padding: 6px 9px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-card);
-}
-
-/* 边框按"必装 / 可选"两档配色；下面的根与缺失都要盖过它俩，
-   所以顺序不能动：同权重时后写的赢。
-   可选 = 中性灰（等于默认边框），必装 = 主色 —— 一眼先看见必装的那些 */
+/* 状态类留在 CSS：边框色按「可选 → 必装 → 游戏/加载器 → 根 → 缺失」的顺序叠，
+   同权重时后写的赢，改成工具类就没有这个顺序了。排版在模板上。 */
 .dep-node-optional {
   border-color: var(--border);
 }
@@ -108,22 +95,19 @@ const tip = computed(() => {
   border-color: var(--accent-border);
 }
 
-/* 游戏 / 加载器提供的（minecraft、forge 这类，统称虚拟前置）：单独一色。
-   它不是模组，装不装由运行环境决定，跟"必装 / 可选"是两回事 */
+/* 游戏 / 加载器提供的前置：单独一色，它不是模组，装不装由运行环境决定 */
 .dep-node-virtual {
   border-color: var(--yellow);
   background: var(--bg-raised);
 }
 
-/* 图的根，即当前打开的这个模组：用浅主色**底纹**标记，不占边框色。
-   边框色一档一个含义（必装 / 可选 / 游戏加载器），选中还要用它，根再插一脚就分不清了。
-   底纹要垫在画布底色上再叠：--accent-soft 本身带透明度，直接当背景会让画布的点阵透过来 */
+/* 图的根：浅主色底纹，不占边框色 —— 边框色一档一个含义 */
 .dep-node-root {
   background-color: var(--bg-raised);
   background-image: linear-gradient(var(--accent-soft), var(--accent-soft));
 }
 
-/* 缺失：红虚线框盖过上面几档 —— 它一定是必装，红色说明"还没装" */
+/* 缺失：红虚线框盖过上面几档 */
 .dep-node-missing {
   border-color: var(--red);
   border-style: dashed;
@@ -133,50 +117,7 @@ const tip = computed(() => {
   opacity: 0.55;
 }
 
-.dep-node-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  flex-shrink: 0;
-  object-fit: contain;
-}
-
-.dep-node-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-  line-height: 1.25;
-}
-
-.dep-node-name {
-  overflow: hidden;
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.dep-node-sub {
-  overflow: hidden;
-  color: var(--text-dim);
-  font-size: 10.5px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* 装没装的标记：一枚小圆牌，绿勾 / 红叹号 */
-.dep-node-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  border-radius: 50%;
-}
-
+/* 装没装的标记：绿勾 / 红叹号，颜色是非 token 的 color-mix */
 .dep-node-mark.ok {
   background: color-mix(in srgb, var(--green) 18%, transparent);
   color: var(--green);
@@ -185,16 +126,5 @@ const tip = computed(() => {
 .dep-node-mark.warn {
   background: color-mix(in srgb, var(--red) 16%, transparent);
   color: var(--red);
-}
-
-/* 连线锚点不画出来：节点四边就是锚点该在的位置，露出来反而碍眼 */
-.dep-handle {
-  width: 1px;
-  height: 1px;
-  min-width: 0;
-  min-height: 0;
-  border: none;
-  background: transparent;
-  opacity: 0;
 }
 </style>

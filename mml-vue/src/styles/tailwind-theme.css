@@ -1,0 +1,22 @@
+/* Tailwind 入口（给自定义主题用）：与启动器共用同一套 token，但**不限定扫描范围**
+ *
+ * 主题工程里的用法（改完后打包成 custom.css）：
+ *   npm i -D tailwindcss @tailwindcss/vite
+ *   vite.config.ts: plugins: [vue(), tailwindcss()]
+ *   custom.css 第一行: @import "mml-vue/tailwind.css";
+ * 然后照常写工具类：bg-card / bg-side / text-dim / text-fg / border-border / rounded-panel。
+ * 颜色与档位取自启动器当前主题，跟着明暗、强调色一起变。
+ *
+ * 不引 preflight：这个 CSS 是挂进启动器页面里的，preflight 会把启动器自己的
+ * 按钮、边距、列表整套重置掉。需要重置就在自己的样式里局部写。
+ *
+ * 整页 iframe 主题（index.html）也能用：变量值由启动器 postMessage 下发，
+ * 页面侧写进 document.documentElement.style 即可，消息形状见 custom/README.md。
+ *
+ * 这个文件不写 @source：扫描范围交给使用方自己的 Vite / Tailwind 配置，
+ * 免得把启动器源码里的类名也打进主题包。
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./tailwind-tokens.css";

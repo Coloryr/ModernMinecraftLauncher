@@ -21,8 +21,8 @@ npm start
 1. 点「新建项目」，选择 demo 类型、父目录和项目名。默认自动从官方仓库下载 demo 以及同一提交的 `mml-ipc`、`mml-vue`（两个 HTML 模板零依赖，不铺 SDK）；也可选择本地启动器源码仓库。没打开项目时，左侧按卡片列出最近项目：显示名、路径与 demo 类型，点一下直接打开。
 2. 工具复制源码、安装依赖并打开预览。SDK 快照保存在项目的 `.mml-deps`，后续安装不会悄悄换成另一个版本。
 3. 文件树按目录层级展开 / 收起；选择文件后在 Monaco 中编辑，编辑器带 CSS / HTML / JavaScript / TypeScript 补全（CSS 里还能补项目的主题变量与控件类名）。`Ctrl+S` 保存后自动重建预览；外部编辑器改过同一文件时，会阻止覆盖，可用编辑区上方标签栏右侧的刷新按钮重新读取。「外部编辑器」按钮直接用 VS Code / Cursor 打开项目，两者都没装时打开项目文件夹。
-4. 顶部「界面配色」切换工具、代码编辑器与原生标题栏的亮色 / 暗色，重启后保留选择。右侧的预览配色独立切换，可选择启动器的全部 19 个窗口，并通过八个手柄或「窗口大小」输入框调整预览窗口尺寸。预览默认按该窗口的最小客户区尺寸显示（主窗口 920×600、设置 850×600、账户 800×650 等），清单与尺寸都对着启动器窗口注册表校验；只有点「适应预览区」才铺满，调整工具窗口大小不会自动改预览尺寸，放不下时滚动查看。
-5. 「CSS 控件 / CSS 变量」读取项目 SDK 生成的清单。点击一项会把选择器骨架或变量定义追加到项目根目录的 `custom.css` 末尾并打开它；页面 / 主页主题第一次追加时，会自动在入口文件里引入 `custom.css`。
+4. 顶部「界面配色」切换工具、代码编辑器与原生标题栏的亮色 / 暗色，重启后保留选择。右侧的预览配色独立切换，可选择启动器的全部 19 个窗口，并通过八个手柄或「窗口大小」输入框调整预览窗口尺寸。两个 HTML 模板的配色通过主题变量下发，切换时不重载页面。预览默认按该窗口的最小客户区尺寸显示（主窗口 920×600、设置 850×600、账户 800×650 等），清单与尺寸都对着启动器窗口注册表校验；只有点「适应预览区」才铺满，调整工具窗口大小不会自动改预览尺寸，放不下时滚动查看。
+5. 「CSS 控件 / CSS 变量」读取项目 SDK 生成的清单。点击一项会把选择器骨架或变量定义追加到 `custom.css` 末尾并打开它：自定义 CSS 模板写 `src/custom.css`（由 Vite 编进包），页面 / 主页主题写项目根目录；页面 / 主页第一次追加时，会自动在入口文件里引入 `custom.css`。两个 HTML 模板的页面样式直接改 `src/style.css`。清单取自项目 SDK 的 `mml-vue/ui-kit/controls`，工具不自己扫样式表；SDK 快照换了以后重开项目即可刷新。
 6. 保存后点「构建 ZIP」，输出日志会给出产物路径。把 ZIP 导入启动器验证实际功能。检查面板里改的行内样式只在预览里临时生效，不会写回源码。
 7. 左侧活动栏是五个开关：项目文件、编辑器、预览、元素检查、输出。编辑器可以整个收起，把宽度让给预览；编辑器和预览中间的分隔条能左右拖动改宽度。底部面板是输出日志，上沿可上下拖动调高度，右侧箭头把它收成一条 30px 的标题栏；元素检查在右侧内容预览面板里；收起项目文件或预览后，活动栏按钮一直都在，点一下就能恢复。
 8. `F12` / `Ctrl+Shift+I` 切换元素检查：点一下预览，或点活动栏 / 预览标题栏的检查按钮就能开；编辑器里的 F12 仍留给 Monaco（转到定义）。进入检查模式后，预览会高亮鼠标下的元素；预览面板下半部分左边是页面元素树（逐层展开），右边「样式」页列出命中的 CSS 规则与 `element.style`，行内样式可以直接改、实时生效，「计算值」页列出解析后的样式与 CSS 变量。自定义主页面的元素树从内容区根节点开始，不含 html / body 与启动器自己的界面。再按 F12 或点活动栏的检查按钮退出。
@@ -33,9 +33,9 @@ npm start
 | 自定义主页面（HTML） | `src/index.html`、`src/style.css`、`src/app.js` | `index.html` |
 | 整页主题 | `src/ReplaceWindow.vue`、`src/replace.ts` | `custom.js`、`custom.css` |
 | 整页 HTML | `src/index.html`、`src/style.css`、`src/app.js` | `index.html` |
-| 自定义 CSS | `custom.css`、`src/replace.ts` | `custom.css`、`custom.js` |
+| 自定义 CSS | `src/custom.css`、`src/replace.ts` | `custom.css`、`custom.js` |
 
-三个组件类 demo 在项目快照中的真实 `mml-vue` 宿主上预览，CSS 和组件加载方式与启动器相同。两个 HTML demo 使用其内置浏览器预览，只显示页面本身。预览没有启动器后端，登录、游戏启动、实例文件等操作需要导入启动器验证；需要实例参数的窗口只能展示无实例时的界面。预览窗口支持拖拽八个手柄或输入宽高；超出预览区时画布出现滚动条，可以滚动查看整窗。
+三个组件类 demo 在项目快照中的真实 `mml-vue` 宿主上预览，CSS 和组件加载方式与启动器相同。两个 HTML demo 使用其内置浏览器预览，只显示页面本身；它们的 `src/tailwind.css` 是预编译产物，在工具里新加 Tailwind 工具类不会自动编进去，要按各自 README 的命令重新生成，否则该类不生效。预览没有启动器后端，登录、游戏启动、实例文件等操作需要导入启动器验证；需要实例参数的窗口只能展示无实例时的界面。预览窗口支持拖拽八个手柄或输入宽高；超出预览区时画布出现滚动条，可以滚动查看整窗。
 
 关闭工具会回收安装、构建及预览子进程；有未保存内容或任务运行时先确认。项目源码留在所选目录，最近项目、语言与界面配色写入工具自己的 `studio.json`。
 
@@ -84,7 +84,7 @@ npm run tauri build -- --debug --no-bundle
 `npm test` 只测预览脚本与静态资源边界；项目创建、文件读写、构建产物识别在 `cargo test -p mml-theme-studio --lib` 里。界面、预览画布与元素检查需要手动启动确认：
 
 1. 新建一个 CSS demo，确认依赖安装完成、预览出现在右侧区域。
-2. 改 `custom.css` 并保存，确认预览不刷新整页也能看到变化。
+2. 改 `custom.css`（自定义 CSS 模板是 `src/custom.css`）并保存，确认预览不刷新整页也能看到变化。
 3. 切换预览窗口种类与配色，确认只重载预览、不影响编辑器；把窗口拉到超过预览区，确认出现横向 / 纵向滚动条，拖动能滚到四角的手柄。
 4. 切换界面配色，确认 Monaco 与原生标题栏一起变化，重启后保持。
 5. 点「仅预览」，确认代码区收起、预览占满；按 F12 进入检查模式，点预览里的按钮或标题，确认下方面板列出选择器、尺寸与样式。
@@ -95,6 +95,6 @@ npm run tauri build -- --debug --no-bundle
 
 An independent desktop theme editor built with Tauri 2, Vue 3 and Monaco. Install a Rust toolchain, Node.js 24+, npm and Git, then run `npm install` and `npm start` in this directory. The dev server listens on `127.0.0.1:1421`, separate from the launcher's 1420, and the Rust shell is compiled and launched by `tauri dev`.
 
-Create a project from one of the five official demos; the tool downloads a matching SDK snapshot, installs dependencies and starts preview. With no project open, the sidebar lists recent projects as cards with their display name, path and demo type. The editor completes CSS, HTML, JavaScript and TypeScript, including the project's theme variables and control class names in CSS. Save with Ctrl+S to rebuild. The preview is a design canvas with VS WPF designer-style selection handles and a size input; resize the window with the eight handles, and scroll the canvas when it is larger than the preview area. The window list covers all 19 launcher windows, and the preview enforces each window's minimum size (for example 920×600 for the main window). The window uses a custom titlebar with the same decoration plugin as the launcher. The activity bar on the left toggles the file tree, the editor, the preview panel, the element inspector and the bottom panel; the splitter between the editor and the preview can be dragged, the bottom panel is the output log and collapses to a single 30px bar; the element inspector sits at the bottom of the preview panel. The external editor button opens the project in VS Code or Cursor. The preview starts at the selected window's minimum size and only fills the canvas when you press Fit. F12 / Ctrl+Shift+I toggles the element inspector (the editor keeps F12 for Monaco): the preview highlights the element under the cursor, the panel shows the DOM tree on the left, matched CSS rules and an editable element.style on the Styles tab, and computed values plus CSS variables on the Computed tab. For custom home pages the tree starts at the content root, without html / body or the launcher shell. Inline edits apply to the preview only. Game launch, login and instance file operations require validation in the launcher.
+Create a project from one of the five official demos; the tool downloads a matching SDK snapshot, installs dependencies and starts preview. With no project open, the sidebar lists recent projects as cards with their display name, path and demo type. The editor completes CSS, HTML, JavaScript and TypeScript, including the project's theme variables and control class names in CSS; both lists come from the project SDK's `mml-vue/ui-kit/controls` manifest. Save with Ctrl+S to rebuild. The preview is a design canvas with VS WPF designer-style selection handles and a size input; resize the window with the eight handles, and scroll the canvas when it is larger than the preview area. The window list covers all 19 launcher windows, and the preview enforces each window's minimum size (for example 920×600 for the main window). The window uses a custom titlebar with the same decoration plugin as the launcher. The activity bar on the left toggles the file tree, the editor, the preview panel, the element inspector and the bottom panel; the splitter between the editor and the preview can be dragged, the bottom panel is the output log and collapses to a single 30px bar; the element inspector sits at the bottom of the preview panel. The external editor button opens the project in VS Code or Cursor. The preview starts at the selected window's minimum size and only fills the canvas when you press Fit. The two HTML demos get their theme variables from the studio, so the preview theme switches them without a reload; their `src/tailwind.css` is precompiled, so new utility classes need a regeneration step from the demo README before they take effect. F12 / Ctrl+Shift+I toggles the element inspector (the editor keeps F12 for Monaco): the preview highlights the element under the cursor, the panel shows the DOM tree on the left, matched CSS rules and an editable element.style on the Styles tab, and computed values plus CSS variables on the Computed tab. For custom home pages the tree starts at the content root, without html / body or the launcher shell. Inline edits apply to the preview only. Game launch, login and instance file operations require validation in the launcher.
 
 `npm run pack` builds installers under the repository's `target/release/bundle`. The user project's npm/Vite build still needs system Node.js 24+, npm and Git.

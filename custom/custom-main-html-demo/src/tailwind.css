@@ -1,0 +1,40 @@
+/*! tailwindcss v4.3.5 | MIT License | https://tailwindcss.com */
+@layer theme, base, components, utilities;
+@layer theme {
+  :root, :host {
+    --spacing: 0.25rem;
+    --color-card: var(--bg-card);
+    --color-dim: var(--text-dim);
+    --radius-ctl: var(--ctl-radius);
+    --radius-card: 10px;
+  }
+}
+@layer utilities {
+  .flex {
+    display: flex;
+  }
+  .grid {
+    display: grid;
+  }
+  .hidden {
+    display: none;
+  }
+  .items-center {
+    align-items: center;
+  }
+  .justify-between {
+    justify-content: space-between;
+  }
+  .gap-1\.5 {
+    gap: calc(var(--spacing) * 1.5);
+  }
+  .gap-2\.5 {
+    gap: calc(var(--spacing) * 2.5);
+  }
+  .bg-card {
+    background-color: var(--color-card);
+  }
+  .text-dim {
+    color: var(--color-dim);
+  }
+}

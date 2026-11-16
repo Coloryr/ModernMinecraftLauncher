@@ -311,38 +311,38 @@ async function loadList() {
 
 <template>
   <WindowFrame enter=":scope > *" :title="t('winJavaDownload.title')" @close="$emit('close')">
-    <div class="java-download-body">
-      <div class="field-row">
-        <div class="field">
-          <label class="field-label">{{ t("winJavaDownload.source") }}</label>
+    <div class="java-download-body flex h-full flex-col overflow-y-auto">
+      <div class="field-row flex flex-wrap gap-2.5">
+        <div class="field flex min-w-0 flex-[1_1_110px] flex-col">
+          <label class="field-label whitespace-nowrap">{{ t("winJavaDownload.source") }}</label>
           <select v-model="source" class="field-select" :disabled="optionsLoading" @change="onSourceChange">
             <option v-for="s in sources" :key="s" :value="s">{{ sourceLabel(s) }}</option>
           </select>
         </div>
 
-        <div class="field">
-          <label class="field-label">{{ t("winJavaDownload.type") }}</label>
+        <div class="field flex min-w-0 flex-[1_1_110px] flex-col">
+          <label class="field-label whitespace-nowrap">{{ t("winJavaDownload.type") }}</label>
           <select v-model="javaType" class="field-select" :disabled="optionsLoading" @change="loadList">
             <option v-for="tp in options?.types ?? []" :key="tp" :value="tp">{{ typeLabel(tp) }}</option>
           </select>
         </div>
 
-        <div class="field">
-          <label class="field-label">{{ t("winJavaDownload.major") }}</label>
+        <div class="field flex min-w-0 flex-[1_1_110px] flex-col">
+          <label class="field-label whitespace-nowrap">{{ t("winJavaDownload.major") }}</label>
           <select v-model="major" class="field-select" :disabled="optionsLoading" @change="loadList">
             <option v-for="m in options?.majors ?? []" :key="m" :value="m">{{ m }}</option>
           </select>
         </div>
 
-        <div class="field">
-          <label class="field-label">{{ t("winJavaDownload.system") }}</label>
+        <div class="field flex min-w-0 flex-[1_1_110px] flex-col">
+          <label class="field-label whitespace-nowrap">{{ t("winJavaDownload.system") }}</label>
           <select v-model="system" class="field-select" :disabled="optionsLoading" @change="loadList">
             <option v-for="s in options?.systems ?? []" :key="s" :value="s">{{ systemLabel(s) }}</option>
           </select>
         </div>
 
-        <div class="field">
-          <label class="field-label">{{ t("winJavaDownload.arch") }}</label>
+        <div class="field flex min-w-0 flex-[1_1_110px] flex-col">
+          <label class="field-label whitespace-nowrap">{{ t("winJavaDownload.arch") }}</label>
           <select v-model="arch" class="field-select" :disabled="optionsLoading" @change="loadList">
             <option v-for="a in options?.archs ?? []" :key="a" :value="a">{{ a }}</option>
           </select>
@@ -350,27 +350,28 @@ async function loadList() {
       </div>
 
       <!-- 加载提示放行内：改筛选时不该弹一层面板盖住列表 -->
-      <div v-if="optionsLoading || listLoading" class="list-loading">
+      <div v-if="optionsLoading || listLoading" class="list-loading mt-3 flex items-center gap-2 text-body text-dim">
         <span class="loading-spin" />
         <span>{{ t("winJavaDownload.loadingTitle") }}</span>
       </div>
 
       <!-- 匹配的包列表：grid 文本卡片 -->
-      <div v-if="!items.length && !listLoading && !optionsLoading" class="list-empty">
+      <div v-if="!items.length && !listLoading && !optionsLoading" class="list-empty mt-1 text-body text-red">
         {{ t("winJavaDownload.listEmpty") }}
       </div>
-      <div class="item-grid">
-        <div v-for="item in items" :key="item.uuid" class="item-card">
-          <div class="item-head">
-            <div class="item-title">{{ item.javaVersion }}</div>
+      <div class="item-grid mt-3.5 grid flex-1 content-start gap-3 overflow-y-scroll [scrollbar-gutter:stable] grid-cols-[repeat(auto-fill,minmax(230px,1fr))]">
+        <div v-for="item in items" :key="item.uuid"
+          class="item-card flex min-w-0 flex-col gap-1.5 rounded-card border border-border bg-card px-3.5 py-3">
+          <div class="item-head flex items-center justify-between gap-2">
+            <div class="item-title text-heading font-semibold">{{ item.javaVersion }}</div>
             <BaseButton variant="accent" :disabled="isInstalling(item.uuid)"
               @click="startDownload(item)">
               {{ isInstalling(item.uuid) ? t("winJavaDownload.downloading") : t("winJavaDownload.download") }}
             </BaseButton>
           </div>
-          <div class="item-sub">{{ item.name }}</div>
-          <div class="item-sub">{{ item.filename }}</div>
-          <div v-if="item.size > 0" class="item-sub">{{ formatSize(item.size) }}</div>
+          <div class="item-sub truncate text-meta text-dim">{{ item.name }}</div>
+          <div class="item-sub truncate text-meta text-dim">{{ item.filename }}</div>
+          <div v-if="item.size > 0" class="item-sub truncate text-meta text-dim">{{ formatSize(item.size) }}</div>
         </div>
       </div>
     </div>
@@ -378,23 +379,8 @@ async function loadList() {
 </template>
 
 <style scoped>
-.java-download-body {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow-y: auto;
-}
-
-/* 行内加载提示：换筛选时只占一行，不弹面板盖住列表 */
-.list-loading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  color: var(--text-dim);
-  font-size: 12.5px;
-}
-
+/* 排版都改到模板上的工具类了；这里只剩转圈本体（边框 + 动画），
+   工具类表达不了 keyframes。 */
 .loading-spin {
   width: 14px;
   height: 14px;
@@ -410,73 +396,4 @@ async function loadList() {
   }
 }
 
-/* 五个下拉框排开；窗口窄时自动换行，别把英文标签挤在一起 */
-.field-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 110px;
-  min-width: 0;
-}
-
-.field-label {
-  white-space: nowrap;
-}
-
-/* 匹配包的 grid 列表：占满剩余空间，卡片自适应列数 */
-.item-grid {
-  flex: 1;
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 12px;
-  align-content: start;
-  overflow-y: scroll;
-  scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
-}
-
-.item-card {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-card);
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-/* 卡片标题行：版本号 + 下载按钮 */
-.item-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.item-title {
-  font-weight: 600;
-  font-size: 15px;
-}
-
-.item-sub {
-  color: var(--text-dim);
-  font-size: 11.5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 没有匹配的 Java：紧贴筛选行下方，用告警色 */
-.list-empty {
-  margin-top: 4px;
-  color: var(--red);
-  font-size: 12.5px;
-}
 </style>

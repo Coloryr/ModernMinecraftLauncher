@@ -29,9 +29,9 @@ const previewLimit = 5;
   <BaseModal :title="t('resource.dropConflictTitle')" :closable="false" @close="emit('close')">
     <p class="delete-tip">{{ t("resource.dropConflictText", { count: props.conflicts.length }) }}</p>
     <!-- 只列前几条：拖一批进来时清单可能很长，弹窗不能长到看不见按钮 -->
-    <ul class="drop-conflict-list">
+    <ul class="drop-conflict-list mt-1 mb-0 ml-0 mr-[-8px] max-h-[148px] overflow-y-auto pl-[18px] pr-2 text-title text-dim">
       <li v-for="name in props.conflicts.slice(0, previewLimit)" :key="name">{{ name }}</li>
-      <li v-if="props.conflicts.length > previewLimit" class="drop-conflict-more">
+      <li v-if="props.conflicts.length > previewLimit" class="drop-conflict-more -ml-[18px] list-none text-dim">
         {{ t("resource.dropConflictMore", { count: props.conflicts.length - previewLimit }) }}
       </li>
     </ul>
@@ -49,25 +49,3 @@ const previewLimit = 5;
   </BaseModal>
 </template>
 
-<style scoped>
-/* 列出来的那几个同名项：拖一批进来时清单可能很长，限高自己滚，别把按钮顶出屏幕 */
-.drop-conflict-list {
-  margin: 4px 0 0;
-  padding-left: 18px;
-  max-height: 148px;
-  overflow-y: auto;
-  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
-     行的右边缘仍落在弹窗内容区里，滚动条画在这 8px 上
-     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
-  margin-right: -8px;
-  padding-right: 8px;
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
-.drop-conflict-more {
-  list-style: none;
-  margin-left: -18px;
-  color: var(--text-dim);
-}
-</style>

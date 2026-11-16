@@ -20,6 +20,11 @@ const zipPath = join(root, "custom-ui-css-demo.zip");
 /** 入口打包产物；放在包根，mml-vue 见到它才会加载入口 */
 const ENTRY_OUTPUT = join(root, "custom.js");
 
+/** 样式源码编译产物；包根的 custom.css 由它复制而来，不提交 */
+const STYLE_OUTPUT = join(root, "dist", "custom.css");
+/** 包根样式：必需条目，打包期生成、打完删掉 */
+const STYLE_FILE = join(root, "custom.css");
+
 /** 用 Vite 把入口与 Vue 组件打成 IIFE（Vue 走页面全局 __mmlVue）；失败返回 false */
 function buildEntry(): boolean {
   const vite = join(root, "node_modules", "vite", "bin", "vite.js");
@@ -38,6 +43,12 @@ function buildEntry(): boolean {
     return false;
   }
   copyFileSync(built, ENTRY_OUTPUT);
+  // 样式同一次构建产出：src/custom.css 经 Tailwind 编译后落到包根
+  if (!existsSync(STYLE_OUTPUT)) {
+    console.error("✗ Vite 没生成 dist/custom.css");
+    return false;
+  }
+  copyFileSync(STYLE_OUTPUT, STYLE_FILE);
   return true;
 }
 
@@ -46,9 +57,10 @@ const MANIFEST_SRC = join(root, "src", "theme.json");
 /** 包根清单只在打包期存在，不留在源码目录 */
 const MANIFEST = join(root, "theme.json");
 
-/** 删掉本次生成的 custom.js 与 dist，不留在工作区 */
+/** 删掉本次生成的 custom.js / custom.css 与 dist，不留在工作区 */
 function cleanupEntry() {
   rmSync(ENTRY_OUTPUT, { force: true });
+  rmSync(STYLE_FILE, { force: true });
   rmSync(join(root, "dist"), { recursive: true, force: true });
 }
 

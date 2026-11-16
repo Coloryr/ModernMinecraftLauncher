@@ -80,7 +80,7 @@ watch(
   <template v-if="phase === 'idle' && tree.length">
     <!-- 压缩包类型决定按普通包还是整合包安装，放到文件列表上面 -->
     <label class="field-label">{{ t("add.packType") }}</label>
-    <select :value="packType" class="field-select pack-type"
+    <select :value="packType" class="field-select pack-type mb-2"
       @change="emit('update:packType', ($event.target as HTMLSelectElement).value)">
       <option v-for="p in packTypes" :key="p" :value="p">{{ t(`add.pack.${p}`) }}</option>
     </select>
@@ -94,14 +94,11 @@ watch(
 </template>
 
 <style scoped>
+/* 只剩两条工具类表达不了的规则：伪类首元素与原生下拉的弹层方向。 */
+
 /* 卡片里第一条标签顶格，不留多余的 12px */
 .field-label:first-child {
   margin-top: 0;
-}
-
-/* 压缩包类型下拉与下方文件列表留一点间距 */
-.pack-type {
-  margin-bottom: 8px;
 }
 
 /* 这个「整合包类型」下拉在卡片顶部，弹层按可用空间挑方向 */

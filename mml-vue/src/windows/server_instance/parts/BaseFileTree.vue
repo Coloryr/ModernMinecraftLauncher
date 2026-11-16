@@ -117,7 +117,7 @@ watch(
         @click="row.entry.dir ? toggleDir(row.entry.path) : emit('toggle', row.entry.path)">
         {{ row.entry.path.split("/").pop() }}{{ row.entry.dir ? "/" : "" }}
       </span>
-      <span class="si-counter">{{ row.entry.dir ? "—" : sizeText(row.entry.size) }}</span>
+      <span class="si-counter shrink-0 text-meta text-dim [font-variant-numeric:tabular-nums]">{{ row.entry.dir ? "—" : sizeText(row.entry.size) }}</span>
     </div>
   </template>
 </template>

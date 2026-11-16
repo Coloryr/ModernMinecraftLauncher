@@ -1,10 +1,13 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import tailwindcss from "@tailwindcss/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue()],
+  // Tailwind 只用来出 utilities：重置、控件外观、主题变量仍在 styles/ 里，
+  // 配置与 token 映射见 src/styles/tailwind.css
+  plugins: [vue(), tailwindcss()],
   resolve: {
     alias: {
       // mml-ipc 是仓库内的本地包，没发到 npm：直接按路径取源码，不经过 node_modules。

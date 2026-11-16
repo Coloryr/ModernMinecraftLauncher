@@ -55,13 +55,13 @@ function isCurrent(acc: AccountStoreDto): boolean {
 </script>
 
 <template>
-  <div class="acc-detail">
-    <div v-if="accounts.length > 0" class="table-card">
+  <div class="acc-detail flex min-h-0 flex-1 flex-col gap-3.5">
+    <div v-if="accounts.length > 0" class="table-card flex min-h-0 flex-1 flex-col overflow-hidden rounded-panel border border-border bg-card">
       <div class="table-wrap">
-        <table class="detail-table wide">
+        <table class="detail-table wide w-full border-collapse">
           <thead>
             <tr>
-              <th class="col-actions">{{ t("account.actions") }}</th>
+              <th class="col-actions w-[108px]">{{ t("account.actions") }}</th>
               <th>{{ t("account.name") }}</th>
               <th>{{ t("account.uuid") }}</th>
               <th>{{ t("account.type") }}</th>
@@ -75,11 +75,11 @@ function isCurrent(acc: AccountStoreDto): boolean {
             <tr v-for="acc in accounts" :key="acc.uuid" :class="{ current: isCurrent(acc) }"
               @dblclick="!accountLocked && emit('switch', acc)"
               @contextmenu.prevent="emit('menu', { event: $event, acc })">
-              <td class="col-actions">
+              <td class="col-actions w-[108px]">
                 <!-- 不可见的皮肤探测图：表格不展示皮肤，但「查看皮肤 / 刷新皮肤」要知道有没有皮肤。
                    没有它就永远不会产生 skin 的失败标记，那俩按钮在没皮肤的账户上照样显示。
                    1px + opacity 0：不占位、不可见，只为了让 @error / @load 能触发 -->
-                <img class="skin-probe" :src="accountSkinUrl(acc)" alt="" aria-hidden="true" data-no-fallback
+                <img class="skin-probe pointer-events-none absolute h-px w-px opacity-0" :src="accountSkinUrl(acc)" alt="" aria-hidden="true" data-no-fallback
                   @error="markImageFailed(acc, 'skin')" @load="markImageLoaded(acc, 'skin')" />
                 <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh"
                   :can-relogin="acc.canRelogin" :can-edit="acc.canEdit" :has-skin="!hasNoSkin(acc)"
@@ -87,11 +87,11 @@ function isCurrent(acc: AccountStoreDto): boolean {
                   @refresh-skin="emit('refreshSkin', acc)" @relogin="emit('relogin', acc)" @edit="emit('edit', acc)"
                   @delete="emit('delete', acc)" />
               </td>
-              <td class="cell-name">
+              <td class="cell-name max-w-[200px] overflow-hidden text-ellipsis font-bold">
                 <HighlightText :text="acc.userName" :query="query" />
-                <span v-if="isCurrent(acc)" class="current-tag">{{ t("account.current") }}</span>
+                <span v-if="isCurrent(acc)" class="current-tag ml-1.5 shrink-0 whitespace-nowrap rounded-pill bg-accent px-2 py-0.5 text-caption text-on-accent">{{ t("account.current") }}</span>
               </td>
-              <td class="mono">
+              <td class="mono [font-family:'Cascadia Code',Consolas,monospace]">
                 <HighlightText :text="acc.uuid" :query="query" />
               </td>
               <td>
@@ -99,10 +99,10 @@ function isCurrent(acc: AccountStoreDto): boolean {
               </td>
               <td>{{ acc.loginTime }}</td>
               <td>
-                <span class="token-tag" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
+                <span class="token-tag shrink-0 whitespace-nowrap rounded-pill px-[9px] py-0.5" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
               </td>
-              <td class="cell-ext" v-tip="acc.ext1 ?? ''">{{ acc.ext1 ?? "—" }}</td>
-              <td class="cell-ext" v-tip="acc.ext2 ?? ''">{{ acc.ext2 ?? "—" }}</td>
+              <td class="cell-ext max-w-[180px] overflow-hidden text-ellipsis text-meta [font-family:'Cascadia Code',Consolas,monospace]" v-tip="acc.ext1 ?? ''">{{ acc.ext1 ?? "—" }}</td>
+              <td class="cell-ext max-w-[180px] overflow-hidden text-ellipsis text-meta [font-family:'Cascadia Code',Consolas,monospace]" v-tip="acc.ext2 ?? ''">{{ acc.ext2 ?? "—" }}</td>
             </tr>
           </tbody>
         </table>
@@ -114,45 +114,7 @@ function isCurrent(acc: AccountStoreDto): boolean {
 </template>
 
 <style scoped>
-.acc-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  /* 占满视图区剩余高度：工具栏留在外面，上下滚动发生在表格容器里 */
-  flex: 1;
-  min-height: 0;
-}
-
-/* 卡片负责边框与圆角并裁切，滚动交给里面的表格 —— 滚动条是方的，
-   不裁的话它会把右下圆角盖成直角 */
-.table-card {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-card);
-  overflow: hidden;
-}
-
-/* 表格在容器内滚动：上下滚动看行，左右滚动看列；列都是 nowrap，长内容不压缩 */
-.table-wrap {
-  overflow: auto;
-  overflow-y: scroll;
-  /* 只预留**纵向**那条：scrollbar-gutter 管不到横向；表格列多是 nowrap，
-     横向滚动条基本常驻，纵向那条随账户数量出现 / 消失，预留它免得行整体左移 */
-  scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
-  flex: 1;
-  min-height: 0;
-}
-
-.detail-table.wide {
-  border-collapse: collapse;
-  width: 100%;
-}
-
+/* 表格元素选择器留在 CSS：th / td 数量多，逐个挂工具类反而更难读 */
 .detail-table th,
 .detail-table td {
   padding: 10px 14px;
@@ -172,59 +134,32 @@ function isCurrent(acc: AccountStoreDto): boolean {
   border-bottom: none;
 }
 
+/* 当前使用的账户：整行铺强调色（状态类，主题可覆盖） */
 .detail-table tbody tr.current td {
   background: var(--accent-soft);
 }
 
-.col-actions {
-  width: 108px;
+/* 表格滚动容器：横向不预留、纵向预留一条滚动条槽，避免行随账户数量左右跳 */
+.table-wrap {
+  overflow: auto;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  flex: 1;
+  min-height: 0;
 }
 
-/* 皮肤探测图：只用于触发加载 / 失败事件，本身不可见也不占位 */
-.skin-probe {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.cell-name {
-  font-weight: 700;
-  /* 名字过长省略显示，不把表格撑出横向滚动条；悬停 title 看全名 */
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 自定义字段同样省略，悬停看全文；微软 ext1 是 refresh_token，很长 */
+/* 表格单元格的字号由上面那条统一给（12.5），这两处要更小，必须留在无层里，
+   否则会被表格规则盖掉 */
 .cell-ext {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-family: "Cascadia Code", Consolas, monospace;
   font-size: 11.5px;
 }
 
-.current-tag {
-  font-size: 10.5px;
-  padding: 2px 8px;
-  border-radius: 20px;
-  background: var(--accent);
-  color: var(--on-accent);
-  white-space: nowrap;
-  flex-shrink: 0;
-  margin-left: 6px;
-}
-
+/* 11px 不在六档字号里，保留原值 */
 .token-tag {
   font-size: 11px;
-  padding: 2px 9px;
-  border-radius: 20px;
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 
+/* 令牌状态色：语义态，主题可覆盖 */
 .token-tag.valid {
   background: color-mix(in srgb, var(--green) 14%, transparent);
   color: var(--green);
@@ -233,9 +168,5 @@ function isCurrent(acc: AccountStoreDto): boolean {
 .token-tag.expired {
   background: color-mix(in srgb, var(--red) 14%, transparent);
   color: var(--red);
-}
-
-.mono {
-  font-family: "Cascadia Code", Consolas, monospace;
 }
 </style>

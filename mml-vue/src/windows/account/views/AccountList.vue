@@ -71,33 +71,33 @@ function hidePreview() {
 </script>
 
 <template>
-  <div class="acc-list" :class="{ empty: accounts.length === 0 }">
-    <div v-for="acc in accounts" :key="acc.uuid" class="acc-row" :class="{ current: isCurrent(acc) }"
+  <div class="acc-list flex flex-col gap-2" :class="{ empty: accounts.length === 0 }">
+    <div v-for="acc in accounts" :key="acc.uuid" class="acc-row flex cursor-default items-center gap-3 rounded-panel border border-border bg-card px-3.5 py-2.5" :class="{ current: isCurrent(acc) }"
       @dblclick="!accountLocked && emit('switch', acc)" @contextmenu.prevent="emit('menu', { event: $event, acc })">
       <!-- 加载中：图上叠转圈，onload 后消失 -->
-      <div v-if="!imageFailed(acc, 'avatar')" class="row-avatar-box">
-        <img :src="accountAvatarUrl(acc)" class="row-avatar" :class="{ pending: imageLoading(acc, 'avatar') }" alt=""
+      <div v-if="!imageFailed(acc, 'avatar')" class="row-avatar-box relative h-10 w-10 shrink-0">
+        <img :src="accountAvatarUrl(acc)" class="row-avatar h-10 w-10 [image-rendering:pixelated]" :class="{ pending: imageLoading(acc, 'avatar') }" alt=""
           data-no-fallback @load="markImageLoaded(acc, 'avatar')" @error="markImageFailed(acc, 'avatar')"
           @mouseenter="showPreview($event, acc)" @mousemove="movePreview" @mouseleave="hidePreview" />
-        <div v-if="imageLoading(acc, 'avatar')" class="img-spin" />
+        <div v-if="imageLoading(acc, 'avatar')" class="img-spin absolute inset-0 flex items-center justify-center" />
       </div>
       <!-- 头像拉取失败回退字母头像（与主页面下拉一致），不显示"无头像"占位 -->
-      <span v-else class="row-avatar row-letter" :style="{ background: acc.avatarColor }">
+      <span v-else class="row-avatar row-letter flex items-center justify-center text-heading font-bold text-on-accent select-none" :style="{ background: acc.avatarColor }">
         {{ acc.userName.charAt(0).toUpperCase() }}
       </span>
-      <div class="row-meta">
-        <span class="row-name">
+      <div class="row-meta flex min-w-0 flex-1 flex-col gap-[3px]">
+        <span class="row-name overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-bold text-fg">
           <HighlightText :text="acc.userName" :query="query" />
         </span>
-        <span class="row-sub">
+        <span class="row-sub flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-meta text-dim [font-family:'Cascadia Code',Consolas,monospace]">
           <AccountTypeBadge :auth-type="acc.authType" />
-          <span class="row-uuid">
+          <span class="row-uuid overflow-hidden text-ellipsis">
             <HighlightText :text="acc.uuid" :query="query" />
           </span>
         </span>
       </div>
-      <span v-if="isCurrent(acc)" class="current-tag">{{ t("account.current") }}</span>
-      <span class="token-tag" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
+      <span v-if="isCurrent(acc)" class="current-tag shrink-0 whitespace-nowrap rounded-pill bg-accent px-2 py-0.5 text-caption text-on-accent">{{ t("account.current") }}</span>
+      <span class="token-tag shrink-0 whitespace-nowrap rounded-pill px-[9px] py-0.5 text-[11px]" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
       <AccountActions :locked="accountLocked && acc.uuid === currentUuid" :can-refresh="acc.canRefresh"
         :can-relogin="acc.canRelogin" :can-edit="acc.canEdit" :has-skin="!hasNoSkin(acc)"
         @refresh="emit('refresh', acc)" @view-skin="emit('viewSkin', acc)" @refresh-skin="emit('refreshSkin', acc)"
@@ -108,69 +108,32 @@ function hidePreview() {
 
     <!-- 悬停头像时的头像大图 -->
     <Teleport to="body">
-      <div v-if="preview" class="skin-float" :style="{ left: preview.x + 'px', top: preview.y + 'px' }">
-        <img :src="preview.url" alt="" />
+      <div v-if="preview" class="skin-float pointer-events-none fixed z-[300] rounded-card border border-border bg-card p-2 shadow-[var(--shadow-lg)]" :style="{ left: preview.x + 'px', top: preview.y + 'px' }">
+        <img class="block h-[160px] w-[160px] [image-rendering:pixelated]" :src="preview.url" alt="" />
       </div>
     </Teleport>
   </div>
 </template>
 
 <style scoped>
-.acc-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* 空状态：占位框吃满视图区剩余高度 */
+/* 空状态占满视图区剩余高度（.empty 由调用方按数据状态挂） */
 .acc-list.empty {
   flex: 1;
   min-height: 0;
 }
 
-.acc-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  cursor: default;
-}
-
+/* 当前使用的账户：描边 + 一圈光晕（状态类，主题可覆盖） */
 .acc-row.current {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
 }
 
-/* 头像槽容器：相对定位，加载中时上面叠转圈 */
-.row-avatar-box {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-}
-
-.row-avatar {
-  width: 40px;
-  height: 40px;
-  image-rendering: pixelated;
-}
-
+/* 头像加载中先压透明，onload 后出现 */
 .row-avatar.pending {
   opacity: 0;
 }
 
-/* 加载中转圈（img 上层居中） */
-.img-spin {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
+/* 加载中转圈：定位与居中在工具类上，这里只剩伪元素与关键帧 */
 .img-spin::after {
   content: "";
   width: 16px;
@@ -187,68 +150,7 @@ function hidePreview() {
   }
 }
 
-/* 头像拉取失败时的字母头像（取名字首字符，背景用账户配色） */
-.row-letter {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--on-accent);
-  font-weight: 700;
-  font-size: 15px;
-  user-select: none;
-}
-
-.row-meta {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.row-name {
-  font-size: 14px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.row-sub {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  font-family: "Cascadia Code", Consolas, monospace;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.row-uuid {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.current-tag {
-  font-size: 10.5px;
-  padding: 2px 8px;
-  border-radius: 20px;
-  background: var(--accent);
-  color: var(--on-accent);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.token-tag {
-  font-size: 11px;
-  padding: 2px 9px;
-  border-radius: 20px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
+/* 令牌状态色：语义态 */
 .token-tag.valid {
   background: color-mix(in srgb, var(--green) 14%, transparent);
   color: var(--green);
@@ -257,24 +159,5 @@ function hidePreview() {
 .token-tag.expired {
   background: color-mix(in srgb, var(--red) 14%, transparent);
   color: var(--red);
-}
-
-/* 悬停头像时的头像大图：Teleport 到 body，跟随鼠标 */
-.skin-float {
-  position: fixed;
-  z-index: 300;
-  pointer-events: none;
-  padding: 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow-lg);
-}
-
-.skin-float img {
-  display: block;
-  width: 160px;
-  height: 160px;
-  image-rendering: pixelated;
 }
 </style>

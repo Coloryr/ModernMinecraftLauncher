@@ -1047,16 +1047,17 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
       </template>
     </template>
     <!-- 一个收藏都没有：左栏与搜索全部收起，两个入口放进占满窗口的占位框 -->
-    <div v-if="isEmpty" class="collect-empty-box">
-      <div class="empty-mark">
+    <div v-if="isEmpty"
+      class="collect-empty-box flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-panel border border-dashed border-accent-border bg-side px-6 py-8 text-center text-dim">
+      <div class="empty-mark flex h-[58px] w-[58px] items-center justify-center rounded-full bg-accent-soft text-accent">
         <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="m12 2.6 2.9 5.9 6.5.95-4.7 4.58 1.1 6.47L12 17.44 6.2 20.5l1.1-6.47-4.7-4.58 6.5-.95z" />
         </svg>
       </div>
-      <p class="empty-title">{{ t("collect.emptyTitle") }}</p>
-      <p class="empty-hint">{{ t("collect.empty") }}</p>
-      <div class="collect-empty-actions">
+      <p class="empty-title m-0 text-heading font-semibold text-fg">{{ t("collect.emptyTitle") }}</p>
+      <p class="empty-hint m-0 max-w-[360px] text-body leading-[1.6]">{{ t("collect.empty") }}</p>
+      <div class="collect-empty-actions mt-2 flex gap-2">
         <BaseButton variant="accent" @click="openWindow('add_modpack')">
           {{ t("collect.addModpack") }}
         </BaseButton>
@@ -1066,7 +1067,7 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
       </div>
     </div>
 
-    <div v-else class="collect-body" @click="closeMenu()">
+    <div v-else class="collect-body flex min-h-0 flex-1 flex-col gap-3" @click="closeMenu()">
       <!-- 多选条：由卡片右键菜单的「多选」进入 -->
       <div v-if="multiSelect" class="multi-bar">
         <span class="multi-count">{{ t("collect.installCount", { count: checked.size }) }}</span>
@@ -1089,18 +1090,18 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
       </div>
 
       <!-- 左栏：全部 + 默认分组 + 自建分组，与方块窗口同一个分类栏 -->
-      <div class="collect-main">
+      <div class="collect-main flex min-h-0 flex-1 gap-4">
         <CategoryRail flush :all-label="t('collect.all')" :all-count="shownCount" :items="railItems"
           :active="activeGroup" :drop-key="dropGroup" :new-label="t('collect.addGroup')" new-style="button" sortable
           @pick="activeGroup = $event" @reorder="onGroupReorder" @group-menu="openGroupMenu"
           @new-group="showAddGroup = true" />
 
-        <div class="collect-content">
+        <div class="collect-content flex min-h-0 min-w-0 flex-1 flex-col gap-3">
           <!-- 搜索：按收藏项名字过滤，分组计数跟着变 -->
           <SearchBox v-model="keyword" :placeholder="t('collect.search')" :clear-label="t('collect.searchClear')"
             width="100%" />
 
-          <div class="collect-scroll">
+          <div class="collect-scroll -mr-[26px] mt-[-2px] min-h-0 flex-1 overflow-y-scroll pb-0.5 pr-[17px] pt-0.5 [scrollbar-gutter:stable]">
             <Transition :css="false" mode="out-in" @enter="enterCards" @leave="leaveCards">
               <div :key="activeGroup" class="collect-pane">
             <!-- 当前分组是空的：搜索没命中与"这一组确实没收藏"分开说 -->
@@ -1108,40 +1109,44 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
               {{ keyword.trim() ? t("collect.searchEmpty") : t("collect.emptyGroup") }}
             </p>
 
-            <div v-else class="collect-grid">
-              <div v-for="item in activeItems" :key="item.uuid" class="collect-card"
+            <div v-else class="collect-grid grid content-start gap-3 grid-cols-[repeat(auto-fill,minmax(min(340px,100%),1fr))]">
+              <div v-for="item in activeItems" :key="item.uuid"
+                class="collect-card relative flex cursor-pointer items-center gap-2.5 rounded-panel border border-border bg-card px-2.5 py-2 transition-[border-color,background,transform] duration-150"
                 :class="{ active: checked.has(item.uuid), dragging: draggingUuids.has(item.uuid) }"
                 @pointerdown="onCardPointerDown($event, item)" @click="onCardClick(item, $event)"
                 @contextmenu.prevent="openMenu($event, item)">
-                <span v-if="multiSelect" class="card-box" @click.stop @pointerdown.stop>
+                <span v-if="multiSelect" class="card-box absolute left-1.5 top-1.5 z-[2] inline-flex h-[15px] w-[15px] shrink-0"
+                  @click.stop @pointerdown.stop>
                   <input type="checkbox" class="card-check" :checked="checked.has(item.uuid)" @click.stop
                     @change="toggleCheck(item.uuid, ($event.target as HTMLInputElement).checked)" />
                   <span class="check-mark">
                     <GlyphIcon name="check" :size="11" :weight="3" />
                   </span>
                 </span>
-                <div class="card-icon">
+                <div class="card-icon flex h-[60px] w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-ctl bg-hover">
                   <!-- 用全仓通用的 AsyncImage：加载中是流光占位、失败是灰底占位，
                        与下载整合包窗口的项目图标同一套观感 -->
                   <AsyncImage v-if="iconOf(item)" :src="iconOf(item)" @error="onIconError(item)" />
-                  <GlyphIcon v-else class="card-icon-none" name="image" :size="22" :weight="1.6" />
+                  <GlyphIcon v-else class="card-icon-none text-dim" name="image" :size="22" :weight="1.6" />
                 </div>
-                <div class="card-text">
+                <div class="card-text min-w-0 flex-1">
                   <!-- 搜索命中的那截给底色：看不出"为什么这条被搜出来"最难用 -->
-                  <div class="card-name" v-tip="item.name">
+                  <div class="card-name truncate text-[13.5px] font-semibold leading-[1.35] text-fg" v-tip="item.name">
                     <HighlightText :text="item.name" :query="keyword" />
                   </div>
-                  <div class="card-meta">{{ item.source }} · {{ item.fileType }}</div>
+                  <div class="card-meta mt-1 text-[12px] text-dim">{{ item.source }} · {{ item.fileType }}</div>
                   <!-- 项目 ID 与收藏时间：ID 用来回源对项目，时间是"多早收的"的线索 -->
-                  <div class="card-sub">
-                    <span class="card-pid" v-tip="item.pid">{{ item.pid }}</span>
-                    <span v-if="item.favTime" class="card-time">
+                  <div class="card-sub mt-0.5 flex items-center justify-between gap-2 text-[11px] text-dim">
+                    <span class="card-pid truncate font-[Cascadia_Code,Consolas,monospace]" v-tip="item.pid">{{ item.pid }}</span>
+                    <span v-if="item.favTime" class="card-time shrink-0 whitespace-nowrap">
                       {{ t("collect.favTime", { time: formatMinute(item.favTime) }) }}
                     </span>
                   </div>
                 </div>
-                <span class="card-acts" @pointerdown.stop>
-                  <button class="card-act" v-tip="t('collect.openUrl')" @click.stop="openUrl(item)">
+                <span class="card-acts flex shrink-0 items-center gap-0.5" @pointerdown.stop>
+                  <button
+                    class="card-act flex h-ctl w-ctl cursor-pointer items-center justify-center rounded-ctl border-0 bg-transparent p-0 text-dim transition-colors duration-[120ms]"
+                    v-tip="t('collect.openUrl')" @click.stop="openUrl(item)">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"
                       stroke-linecap="round" stroke-linejoin="round">
                       <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5" />
@@ -1158,11 +1163,11 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
 
           <!-- 跟手浮起副本：手里抓着的那一项，跟着指针走 -->
           <DragGhost v-if="collectGhost && collectDragItem" :x="collectGhost.x" :y="collectGhost.y">
-            <div class="card-icon">
+            <div class="card-icon flex h-[60px] w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-ctl bg-hover">
               <AsyncImage v-if="iconOf(collectDragItem)" :src="iconOf(collectDragItem)" />
-              <GlyphIcon v-else class="card-icon-none" name="image" :size="22" :weight="1.6" />
+              <GlyphIcon v-else class="card-icon-none text-dim" name="image" :size="22" :weight="1.6" />
             </div>
-            <span class="card-name">{{ collectDragItem.name }}</span>
+            <span class="card-name truncate text-[13.5px] font-semibold leading-[1.35] text-fg">{{ collectDragItem.name }}</span>
           </DragGhost>
         </div>
       </div>

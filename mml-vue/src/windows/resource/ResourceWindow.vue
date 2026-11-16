@@ -321,10 +321,10 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
       </template>
     </template>
 
-    <div v-if="!depItem" class="resource-layout">
+    <div v-if="!depItem" class="resource-layout flex h-full gap-[18px]">
       <CategoryRail :data="data" :view="view" @select="selectCategory" />
 
-      <section class="cat-content">
+      <section class="cat-content mr-[-26px] flex min-w-0 flex-1 flex-col gap-3">
         <!--
           存档类的两个子页共用这一条顶栏：子页切换栏挂在**窗口层**，子页之间来回切时不重建，
           分段控件的滑块才能从「存档」滑到「数据包」（放在子页里的话是两份控件，滑块只会跳）。
@@ -335,7 +335,7 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
         <ContentHead v-if="instance && category === 'saves'" :data="data">
           <SaveTabs :data="data" />
           <template #actions>
-            <div id="resource-saves-actions" class="head-pane-actions"></div>
+            <div id="resource-saves-actions" class="head-pane-actions flex items-center gap-1.5"></div>
           </template>
         </ContentHead>
 
@@ -353,7 +353,7 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
           <div v-if="!instance" key="__no-instance" class="empty-tip">
             {{ t("resource.notSelected") }}
           </div>
-          <div v-else :key="paneKey" class="pane-swap">
+          <div v-else :key="paneKey" class="pane-swap flex min-h-0 flex-1 flex-col gap-3">
             <ScreenshotPane v-if="category === 'screenshots'" :data="data" :ops="ops" />
             <ServerPane v-else-if="category === 'servers'" :data="data" :ops="ops" />
             <ModPane v-else-if="category === 'mods'" :data="data" :ops="ops" :view="view" :deps="deps"

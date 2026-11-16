@@ -1,0 +1,3 @@
+/* Tailwind 入口：只出 utilities、不含 preflight，token 映射到启动器主题变量。
+   之所以单独一个文件：custom.css 是"这一份皮肤"的样式，入口被换掉时它还要留着。 */
+@import "mml-vue/tailwind.css";

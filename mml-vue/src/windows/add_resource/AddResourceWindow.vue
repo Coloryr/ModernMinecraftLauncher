@@ -826,19 +826,19 @@ onActivated(async () => {
       <InstanceChip v-if="instanceChip" :instance="instanceChip" />
     </template>
 
-    <div class="res-mode" ref="bodyRef">
+    <div class="res-mode flex flex-col gap-2.5" ref="bodyRef">
 
       <!-- 资源类型 + 下载源 + 版本 -->
-      <div class="res-top">
-        <div class="res-filters">
+      <div class="res-top flex flex-col gap-2.5 rounded-panel border border-border bg-card px-[18px] py-2.5">
+        <div class="res-filters flex flex-wrap items-center gap-2.5">
           <SegmentedTabs v-model="type" :options="TYPES" :disabled="searching" />
           <!-- 存档只有 CurseForge 有：锁定源，不显示页签 -->
           <SegmentedTabs v-if="!isSaveType" v-model="source" :options="shownSources" :disabled="searching" />
-          <div v-else class="res-source-lock">
-            <span class="res-source-name">{{ t("modpack.curseforge") }}</span>
-            <span class="res-source-hint">{{ t("addResource.saveSourceLimit") }}</span>
+          <div v-else class="res-source-lock flex h-ctl items-center gap-2 rounded-card border border-border px-3 text-title">
+            <span class="res-source-name font-semibold text-fg">{{ t("modpack.curseforge") }}</span>
+            <span class="res-source-hint text-meta text-dim">{{ t("addResource.saveSourceLimit") }}</span>
           </div>
-          <select v-model="version" class="field-select sel-filter sel-version" :disabled="searching"
+          <select v-model="version" class="field-select sel-version flex-[1_1_110px]" :disabled="searching"
             @change="submitSearch">
             <option value="">{{ t("modpack.allVersions") }}</option>
             <option v-for="v in versions" :key="v" :value="v">{{ v }}</option>
@@ -846,23 +846,23 @@ onActivated(async () => {
         </div>
 
         <!-- 过滤条件 + 搜索同一行：加载期间整条锁死，避免半途改条件与在途请求打架 -->
-        <div class="res-filters">
-          <select v-model="sort" class="field-select sel-filter" :disabled="searching" @change="submitSearch">
+        <div class="res-filters flex flex-wrap items-center gap-2.5">
+          <select v-model="sort" class="field-select sel-filter min-w-[150px] flex-[0_1_150px]" :disabled="searching" @change="submitSearch">
             <option v-for="s in sorts" :key="s" :value="s">{{ t(`modpack.sort.${s}`) }}</option>
           </select>
-          <select v-if="categories.length" v-model="category" class="field-select sel-filter" :disabled="searching"
+          <select v-if="categories.length" v-model="category" class="field-select sel-filter min-w-[150px] flex-[0_1_150px]" :disabled="searching"
             @change="submitSearch">
             <option value="">{{ t("modpack.allCategories") }}</option>
             <option v-for="c in categories" :key="c.value" :value="c.value">{{ c.label }}</option>
           </select>
-          <select v-if="type === 'mod'" v-model="loader" class="field-select sel-filter" :disabled="searching"
+          <select v-if="type === 'mod'" v-model="loader" class="field-select sel-filter min-w-[150px] flex-[0_1_150px]" :disabled="searching"
             @change="submitSearch">
             <option v-for="l in loaderChoices" :key="l" :value="l">
               {{ l === "normal" ? t("addResource.loader.normal") : l }}
             </option>
           </select>
 
-          <div class="res-search">
+          <div class="res-search flex min-w-[220px] flex-1 gap-2">
             <input v-model="filter" class="field-input search-input" :placeholder="t('addResource.searchHint')"
               spellcheck="false" :disabled="searching" @keydown.enter="submitSearch" />
             <button class="search-btn" :disabled="searching" @click="submitSearch">
@@ -877,7 +877,8 @@ onActivated(async () => {
       <div class="list-bar" :class="{ on: searching }" aria-hidden="true"><span /></div>
 
       <!-- 结果列表：加载状态内联在本区，旧内容保留并压暗 -->
-      <div class="res-list" :class="{ 'is-loading-dim': searching }">
+      <div class="res-list -mx-2 flex min-h-[120px] flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2"
+        :class="{ 'is-loading-dim': searching }">
         <!-- 首次加载（还没有内容）：骨架行 -->
         <template v-if="searching && items.length === 0">
           <div v-for="n in 6" :key="n" class="sk-row">
@@ -903,7 +904,7 @@ onActivated(async () => {
         hide-finished />
 
       <!-- 分页 -->
-      <div v-if="maxPage > 0" class="res-page">
+      <div v-if="maxPage > 0" class="res-page flex items-center justify-center gap-3">
         <button class="page-btn" :disabled="page === 0 || searching" @click="turnPage(-1)">
           {{ t("modpack.prevPage") }}
         </button>

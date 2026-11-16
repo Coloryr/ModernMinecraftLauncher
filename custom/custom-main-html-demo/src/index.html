@@ -4,19 +4,34 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>M²L · HTML 自定义主页面</title>
+  <link rel="stylesheet" href="./tailwind.css" />
   <link rel="stylesheet" href="./style.css" />
+  <script>
+    // iframe 拿不到宿主的 CSS 变量：启动器会把主题变量 postMessage 过来，
+    // 写进 :root 后 Tailwind 的 bg-card / text-dim 这类类才有颜色。
+    window.addEventListener("message", (e) => {
+      if (e.source !== window.parent) return;
+      const data = e.data;
+      if (!data || data.__mml !== 1 || data.type !== "theme-tokens") return;
+      const root = document.documentElement;
+      for (const [name, value] of Object.entries(data.tokens)) root.style.setProperty(name, value);
+      root.dataset.mmlTheme = data.theme;
+    });
+    // 页面可能晚于父窗口握手才就绪，主动要一次
+    window.parent.postMessage({ __mml: 1, type: "theme-tokens?" }, "*");
+  </script>
   <script src="./app.js" defer></script>
 </head>
 <body>
   <div class="home">
     <!-- 只铺满主页内容区：启动器的标题栏、侧栏与其它窗口都在这一页外面 -->
-    <header class="bar">
-      <div class="brand">
+    <header class="bar flex items-center justify-between">
+      <div class="brand flex items-center gap-2.5">
         <span class="brand-mark">星</span>
         <strong class="brand-name">星野 Server</strong>
         <span class="tag">HTML 主页</span>
       </div>
-      <div class="bar-actions">
+      <div class="bar-actions flex items-center gap-1.5">
         <span class="online"><i class="online-dot"></i><span id="online-count">24</span> 人在线</span>
         <button class="ghost-btn" id="refresh" type="button" title="刷新实例列表">刷新</button>
         <button class="icon-btn" id="theme-toggle" type="button" title="切换亮 / 暗主题" aria-label="切换亮 / 暗主题">

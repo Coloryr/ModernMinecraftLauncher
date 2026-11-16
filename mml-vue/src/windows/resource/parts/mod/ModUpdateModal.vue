@@ -74,32 +74,32 @@ function apply() {
 <template>
   <BaseModal :title="t('resource.updateTitle')" :width="640" :closable="false" @close="emit('close')">
     <!-- 全选 + 已选计数：条目可能几十个，逐个点太慢 -->
-    <div class="upd-toolbar">
-      <label class="upd-all">
-        <input type="checkbox" class="upd-check" :checked="allChecked" :indeterminate="someChecked"
+    <div class="upd-toolbar mb-2 flex items-center justify-between gap-2.5">
+      <label class="upd-all flex cursor-pointer items-center gap-[7px] text-body text-fg">
+        <input type="checkbox" class="upd-check m-0 h-[15px] w-[15px] shrink-0 cursor-pointer accent-accent" :checked="allChecked" :indeterminate="someChecked"
           @change="toggleAll" />
         <span>{{ t("resource.selectAll") }}</span>
       </label>
-      <span class="upd-count">{{ t("resource.selectedCount", { n: checked.size }) }}</span>
+      <span class="upd-count text-meta text-dim">{{ t("resource.selectedCount", { n: checked.size }) }}</span>
     </div>
 
     <!-- 更新条数可能上百：接虚拟列表，只渲染视口附近那几行；行高不齐（名字会换行），量第一行当估值 -->
-    <VirtualList class="upd-list" :count="updates.length" :row-gap="8" measure-row>
+    <VirtualList class="upd-list mr-[-8px] flex max-h-[52vh] flex-col gap-2 overflow-y-auto pr-2" :count="updates.length" :row-gap="8" measure-row>
       <template #default="{ start, end }">
-        <label v-for="u in updates.slice(start, end)" :key="u.uuid" class="upd-row"
-          :class="{ 'upd-row-on': isChecked(u) }">
-          <input type="checkbox" class="upd-check" :checked="isChecked(u)" @change="toggle(u)" />
-          <span class="upd-body">
-            <span class="upd-head">
-              <span class="upd-name">{{ u.name || u.file }}</span>
-              <span v-if="u.disable" class="upd-tag">{{ t("resource.modDisabled") }}</span>
+        <label v-for="u in updates.slice(start, end)" :key="u.uuid" class="upd-row flex cursor-pointer items-start gap-2.5 rounded-ctl border border-border bg-card px-2.5 py-2"
+          :class="{ 'upd-row-on border-accent-border bg-accent-soft': isChecked(u) }">
+          <input type="checkbox" class="upd-check m-0 h-[15px] w-[15px] shrink-0 cursor-pointer accent-accent" :checked="isChecked(u)" @change="toggle(u)" />
+          <span class="upd-body flex min-w-0 flex-col">
+            <span class="upd-head flex flex-wrap items-baseline gap-x-2.5 gap-y-[3px]">
+              <span class="upd-name break-all text-body font-semibold text-fg">{{ u.name || u.file }}</span>
+              <span v-if="u.disable" class="upd-tag rounded-[6px] border border-border px-1.5 text-meta text-dim">{{ t("resource.modDisabled") }}</span>
             </span>
-            <span class="upd-meta">
+            <span class="upd-meta mt-[3px] flex flex-wrap items-baseline gap-1.5 text-body text-dim">
               <span>{{ t("resource.updateCurrent", { version: u.version || u.file }) }}</span>
               <span class="upd-arrow">→</span>
-              <span class="upd-new">{{ t("resource.updateNew", { version: u.newVersion || u.newFile }) }}</span>
+              <span class="upd-new text-accent">{{ t("resource.updateNew", { version: u.newVersion || u.newFile }) }}</span>
             </span>
-            <span class="upd-note">
+            <span class="upd-note mt-[3px] flex flex-wrap gap-x-2.5 gap-y-[3px] break-all text-meta text-dim">
               <span class="upd-file">{{ u.file }} → {{ u.newFile }}</span>
               <span v-if="u.date">{{ t("resource.updateDate", { date: isoDate(u.date) }) }}</span>
             </span>
@@ -109,7 +109,7 @@ function apply() {
     </VirtualList>
 
     <!-- 只在有查询失败时留一行：没查出来的不等于"已是最新"，这行不能省 -->
-    <p v-if="props.result.failed" class="upd-foot">
+    <p v-if="props.result.failed" class="upd-foot m-0 mt-2.5 text-meta text-dim">
       {{ t("resource.updateFailed", { n: props.result.failed }) }}
     </p>
 
@@ -122,127 +122,3 @@ function apply() {
   </BaseModal>
 </template>
 
-<style scoped>
-/* 弹窗在 body 下，样式走 scoped（与 ModExportModal 同一处理） */
-.upd-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.upd-all {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--text);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-/* 勾选框：原生控件 + accent-color 跟主题走（弹窗在 body 下，拿不到窗口级那套样式） */
-.upd-check {
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
-  margin: 0;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.upd-count {
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
-
-.upd-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 52vh;
-  overflow-y: auto;
-  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
-     行的右边缘仍落在弹窗内容区里，滚动条画在这 8px 上
-     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
-  margin-right: -8px;
-  padding-right: 8px;
-}
-
-/* 一行一条：整行是 label，点哪儿都能勾 */
-.upd-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-card);
-  cursor: pointer;
-}
-
-/* 勾中的那条给主色边框：一屏十几条时一眼看得出选了哪些 */
-.upd-row-on {
-  border-color: var(--accent-border);
-  background: var(--accent-soft);
-}
-
-.upd-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.upd-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 3px 10px;
-}
-
-.upd-name {
-  color: var(--text);
-  font-size: 12.5px;
-  font-weight: 600;
-  word-break: break-all;
-}
-
-.upd-tag {
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-dim);
-  font-size: 11px;
-}
-
-.upd-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px;
-  margin-top: 3px;
-  color: var(--text-dim);
-  font-size: 12px;
-}
-
-/* 新版本是这一行的重点，给主色；旧版本与箭头保持次要 */
-.upd-new {
-  color: var(--accent);
-}
-
-.upd-note {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px 10px;
-  margin-top: 3px;
-  color: var(--text-dim);
-  font-size: 11.5px;
-  word-break: break-all;
-}
-
-.upd-foot {
-  margin: 10px 0 0;
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
-</style>

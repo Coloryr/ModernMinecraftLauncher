@@ -6,7 +6,9 @@
  *   2. 换实例启动按钮：入口脚本把 Vue 写的 ReplaceButton 挂到原按钮位置，
  *      这里只负责替换按钮的外观。
  *
- * 打包：npm run pack（会把 src/replace.ts 编译成 custom.js 一起放进包）；
+ * 这个文件是**源码**：npm run pack 会用 Vite + Tailwind 编译成包根的 custom.css
+ * （所以可以用 @apply 与 mml-vue 的工具类，颜色 / 字号 / 圆角都映射到启动器主题变量）。
+ * Tailwind 入口在 src/theme.css，入口脚本里先引它、再引本文件。
  * 导入：设置 → 界面 → 自定义 CSS → 导入 CSS 包。
  * ============================================================ */
 
@@ -39,10 +41,7 @@ html[data-theme="Light"][data-accent] {
    这里写替换按钮的外观 */
 
 .mml-custom-launch {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  /* 排版（flex / 间距 / 字号 / 粗细 / 光标）在模板上用工具类写；这里只留这一份皮肤的视觉 */
   width: 230px;
   min-height: 46px;
   padding: 0 26px;
@@ -51,10 +50,7 @@ html[data-theme="Light"][data-accent] {
   background: linear-gradient(120deg, #f97316, #f43f5e);
   background-size: 220% 100%;
   color: #fff;
-  font-size: 15px;
-  font-weight: 700;
   letter-spacing: 0.02em;
-  cursor: pointer;
   box-shadow: 0 6px 22px rgba(244, 63, 94, 0.35);
 }
 

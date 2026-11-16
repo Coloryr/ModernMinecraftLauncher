@@ -107,7 +107,7 @@ onMounted(async () => {
        所以不传 hide-modpack-indicator，内容区也不内嵌进度卡片 -->
   <WindowFrame enter=":scope > *" :title="t('winTitle.addModpack')" :back="detailOpen ? t('modpack.back') : ''" body-gutter
     @back="modeRef?.closeDetail()" @close="$emit('close')">
-    <div class="modpack-body">
+    <div class="modpack-body flex flex-col gap-3">
       <ModpackMode ref="modeRef" :group="group" :groups="groups" :status="modpackStatus" @update:group="group = $event"
         @install="install" @detail="detailOpen = $event" />
     </div>
@@ -116,12 +116,3 @@ onMounted(async () => {
   </WindowFrame>
 </template>
 
-<style scoped>
-/* 这一列不额外回缩：卡片边缘与筛选卡、项目卡一样落在窗口内容区边距上；
-   项目列表那 8px 是给悬停阴影留的，已在 ModpackMode 里用负外边距抵掉 */
-.modpack-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-</style>

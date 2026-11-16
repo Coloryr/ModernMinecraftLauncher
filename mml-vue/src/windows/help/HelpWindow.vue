@@ -183,31 +183,31 @@ async function copyQq() {
 <template>
   <WindowFrame enter=":scope > *" :title="t('features.help')" body-gutter @close="$emit('close')">
     <!-- 启动器信息：图标、名称、版本、作者与这份 exe 的 SHA1，放在 FAQ 之前 -->
-    <section class="about">
-      <img class="about-icon" :src="appIcon" alt="" />
-      <div class="about-body">
-        <div class="about-title">
+    <section class="about mb-3.5 flex gap-3.5 rounded-panel border border-border bg-card px-5 py-4">
+      <img class="about-icon h-14 w-14 shrink-0 rounded-panel" :src="appIcon" alt="" />
+      <div class="about-body flex min-w-0 flex-1 flex-col gap-1">
+        <div class="about-title flex items-center gap-1.5 text-heading font-bold">
           {{ t("app.name") }}
-          <span v-if="isTestBuild" class="about-badge" :class="`is-${buildChannel}`">
+          <span v-if="isTestBuild" class="about-badge rounded-pill border border-current px-1.5 py-0.5 text-caption font-semibold" :class="`is-${buildChannel}`">
             {{ t(buildBadgeKey) }}
           </span>
         </div>
-        <p class="about-sub">{{ t("app.sub") }}</p>
-        <div class="about-row">
-          <span class="about-label">{{ t("winHelp.version") }}</span>
-          <span class="about-value">{{ appVersion || "—" }}</span>
+        <p class="about-sub mb-1.5 text-body text-dim">{{ t("app.sub") }}</p>
+        <div class="about-row flex items-baseline gap-2 text-body">
+          <span class="about-label min-w-[84px] shrink-0 text-meta text-dim">{{ t("winHelp.version") }}</span>
+          <span class="about-value text-fg">{{ appVersion || "—" }}</span>
         </div>
-        <div class="about-row">
-          <span class="about-label">{{ t("winHelp.author") }}</span>
-          <span class="about-value">{{ t("winHelp.authorName") }}</span>
+        <div class="about-row flex items-baseline gap-2 text-body">
+          <span class="about-label min-w-[84px] shrink-0 text-meta text-dim">{{ t("winHelp.author") }}</span>
+          <span class="about-value text-fg">{{ t("winHelp.authorName") }}</span>
         </div>
-        <div class="about-row">
-          <span class="about-label">{{ t("winHelp.testers") }}</span>
-          <span class="about-value">{{ testersText }}</span>
+        <div class="about-row flex items-baseline gap-2 text-body">
+          <span class="about-label min-w-[84px] shrink-0 text-meta text-dim">{{ t("winHelp.testers") }}</span>
+          <span class="about-value text-fg">{{ testersText }}</span>
         </div>
-        <div class="about-row">
-          <span class="about-label">{{ t("winHelp.exeSha1") }}</span>
-          <code class="about-sha1" :class="{ 'is-error': !!exeError }" :title="exePath">
+        <div class="about-row flex items-baseline gap-2 text-body">
+          <span class="about-label min-w-[84px] shrink-0 text-meta text-dim">{{ t("winHelp.exeSha1") }}</span>
+          <code class="about-sha1 text-meta text-fg break-all [font-family:'Cascadia Code',Consolas,monospace]" :class="{ 'is-error': !!exeError }" :title="exePath">
             <template v-if="exeSha1">{{ exeSha1 }}</template>
 <template v-else-if="exeLoading">{{ t("winHelp.sha1Reading") }}</template>
 <template v-else>{{ exeError || "—" }}</template>
@@ -216,7 +216,7 @@ async function copyQq() {
       </div>
 
       <!-- 打开日志 / 上传日志 / 仓库 / 问题反馈：跟介绍信息同一张卡，贴右上角，正文行数不用再挪 -->
-      <div class="about-actions">
+      <div class="about-actions -mr-2 flex gap-1 self-start">
         <!-- 反馈问题前先看日志：打开的是启动器自己的 logs.log，不是实例运行日志 -->
         <button class="ui-btn-icon" v-tip="t('winHelp.openLog')" :aria-label="t('winHelp.openLog')"
           @click="openLog">
@@ -239,91 +239,91 @@ async function copyQq() {
       </div>
     </section>
 
-    <div class="help-list">
-      <div v-for="(item, i) in faqs" :key="item.q" class="faq-item">
-        <button class="faq-q" @click="toggle(i)">
+    <div class="help-list flex flex-col gap-2.5">
+      <div v-for="(item, i) in faqs" :key="item.q" class="faq-item overflow-hidden rounded-panel border border-border bg-card">
+        <button class="faq-q flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-5 py-3.5 text-left text-title font-semibold text-fg [font-family:inherit] hover:bg-hover" @click="toggle(i)">
           <span>{{ item.q }}</span>
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+          <svg class="shrink-0 text-dim transition-transform duration-150" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
             :style="{ transform: openIndex === i ? 'rotate(180deg)' : 'none' }">
             <path d="m6 9 6 6 6-6" />
           </svg>
         </button>
-        <div v-if="openIndex === i" class="faq-a">{{ item.a }}</div>
+        <div v-if="openIndex === i" class="faq-a px-5 pb-4 pt-1 text-title leading-[1.7] text-dim">{{ item.a }}</div>
       </div>
     </div>
 
-    <div class="footer-note">
+    <div class="footer-note mt-[22px] rounded-panel border border-border bg-card px-5 py-4 text-body leading-[1.8] text-dim">
       <p>{{ t("winHelp.stillStuck") }}</p>
       <p>{{ t("winHelp.report") }}</p>
-      <span class="footer-qq">
+      <span class="footer-qq mt-2.5 inline-flex items-center gap-1.5 text-body text-dim">
         {{ t("winHelp.qqGroup", { n: QQ_GROUP }) }}
-        <button class="qq-copy" v-tip="t('winHelp.qqCopy')" :aria-label="t('winHelp.qqCopy')" @click="copyQq">
+        <button class="qq-copy h-ctl cursor-pointer rounded-ctl border border-border bg-raised px-2.5 text-meta text-accent [font-family:inherit] transition-[border-color,background] duration-[0.12s] hover:border-accent-border hover:bg-accent-soft" v-tip="t('winHelp.qqCopy')" :aria-label="t('winHelp.qqCopy')" @click="copyQq">
           {{ t("winHelp.qqCopy") }}
         </button>
       </span>
     </div>
 
     <!-- 开源许可：只给上游链接，许可全文不随安装包分发，见 ./thirdParty.ts -->
-    <div class="lic-block">
-      <button class="faq-q" @click="licenseOpen = !licenseOpen">
+    <div class="lic-block mt-[22px] overflow-hidden rounded-panel border border-border bg-card">
+      <button class="faq-q flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-5 py-3.5 text-left text-title font-semibold text-fg [font-family:inherit] hover:bg-hover" @click="licenseOpen = !licenseOpen">
         <span>{{ t("winHelp.license") }}</span>
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+        <svg class="shrink-0 text-dim transition-transform duration-150" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
           :style="{ transform: licenseOpen ? 'rotate(180deg)' : 'none' }">
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
 
-      <div v-if="licenseOpen" class="lic-body">
-        <p class="lic-lead">{{ t("winHelp.licenseIntro") }}</p>
+      <div v-if="licenseOpen" class="lic-body px-5 pb-4 pt-1 text-title leading-[1.7] text-dim">
+        <p class="lic-lead mb-2.5">{{ t("winHelp.licenseIntro") }}</p>
 
         <section v-for="sec in licenseSections" :key="sec.key" class="lic-sec">
-          <p class="lic-sub">{{ sec.title }}</p>
-          <p v-if="sec.lead" class="lic-text">{{ sec.lead }}</p>
-          <div v-if="sec.counts.length" class="lic-counts">
+          <p class="lic-sub mb-1.5 text-title font-semibold text-fg">{{ sec.title }}</p>
+          <p v-if="sec.lead" class="lic-text mb-2 text-body">{{ sec.lead }}</p>
+          <div v-if="sec.counts.length" class="lic-counts mb-2 flex flex-wrap gap-x-3.5 gap-y-1 text-meta">
             <span v-for="row in sec.counts" :key="row.license || row.key">
               {{ row.key ? t(row.key) : row.license }} · {{ row.count }}
             </span>
           </div>
-          <div v-for="item in sec.items" :key="item.name" class="lic-row">
-            <div class="lic-info">
-              <span class="lic-name">{{ item.name }}</span>
-              <span class="lic-meta">{{ item.version }} · {{ item.license }}</span>
-              <span v-if="item.note" class="lic-note">{{ t(item.note) }}</span>
+          <div v-for="item in sec.items" :key="item.name" class="lic-row flex items-center gap-2.5 py-1.5">
+            <div class="lic-info flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span class="lic-name text-body font-semibold text-fg">{{ item.name }}</span>
+              <span class="lic-meta text-meta">{{ item.version }} · {{ item.license }}</span>
+              <span v-if="item.note" class="lic-note basis-full text-meta">{{ t(item.note) }}</span>
             </div>
-            <button v-if="item.url" class="lic-open" @click="openUrl(item.url)">
+            <button v-if="item.url" class="lic-open shrink-0 cursor-pointer rounded-ctl border border-border bg-transparent px-2.5 py-[3px] text-meta text-dim [font-family:inherit] transition-[background,color] duration-150 hover:bg-hover hover:text-fg" @click="openUrl(item.url)">
               {{ t("winHelp.licenseUpstream") }}
             </button>
           </div>
         </section>
 
-        <button class="lic-open lic-spdx" @click="openUrl(SPDX_LICENSE_LIST)">
+        <button class="lic-open shrink-0 cursor-pointer rounded-ctl border border-border bg-transparent px-2.5 py-[3px] text-meta text-dim [font-family:inherit] transition-[background,color] duration-150 hover:bg-hover hover:text-fg lic-spdx mx-auto mt-3.5 block" @click="openUrl(SPDX_LICENSE_LIST)">
           {{ t("winHelp.licenseSpdx") }}
         </button>
       </div>
     </div>
 
     <!-- 第三方服务与平台：本项目只是调用方，许可那一档放不下这类内容 -->
-    <div class="lic-block">
-      <button class="faq-q" @click="servicesOpen = !servicesOpen">
+    <div class="lic-block mt-[22px] overflow-hidden rounded-panel border border-border bg-card">
+      <button class="faq-q flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-5 py-3.5 text-left text-title font-semibold text-fg [font-family:inherit] hover:bg-hover" @click="servicesOpen = !servicesOpen">
         <span>{{ t("winHelp.services") }}</span>
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+        <svg class="shrink-0 text-dim transition-transform duration-150" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
           :style="{ transform: servicesOpen ? 'rotate(180deg)' : 'none' }">
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
 
-      <div v-if="servicesOpen" class="lic-body">
-        <p class="lic-lead">{{ t("winHelp.servicesIntro") }}</p>
+      <div v-if="servicesOpen" class="lic-body px-5 pb-4 pt-1 text-title leading-[1.7] text-dim">
+        <p class="lic-lead mb-2.5">{{ t("winHelp.servicesIntro") }}</p>
 
-        <div v-for="srv in THIRD_PARTY_SERVICES" :key="srv.name" class="lic-row">
-          <div class="lic-info">
-            <span class="lic-name">{{ srv.name }}</span>
-            <span class="lic-note">{{ t(srv.purpose) }}</span>
+        <div v-for="srv in THIRD_PARTY_SERVICES" :key="srv.name" class="lic-row flex items-center gap-2.5 py-1.5">
+          <div class="lic-info flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span class="lic-name text-body font-semibold text-fg">{{ srv.name }}</span>
+            <span class="lic-note basis-full text-meta">{{ t(srv.purpose) }}</span>
           </div>
-          <button v-if="srv.url" class="lic-open" @click="openUrl(srv.url)">
+          <button v-if="srv.url" class="lic-open shrink-0 cursor-pointer rounded-ctl border border-border bg-transparent px-2.5 py-[3px] text-meta text-dim [font-family:inherit] transition-[background,color] duration-150 hover:bg-hover hover:text-fg" @click="openUrl(srv.url)">
             {{ t("winHelp.serviceOpen") }}
           </button>
-          <button v-for="link in srv.links" :key="link.url" class="lic-open" @click="openUrl(link.url)">
+          <button v-for="link in srv.links" :key="link.url" class="lic-open shrink-0 cursor-pointer rounded-ctl border border-border bg-transparent px-2.5 py-[3px] text-meta text-dim [font-family:inherit] transition-[background,color] duration-150 hover:bg-hover hover:text-fg" @click="openUrl(link.url)">
             {{ t(link.label) }}
           </button>
         </div>
@@ -333,58 +333,8 @@ async function copyQq() {
 </template>
 
 <style scoped>
-/* ---------- 启动器信息 ---------- */
-
-.about {
-  display: flex;
-  gap: 14px;
-  margin-bottom: 14px;
-  padding: 16px 20px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-
-.about-icon {
-  width: 56px;
-  height: 56px;
-  flex-shrink: 0;
-  border-radius: 12px;
-}
-
-.about-body {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* 打开日志 / 仓库 / 反馈三枚图标按钮：贴卡片右上角，不另占正文的一行 */
-.about-actions {
-  display: flex;
-  gap: 4px;
-  align-self: flex-start;
-  margin-right: -8px;
-}
-
-.about-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-/* 构建通道徽章：与顶栏那一枚同口径，测试版用强调色、预发布版用黄色 */
-.about-badge {
-  padding: 2px 6px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 600;
-}
-
+/* 排版 / 间距 / 字号 / 颜色都在模板的工具类上；这里只留状态色与兄弟组合 ——
+   前者按语义类名做主题覆盖，后者用工具类表达不了相邻关系 */
 .about-badge.is-debug {
   color: var(--accent);
 }
@@ -393,230 +343,16 @@ async function copyQq() {
   color: var(--yellow);
 }
 
-.about-sub {
-  margin: 0 0 6px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-}
-
-.about-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 12.5px;
-}
-
-.about-label {
-  flex-shrink: 0;
-  min-width: 84px;
-  font-size: 11.5px;
-  color: var(--text-dim);
-}
-
-.about-value {
-  color: var(--text);
-}
-
-/* SHA1 有 40 位：窄窗口下任意位置折行，别把内容区撑出横向滚动 */
-.about-sha1 {
-  font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 11.5px;
-  color: var(--text);
-  word-break: break-all;
-}
-
 .about-sha1.is-error {
   color: var(--red);
 }
 
-.help-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.faq-item {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.faq-q {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 20px;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.faq-q svg {
-  color: var(--text-dim);
-  transition: transform 0.15s;
-  flex-shrink: 0;
-}
-
-.faq-q:hover {
-  background: var(--bg-hover);
-}
-
-.faq-a {
-  padding: 4px 20px 16px;
-  font-size: 13px;
-  color: var(--text-dim);
-  line-height: 1.7;
-}
-
-.footer-note {
-  margin-top: 22px;
-  padding: 16px 20px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-  line-height: 1.8;
-}
-
-.footer-qq {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-}
-
-.qq-copy {
-  height: var(--ctl-h);
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--ctl-radius);
-  background: var(--bg-raised);
-  color: var(--accent);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
-}
-
-.qq-copy:hover {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-/* ---------- 开源许可 ---------- */
-
-/* 与 FAQ 卡片同一套外观：它也是"标题行可点开的一段内容" */
-.lic-block {
-  margin-top: 22px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.lic-body {
-  padding: 4px 20px 16px;
-  font-size: 13px;
-  color: var(--text-dim);
-  line-height: 1.7;
-}
-
-.lic-lead {
-  margin: 0 0 10px;
-}
-
-.lic-sec+.lic-sec {
-  margin-top: 16px;
-}
-
-.lic-sub {
-  margin: 0 0 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.lic-text {
-  margin: 0 0 8px;
-  font-size: 12.5px;
-}
-
-/* 许可分布：窄窗口下自己换行，不横向滚 */
-.lic-counts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin-bottom: 8px;
-  font-size: 11.5px;
-}
-
-.lic-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-}
-
-.lic-row+.lic-row {
+/* 许可清单相邻行之间的分隔线 */
+.lic-row + .lic-row {
   border-top: 1px solid var(--border);
 }
 
-.lic-info {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.lic-name {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.lic-meta {
-  font-size: 11.5px;
-}
-
-/* 补充说明整条另起一行 */
-.lic-note {
-  flex-basis: 100%;
-  font-size: 11.5px;
-}
-
-.lic-open {
-  flex-shrink: 0;
-  padding: 3px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 11.5px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.lic-open:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.lic-spdx {
-  display: block;
-  margin: 14px auto 0;
+.lic-sec + .lic-sec {
+  margin-top: 16px;
 }
 </style>

@@ -98,23 +98,24 @@ watch(
 
   <!-- 扫到了实例：列出来勾选（默认全选） -->
   <template v-else-if="found.length">
-    <div class="found-head">
-      <span class="found-title">{{ t("add.folderFound", { n: found.length }) }}</span>
-      <span class="found-actions">
-        <button type="button" class="found-link" @click="emit('set-all-instances', true)">
+    <div class="found-head mt-3 flex items-center justify-between">
+      <span class="found-title text-body font-semibold text-dim">{{ t("add.folderFound", { n: found.length }) }}</span>
+      <span class="found-actions flex gap-2.5">
+        <button type="button" class="found-link cursor-pointer border-0 bg-transparent p-0 text-[12px] text-accent [font-family:inherit]" @click="emit('set-all-instances', true)">
           {{ t("add.filesAll") }}
         </button>
-        <button type="button" class="found-link" @click="emit('set-all-instances', false)">
+        <button type="button" class="found-link cursor-pointer border-0 bg-transparent p-0 text-[12px] text-accent [font-family:inherit]" @click="emit('set-all-instances', false)">
           {{ t("add.filesNone") }}
         </button>
       </span>
     </div>
-    <div class="found-list">
-      <label v-for="item in found" :key="item.path" class="found-item">
+    <div class="found-list mt-1.5 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-scroll [scrollbar-gutter:stable]">
+      <label v-for="item in found" :key="item.path"
+        class="found-item flex cursor-pointer items-center gap-2 rounded-[7px] px-2 py-[5px]">
         <input type="checkbox" :checked="picked.has(item.path)"
           @change="emit('toggle-instance', item.path, ($event.target as HTMLInputElement).checked)" />
-        <span class="found-name">{{ item.name }}</span>
-        <span class="found-path" v-tip="item.path">{{ item.path }}</span>
+        <span class="found-name shrink-0 text-title text-fg">{{ item.name }}</span>
+        <span class="found-path min-w-0 flex-1 truncate text-right text-meta text-dim [direction:rtl]" v-tip="item.path">{{ item.path }}</span>
       </label>
     </div>
   </template>
@@ -142,79 +143,11 @@ watch(
   color: var(--red);
 }
 
-.found-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 12px;
-}
-
-.found-title {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-dim);
-}
-
-.found-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.found-link {
-  border: none;
-  background: transparent;
-  padding: 0;
-  color: var(--accent);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-}
-
 .found-link:hover {
   text-decoration: underline;
 }
 
-.found-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 6px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: scroll;
-  scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
-}
-
-.found-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
-  border-radius: 7px;
-  cursor: pointer;
-}
-
 .found-item:hover {
   background: var(--bg-hover);
-}
-
-.found-name {
-  font-size: 13px;
-  color: var(--text);
-  flex-shrink: 0;
-}
-
-/* 路径只作辅助信息：窄了先省略它 */
-.found-path {
-  flex: 1;
-  min-width: 0;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  direction: rtl;
-  text-align: right;
 }
 </style>

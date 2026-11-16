@@ -44,7 +44,7 @@ function pick(name: string) {
 </script>
 
 <template>
-  <div class="group-combo">
+  <div class="group-combo relative">
     <input :value="modelValue" class="field-input" :placeholder="t('add.groupPlaceholder')" spellcheck="false"
       autocomplete="off" role="combobox" aria-autocomplete="list" :aria-expanded="open" @input="onInput"
       @focus="emit('update:open', true)" @blur="emit('update:open', false)" />

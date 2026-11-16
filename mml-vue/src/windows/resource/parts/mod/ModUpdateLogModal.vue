@@ -243,43 +243,43 @@ function shortSha1(value: string): string {
         **只看一个模组时搜索框整个不出现**：搜的就是模组名，一组里只有一个模组，
         搜了只会让人以为还能再筛；日期范围照旧，那一栏筛的是记录
       -->
-      <div class="log-filter">
-        <div v-if="!onlyProjectId" class="log-search">
+      <div class="log-filter flex items-center gap-1.5 mb-2">
+        <div v-if="!onlyProjectId" class="log-search min-w-0 flex-1">
           <SearchBox v-model="keyword" :placeholder="t('resource.updateLogSearch')" width="100%" />
         </div>
-        <BaseDatePicker v-model="from" class="log-date" :placeholder="t('resource.updateLogDateFrom')" :max="to"
+        <BaseDatePicker v-model="from" class="log-date w-[132px] shrink-0" :placeholder="t('resource.updateLogDateFrom')" :max="to"
           :aria-label="t('resource.updateLogDateFrom')" />
-        <span class="log-sep">–</span>
-        <BaseDatePicker v-model="to" class="log-date" :placeholder="t('resource.updateLogDateTo')" :min="from"
+        <span class="log-sep shrink-0 text-dim">–</span>
+        <BaseDatePicker v-model="to" class="log-date w-[132px] shrink-0" :placeholder="t('resource.updateLogDateTo')" :min="from"
           :aria-label="t('resource.updateLogDateTo')" />
       </div>
 
       <!-- 只看一个模组时给一条可关掉的提示，否则用户不知道列表为什么只剩一组 -->
-      <p v-if="onlyProjectId" class="log-only">
+      <p v-if="onlyProjectId" class="log-only m-0 mb-2 flex items-center gap-1.5 rounded-ctl border border-accent-border bg-accent-soft px-2 py-[5px] text-body text-accent">
         <span>{{ t("resource.updateLogOnly", { name: onlyName }) }}</span>
-        <button class="log-only-x" :aria-label="t('resource.cancel')" @click="onlyProjectId = ''">
+        <button class="log-only-x inline-flex h-[18px] w-[18px] cursor-pointer items-center justify-center rounded-[4px] border-0 bg-transparent p-0 text-[inherit] hover:bg-hover" :aria-label="t('resource.cancel')" @click="onlyProjectId = ''">
           <GlyphIcon name="close" :size="12" :weight="2.4" />
         </button>
       </p>
 
-      <div class="log-summary">
-        <p class="log-count">{{ t("resource.updateLogCount", { n: totalCount }) }}</p>
-        <button v-if="hasFilter" class="log-clear" @click="clearFilters">
+      <div class="log-summary mb-2 flex items-center justify-between gap-2">
+        <p class="log-count m-0 text-meta text-dim">{{ t("resource.updateLogCount", { n: totalCount }) }}</p>
+        <button v-if="hasFilter" class="log-clear cursor-pointer rounded-[6px] border-0 bg-transparent px-1.5 py-0.5 text-meta text-accent transition-colors duration-100 hover:bg-hover [font-family:inherit]" @click="clearFilters">
           {{ t("resource.updateLogClear") }}
         </button>
       </div>
       <p v-if="!visibleGroups.length" class="empty-tip">{{ t("resource.updateLogNoMatch") }}</p>
 
-      <div v-else class="log-list">
+      <div v-else class="log-list mr-[-8px] flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-2">
         <section v-for="group in visibleGroups" :key="group.projectId" class="log-group">
           <!-- 组头整行可点：箭头 + 模组名（没记过就退回项目编号）+ 该组的条数；右键只看这一个 -->
-          <button class="log-group-head" :class="{ collapsed: isCollapsed(group.projectId) }"
+          <button class="log-group-head flex w-full cursor-pointer items-center gap-2 rounded-ctl border-0 bg-transparent px-1.5 py-1 text-left text-body font-semibold text-fg transition-colors duration-100 hover:bg-hover [font-family:inherit]" :class="{ collapsed: isCollapsed(group.projectId) }"
             @click="toggleGroup(group.projectId)" @contextmenu.prevent="onlyProject(group.projectId)">
-            <GlyphIcon name="chevron-down" :size="12" class="log-group-caret" />
-            <span class="log-group-name">
+            <GlyphIcon name="chevron-down" :size="12" class="log-group-caret transition-transform duration-100" />
+            <span class="log-group-name break-all">
               <HighlightText :text="group.name || group.projectId" :query="keyword" />
             </span>
-            <span class="log-group-count">{{ t("resource.updateLogGroupCount", { n: group.update.length }) }}</span>
+            <span class="log-group-count ml-auto shrink-0 text-meta font-normal text-dim">{{ t("resource.updateLogGroupCount", { n: group.update.length }) }}</span>
           </button>
 
           <!--
@@ -287,26 +287,26 @@ function shortSha1(value: string): string {
             记录之间靠一条分界线隔开，不再各自套一个卡片框 —— 版本号里带着模组名，
             一行放不下时会把右边的文件名挤成一列竖排
           -->
-          <div v-if="!isCollapsed(group.projectId)" class="log-rows">
-            <div v-for="(item, index) in group.update" :key="item.time + '|' + item.fileId" class="log-row">
-              <div class="log-top">
-                <span class="log-ver">{{ t("resource.updateLogVersion", {
+          <div v-if="!isCollapsed(group.projectId)" class="log-rows flex flex-col pb-0 pl-[26px] pt-1.5">
+            <div v-for="(item, index) in group.update" :key="item.time + '|' + item.fileId" class="log-row flex flex-col gap-[5px] border-b border-border py-2 last:border-b-0 last:pb-[2px]">
+              <div class="log-top flex items-start gap-2.5">
+                <span class="log-ver min-w-0 flex-1 break-words text-meta font-semibold leading-[1.6] text-accent">{{ t("resource.updateLogVersion", {
                   from: dash(item.oldVersion), to:
                     dash(item.version) }) }}</span>
-                <span class="log-right">
-                  <span class="log-time">{{ formatTime(item.time) }}</span>
-                  <button class="log-del" :disabled="busy" v-tip="t('resource.updateLogDelete')"
+                <span class="log-right flex shrink-0 items-center gap-1.5">
+                  <span class="log-time text-meta text-dim">{{ formatTime(item.time) }}</span>
+                  <button class="log-del inline-flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-[6px] border-0 bg-transparent p-0 text-dim disabled:cursor-default disabled:opacity-50" :disabled="busy" v-tip="t('resource.updateLogDelete')"
                     :aria-label="t('resource.updateLogDelete')" @click="removeEntry(group.projectId, index)">
                     <GlyphIcon name="trash" :size="12" />
                   </button>
                 </span>
               </div>
-              <div class="log-file">{{ item.file }}</div>
-              <div class="log-meta">
-                <span class="log-chip">
+              <div class="log-file break-all text-body text-fg">{{ item.file }}</div>
+              <div class="log-meta flex flex-wrap gap-1.5 text-meta text-dim">
+                <span class="log-chip rounded-pill border border-border bg-side px-1.5 py-px break-all">
                   {{ t("resource.updateLogFileId", { from: dash(item.oldFileId), to: dash(item.fileId) }) }}
                 </span>
-                <span class="log-chip mono" v-tip="item.sha1">
+                <span class="log-chip mono rounded-pill border border-border bg-side px-1.5 py-px break-all [font-family:monospace]" v-tip="item.sha1">
                   {{ t("resource.updateLogSha1") }} {{ shortSha1(item.sha1) }}
                 </span>
               </div>
@@ -323,263 +323,25 @@ function shortSha1(value: string): string {
 </template>
 
 <style scoped>
-/* 弹窗在 body 下，样式走 scoped（与 ModReplaceModal / ModUpdateModal 同一处理） */
+/* 弹窗在 body 下，样式走 scoped（与 ModReplaceModal / ModUpdateModal 同一处理）。
+   排版全在模板上的工具类里，这里只留工具类表达不了的三处：
+   父级状态选择器、对 BaseModal 内 .modal-body 子元素的规则、非 token 的红色悬停底。 */
 
-/* 搜索 + 日期范围一行摆下：搜索吃掉剩余宽度，两个日期是固定宽 */
-.log-filter {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.log-search {
-  flex: 1;
-  min-width: 0;
-}
-
-.log-date {
-  width: 132px;
-  flex-shrink: 0;
-}
-
-.log-sep {
-  color: var(--text-dim);
-  flex-shrink: 0;
-}
-
-/* 只看一个模组时的提示条 */
-.log-only {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 8px;
-  padding: 5px 8px;
-  border: 1px solid var(--accent-border);
-  border-radius: var(--ctl-radius);
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 12px;
-}
-
-.log-only-x {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.log-only-x:hover {
-  background: var(--bg-hover);
-}
-
-/* 统计行：「共 N 条」在左，有筛选时右边补一个「清除筛选」 */
-.log-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.log-count {
-  margin: 0;
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
-
-.log-clear {
-  padding: 2px 6px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--accent);
-  font-size: 11.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.12s;
-}
-
-.log-clear:hover {
-  background: var(--bg-hover);
-}
-
-/* 加载中 / 出错 / 空 / 筛完没结果：这几档没有可滚的列表，让提示吃掉剩余高度并居中，
-   动作按钮才会贴底，而不是浮在面板中间 */
-.modal-body>.empty-tip,
-.modal-body>.error-text {
+.modal-body > .empty-tip,
+.modal-body > .error-text {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-/* 弹窗高度被 fixed-height 锁死，这里吃掉剩余高度自己滚 ——
-   **不能再给 max-height**：那样面板与列表会各滚一层，右边出现两条滚动条 */
-.log-list {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
-  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 */
-  margin-right: -8px;
-  padding-right: 8px;
-}
-
-/* 组头：箭头 + 模组名 + 条数；点整行收起 / 展开，右键只看这一个 */
-.log-group-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  /* 左右各让 6px：悬停底色有边距；下方卡片按同样的起点缩进，与组名对齐 */
-  padding: 4px 6px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  font-size: 12.5px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s;
-}
-
-.log-group-head:hover {
-  background: var(--bg-hover);
-}
-
-.log-group-caret {
-  transition: transform 0.12s;
 }
 
 .log-group-head.collapsed .log-group-caret {
   transform: rotate(-90deg);
 }
 
-.log-group-name {
-  word-break: break-all;
-}
-
-.log-group-count {
-  flex-shrink: 0;
-  margin-left: auto;
-  color: var(--text-dim);
-  font-size: 11.5px;
-  font-weight: 400;
-}
-
-/* 记录列表：缩进到组名下面（组头 6px 内边距 + 12px 箭头 + 8px 间距），
-   条目之间只留一条分界线，不再各自套框 */
-.log-rows {
-  display: flex;
-  flex-direction: column;
-  padding: 6px 0 0 26px;
-}
-
-.log-row {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.log-row:last-child {
-  border-bottom: none;
-  padding-bottom: 2px;
-}
-
-/* 第一行：版本跃迁占满左侧，时间与删除固定贴右，版本再长也只在自己这一行折行 */
-.log-top {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-/* 版本跃迁是本条记录的主信息：强调色加重，长版本号（带模组名）自己折行 */
-.log-ver {
-  flex: 1;
-  min-width: 0;
-  color: var(--accent);
-  font-size: 11.5px;
-  font-weight: 600;
-  line-height: 1.6;
-  word-break: break-word;
-}
-
-/* 文件名单独一行：它可能很长且没有空格，独占一行才不会把别的挤成竖条 */
-.log-file {
-  color: var(--text);
-  font-size: 12px;
-  word-break: break-all;
-}
-
-/* 时间与删除按钮摆一起，一起贴右边 */
-.log-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.log-time {
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
-
-.log-del {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-}
-
+/* 危险动作的悬停底：color-mix 的 14% 没有对应 token，留在 CSS */
 .log-del:hover:not(:disabled) {
   background: color-mix(in srgb, var(--red) 14%, transparent);
   color: var(--red);
-}
-
-.log-del:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* 文件号与 SHA1：两枚小标签，长哈希截断，完整值在悬停提示里 */
-.log-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
-
-.log-chip {
-  padding: 1px 6px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg-side);
-  word-break: break-all;
-}
-
-.log-chip.mono {
-  font-family: monospace;
 }
 </style>

@@ -339,10 +339,11 @@ onUnmounted(() => {
       </BaseButton>
     </template>
 
-    <div class="download-body" :class="{ fill: !multiWindow }">
+    <div class="download-body flex flex-col gap-3"
+      :class="{ fill: !multiWindow, 'min-h-0 flex-1': !multiWindow }">
       <!-- 总览：任务总量 / 文件数 / 大小 / 总体速度 + 总体进度条 -->
-      <div class="overview">
-        <div class="overview-head">
+      <div class="overview flex flex-col gap-2 rounded-panel border border-border bg-card px-3 py-2.5">
+        <div class="overview-head flex items-center gap-3.5 text-body text-dim">
           <span class="ov-item">{{ t("winDownload.taskCount", { n: tasks.length }) }}</span>
           <span class="ov-item">
             {{ t(countKey, { done: overallFiles.done, total: overallFiles.total }) }}
@@ -350,14 +351,15 @@ onUnmounted(() => {
           <span v-if="overallBytes.all > 0" class="ov-item">
             {{ sizeText(overallBytes.now, overallBytes.all) }}
           </span>
-          <span class="ov-speed">
-            <span class="ov-speed-label">{{ t("winDownload.totalSpeed") }}</span>
-            <span class="ov-speed-value" :class="{ idle: status.speed <= 0 }">
+          <span class="ov-speed ml-auto flex items-center gap-1.5">
+            <span class="ov-speed-label text-meta">{{ t("winDownload.totalSpeed") }}</span>
+            <span class="ov-speed-value text-title font-bold text-green [font-variant-numeric:tabular-nums]"
+              :class="{ idle: status.speed <= 0 }">
               {{ formatSpeed(status.speed) }}
             </span>
           </span>
           <!-- 全局控制：独立窗口时在标题栏上；单窗口的弹窗没有标题栏槽，留在这里 -->
-          <span v-if="!multiWindow" class="ov-actions">
+          <span v-if="!multiWindow" class="ov-actions flex gap-1.5">
             <BaseButton v-if="!allPaused" size="sm" :disabled="!hasTasks" @click="pauseAll">
               {{ t("winDownload.pause") }}
             </BaseButton>
@@ -369,70 +371,73 @@ onUnmounted(() => {
             </BaseButton>
           </span>
         </div>
-        <div class="ov-progress">
+        <div class="ov-progress flex items-center gap-2">
           <span class="progress-track ov-track">
             <span class="progress-fill" :class="{ 'is-roll': overallRolling }"
               :style="overallRolling ? undefined : { width: overall + '%' }" />
           </span>
-          <span class="ov-percent">{{ overall.toFixed(1) }}%</span>
+          <span class="ov-percent w-12 shrink-0 text-right text-meta text-dim [font-variant-numeric:tabular-nums]">{{ overall.toFixed(1) }}%</span>
         </div>
       </div>
 
       <!-- 下载任务：只有一个任务时隐藏（信息与下方线程进度重复） -->
-      <div v-if="tasks.length !== 1" class="section tasks">
-        <div class="section-head">
-          <span class="section-title">{{ t("winDownload.tasks") }}</span>
+      <div v-if="tasks.length !== 1" class="section tasks flex flex-col gap-2">
+        <div class="section-head flex items-center justify-between">
+          <span class="section-title text-body font-bold text-dim">{{ t("winDownload.tasks") }}</span>
         </div>
-        <div v-if="loading" class="empty">{{ t("winDownload.loading") }}</div>
-        <div v-else-if="tasks.length === 0" class="empty">{{ t("winDownload.empty") }}</div>
-        <div v-else class="task-list">
-          <div v-for="task in tasks" :key="task.id" class="task-item">
-            <div class="task-head">
-              <span class="task-id">#{{ task.id }}</span>
+        <div v-if="loading" class="empty rounded-card border border-dashed border-border bg-card px-4 py-4 text-center text-body text-dim">{{ t("winDownload.loading") }}</div>
+        <div v-else-if="tasks.length === 0" class="empty rounded-card border border-dashed border-border bg-card px-4 py-4 text-center text-body text-dim">{{ t("winDownload.empty") }}</div>
+        <div v-else class="task-list flex flex-col gap-1.5">
+          <div v-for="task in tasks" :key="task.id"
+            class="task-item flex flex-col gap-1.5 rounded-card border border-border bg-card px-2.5 py-2">
+            <div class="task-head grid items-center gap-2 text-body grid-cols-[26px_86px_minmax(0,1fr)_54px_122px_100px]">
+              <span class="task-id font-bold text-accent [font-variant-numeric:tabular-nums]">#{{ task.id }}</span>
               <span class="state-tag" :class="'ts-' + taskState(task)">
                 {{ t(`winDownload.taskState.${taskState(task)}`) }}
               </span>
-              <span class="task-meta">
+              <span class="task-meta truncate text-dim [font-variant-numeric:tabular-nums]">
                 {{ t(taskCountKey(task), { done: task.completed, total: task.total }) }}
               </span>
-              <span class="task-meta right">
+              <span class="task-meta right truncate text-right text-dim [font-variant-numeric:tabular-nums]">
                 <template v-if="task.failed > 0">{{ t("winDownload.failed", { n: task.failed }) }}</template>
               </span>
-              <span class="task-meta right">{{ sizeText(task.nowBytes, task.allBytes) }}</span>
-              <span class="task-meta right">
+              <span class="task-meta right truncate text-right text-dim [font-variant-numeric:tabular-nums]">{{ sizeText(task.nowBytes, task.allBytes) }}</span>
+              <span class="task-meta right truncate text-right text-dim [font-variant-numeric:tabular-nums]">
                 {{ t("winDownload.elapsed", { time: formatDuration(task.elapsedMs) }) }}
               </span>
             </div>
-            <div class="task-foot">
+            <div class="task-foot flex items-center gap-2">
               <span class="progress-track">
                 <span class="progress-fill"
                   :class="{ failed: task.failed > 0, paused: task.paused, 'is-roll': taskRolling(task) }"
                   :style="taskRolling(task) ? undefined : { width: downloadTaskPercent(task) + '%' }" />
               </span>
-              <span class="task-percent">{{ downloadTaskPercent(task).toFixed(1) }}%</span>
+              <span class="task-percent w-[46px] shrink-0 whitespace-nowrap text-right text-meta text-dim [font-variant-numeric:tabular-nums]">{{ downloadTaskPercent(task).toFixed(1) }}%</span>
             </div>
           </div>
         </div>
       </div>
 
       <!-- 下载线程：当前文件进度 + 速度 -->
-      <div class="section threads">
-        <div class="section-head">
-          <span class="section-title">{{ t("winDownload.threads") }}</span>
+      <div class="section threads flex flex-col gap-2">
+        <div class="section-head flex items-center justify-between">
+          <span class="section-title text-body font-bold text-dim">{{ t("winDownload.threads") }}</span>
         </div>
-        <div v-if="threads.length === 0" class="empty">{{ t("winDownload.idle") }}</div>
-        <div v-else class="thread-list">
-          <div v-for="item in threads" :key="item.thread" class="thread-item">
-            <span class="thread-id">#{{ item.thread + 1 }}</span>
-            <span class="thread-name" v-tip="item.name">{{ item.name }}</span>
-            <span class="thread-progress">
+        <div v-if="threads.length === 0" class="empty rounded-card border border-dashed border-border bg-card px-4 py-4 text-center text-body text-dim">{{ t("winDownload.idle") }}</div>
+        <div v-else class="thread-list flex flex-col gap-1.5">
+          <div v-for="item in threads" :key="item.thread"
+            class="thread-item grid items-center gap-2 rounded-card border border-border bg-card px-2.5 py-1.5 text-body grid-cols-[26px_minmax(0,1fr)_116px_124px_78px_88px]">
+            <span class="thread-id font-semibold text-dim [font-variant-numeric:tabular-nums]">#{{ item.thread + 1 }}</span>
+            <span class="thread-name truncate" v-tip="item.name">{{ item.name }}</span>
+            <span class="thread-progress flex items-center gap-2">
               <span class="progress-track">
                 <span class="progress-fill" :style="{ width: item.progress + '%' }" />
               </span>
-              <span class="thread-percent">{{ item.progress.toFixed(1) }}%</span>
+              <span class="thread-percent w-10 shrink-0 whitespace-nowrap text-right text-meta text-dim [font-variant-numeric:tabular-nums]">{{ item.progress.toFixed(1) }}%</span>
             </span>
-            <span class="thread-size">{{ sizeText(item.nowBytes, item.allBytes) }}</span>
-            <span class="thread-speed" :class="{ idle: item.speed <= 0 }">
+            <span class="thread-size whitespace-nowrap text-right text-meta text-dim [font-variant-numeric:tabular-nums]">{{ sizeText(item.nowBytes, item.allBytes) }}</span>
+            <span class="thread-speed whitespace-nowrap text-right text-meta font-semibold text-green [font-variant-numeric:tabular-nums]"
+              :class="{ idle: item.speed <= 0 }">
               {{ formatSpeed(item.speed) }}
             </span>
             <span class="state-tag" :class="'state-' + item.state">{{ stateLabel(item.state) }}</span>
@@ -456,21 +461,13 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.download-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+/* 窗口排版已改到模板上的工具类（语义类名都留着：.task-item / .thread-item / .overview /
+   .task-list 这些在 themes.css 的毛玻璃表里，主题包也按类名覆盖）。
+   这里只留工具类压不住的部分：.fill 状态下的后代选择（两段列表各自滚）、
+   :first-child 伪类、状态色映射与进度条的本窗覆盖。 */
 
-/* ---------- 弹窗形态：把锁死的高度分下去 ----------
-   面板高度由 shellProps 的 fixedHeight 定死，这里让两段列表各自滚。
+/* 弹窗形态：把锁死的高度分下去，两段列表各自滚。
    不这么切的话，线程行的增删会一路顶到面板上，弹窗高度就跟着抽动 */
-.download-body.fill {
-  flex: 1;
-  min-height: 0;
-}
-
-/* 任务区：最多这么高，多了自己滚（任务数变化不再撑高面板） */
 .download-body.fill .section.tasks {
   min-height: 0;
 }
@@ -479,14 +476,11 @@ onUnmounted(() => {
   max-height: 168px;
   overflow-y: scroll;
   scrollbar-gutter: stable;
-  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
-     行不往左缩（槽位由上面的 scrollbar-gutter 常驻），滚动条画在这 8px 上
-     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
+  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 */
   margin-right: -8px;
   padding-right: 8px;
 }
 
-/* 线程区：吃掉剩余高度，行数变化只影响它自己的滚动条 */
 .download-body.fill .section.threads {
   flex: 1;
   min-height: 0;
@@ -497,30 +491,8 @@ onUnmounted(() => {
   min-height: 0;
   overflow-y: scroll;
   scrollbar-gutter: stable;
-  /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——
-     行不往左缩（槽位由上面的 scrollbar-gutter 常驻），滚动条画在这 8px 上
-     （与项目列表 .res-list 同一做法，见 styles/scrollbar.css） */
   margin-right: -8px;
   padding-right: 8px;
-}
-
-/* ---------- 总览 ---------- */
-.overview {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-
-.overview-head {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 12.5px;
-  color: var(--text-dim);
 }
 
 .ov-item:first-child {
@@ -528,143 +500,9 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-.ov-speed {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* 全局控制按钮（暂停 / 继续 / 停止） */
-.ov-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.ov-speed-label {
-  font-size: 11.5px;
-}
-
-.ov-speed-value {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--green);
-  font-variant-numeric: tabular-nums;
-}
-
 .ov-speed-value.idle {
   color: var(--text-dim);
   font-weight: 500;
-}
-
-/* 总体进度：进度条 + 右侧百分比 */
-.ov-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ov-percent {
-  flex-shrink: 0;
-  width: 48px;
-  text-align: right;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-.ov-track {
-  height: 8px;
-}
-
-/* ---------- 分区 ---------- */
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.section-title {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--text-dim);
-}
-
-.empty {
-  padding: 16px;
-  background: var(--bg-card);
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  text-align: center;
-  font-size: 12.5px;
-  color: var(--text-dim);
-}
-
-/* ---------- 任务 ---------- */
-.task-list,
-.thread-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.task-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-/* 任务行：数字/时间列贴右，多余宽度只留在「文件」列（表格常规做法） */
-.task-head {
-  display: grid;
-  grid-template-columns: 26px 86px minmax(0, 1fr) 54px 122px 100px;
-  gap: 8px;
-  align-items: center;
-  font-size: 12.5px;
-}
-
-.task-id {
-  font-weight: 700;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-
-.task-meta {
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-variant-numeric: tabular-nums;
-}
-
-.task-meta.right {
-  text-align: right;
-}
-
-.task-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.task-percent {
-  flex-shrink: 0;
-  width: 46px;
-  text-align: right;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 /* ---------- 进度条 ---------- */
@@ -693,65 +531,8 @@ onUnmounted(() => {
   background: var(--yellow);
 }
 
-/* ---------- 线程 ---------- */
-/* 线程行：固定列宽，信息列紧邻；状态列放得下最长的标签 "获取信息" / "Fetching Info"，
-   大小 / 速度列按最宽的 "41.4 MB / 41.4 MB"、"12.3 MB/s" 留宽，数字列一律不换行 */
-.thread-item {
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) 116px 124px 78px 88px;
-  gap: 8px;
-  align-items: center;
-  padding: 6px 10px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 12.5px;
-}
-
-.thread-id {
-  font-weight: 600;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-.thread-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.thread-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.thread-percent {
-  flex-shrink: 0;
-  width: 40px;
-  text-align: right;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.thread-size {
-  text-align: right;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.thread-speed {
-  text-align: right;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--green);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+.ov-track {
+  height: 8px;
 }
 
 .thread-speed.idle {
@@ -759,7 +540,7 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-/* ---------- 状态标签（多色） ---------- */
+/* ---------- 状态标签（多色）：状态 → 颜色的映射，工具类表达不了 ---------- */
 .state-tag {
   padding: 1px 8px;
   border-radius: 999px;
@@ -772,7 +553,6 @@ onUnmounted(() => {
   color: var(--text-dim);
 }
 
-/* 任务状态 */
 .ts-running {
   color: var(--dl-running);
   background: var(--dl-running-bg);
@@ -793,7 +573,6 @@ onUnmounted(() => {
   background: var(--dl-done-bg);
 }
 
-/* 线程状态 */
 .state-download {
   color: var(--dl-running);
   background: var(--dl-running-bg);

@@ -191,7 +191,7 @@ function sub(item: ShaderItemDto): string {
             @change.stop="toggleSelect(item)" @click.stop />
         </template>
         <template #badges>
-          <span v-if="item.selected" class="badge">{{ t("resource.shaderOn") }}</span>
+          <span v-if="item.selected" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.shaderOn") }}</span>
         </template>
         <!-- 光影包注释与文件名都可能带 `§` 格式码，统一过显示期解析 -->
         <template #name>

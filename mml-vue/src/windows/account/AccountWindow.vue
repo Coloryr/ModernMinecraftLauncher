@@ -839,11 +839,11 @@ function tokenLabel(acc: AccountStoreDto): string {
 
       <p v-if="addInvalid.length" class="error-text">{{ t("account.fieldsRequired") }}</p>
 
-      <p v-if="addType === 'microsoft'" class="hint">{{ t("account.loginHint") }}</p>
+      <p v-if="addType === 'microsoft'" class="hint mt-2.5 text-[12px] text-dim">{{ t("account.loginHint") }}</p>
 
       <div class="modal-actions">
         <!-- 统一通行证 / LittleSkin 有现成的注册页：没有账户时不必关掉弹窗再去开浏览器 -->
-        <BaseButton v-if="registerUrl" variant="ghost" class="reg-btn" @click="openRegister">
+        <BaseButton v-if="registerUrl" variant="ghost" class="reg-btn mr-auto" @click="openRegister">
           {{ t("account.register") }}
         </BaseButton>
         <BaseButton @click="showAdd = false">{{ t("add.cancel") }}</BaseButton>
@@ -854,9 +854,9 @@ function tokenLabel(acc: AccountStoreDto): string {
     <!-- 微软登录：请求码 + 地址 + 打开浏览器 / 取消 -->
     <BaseModal v-if="showOauth" :title="t('account.oauthTitle')" :closable="false" below-titlebar @close="cancelLogin">
       <label class="field-label">{{ t("account.oauthCode") }}</label>
-      <div class="oauth-code copyable" v-tip="t('account.copy')" @click="copyOauthValue(oauthCode)">
+      <div class="oauth-code copyable group flex cursor-pointer select-text items-center justify-between gap-2.5 rounded-card border border-border bg-side px-3.5 py-2.5 text-center text-display font-extrabold tracking-[4px] text-accent transition-[border-color] duration-150 hover:border-accent [font-family:'Cascadia Code',Consolas,monospace]" v-tip="t('account.copy')" @click="copyOauthValue(oauthCode)">
         {{ oauthCode }}
-        <svg class="copy-ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+        <svg class="copy-ico shrink-0 opacity-[0.55] group-hover:opacity-100" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <rect x="9" y="9" width="12" height="12" rx="2" />
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
@@ -864,16 +864,16 @@ function tokenLabel(acc: AccountStoreDto): string {
       </div>
 
       <label class="field-label">{{ t("account.oauthUrl") }}</label>
-      <div class="oauth-url copyable" v-tip="t('account.copy')" @click="copyOauthValue(oauthUrl)">
-        <span class="oauth-url-text">{{ oauthUrl }}</span>
-        <svg class="copy-ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+      <div class="oauth-url copyable group flex cursor-pointer select-text items-center justify-between gap-2.5 rounded-card border border-border bg-side px-3.5 py-2.5 text-title text-accent break-all transition-[border-color] duration-150 hover:border-accent" v-tip="t('account.copy')" @click="copyOauthValue(oauthUrl)">
+        <span class="oauth-url-text text-left">{{ oauthUrl }}</span>
+        <svg class="copy-ico shrink-0 opacity-[0.55] group-hover:opacity-100" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <rect x="9" y="9" width="12" height="12" rx="2" />
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
       </div>
 
-      <p class="hint">{{ t("account.oauthHint") }}</p>
+      <p class="hint mt-2.5 text-[12px] text-dim">{{ t("account.oauthHint") }}</p>
 
       <div class="modal-actions">
         <BaseButton @click="cancelLogin">{{ t("add.cancel") }}</BaseButton>
@@ -883,7 +883,7 @@ function tokenLabel(acc: AccountStoreDto): string {
 
     <BaseModal v-if="showOauthRun" :title="t('account.oauthTitle')" :closable="false" below-titlebar
       @close="cancelLogin">
-      <p class="hint">{{ oauthState }}</p>
+      <p class="hint mt-2.5 text-[12px] text-dim">{{ oauthState }}</p>
 
       <div class="modal-actions">
         <BaseButton @click="cancelLogin">{{ t("add.cancel") }}</BaseButton>
@@ -893,9 +893,9 @@ function tokenLabel(acc: AccountStoreDto): string {
     <!-- 删除确认：账户名与类型一行，UUID 单独一行，方便核对删的是哪一个 -->
     <BaseModal v-if="deleteTarget" :title="t('account.delete')" :closable="false" below-titlebar
       @close="deleteTarget = null">
-      <div class="delete-tip">
-        <span class="delete-name">{{ deleteTarget.userName }} - {{ t(typeLabelKey(deleteTarget.authType)) }}</span>
-        <span class="delete-uuid">{{ deleteTarget.uuid }}</span>
+      <div class="delete-tip mx-0 mb-4 mt-1 flex flex-col gap-1.5">
+        <span class="delete-name text-[14px] font-bold break-all">{{ deleteTarget.userName }} - {{ t(typeLabelKey(deleteTarget.authType)) }}</span>
+        <span class="delete-uuid text-meta text-dim break-all [font-family:'Cascadia Code',Consolas,monospace]">{{ deleteTarget.uuid }}</span>
       </div>
       <div class="modal-actions">
         <BaseButton @click="deleteTarget = null">{{ t("add.cancel") }}</BaseButton>
@@ -921,7 +921,7 @@ function tokenLabel(acc: AccountStoreDto): string {
       <label class="field-label">{{ t("account.password") }}</label>
       <input v-model="reloginFields.pass" class="field-input" type="password" @keyup.enter="confirmRelogin" />
 
-      <p class="hint">{{ t("account.reloginHint") }}</p>
+      <p class="hint mt-2.5 text-[12px] text-dim">{{ t("account.reloginHint") }}</p>
 
       <div class="modal-actions">
         <BaseButton @click="reloginTarget = null">{{ t("add.cancel") }}</BaseButton>
@@ -936,8 +936,8 @@ function tokenLabel(acc: AccountStoreDto): string {
       <input v-model="editFields.name" class="field-input" spellcheck="false" />
 
       <label class="field-label">{{ t("account.uuid") }}</label>
-      <div class="uuid-row">
-        <input v-model="editFields.uuid" class="field-input grow" spellcheck="false" />
+      <div class="uuid-row flex items-center gap-2">
+        <input v-model="editFields.uuid" class="field-input grow min-w-[140px] flex-1" spellcheck="false" />
         <BaseButton size="sm" @click="randomUuid">{{ t("account.randomUuid") }}</BaseButton>
       </div>
 
@@ -970,7 +970,8 @@ function tokenLabel(acc: AccountStoreDto): string {
 </template>
 
 <style scoped>
-/* 详情 / 皮肤子页面 / 空状态时视图区占满剩余高度，滚动交给内部容器 */
+/* 排版 / 间距 / 字号 / 颜色在模板的工具类上；这里留状态类、对全局样式的覆盖，
+   以及不在六档字号里的原值 —— 后者换成工具类就得改设计，不做 */
 .view-area.fill {
   flex: 1;
   min-height: 0;
@@ -979,107 +980,10 @@ function tokenLabel(acc: AccountStoreDto): string {
   flex-direction: column;
 }
 
-/* 删除确认：名字与类型一行，UUID 换行，长串都允许折行 */
-.delete-tip {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 4px 0 16px;
-}
-
-.delete-name {
-  font-size: 14px;
-  font-weight: 700;
-  word-break: break-all;
-}
-
-.delete-uuid {
-  font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  word-break: break-all;
-}
-
-/* UUID 输入 + 随机按钮 */
-.uuid-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 注册按钮靠左：它是"还没有账户"的旁路，不跟取消 / 添加挤在右端 */
-.reg-btn {
-  margin-right: auto;
-}
-
-/* 这一排的通用标准（宽度 170–280、省略号、按钮不缩、chip 可压）在 styles/titlebar.css；
-   这里只留账户窗口自己的例外：类型筛选比标准下拉窄一档，标题栏还要塞搜索框与分段控件 */
+/* 类型筛选比标准下拉窄一档：这是对 styles/titlebar.css 的覆盖，
+   必须留在无层 CSS 里，工具类压不住它 */
 .head-select {
   min-width: 128px;
 }
 
-/* 标题栏搜索框走共享组件 SearchBox；它自己的外观全部来自 .field-input 与 .input-clear */
-
-.grow {
-  flex: 1;
-  min-width: 140px;
-}
-
-/* 微软登录码：等宽字体 + 宽字距，方便照着抄 */
-.oauth-code {
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 4px;
-  font-family: "Cascadia Code", Consolas, monospace;
-  color: var(--accent);
-  background: var(--bg-side);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  text-align: center;
-}
-
-.oauth-url {
-  font-size: 13px;
-  color: var(--accent);
-  background: var(--bg-side);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  word-break: break-all;
-}
-
-/* 登录码 / 网址可点击复制 */
-.copyable {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  cursor: pointer;
-  user-select: text;
-  transition: border-color 0.15s;
-}
-
-.copyable:hover {
-  border-color: var(--accent);
-}
-
-.oauth-url-text {
-  text-align: left;
-}
-
-.copy-ico {
-  flex-shrink: 0;
-  opacity: 0.55;
-}
-
-.copyable:hover .copy-ico {
-  opacity: 1;
-}
-
-.hint {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin: 10px 0 0;
-}
 </style>

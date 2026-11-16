@@ -52,7 +52,7 @@ const { enter: enterPage, leave: leavePage } = useStaggerEnter(".si-section > *"
       </div>
     </template>
 
-    <div class="si-layout">
+    <div class="si-layout flex min-h-0 flex-1">
       <!-- 左侧分页 -->
       <nav ref="railEl" class="si-rail" :class="{ ready: thumbReady }">
         <span class="si-thumb" :style="thumbStyle" aria-hidden="true"></span>
@@ -68,19 +68,19 @@ const { enter: enterPage, leave: leavePage } = useStaggerEnter(".si-section > *"
         </button>
       </nav>
 
-      <div class="si-content" :inert="loading">
+      <div class="si-content relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden py-[22px] pl-[26px]" :inert="loading">
         <Transition :css="false" mode="out-in" @enter="enterPage" @leave="leavePage">
-          <div v-if="!instances.length" key="__empty" class="si-page">
-            <header class="si-head">
-              <h2 class="si-title">{{ t(`serverInstance.tab.${section}`) }}</h2>
-              <p class="si-sub">{{ t(`serverInstance.tabDesc.${section}`) }}</p>
+          <div v-if="!instances.length" key="__empty" class="si-page flex min-h-0 flex-1 flex-col">
+            <header class="si-head mb-3.5 pr-[26px]">
+              <h2 class="si-title text-display font-extrabold">{{ t(`serverInstance.tab.${section}`) }}</h2>
+              <p class="si-sub mt-1 text-body text-dim">{{ t(`serverInstance.tabDesc.${section}`) }}</p>
             </header>
             <p class="empty-tip">{{ t("serverInstance.noInstance") }}</p>
           </div>
-          <div v-else :key="section" class="si-page">
-            <header class="si-head">
-              <h2 class="si-title">{{ t(`serverInstance.tab.${section}`) }}</h2>
-              <p class="si-sub">{{ t(`serverInstance.tabDesc.${section}`) }}</p>
+          <div v-else :key="section" class="si-page flex min-h-0 flex-1 flex-col">
+            <header class="si-head mb-3.5 pr-[26px]">
+              <h2 class="si-title text-display font-extrabold">{{ t(`serverInstance.tab.${section}`) }}</h2>
+              <p class="si-sub mt-1 text-body text-dim">{{ t(`serverInstance.tabDesc.${section}`) }}</p>
             </header>
             <GeneralPanel v-if="section === 'general'" />
             <BasePanel v-else-if="section === 'base'" />

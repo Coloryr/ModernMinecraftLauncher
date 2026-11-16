@@ -29,17 +29,33 @@ const text = computed(() => {
   }
 });
 
-/** 样式类：与 settings.css 的 .save-state.ok / .err / .pending 对应 */
+/** 样式类：状态名保留给主题覆盖，具体颜色用工具类 */
 const kind = computed(() => {
   if (props.state === "idle" && props.pending) return "pending";
   if (props.state === "saved") return "ok";
   if (props.state === "error") return "err";
   return props.state;
 });
+
+/** 状态对应的文字色；未命中时沿用 .save-state 的默认弱化色 */
+const kindColor = computed(() => {
+  switch (kind.value) {
+    case "ok":
+      return "text-green";
+    case "err":
+      return "text-red";
+    case "pending":
+      return "text-yellow";
+    default:
+      return "";
+  }
+});
 </script>
 
 <template>
-  <span v-if="text" class="save-state" :class="kind" role="status" aria-live="polite">
+  <span v-if="text"
+    class="save-state inline-flex items-center gap-[5px] text-meta text-dim mr-1 whitespace-nowrap"
+    :class="[kind, kindColor]" role="status" aria-live="polite">
     {{ text }}
   </span>
 </template>

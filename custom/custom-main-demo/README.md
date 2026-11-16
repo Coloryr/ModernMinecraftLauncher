@@ -26,14 +26,26 @@ custom-main-demo.zip
 
 `src/theme.json` 声明包类型，导入时按包根的那份判定；没有清单的包与其它类型入口重合时会被拒绝。
 
+## 样式与 Tailwind
+
+样式源码是 `src/App.vue` 的 `<style>` 与 `src/theme.css`，后者第一行
+`@import "mml-vue/tailwind.css";`：只出 utilities、不含 preflight，token 映射到启动器
+主题变量（`bg-card` / `text-dim` / `text-meta` / `rounded-panel`），换深浅色与强调色都跟着变。
+
+- 工具类与普通 CSS 可以混写，示例里 `.card` 的底色、`.card-head` 的排版就走工具类。
+- 这个示例用 `postcss-prefix-selector` 把选择器限定在 `.mml-home` 内，它把 Tailwind 的
+  `:root` 变量映射成 `.mml-home`，工具类输出成 `.mml-home .bg-card`，正好是后代，变量能继承；
+  **不要**给前缀插件加 `:root` 的 exclude，那会让变量漏到宿主页面根上。
+- 不用 Tailwind 也完全可以：删掉 `src/theme.css` 的 `@import` 与 `entry.ts` 里的引用即可。
+
 ## 依赖从哪来
 
-`mml-ipc` 没有发布到 npm，`package.json` 里写的是 `file:.mml-deps/mml-ipc`，
-由 `scripts/deps.mjs` 在 npm 解析依赖之前铺好：
+`mml-ipc` 与 `mml-vue`（Tailwind token 与 ui-kit 都从它取）没有发布到 npm，
+`package.json` 里写的是 `file:.mml-deps/<名字>`，由 `scripts/deps.mjs` 在 npm 解析依赖之前铺好：
 
-- 上级目录有本仓库（示例在 `custom/<示例>/` 下）→ 直接链到 `../../mml-ipc`，
+- 上级目录有本仓库（示例在 `custom/<示例>/` 下）→ 直接链到 `../../mml-ipc`、`../../mml-vue`，
   改仓库里的源码立即生效；
-- 上级目录没有 → 浅克隆仓库到 `.mml-deps/repo`，只检出 `mml-ipc`，再链过去。
+- 上级目录没有 → 浅克隆仓库到 `.mml-deps/repo`，只检出这两个包，再链过去。
 
 `.mml-deps/` 是生成物，已忽略；要手动重建跑 `npm run deps`。克隆地址可用
 `MML_REPO_URL` 覆盖，指向内网镜像或自己的 fork。

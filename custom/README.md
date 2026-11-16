@@ -49,6 +49,27 @@ npm run build      # vite build 入口 + 压 zip
 
 构建产物（zip）留在各自目录下，已在 `.gitignore` 里忽略；重新构建会覆盖同名 zip。
 
+## Tailwind 支持情况
+
+五个示例都能用 Tailwind：三个带构建的在构建里编译（`@import "mml-vue/tailwind.css"`，
+token 映射到启动器主题变量、不含 preflight）；两个 HTML 示例没有构建，用**预编译好的
+`src/tailwind.css`**，改了类名要按各自 README 的命令重新生成。
+
+| 示例 | 构建 | Tailwind 怎么来 |
+| --- | --- | --- |
+| custom-main-demo | Vite | 构建时编译，入口 `src/theme.css` |
+| custom-ui-demo | Vite | 构建时编译，入口 `src/theme.css` |
+| custom-ui-css-demo | Vite | 构建时编译，入口 `src/theme.css`，皮肤规则在 `src/custom.css` |
+| custom-main-html-demo | 无 | 预编译产物 `src/tailwind.css`（已提交，重新生成见该示例 README） |
+| custom-ui-html-demo | 无 | 同上 |
+
+- 工具类：`bg-card` / `text-dim` / `text-meta` / `rounded-panel` / `border-border` 等，
+  颜色与档位都取自启动器主题（长短名等价，长名形如 `bg-bg-card`）。
+- **iframe 类示例（两个 HTML）必须先收主题变量**：页面在 `<head>` 里监听
+  `theme-tokens` 消息并写进 `:root`，否则 `bg-card` 这类颜色类算出来是空的，
+  只写排版类（`flex` / `gap-*`）才不受影响。
+- 组件型主题（前三个）跑在宿主 DOM 里，变量天然可用，不用这套监听。
+
 ## 五个示例各自改什么
 
 ### custom-main-demo —— 自定义主页面
@@ -118,5 +139,88 @@ npm run build      # vite build 入口 + 压 zip
   `window.mml`，不各写一份类型。
 - `mml-vue/ui-kit`：控件与样式变量的唯一来源；改完 `mml-vue` 的控件后重跑
   `node mml-vue/scripts/gen-ui.ts`，示例拿到的清单跟着更新。
+- `mml-vue/tailwind.css`：Tailwind 入口（不含 preflight），工具类直接映射启动器的
+  主题变量，用法见下一节。
+
+### 用 Tailwind 写主题
+
+组件型主题（`custom.js`）跑在启动器页面里，可以直接用 Tailwind：颜色与档位取自启动器
+当前主题，明暗切换、换强调色都跟着变。
+
+```bash
+npm i -D tailwindcss @tailwindcss/vite
+```
+
+```ts
+// vite.config.ts
+import tailwindcss from "@tailwindcss/vite";
+export default defineConfig({ plugins: [vue(), tailwindcss()] });
+```
+
+```css
+/* 打包后就是 custom.css：先引入口，再写自己的样式 */
+@import "mml-vue/tailwind.css";
+
+.hero {
+  @apply bg-card text-fg border border-border rounded-panel p-4 text-meta;
+}
+```
+
+- 可用工具类：底色 `bg-page` / `bg-side` / `bg-card` / `bg-hover` / `bg-raised` /
+  `bg-modal` / `bg-overlay`，文字 `text-fg` / `text-dim` / `text-sub`，强调 `text-accent` /
+  `bg-accent-soft` / `border-accent-border` / `text-on-accent`，状态 `text-green` / `text-red` /
+  `text-yellow`；字号 `text-caption` / `text-meta` / `text-body` / `text-title` / `text-heading` /
+  `text-display`；圆角 `rounded-ctl` / `rounded-card` / `rounded-panel` / `rounded-pill`；
+  控件高 `h-ctl`。
+- 另有 `bg-bg-card`、`text-text-dim` 这类长名（工具类名 = 前缀 + token 名），两套等价，
+  新代码用短名即可。
+- 入口**不含 preflight**：它要挂进启动器页面，重置会把启动器自己的按钮与边距打乱。
+  需要重置就在自己的选择器里局部写。
+- 别在自己的样式里写字面色值，深浅主题会同时失效。
+- **整页 iframe 主题**（`index.html`）拿不到宿主的 CSS 变量，但启动器会把变量值
+  发过来，见下一节。
+
+### iframe 主题拿主题色
+
+iframe 是独立文档，宿主的 `--bg-card` 这类变量不会继承进去。启动器在握手后、
+以及主题 / 强调色 / 纯色模式变化时，会往 iframe 发一条消息（整页包与主页面包通用）：
+
+```ts
+// 父 → iframe
+{ __mml: 1, type: "theme-tokens", theme: "Dark" | "Light", tokens: Record<string, string> }
+// iframe → 父：主动要一次（页面加载晚于握手时用）
+{ __mml: 1, type: "theme-tokens?" }
+```
+
+`tokens` 是「变量名 → 计算值」，例如 `{ "--bg-card": "rgb(34 38 46 / 85%)", "--text": "#e8eaed" }`，
+取不到的项不会出现。页面侧最小写法：
+
+```html
+<script>
+  // 只认父窗口发来的、带协议标记的消息
+  window.addEventListener("message", (e) => {
+    if (e.source !== window.parent) return;
+    const data = e.data;
+    if (!data || data.__mml !== 1 || data.type !== "theme-tokens") return;
+    const root = document.documentElement;
+    for (const [name, value] of Object.entries(data.tokens)) {
+      root.style.setProperty(name, value);
+    }
+    root.dataset.mmlTheme = data.theme;
+  });
+  // 页面自己决定什么时候要：父窗口也会在握手后主动发一次
+  window.parent.postMessage({ __mml: 1, type: "theme-tokens?" }, "*");
+</script>
+```
+
+拿到之后 `bg-card` 这类工具类就能用了，做法和组件型主题一样：
+
+```css
+@import "mml-vue/tailwind.css"; /* 打包成页面自己的 css，跟 index.html 一起进 zip */
+```
+
+- 变量是**值**不是引用：页面刷新后要重新收一次，父窗口会在 iframe `load` 时补发。
+- 页面用 `window.mml` 时也能自己监听，消息格式与上面一致，不用另写一套。
+- `--accent-grad` 这类渐变不放进来，需要渐变就在页面里用 `--accent` 自己拼。
 
 各示例的详细步骤、可改位置和实现说明见各自 README。

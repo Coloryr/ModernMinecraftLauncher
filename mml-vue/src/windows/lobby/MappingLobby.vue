@@ -41,18 +41,19 @@ onMounted(refresh);
 </script>
 
 <template>
-  <section class="mapping">
-    <p class="notice">{{ t('lobby.mappingPending') }}</p>
-    <div class="toolbar">
-      <input v-model="keyword" :aria-label="t('lobby.searchRooms')" :placeholder="t('lobby.searchRooms')" />
+  <section class="mapping grid gap-3.5">
+    <p class="notice text-title leading-[1.7] text-dim">{{ t('lobby.mappingPending') }}</p>
+    <div class="toolbar flex flex-wrap items-center gap-2.5">
+      <input class="min-w-[180px] flex-1 rounded-ctl border border-border bg-card px-3 py-2 text-fg" v-model="keyword"
+      :aria-label="t('lobby.searchRooms')" :placeholder="t('lobby.searchRooms')" />
       <BaseButton :disabled="busy" @click="refresh">{{ t('lobby.refreshRooms') }}</BaseButton>
       <BaseButton :disabled="!view?.available || busy" @click="action('host', '')">{{ t('lobby.createRoom') }}
       </BaseButton>
     </div>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <p v-if="!rooms.length" class="empty">{{ t('lobby.noRooms') }}</p>
-    <article v-for="room in rooms" :key="room.id">
-      <strong>
+    <p v-if="error" class="error text-red" role="alert">{{ error }}</p>
+    <p v-if="!rooms.length" class="empty rounded-panel border border-dashed border-border px-4 py-12 text-center text-title leading-[1.7] text-dim">{{ t('lobby.noRooms') }}</p>
+    <article v-for="room in rooms" :key="room.id" class="flex flex-wrap items-center gap-2.5 rounded-panel border border-border p-4">
+      <strong class="flex-1">
         <HighlightText :text="room.name" :query="keyword" />
       </strong>
       <span>{{ t('lobby.players', { count: room.players }) }}</span>
@@ -60,56 +61,3 @@ onMounted(refresh);
     </article>
   </section>
 </template>
-
-<style scoped>
-.mapping {
-  display: grid;
-  gap: 14px;
-}
-
-.notice,
-.empty {
-  color: var(--text-dim);
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-.toolbar,
-article {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.toolbar input {
-  flex: 1;
-  min-width: 180px;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  background: var(--bg-card);
-}
-
-.empty {
-  padding: 48px 16px;
-  text-align: center;
-  border: 1px dashed var(--border);
-  border-radius: 12px;
-}
-
-article {
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-
-article strong {
-  flex: 1;
-}
-
-.error {
-  color: var(--red);
-}
-</style>

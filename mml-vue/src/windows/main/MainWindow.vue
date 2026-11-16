@@ -2545,7 +2545,7 @@ onMounted(async () => {
            ResourceTitleIndicator），对应弹窗由 App.vue 渲染：内容区不再留卡片占位 -->
 
       <!-- 主体 -->
-      <main class="main"
+      <main class="main relative flex flex-1 min-h-0"
         :class="{ 'side-right': sidebarSide === 'Right', 'sidebar-anim': sidebarAnim, 'pane-max': paneMaximized, 'pane-absolute': paneAbsolute,
           'sidebar-collapsed': sidebarCollapsed, 'home-active': newsActive }">
         <!-- 锁定的实例已不存在，例如整合包作者的实例被删 / 改名：整块换成错误页，顶部栏保留 -->
@@ -2559,7 +2559,7 @@ onMounted(async () => {
         <!-- 空实例：强制打开启动器主页，主页内融合空状态引导（隐藏实例分组） -->
         <template v-else-if="instances.length === 0">
           <!-- 自定义主页面：整块铺满内容区，不留四周内边距，也不给底部留白 -->
-          <section v-if="useCustomHome" class="custom-home-page">
+          <section v-if="useCustomHome" class="custom-home-page flex min-h-0 flex-1 flex-col">
             <CustomHomePage :entry-url="customHome?.entryUrl ?? ''" />
           </section>
           <section v-else class="news-page">
@@ -2574,7 +2574,7 @@ onMounted(async () => {
         <template v-else-if="effectiveMode === 'list'">
           <Transition :css="false" mode="out-in" @enter="enterHomePage" @leave="leaveHomePage">
             <!-- 自定义主页面：与列表模式一样铺满内容区（自己滚动，不留内边距） -->
-            <section v-if="newsActive && useCustomHome" key="custom-home" class="custom-home-page">
+            <section v-if="newsActive && useCustomHome" key="custom-home" class="custom-home-page flex min-h-0 flex-1 flex-col">
               <CustomHomePage :entry-url="customHome?.entryUrl ?? ''" />
             </section>
 
@@ -2716,7 +2716,7 @@ onMounted(async () => {
                  height:100% 解析不出高度（父元素没有确定高度），会把页面压扁；这里单独包一层
                  去掉 padding 的撑满容器，让 iframe 铺满整个内容区 -->
             <Transition :css="false" mode="out-in" @enter="enterHomePage" @leave="leaveHomePage">
-              <div v-if="newsActive && useCustomHome" key="custom-home" class="custom-home-fill">
+              <div v-if="newsActive && useCustomHome" key="custom-home" class="custom-home-fill flex min-h-0 flex-1 flex-col">
                 <CustomHomePage :entry-url="customHome?.entryUrl ?? ''" />
               </div>
 
@@ -2726,11 +2726,11 @@ onMounted(async () => {
                 @select="(inst: InstanceInfoDto) => select(inst)" @quick-launch="quickLaunch"
                 back-label-key="home.backToDetail" @back="newsActive = false" />
 
-              <div v-else key="detail" class="detail-content">
+              <div v-else key="detail" class="detail-content flex flex-1 flex-col gap-4">
                 <!-- 按实例 uuid 做 key：切换实例时整块详情走进出动画 -->
                 <Transition name="view-swap" mode="out-in">
-                  <div v-if="selected" :key="selected.uuid" class="detail-instance">
-                    <div class="detail-top">
+                  <div v-if="selected" :key="selected.uuid" class="detail-instance flex flex-col gap-2.5">
+                    <div class="detail-top flex items-start gap-[18px]">
                       <!-- 实例图标：悬停压暗并露出改图标入口，与列表模式同一套 -->
                       <InstanceIcon :name="selected.name" :uuid="selected.uuid" :size="84" @mouseenter="onIconHover">
                         <div class="icon-edit-overlay">

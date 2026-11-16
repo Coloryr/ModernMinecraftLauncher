@@ -122,69 +122,69 @@ function hidePreview() {
 </script>
 
 <template>
-  <div class="acc-grid" :class="{ empty: accounts.length === 0 }">
-    <div v-for="acc in accounts" :key="acc.uuid" class="acc-card" :class="{ current: isCurrent(acc) }"
+  <div class="acc-grid grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4" :class="{ empty: accounts.length === 0 }">
+    <div v-for="acc in accounts" :key="acc.uuid" class="acc-card flex flex-col gap-3.5 rounded-[16px] border border-border bg-card p-[18px]" :class="{ current: isCurrent(acc) }"
       @dblclick="!accountLocked && emit('switch', acc)" @contextmenu.prevent="emit('menu', { event: $event, acc })">
-      <div class="acc-images"
+      <div class="acc-images relative flex items-center justify-center gap-3 rounded-panel bg-side py-[18px]"
         :class="{ empty: imageFailed(acc, 'avatar') && imageFailed(acc, 'skin') && imageFailed(acc, 'cape') }">
-        <span v-if="isCurrent(acc)" class="current-badge">{{ t("account.current") }}</span>
+        <span v-if="isCurrent(acc)" class="current-badge absolute left-2 top-2 whitespace-nowrap rounded-pill bg-accent px-[9px] py-0.5 text-caption text-on-accent">{{ t("account.current") }}</span>
         <!-- 平铺卡片看不到详情表格里的 Token 列，右上角直接标出这一条是否有效 -->
-        <span class="validity-badge" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
+        <span class="validity-badge absolute right-2 top-2 whitespace-nowrap rounded-pill px-[9px] py-0.5 text-caption" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
         <!-- 加载中：图上叠转圈，onload 后消失（img 先渲染，加载完才能触发事件） -->
-        <div v-if="!imageFailed(acc, 'avatar')" class="img-box img-avatar-box">
+        <div v-if="!imageFailed(acc, 'avatar')" class="img-box img-avatar-box relative h-14 w-14 shrink-0">
           <!-- 头像也点开皮肤弹窗：三者是同一个入口，描边与悬停大图的口径要一致 -->
-          <img :src="accountAvatarUrl(acc)" class="img-avatar" role="button" tabindex="0"
+          <img :src="accountAvatarUrl(acc)" class="img-avatar h-14 w-14 cursor-pointer [image-rendering:pixelated]" role="button" tabindex="0"
             :class="{ pending: imageLoading(acc, 'avatar') }" :alt="t('account.avatar')" data-no-fallback
             @load="markImageLoaded(acc, 'avatar')" @error="markImageFailed(acc, 'avatar')"
             @mouseenter="showPreview($event, acc, 'avatar')" @mousemove="movePreview" @mouseleave="hidePreview"
             @click.stop="openSkin(acc)" @dblclick.stop="openSkin(acc)" @keydown.enter.prevent="openSkin(acc)" />
-          <div v-if="imageLoading(acc, 'avatar')" class="img-spin" />
+          <div v-if="imageLoading(acc, 'avatar')" class="img-spin absolute inset-0 flex items-center justify-center" />
         </div>
         <!-- 头像由皮肤渲染而来：皮肤都没有时不再显示"无头像"，只留皮肤/披风占位 -->
-        <div v-else-if="!imageFailed(acc, 'skin')" class="img-ph img-avatar-ph">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"
+        <div v-else-if="!imageFailed(acc, 'skin')" class="img-ph img-avatar-ph flex h-14 w-14 select-none flex-col items-center justify-center gap-[5px] border border-dashed border-border text-[10px] text-dim">
+          <svg class="opacity-[0.55]" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"
             stroke-linecap="round">
             <circle cx="12" cy="8" r="4" />
             <path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" />
           </svg>
           <span>{{ t("account.noAvatar") }}</span>
         </div>
-        <div v-if="!imageFailed(acc, 'skin')" class="img-box img-skin-box">
+        <div v-if="!imageFailed(acc, 'skin')" class="img-box img-skin-box relative h-24 w-12 shrink-0">
           <!-- 点开皮肤弹窗：与操作按钮里的「查看皮肤」同一个入口。
                双击的父级语义是"切换账户"，这里 .stop 掉，免得点两下顺手换了账户 -->
-          <img :src="accountSkinUrl(acc)" class="img-skin" role="button" tabindex="0"
+          <img :src="accountSkinUrl(acc)" class="img-skin h-24 w-12 cursor-pointer rounded-[5px] [image-rendering:pixelated]" role="button" tabindex="0"
             :class="{ 'mode-3d': isSkin3D, pending: imageLoading(acc, 'skin') }" :alt="t('account.skin')"
             data-no-fallback @load="markImageLoaded(acc, 'skin')" @error="markImageFailed(acc, 'skin')"
             @mouseenter="showPreview($event, acc, 'skin')" @mousemove="movePreview" @mouseleave="hidePreview"
             @click.stop="openSkin(acc)" @dblclick.stop="openSkin(acc)" @keydown.enter.prevent="openSkin(acc)" />
-          <div v-if="imageLoading(acc, 'skin')" class="img-spin" />
+          <div v-if="imageLoading(acc, 'skin')" class="img-spin absolute inset-0 flex items-center justify-center" />
         </div>
-        <div v-else class="img-ph img-skin-ph">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"
+        <div v-else class="img-ph img-skin-ph flex h-24 w-12 select-none flex-col items-center justify-center gap-[5px] rounded-[5px] border border-dashed border-border text-[10px] text-dim">
+          <svg class="opacity-[0.55]" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"
             stroke-linecap="round">
             <circle cx="12" cy="5" r="2.4" />
             <path d="M9.5 9h5l1.5 6h-2l-.8 7h-2.4l-.8-7h-2z" />
           </svg>
           <span>{{ t("account.noSkin") }}</span>
         </div>
-        <div v-if="!imageFailed(acc, 'cape')" class="img-box img-cape-box">
-          <img :src="accountCapeUrl(acc, capeDisplay)" class="img-cape" role="button" tabindex="0"
+        <div v-if="!imageFailed(acc, 'cape')" class="img-box img-cape-box relative h-24 w-12 shrink-0">
+          <img :src="accountCapeUrl(acc, capeDisplay)" class="img-cape h-24 w-12 cursor-pointer rounded-[5px] object-contain [image-rendering:pixelated]" role="button" tabindex="0"
             :class="{ pending: imageLoading(acc, 'cape') }" :alt="t('account.cape')" data-no-fallback
             @load="markImageLoaded(acc, 'cape')" @error="markImageFailed(acc, 'cape')"
             @mouseenter="showPreview($event, acc, 'cape')" @mousemove="movePreview" @mouseleave="hidePreview"
             @click.stop="openSkin(acc)" @dblclick.stop="openSkin(acc)" @keydown.enter.prevent="openSkin(acc)" />
-          <div v-if="imageLoading(acc, 'cape')" class="img-spin" />
+          <div v-if="imageLoading(acc, 'cape')" class="img-spin absolute inset-0 flex items-center justify-center" />
         </div>
-        <div v-else class="img-ph img-cape-ph">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"
+        <div v-else class="img-ph img-cape-ph flex h-24 w-12 select-none flex-col items-center justify-center gap-[5px] rounded-[5px] border border-dashed border-border text-[10px] text-dim">
+          <svg class="opacity-[0.55]" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M8 3h8l1 3-1 3v12l-4-2.5L8 21V9L7 6z" />
           </svg>
           <span>{{ t("account.noCape") }}</span>
         </div>
       </div>
-      <div class="acc-head">
-        <span class="acc-name">
+      <div class="acc-head flex min-w-0 items-center gap-2">
+        <span class="acc-name min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-bold">
           <HighlightText :text="acc.userName" :query="query" />
         </span>
         <AccountTypeBadge :auth-type="acc.authType" />
@@ -199,24 +199,20 @@ function hidePreview() {
 
     <!-- 悬停图片时的大图预览（跟随鼠标，不拦截事件），尺寸按图片类型区分 -->
     <Teleport to="body">
-      <div v-if="preview" class="skin-float"
+      <div v-if="preview" class="skin-float pointer-events-none fixed z-[300] rounded-card border border-border bg-card p-2 shadow-[var(--shadow-lg)]"
         :class="[preview.kind, preview.kind === 'skin' && isSkin3D ? 'skin3d' : '']"
         :style="{ left: preview.x + 'px', top: preview.y + 'px' }">
-        <img :src="preview.url" alt="" />
-        <img v-if="preview.backUrl" :src="preview.backUrl" alt="" />
+        <img class="block h-[160px] w-[160px] [image-rendering:pixelated]" :src="preview.url" alt="" />
+        <img v-if="preview.backUrl" class="block h-[160px] w-[160px] [image-rendering:pixelated]" :src="preview.backUrl"
+          alt="" />
       </div>
     </Teleport>
   </div>
 </template>
 
 <style scoped>
-.acc-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 16px;
-}
-
-/* 空状态：去掉网格，让占位框吃满视图区剩余高度 */
+/* 排版 / 间距 / 字号 / 颜色在模板的工具类上；这里留状态类、伪类与按类型分档的
+   悬浮大图尺寸 —— 它们都挂着状态或后代选择器，工具类表达不了 */
 .acc-grid.empty {
   display: flex;
   flex-direction: column;
@@ -224,85 +220,23 @@ function hidePreview() {
   min-height: 0;
 }
 
-.acc-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.acc-images {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  justify-content: center;
-  padding: 18px 0;
-  background: var(--bg-side);
-  border-radius: 12px;
-}
-
 /* 无皮肤时不再铺色块，占位直接落在卡片底色上 */
 .acc-images.empty {
   background: transparent;
 }
 
-.current-badge {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  font-size: 10.5px;
-  padding: 2px 9px;
-  border-radius: 20px;
-  background: var(--accent);
-  color: var(--on-accent);
-  white-space: nowrap;
+/* 当前使用的账户：描边 + 一圈光晕 */
+.acc-card.current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
-/* 右上角有效性：有效 / 已过期，与列表的 token 标记同一套配色 */
-.validity-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  font-size: 10.5px;
-  padding: 2px 9px;
-  border-radius: 20px;
-  white-space: nowrap;
-}
-
-.validity-badge.valid {
-  background: color-mix(in srgb, var(--green) 16%, transparent);
-  color: var(--green);
-}
-
-.validity-badge.expired {
-  background: color-mix(in srgb, var(--red) 16%, transparent);
-  color: var(--red);
-}
-
-/* 图片槽容器：相对定位，加载中时上面叠转圈 */
-.img-box {
-  position: relative;
-  flex-shrink: 0;
-}
-
+/* 图片加载中先压透明，onload 后再显示 */
 .img-box img.pending {
   opacity: 0;
-  /* 加载中先隐藏（遮住 alt 文本），onload 后再显示 */
 }
 
-/* 加载中转圈（img 上层居中） */
-.img-spin {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
+/* 加载中转圈：定位与居中在工具类上，这里只剩伪元素与关键帧 */
 .img-spin::after {
   content: "";
   width: 18px;
@@ -319,50 +253,7 @@ function hidePreview() {
   }
 }
 
-.img-avatar-box,
-.img-avatar {
-  width: 56px;
-  height: 56px;
-}
-
-.img-avatar {
-  image-rendering: pixelated;
-}
-
-.img-skin-box,
-.img-skin {
-  width: 48px;
-  height: 96px;
-}
-
-.img-skin {
-  border-radius: 5px;
-  image-rendering: pixelated;
-}
-
-/* 披风渲染输出为 10×16 竖图（cape_2d_draw），槽位与皮肤同宽 48px，
-   高度取槽位高，contain 居中不变形 */
-.img-cape-box {
-  width: 48px;
-  height: 96px;
-}
-
-.img-cape {
-  width: 48px;
-  height: 96px;
-  object-fit: contain;
-  border-radius: 5px;
-  image-rendering: pixelated;
-}
-
-/* 头像 / 皮肤 / 披风三张图都点开皮肤弹窗（与操作按钮里的「查看皮肤」同一入口）：
-   跟随鼠标的大图只说明"能看大图"，要点得动还得给个描边信号 */
-.img-avatar,
-.img-skin,
-.img-cape {
-  cursor: pointer;
-}
-
+/* 三张图都是一个入口：描边跟着悬停 / 聚焦走，工具类写不了伪类组合 */
 .img-avatar:hover,
 .img-avatar:focus-visible,
 .img-skin:hover,
@@ -373,89 +264,24 @@ function hidePreview() {
   outline-offset: 1px;
 }
 
-/* 图片拉取失败 / 无皮肤时的占位：图标 + 横排文字，三个槽位样式统一 */
-.img-ph {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  font-size: 10px;
-  color: var(--text-dim);
-  user-select: none;
+/* 有效性徽章状态色：与列表的 token 标记同一套 */
+.validity-badge.valid {
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+  color: var(--green);
 }
 
-.img-ph svg {
-  opacity: 0.55;
+.validity-badge.expired {
+  background: color-mix(in srgb, var(--red) 16%, transparent);
+  color: var(--red);
 }
 
-.img-avatar-ph {
-  width: 56px;
-  height: 56px;
-  border: 1px dashed var(--border);
-}
-
-.img-skin-ph {
-  width: 48px;
-  height: 96px;
-  border: 1px dashed var(--border);
-  border-radius: 5px;
-}
-
-.img-cape-ph {
-  width: 48px;
-  height: 96px;
-  border: 1px dashed var(--border);
-  border-radius: 5px;
-}
-
-.acc-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.acc-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.acc-card.current {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-/* 悬停图片时的大图：Teleport 到 body，跟随鼠标，按图片类型取不同尺寸 */
-.skin-float {
-  position: fixed;
-  z-index: 300;
-  pointer-events: none;
-  padding: 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow-lg);
-}
-
-.skin-float img {
-  display: block;
-  width: 160px;
-  height: 160px;
-  image-rendering: pixelated;
-}
-
+/* 悬浮大图的基准尺寸在模板的工具类上；下面按图片类型覆盖，属于修饰类 + 后代选择器 */
 .skin-float.skin img {
   width: 128px;
   height: 256px;
 }
 
-/* 皮肤显示模式 = 3D：等距全身图，渲染图为 272x532，contain 防拉伸变形 */
+/* 皮肤 3D：等距全身图，contain 防拉伸 */
 .skin-float.skin3d img {
   width: 320px;
   height: 320px;
@@ -463,7 +289,7 @@ function hidePreview() {
   image-rendering: auto;
 }
 
-/* 披风悬浮大图 = 正面 + 背面两张并排，各 160x256，gap 分开间距 */
+/* 披风悬浮大图 = 正面 + 背面两张并排 */
 .skin-float.cape {
   display: flex;
   gap: 8px;
@@ -474,8 +300,7 @@ function hidePreview() {
   height: 256px;
 }
 
-/* 皮肤显示模式 = 3D：渲染图为 272×532 竖图，铺满整个槽位（contain 按宽缩放），
-   渲染图自带抗锯齿，不用 pixelated */
+/* 皮肤 3D 档：渲染图自带抗锯齿，不用 pixelated */
 .img-skin.mode-3d {
   image-rendering: auto;
   object-fit: contain;

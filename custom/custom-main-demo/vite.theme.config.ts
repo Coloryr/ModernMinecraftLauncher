@@ -1,11 +1,13 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import tailwindcss from "@tailwindcss/vite";
 import prefixer from "postcss-prefix-selector";
 
 // 自定义主页的组件入口：IIFE，Vue 从页面全局 __mmlVue 取；
 // 产物 custom.js / custom.css 由 pack.mjs 放进 zip 根目录。
+// Tailwind 只出 utilities：token 来自 mml-vue/tailwind.css，取的是启动器主题变量。
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), tailwindcss()],
   // 组件直接跑在宿主里，样式必须限定在主页容器内，不能改到启动器其它窗口
   css: {
     postcss: {

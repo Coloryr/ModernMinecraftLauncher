@@ -194,9 +194,9 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
 <template>
   <SettingsGroup id="gamepad" :flash="flashGroup === 'gamepad'">
     <!-- 配置：下拉选一份；除保存外都是图标键，文字进提示 -->
-    <div class="gp-bar">
-      <span class="gp-bar-label">{{ t("winGamepad.profiles") }}</span>
-      <select class="field-select gp-select" :value="editing" :aria-label="t('winGamepad.profiles')"
+    <div class="gp-bar flex items-center gap-2.5 m-0 px-0 pt-3.5 pb-4 bg-bg-solid border-b border-border">
+      <span class="gp-bar-label shrink-0 text-body text-dim">{{ t("winGamepad.profiles") }}</span>
+      <select class="field-select gp-select grow-0 shrink basis-[220px] min-w-[120px] max-w-full" :value="editing" :aria-label="t('winGamepad.profiles')"
         @change="onPick">
         <option v-for="item in profiles" :key="item.name" :value="item.name">{{ item.name }}</option>
       </select>
@@ -205,9 +205,9 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
         :aria-label="active ? t('winGamepad.active') : t('winGamepad.activate')" @click="activate">
         <GlyphIcon name="check" :size="14" />
       </button>
-      <span class="gp-bar-gap" />
+      <span class="gp-bar-gap flex-1 min-w-0" />
       <!-- 未保存提示常驻占位：一出现就把整排按钮挤到下一行 -->
-      <span class="gp-dirty" :class="{ 'is-on': dirty }">{{ t("winGamepad.unsaved") }}</span>
+      <span class="gp-dirty grow-0 shrink-0 text-yellow text-meta whitespace-nowrap invisible" :class="{ 'is-on': dirty }">{{ t("winGamepad.unsaved") }}</span>
       <BaseButton size="sm" variant="accent" :disabled="!config || saving" @click="save">
         {{ t("winGamepad.save") }}
       </BaseButton>
@@ -241,11 +241,11 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
     <p v-else-if="!config" class="empty-tip">{{ t("winGamepad.broken") }}</p>
 
     <template v-else>
-      <section class="gp-sec">
-        <h3 class="gp-sec-title">{{ t("winGamepad.buttons") }}</h3>
+      <section class="gp-sec mb-6">
+        <h3 class="gp-sec-title mt-0 mb-2 text-title font-semibold">{{ t("winGamepad.buttons") }}</h3>
         <p class="field-desc">{{ t("winGamepad.buttonHint") }}</p>
         <!-- 鼠标模式单独一套时，下面这张表跟着上面的分段切 -->
-        <div class="gp-button-mode">
+        <div class="gp-button-mode flex items-center justify-between gap-3 mt-2.5">
           <div class="switch-text">
             <span class="switch-label">{{ t("winGamepad.separateCursor") }}</span>
             <span class="switch-state">{{ t("winGamepad.separateCursorHint") }}</span>
@@ -253,15 +253,15 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
           <BaseSwitch :model-value="config.separateCursor"
             @update:model-value="(value) => config && (config.separateCursor = value)" />
         </div>
-        <SegmentedTabs v-if="config.separateCursor" class="gp-btn-mode" :model-value="buttonMode"
+        <SegmentedTabs v-if="config.separateCursor" class="gp-btn-mode mt-2.5 mb-3" :model-value="buttonMode"
           :options="modeOptions" @update:model-value="setButtonMode" />
-        <div class="gp-row gp-row-head gp-row-button">
+        <div class="gp-row gp-row-head gp-row-button grid items-center gap-2 py-1">
           <span>{{ t("winGamepad.button") }}</span>
           <span>{{ t("winGamepad.action") }}</span>
           <span>{{ t("winGamepad.mode") }}</span>
           <span></span>
         </div>
-        <div v-for="(rule, index) in buttonRules" :key="rule.button + '|' + rule.modifier" class="gp-row gp-row-button">
+        <div v-for="(rule, index) in buttonRules" :key="rule.button + '|' + rule.modifier" class="gp-row gp-row-button grid items-center gap-2 py-1">
           <GamepadKeyPicker :button="rule.button" :modifier="rule.modifier" :layout="effectiveLayout"
             :swap-ab="config.swapAb" @update:button="(value) => setRuleButton(rule, value)"
             @update:modifier="(value) => setRuleModifier(rule, value)" />
@@ -269,12 +269,12 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
           <select v-model="rule.mode" class="field-select gp-mode">
             <option v-for="item in MODES" :key="item" :value="item">{{ modeLabel(item) }}</option>
           </select>
-          <button class="ui-btn-icon gp-remove" v-tip="t('winGamepad.removeBinding')"
+          <button class="ui-btn-icon gp-remove justify-self-end" v-tip="t('winGamepad.removeBinding')"
             :aria-label="t('winGamepad.removeBinding')" @click="buttonRules.splice(index, 1)">
             <GlyphIcon name="close" :size="14" />
           </button>
         </div>
-        <div class="gp-row gp-row-add-button">
+        <div class="gp-row gp-row-add-button grid items-center gap-2 py-1">
           <GamepadKeyPicker :button="newButton.button" :modifier="newButton.modifier" :layout="effectiveLayout"
             :swap-ab="config.swapAb" @update:button="(value) => newButton.button = value ?? 'south'"
             @update:modifier="(value) => newButton.modifier = value" />
@@ -290,10 +290,10 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
         </div>
       </section>
 
-      <section class="gp-sec">
-        <h3 class="gp-sec-title">{{ t("winGamepad.axes") }}</h3>
+      <section class="gp-sec mb-6">
+        <h3 class="gp-sec-title mt-0 mb-2 text-title font-semibold">{{ t("winGamepad.axes") }}</h3>
         <p class="field-desc">{{ t("winGamepad.axisHint") }}</p>
-        <div class="gp-row gp-row-head gp-row-axis">
+        <div class="gp-row gp-row-head gp-row-axis grid items-center gap-2 py-1">
           <span>{{ t("winGamepad.axis") }}</span>
           <span>{{ t("winGamepad.from") }}</span>
           <span>{{ t("winGamepad.to") }}</span>
@@ -301,14 +301,14 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
           <span></span>
         </div>
         <template v-for="(rule, index) in config.axes" :key="rule.axis">
-          <div class="gp-row gp-row-axis">
+          <div class="gp-row gp-row-axis grid items-center gap-2 py-1">
             <select v-model="rule.axis" class="field-select">
               <option v-for="axis in ALL_AXES" :key="axis" :value="axis">{{ axisName(axis) }}</option>
             </select>
             <input v-model.number="rule.from" class="field-input" type="number" step="0.05" min="-1" max="1" />
             <input v-model.number="rule.to" class="field-input" type="number" step="0.05" min="-1" max="1" />
             <GamepadActionPicker v-model="rule.action" :actions="actions" />
-            <button class="ui-btn-icon gp-remove" v-tip="t('winGamepad.removeBinding')"
+            <button class="ui-btn-icon gp-remove justify-self-end" v-tip="t('winGamepad.removeBinding')"
               :aria-label="t('winGamepad.removeBinding')" @click="config.axes.splice(index, 1)">
               <GlyphIcon name="close" :size="14" />
             </button>
@@ -316,7 +316,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
           <!-- 这条轴现在的读数，落在区间里时高亮 -->
           <AxisRangeBar :from="rule.from" :to="rule.to" :value="axisValue(rule.axis)" />
         </template>
-        <div class="gp-row gp-row-add-axis">
+        <div class="gp-row gp-row-add-axis grid items-center gap-2 py-1">
           <select v-model="newAxis.axis" class="field-select">
             <option v-for="axis in ALL_AXES" :key="axis" :value="axis">{{ axisName(axis) }}</option>
           </select>
@@ -331,32 +331,32 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
         <AxisRangeBar :from="newAxis.from" :to="newAxis.to" :value="axisValue(newAxis.axis)" />
       </section>
 
-      <section class="gp-sec">
-        <h3 class="gp-sec-title">{{ t("winGamepad.mouse") }}</h3>
-        <div class="gp-field-row">
-          <div class="gp-field">
+      <section class="gp-sec mb-6">
+        <h3 class="gp-sec-title mt-0 mb-2 text-title font-semibold">{{ t("winGamepad.mouse") }}</h3>
+        <div class="gp-field-row flex gap-2.5">
+          <div class="gp-field flex flex-col flex-1 min-w-0">
             <label class="field-label">{{ t("winGamepad.cursorStick") }}</label>
             <select v-model="config.mouse.cursorStick" class="field-select">
               <option value="left">{{ t("winGamepad.stickLeft") }}</option>
               <option value="right">{{ t("winGamepad.stickRight") }}</option>
             </select>
           </div>
-          <div class="gp-field">
+          <div class="gp-field flex flex-col flex-1 min-w-0">
             <label class="field-label">{{ t("winGamepad.turnStick") }}</label>
             <select v-model="config.mouse.turnStick" class="field-select">
               <option value="left">{{ t("winGamepad.stickLeft") }}</option>
               <option value="right">{{ t("winGamepad.stickRight") }}</option>
             </select>
           </div>
-          <div class="gp-field">
+          <div class="gp-field flex flex-col flex-1 min-w-0">
             <label class="field-label">{{ t("winGamepad.cursorSpeed") }}</label>
             <input v-model.number="config.mouse.cursorSpeed" class="field-input" type="number" step="50" min="0" />
           </div>
-          <div class="gp-field">
+          <div class="gp-field flex flex-col flex-1 min-w-0">
             <label class="field-label">{{ t("winGamepad.turnSpeed") }}</label>
             <input v-model.number="config.mouse.turnSpeed" class="field-input" type="number" step="50" min="0" />
           </div>
-          <div class="gp-field">
+          <div class="gp-field flex flex-col flex-1 min-w-0">
             <label class="field-label">{{ t("winGamepad.deadzone") }}</label>
             <input v-model.number="config.mouse.deadzone" class="field-input" type="number" step="0.05" min="0"
               max="1" />
@@ -413,32 +413,11 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
 </template>
 
 <style scoped>
-/* 顶部配置行：下拉吃掉剩余宽度，动作按钮靠右；往下滚时吸在内容区顶部 */
+/* 顶部配置行吸在内容区顶部（定位与层叠留在这里，其余排版在模板的工具类上） */
 .gp-bar {
   position: sticky;
   top: 0;
   z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  /* 吸顶后 margin 会留在上方、露出一条滚过去的行，间距一律用 padding */
-  margin: 0;
-  /* 上面是分组标题与副标题，紧贴着会看着像标题的附属控件 */
-  padding: 14px 0 16px;
-  /* 有背景图 / 系统材质时 --bg 是半透明的，吸顶会透出下面滚过去的行，改用不透明底 */
-  background: var(--bg-solid, var(--bg));
-  border-bottom: 1px solid var(--border);
-}
-
-.gp-bar-label {
-  flex-shrink: 0;
-  font-size: 12.5px;
-  color: var(--text-dim);
-}
-
-/* 顶栏图标键：方形不参与压缩，窄窗口先压下拉 */
-.gp-bar .ui-btn-icon {
-  flex-shrink: 0;
 }
 
 /* 生效中的配置：按钮此时禁用，默认的 0.5 透明度会把状态一起压掉，
@@ -448,80 +427,19 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
   opacity: 1;
 }
 
-/* 窄窗口先压下拉，别让按钮换行 */
-.gp-select {
-  flex: 0 1 220px;
-  min-width: 120px;
-  max-width: 100%;
-}
-
-.gp-bar-gap {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.gp-dirty {
-  flex: 0 0 auto;
-  /* 一直占着这一格，只切换可见性，出现 / 消失时整排不跟着挪 */
-  visibility: hidden;
-  color: var(--yellow);
-  font-size: 11.5px;
-  white-space: nowrap;
-}
-
+/* 未保存提示常驻占位：只切换可见性，出现 / 消失时整排按钮不跟着挪 */
 .gp-dirty.is-on {
   visibility: visible;
 }
 
-.gp-sec {
-  margin-bottom: 24px;
-}
-
-/* 按钮映射上方的分离开关与模式切换 */
-.gp-button-mode {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 10px;
-}
-
-.gp-btn-mode {
-  margin: 10px 0 12px;
-}
-
-.gp-sec-title {
-  margin: 0 0 8px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-/* 表格行：按钮与轴各一套列宽，表头与数据行共用 */
-.gp-row {
-  display: grid;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.gp-row-button {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 96px var(--ctl-h);
-}
-
-.gp-row-axis {
-  grid-template-columns: 110px 76px 76px minmax(0, 1fr) var(--ctl-h);
-}
-
-.gp-row-head {
-  color: var(--text-dim);
-  font-size: 11.5px;
-  padding-bottom: 2px;
-}
-
+/* 表格行的列宽：按钮与轴各一套，表头与数据行共用。
+   这几列跟控件的固定宽度（--ctl-h / 96px / 110px / 76px）绑着，属于口径型几何 */
+.gp-row-button,
 .gp-row-add-button {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 96px var(--ctl-h);
 }
 
+.gp-row-axis,
 .gp-row-add-axis {
   grid-template-columns: 110px 76px 76px minmax(0, 1fr) var(--ctl-h);
 }
@@ -532,25 +450,5 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
   margin-top: 8px;
   padding-top: 10px;
   border-top: 1px dashed var(--border);
-}
-
-.gp-key {
-  font-weight: 600;
-}
-
-.gp-remove {
-  justify-self: end;
-}
-
-.gp-field-row {
-  display: flex;
-  gap: 10px;
-}
-
-.gp-field {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 0;
-  min-width: 0;
 }
 </style>

@@ -91,7 +91,12 @@ async function vuePreview() {
           if (name === 'custom.css') {
             const cssFiles = (await readdir(output)).filter((file) => file.endsWith('.css'));
             const parts = await Promise.all(cssFiles.map((file) => readFile(join(output, file), 'utf8')));
-            if (template === 'css') parts.unshift(await readFile(join(root, 'custom.css'), 'utf8'));
+            // 新布局的皮肤源码是 src/custom.css，已被 Vite 编进上面的产物；
+            // 根目录那份只在旧项目里还是源码，直接伺服
+            if (template === 'css' && !existsSync(join(root, 'src/custom.css'))) {
+              const legacy = await asset(root, 'custom.css');
+              if (legacy) parts.unshift(legacy.data.toString('utf8'));
+            }
             respond(response, { data: parts.join('\n'), mime: 'text/css; charset=utf-8' });
           } else respond(response, await asset(output, name) || await asset(root, name));
           } catch (error) { next(error); }

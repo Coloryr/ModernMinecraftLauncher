@@ -325,17 +325,17 @@ defineExpose({ resetView });
 
 <template>
   <!-- 窗口子页面：标题与返回键由外层的 WindowFrame 提供，这里只铺画布 -->
-  <div class="dep-page">
-    <div v-if="loading" class="empty-tip dep-page-body">{{ t("resource.loading") }}</div>
+  <div class="dep-page flex h-full flex-col">
+    <div v-if="loading" class="empty-tip dep-page-body min-h-0 flex-1 p-6">{{ t("resource.loading") }}</div>
 
-    <div v-else-if="error" class="empty-tip dep-page-body">
+    <div v-else-if="error" class="empty-tip dep-page-body min-h-0 flex-1 p-6">
       <p>{{ error }}</p>
       <BaseButton size="sm" @click="load(props.item)">{{ t("modpack.retry") }}</BaseButton>
     </div>
 
-    <p v-else-if="!graph?.edges.length" class="empty-tip dep-page-body">{{ t("resource.depTreeNone") }}</p>
+    <p v-else-if="!graph?.edges.length" class="empty-tip dep-page-body min-h-0 flex-1 p-6">{{ t("resource.depTreeNone") }}</p>
 
-    <div v-else ref="flowEl" class="dep-flow" @mousedown.capture="onFlowMouseDown">
+    <div v-else ref="flowEl" class="dep-flow min-h-0 flex-1 overflow-hidden bg-raised" @mousedown.capture="onFlowMouseDown">
       <!-- 拖节点、滚轮缩放、拖画布平移全是 vue-flow 的默认行为；
            连线本身带 nopan，从线上起手的情况由 onFlowMouseDown 补一次 -->
       <!-- 不要 fit-view-on-init：图大时会把整张图缩到看不清，默认视图由 centerOnRoot 给 -->
@@ -351,71 +351,28 @@ defineExpose({ resetView });
     </div>
 
     <!-- 点了线之后浮在鼠标旁边的那句话：fixed 定位，量过宽高再摆（见 showPopup） -->
-    <p v-if="popupText" ref="popupEl" class="dep-edge-popup"
+    <p v-if="popupText" ref="popupEl" class="dep-edge-popup pointer-events-none fixed z-20 m-0 max-w-[420px] break-all rounded-ctl border border-border bg-[var(--bg-solid,var(--bg-card))] px-2.5 py-1.5 text-body leading-[1.5] text-fg shadow-[var(--shadow-lg)]"
       :style="{ left: popupPos.x + 'px', top: popupPos.y + 'px' }">{{
         popupText }}</p>
   </div>
 </template>
 
 <style scoped>
-/* 画布吃掉剩余高度；vue-flow 自己铺满它 */
-.dep-page {
-  /* 铺满窗口内容区，不留边距：画布就是整块内容 */
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
+/* 画布内部的 vue-flow 元素只能靠 :deep 指定；排版已移到模板上的工具类。 */
 
-.dep-page-body {
-  flex: 1;
-  min-height: 0;
-  padding: 24px;
-}
-
-.dep-flow {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--bg-raised);
-}
-
-/* 点阵压淡：--border 跟画布底色几乎同亮度，直接用等于没有；
-   换成次要文字色再压到 45%，深浅两套主题都够看清又不抢连线 */
+/* 点阵压淡：--border 跟画布底色几乎同亮度，直接用等于没有 */
 .dep-flow :deep(.vue-flow__background) {
   opacity: 0.45;
 }
 
-/* 选中的那条线加粗走主色：默认样式太细，点中了也看不出来 */
+/* 选中的那条线加粗走主色 */
 .dep-flow :deep(.vue-flow__edge.selected .vue-flow__edge-path) {
   stroke: var(--accent);
   stroke-width: 2.5;
 }
 
-/* 选中的节点：边框**直接换成主色**，不叠第二层。
-   主色就是本应用"选中"的颜色（资源列表的选中行也用它）；"当前模组"（图的根）
-   因此改成了浅主色底纹，不再占边框色。主题自带的 .selected 样式只认它内置的
-   default / input / output 三种节点，自定义节点得自己给。
-   代价是选中时看不出"必装 / 可选 / 游戏加载器"，选中态优先 */
+/* 选中节点：边框直接换成主色，选中态优先于必装 / 可选 */
 .dep-flow :deep(.vue-flow__node.selected .dep-node) {
   border-color: var(--accent);
-}
-
-/* 贴在鼠标旁边的依赖说明：fixed 定位，跟着视口走。
-   pointer-events: none —— 它压着画布，不穿透的话下一次点空白收不起来 */
-.dep-edge-popup {
-  position: fixed;
-  z-index: 20;
-  max-width: 420px;
-  margin: 0;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-solid, var(--bg-card));
-  color: var(--text);
-  font-size: 12px;
-  line-height: 1.5;
-  box-shadow: var(--shadow-lg);
-  pointer-events: none;
-  word-break: break-all;
 }
 </style>

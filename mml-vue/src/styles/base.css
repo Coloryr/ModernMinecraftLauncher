@@ -7,12 +7,17 @@
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
-/* ---------------- 基础重置 ---------------- */
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* ---------------- 基础重置 ----------------
+   放进 @layer base：不写层的话它是**无层**规则，优先级高于 @layer utilities，
+   会把所有 p-* / m-* 工具类静默压成 0（踩过：设置页与侧栏的留白全部失效）。
+   @layer 顺序在 styles/tailwind.css 里声明，base 低于 utilities，
+   而项目自己的窗口样式都是无层的，仍然压得住这条重置 */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 html,

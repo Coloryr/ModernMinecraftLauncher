@@ -20,11 +20,11 @@ const { loading, reloadCurrent } = props.data;
 </script>
 
 <template>
-  <div class="content-head">
-    <div class="head-lead">
+  <div class="content-head flex items-center justify-between gap-2.5 pr-[calc(26px+9px)]">
+    <div class="head-lead flex min-w-0 flex-1 items-center gap-2">
       <slot />
     </div>
-    <div class="head-actions">
+    <div class="head-actions ml-auto flex shrink-0 items-center gap-1.5">
       <slot name="actions" />
       <button class="mini-btn icon-btn icon-only" :disabled="busy || loading" v-tip="t('resource.refresh')"
         :aria-label="t('resource.refresh')" @click="reloadCurrent">

@@ -1,4 +1,6 @@
 /* M²L 全局样式总入口：按职责拆分，避免单个文件过大 */
+/* Tailwind 必须排在最前：它要先把 @layer 顺序声明出来，后面的文件都在无层里 */
+@import "./tailwind.css";
 @import "./themes.css";
 @import "./base.css";
 @import "./decoration.css";

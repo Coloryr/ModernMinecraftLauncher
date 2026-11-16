@@ -152,24 +152,24 @@ async function generate() {
       <p class="modal-text">{{ t("debugger.desc") }}</p>
 
       <!-- 第一行：JVM 远程调试，开了才让填端口 -->
-      <div class="dbg-row">
-        <div class="dbg-row-head">
+      <div class="dbg-row mt-3.5 flex items-center justify-between gap-3">
+        <div class="dbg-row-head flex items-center gap-2">
           <BaseSwitch v-model="jvmOn" />
           <span class="dbg-row-label">{{ t("debugger.jvm") }}</span>
         </div>
-        <input v-if="jvmOn" v-model="jvmPort" class="field-input dbg-port" inputmode="numeric"
+        <input v-if="jvmOn" v-model="jvmPort" class="field-input dbg-port w-[88px]" inputmode="numeric"
           maxlength="5" :placeholder="t('debugger.jvmPort')" :aria-label="t('debugger.jvmPort')" />
       </div>
       <p v-if="jvmOn" class="dbg-hint">{{ t("debugger.jvmHint") }}</p>
       <p v-if="jvmOn && !portValid" class="dbg-error">{{ t("debugger.portInvalid") }}</p>
 
       <!-- 第二行：渲染调试，开了才让选调试器 -->
-      <div class="dbg-row">
-        <div class="dbg-row-head">
+      <div class="dbg-row mt-3.5 flex items-center justify-between gap-3">
+        <div class="dbg-row-head flex items-center gap-2">
           <BaseSwitch v-model="renderOn" />
           <span class="dbg-row-label">{{ t("debugger.render") }}</span>
         </div>
-        <select v-if="renderOn" v-model="picked" class="field-select dbg-select">
+        <select v-if="renderOn" v-model="picked" class="field-select dbg-select w-[168px]">
           <option value="renderdoc">RenderDoc</option>
           <option v-if="nsight" value="nsight">Nsight Graphics</option>
         </select>
@@ -193,8 +193,8 @@ async function generate() {
 
     <template v-else>
       <p class="modal-text">{{ t("debugger.tokenHint") }}</p>
-      <div v-for="item in fields" :key="item.key" class="dbg-field">
-        <div class="dbg-field-head">
+      <div v-for="item in fields" :key="item.key" class="dbg-field mt-3">
+        <div class="dbg-field-head mb-1 flex items-center justify-between gap-2">
           <span class="field-label">{{ item.label }}</span>
           <BaseButton size="sm" variant="ghost" @click="copy(item.value, item.key)">
             {{ copied === item.key ? t("debugger.copied") : t("debugger.copy") }}
@@ -213,30 +213,9 @@ async function generate() {
 </template>
 
 <style scoped>
-.dbg-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.dbg-row-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
+/* 两行调试开关的排列与端口 / 下拉宽度都在模板上（dbg-row / dbg-row-head / dbg-port / dbg-select） */
 .dbg-row-label {
   font-size: 13px;
-}
-
-.dbg-port {
-  width: 88px;
-}
-
-.dbg-select {
-  width: 168px;
 }
 
 .dbg-hint {
@@ -251,17 +230,7 @@ async function generate() {
   font-size: 11.5px;
 }
 
-.dbg-field {
-  margin-top: 12px;
-}
-
-.dbg-field-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 4px;
-}
+/* .dbg-field / .dbg-field-head 的间距与排列在模板上 */
 
 /* 值按原样展示：等宽字、保留换行，长了在框内滚动，不把弹窗撑宽 */
 .dbg-value {

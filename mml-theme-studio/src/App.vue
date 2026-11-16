@@ -10,6 +10,7 @@ import InspectorPanel from './InspectorPanel.vue';
 import GlyphIcon from '../../mml-vue/src/components/ui/GlyphIcon.vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { INSPECT_PROTOCOL } from './inspector';
+import { themeTokens } from './themeTokens';
 import { registerSnapTarget } from './decoration';
 
 const project = ref<Project | null>(null);
@@ -66,7 +67,7 @@ const confirming = ref(false);
 let confirmResult: ((answer: boolean) => void) | undefined;
 const previewUrl = ref('');
 const previewKind = ref('main');
-const previewTheme = ref('Dark');
+const previewTheme = ref<Theme>('Dark');
 const previewSurface = ref<HTMLDivElement>();
 const previewFrame = ref<HTMLIFrameElement>();
 const previewSize = ref({ width: 900, height: 600 });
@@ -107,15 +108,16 @@ const canvasStyle = computed(() => ({
     previewPos.value.y + previewSize.value.height + PREVIEW_INSET,
   )}px`,
 }));
+// 两个 HTML 模板在预览里都是独立页面：没有启动器外壳，配色靠 theme-tokens 下发
+const isStaticPreview = computed(() => project.value?.template === 'html' || project.value?.template === 'home-html');
 const previewSrc = computed(() => {
   if (!previewUrl.value) return '';
   const url = new URL(previewUrl.value);
   url.searchParams.set('window', previewKind.value);
-  url.searchParams.set('theme', previewTheme.value);
+  // 静态页不认 theme 参数，带上只会白重载一次；配色走 postMessage
+  if (!isStaticPreview.value) url.searchParams.set('theme', previewTheme.value);
   return url.href;
 });
-// 两个 HTML 模板在预览里都是独立页面，没有窗口 / 配色参数可切
-const isStaticPreview = computed(() => project.value?.template === 'html' || project.value?.template === 'home-html');
 const outputHost = ref<HTMLPreElement>();
 const env = ref('');
 const studioTheme = ref<Theme>(document.documentElement.dataset.theme === 'Light' ? 'Light' : 'Dark');
@@ -146,6 +148,10 @@ async function loadFile(path: string) {
   draft.value = file.text;
 }
 async function refresh() { files.value = await call('files'); }
+/** CSS 模板的皮肤源码位置：Tailwind 改造后在 src/ 里，由 Vite 编进包；旧项目仍在根目录 */
+function customCssPath() {
+  return files.value.includes('src/custom.css') ? 'src/custom.css' : 'custom.css';
+}
 async function loadProject(value: Project) {
   project.value = value;
   active.value = null;
@@ -153,13 +159,22 @@ async function loadProject(value: Project) {
   catalog.value = { controls: [], variables: [] };
   recent.value = [{ path: value.root, name: value.name, template: value.template }, ...recent.value.filter((entry) => entry.path !== value.root)].slice(0, 8);
   await refresh();
-  const first = [value.template === 'css' ? 'custom.css' : 'src/App.vue', 'src/ReplaceWindow.vue', 'src/index.html', 'src/theme.json'].find((path) => files.value.includes(path));
+  const first = [value.template === 'css' ? customCssPath() : 'src/App.vue', 'src/ReplaceWindow.vue', 'src/index.html', 'src/theme.json'].find((path) => files.value.includes(path));
   if (first) await loadFile(first);
 }
 async function loadCatalog() { catalog.value = await call('catalog'); }
-// 页面 / 主页主题的样式来自 Vite 打包，首次往 custom.css 追加时要确保入口真的引用了它
-async function ensureCustomCssImport() {
+// 样式来自 Vite 打包，首次往 custom.css 追加时要确保入口真的引用了它
+async function ensureCustomCssImport(path: string) {
   const template = project.value?.template;
+  if (template === 'css') {
+    // CSS 模板的皮肤源码在 src/custom.css：入口 import 了它，Vite 才会编进包里
+    if (path !== 'src/custom.css' || !files.value.includes('src/replace.ts')) return;
+    const source = await call('read', 'src/replace.ts');
+    if (source.text.includes('custom.css')) return;
+    const newline = source.text.includes('\r\n') ? '\r\n' : '\n';
+    await call('save', { path: 'src/replace.ts', text: `import "./custom.css";${newline}${source.text}`, expectedHash: source.hash });
+    return;
+  }
   const entry = template === 'page' ? 'src/replace.ts' : template === 'home' ? 'src/entry.ts' : '';
   if (!entry || !files.value.includes(entry)) return;
   // 页面主题没有 vite-env.d.ts，直接 import CSS 会让 vue-tsc 找不到模块
@@ -183,7 +198,8 @@ async function ensureCustomCssImport() {
 }
 async function appendToCustomCss(snippet: string) {
   if (!project.value) return;
-  const switching = active.value?.path !== 'custom.css';
+  const path = customCssPath();
+  const switching = active.value?.path !== path;
   if (switching && dirty.value) {
     if (!await confirmDiscard()) return;
     active.value = null;
@@ -192,18 +208,18 @@ async function appendToCustomCss(snippet: string) {
   let base: SourceFile | null = null;
   if (!switching && active.value) {
     base = { ...active.value, text: draft.value };
-  } else if (files.value.includes('custom.css')) {
-    base = await call('read', 'custom.css');
+  } else if (files.value.includes(path)) {
+    base = await call('read', path);
   }
   const newline = base?.text.includes('\r\n') ? '\r\n' : '\n';
   const body = snippet.trim().replace(/\r?\n/g, newline);
   const existing = (base?.text ?? '').replace(/[ \t\r\n]+$/, '');
   const text = existing ? `${existing}${newline}${newline}${body}${newline}` : `${body}${newline}`;
-  const file = await call('save', { path: 'custom.css', text, expectedHash: base?.hash ?? null });
-  if (!files.value.includes('custom.css')) await refresh();
-  await ensureCustomCssImport();
+  const file = await call('save', { path, text, expectedHash: base?.hash ?? null });
+  if (!files.value.includes(path)) await refresh();
+  await ensureCustomCssImport(path);
   await refresh();
-  if (switching) await loadFile('custom.css');
+  if (switching) await loadFile(path);
   else { active.value = file; draft.value = file.text; }
 }
 async function openProject(root?: string) {
@@ -352,6 +368,21 @@ function postInspect(message: Record<string, unknown>) {
   previewFrame.value?.contentWindow?.postMessage({ __mmlInspector: INSPECT_PROTOCOL, ...payload }, '*');
 }
 
+/**
+ * 把主题变量发给静态预览页
+ *
+ * 两个 HTML 模板是独立文档，页面拿不到编辑器这边的 CSS 变量；协议与启动器的
+ * customHomeBridge 一致，页面收到后写进 document.documentElement.style。
+ */
+function pushThemeTokens() {
+  const frame = previewFrame.value;
+  if (!frame?.contentWindow || !previewUrl.value || !isStaticPreview.value) return;
+  frame.contentWindow.postMessage(
+    { __mml: 1, type: 'theme-tokens', theme: previewTheme.value, tokens: themeTokens(previewTheme.value) },
+    '*',
+  );
+}
+
 /** 打开或收起检查模式；检查面板在预览面板里，预览必须开着 */
 function setInspecting(value: boolean) {
   inspecting.value = value;
@@ -450,10 +481,11 @@ function stopInspector() {
   setInspecting(false);
 }
 
-/** 预览重载后页面里的脚本状态没了：面板重建、检查模式重新打开 */
+/** 预览重载后页面里的脚本状态没了：面板重建、检查模式重新打开，主题变量重发一份 */
 function onPreviewLoad() {
   previewEpoch.value += 1;
   if (inspecting.value) postInspect({ type: 'enable' });
+  pushThemeTokens();
 }
 async function updateStudioTheme(event: Event) {
   const select = event.target as HTMLSelectElement;
@@ -483,8 +515,14 @@ function keydown(event: KeyboardEvent) {
 function previewMessage(event: MessageEvent) {
   if (!previewUrl.value) return;
   if (event.source !== previewFrame.value?.contentWindow) return;
-  const data = event.data as { __mmlInspector?: unknown; type?: unknown } | null;
-  if (!data || typeof data !== 'object' || data.__mmlInspector !== INSPECT_PROTOCOL) return;
+  const data = event.data as { __mml?: unknown; __mmlInspector?: unknown; type?: unknown } | null;
+  if (!data || typeof data !== 'object') return;
+  // 静态预览页主动要一次主题变量；照启动器桥接的协议回一份
+  if (data.__mml === 1) {
+    if (data.type === 'theme-tokens?') pushThemeTokens();
+    return;
+  }
+  if (data.__mmlInspector !== INSPECT_PROTOCOL) return;
   if (data.type === 'toggle') { toggleInspector(); return; }
   if (data.type === 'exit') { setInspecting(false); return; }
   if (data.type === 'pick' || data.type === 'node' || data.type === 'tree' || data.type === 'inline') {
@@ -494,6 +532,8 @@ function previewMessage(event: MessageEvent) {
 
 watch(dirty, (value) => { void call('dirty', value).catch(showError); });
 watch(studioTheme, (value) => { document.documentElement.dataset.theme = value; }, { immediate: true });
+// 静态预览页不重载，配色一变就把变量重发一份
+watch(previewTheme, () => { pushThemeTokens(); });
 watch(previewUrl, async (value) => {
   // 预览停了就收起检查面板；新地址由 iframe 的 load 事件重新打开检查
   if (!value) stopInspector();
@@ -648,7 +688,7 @@ onBeforeUnmount(() => { unregisterSnap?.(); unlistenResize?.(); window.clearInte
         </div>
         <div class="preview-tools">
           <select v-model="previewKind" class="field-select" :aria-label="t('window')" :disabled="!previewUrl || isStaticPreview"><option v-for="kind in kinds" :key="kind">{{ kind }}</option></select>
-          <select v-model="previewTheme" class="field-select" :aria-label="t('theme')" :disabled="!previewUrl || isStaticPreview"><option value="Dark">{{ t('dark') }}</option><option value="Light">{{ t('light') }}</option></select>
+          <select v-model="previewTheme" class="field-select" :aria-label="t('theme')" :disabled="!previewUrl"><option value="Dark">{{ t('dark') }}</option><option value="Light">{{ t('light') }}</option></select>
         </div>
         <div v-if="previewUrl" class="preview-size">
           <span>{{ t('windowSize') }}</span>

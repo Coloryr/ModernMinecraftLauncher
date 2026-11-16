@@ -246,8 +246,8 @@ function formatLabel(item: PackItemDto): string {
             @change.stop="toggleSelect(item)" @click.stop />
         </template>
         <template #badges>
-          <span v-if="item.fail" class="badge badge-red">{{ t("resource.modFail") }}</span>
-          <span v-if="item.enable" class="badge">{{ t("resource.packOn") }}</span>
+          <span v-if="item.fail" class="badge badge-red shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modFail") }}</span>
+          <span v-if="item.enable" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.packOn") }}</span>
         </template>
         <template #name>
           <FormattedText :text="item.file" />

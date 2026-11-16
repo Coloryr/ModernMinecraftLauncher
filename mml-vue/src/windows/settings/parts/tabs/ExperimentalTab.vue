@@ -98,19 +98,19 @@ const mapState = computed(() =>
       <BaseSwitch v-model="experimental.resourceLink" @update:model-value="applyExperimental" />
     </div>
     <template v-if="experimental.resourceLink">
-      <div class="map-actions">
+      <div class="map-actions flex items-center flex-wrap gap-2">
         <BaseButton size="sm" variant="accent" :disabled="mappingResources" @click="startMapping">
           {{ mappingResources ? t("winSettings.resourceLinkMapping") : t("winSettings.resourceLinkMap") }}
         </BaseButton>
         <BaseButton size="sm" @click="showResources = true">{{ t("winSettings.resourceLinkList") }}</BaseButton>
-        <span v-if="mapState" class="map-state">{{ mapState }}</span>
+        <span v-if="mapState" class="map-state text-meta text-dim">{{ mapState }}</span>
       </div>
-      <div v-if="mappingResources" class="map-progress">
-        <div class="map-progress-track">
-          <div class="map-progress-fill" :class="{ 'is-roll': mapRolling }"
+      <div v-if="mappingResources" class="map-progress flex items-center gap-2">
+        <div class="map-progress-track flex-1 h-2 bg-card border border-border rounded-pill overflow-hidden">
+          <div class="map-progress-fill h-full bg-accent transition-[width] duration-150" :class="{ 'is-roll': mapRolling }"
             :style="mapRolling ? undefined : { width: mapPercent + '%' }" />
         </div>
-        <span class="map-state">{{ mapProgressText }}</span>
+        <span class="map-state text-meta text-dim">{{ mapProgressText }}</span>
       </div>
       <p class="field-desc">{{ t("winSettings.resourceLinkMapHint") }}</p>
     </template>
@@ -148,38 +148,4 @@ const mapState = computed(() =>
   </SettingsGroup>
 </template>
 
-<style scoped>
-/* 存量映射按钮与结果文字同一行；结果太长时换行，不挤按钮 */
-.map-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 
-.map-state {
-  font-size: 11.5px;
-  color: var(--text-dim);
-}
-
-.map-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.map-progress-track {
-  flex: 1;
-  height: 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.map-progress-fill {
-  height: 100%;
-  background: var(--accent);
-  transition: width 0.15s;
-}
-</style>

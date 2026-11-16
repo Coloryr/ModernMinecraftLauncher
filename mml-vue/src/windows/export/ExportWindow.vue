@@ -911,62 +911,63 @@ onBeforeUnmount(() => {
         @update:model-value="currentUuid = $event" />
     </template>
 
-    <div class="export-window">
+    <div class="export-window flex min-h-0 flex-1 flex-col gap-3 overflow-y-scroll [scrollbar-gutter:stable_both-edges]">
       <template v-if="info">
         <!-- 服务器包：启动器 → 配置 → 自定义内容 → 实例 → 内置 Java -->
         <template v-if="serverPack">
           <!-- 启动器本体：只有 Windows 能带，放在最上面 -->
-          <section v-if="info.canBundleLauncher" class="pack-card">
-            <header class="pack-card-head">
-              <span class="pack-card-title">{{ t("winExport.serverLauncher") }}</span>
-              <span class="pack-card-hint">{{ t("winExport.serverLauncherHint") }}</span>
+          <section v-if="info.canBundleLauncher"
+            class="pack-card flex flex-col gap-2 rounded-panel border border-border bg-card px-3.5 py-3">
+            <header class="pack-card-head flex flex-wrap items-baseline gap-2">
+              <span class="pack-card-title text-title font-semibold">{{ t("winExport.serverLauncher") }}</span>
+              <span class="pack-card-hint text-meta text-dim">{{ t("winExport.serverLauncherHint") }}</span>
             </header>
-            <label class="check-row">
+            <label class="check-row flex cursor-pointer items-center gap-2 text-body">
               <input v-model="includeLauncher" type="checkbox" :disabled="busy" />
               {{ t("winExport.includeLauncher") }}
             </label>
           </section>
 
           <!-- 配置：跟包一起带走的启动器设置，不带就保留玩家原来的 -->
-          <section class="pack-card">
-            <header class="pack-card-head">
-              <span class="pack-card-title">{{ t("winExport.serverConfig") }}</span>
-              <span class="pack-card-hint">{{ t("winExport.serverConfigHint") }}</span>
+          <section class="pack-card flex flex-col gap-2 rounded-panel border border-border bg-card px-3.5 py-3">
+            <header class="pack-card-head flex flex-wrap items-baseline gap-2">
+              <span class="pack-card-title text-title font-semibold">{{ t("winExport.serverConfig") }}</span>
+              <span class="pack-card-hint text-meta text-dim">{{ t("winExport.serverConfigHint") }}</span>
             </header>
-            <label class="check-row">
+            <label class="check-row flex cursor-pointer items-center gap-2 text-body">
               <input v-model="serverOptions.config" type="checkbox" :disabled="busy" />
               {{ t("winExport.serverConfigCore") }}
             </label>
-            <label class="check-row">
+            <label class="check-row flex cursor-pointer items-center gap-2 text-body">
               <input v-model="serverOptions.guiConfig" type="checkbox" :disabled="busy" />
               {{ t("winExport.serverConfigGui") }}
             </label>
-            <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig }">
+            <label class="check-row flex cursor-pointer items-center gap-2 text-body" :class="{ 'is-disabled': !serverOptions.guiConfig }">
               <input v-model="serverOptions.bg" type="checkbox" :disabled="busy || !serverOptions.guiConfig" />
               {{ t("winExport.serverBg") }}
             </label>
           </section>
 
           <!-- 自定义内容：依赖界面配置，没导入的置灰 -->
-          <section class="pack-card">
-            <header class="pack-card-head">
-              <span class="pack-card-title">{{ t("winExport.serverCustom") }}</span>
-              <span class="pack-card-hint">
+          <section class="pack-card flex flex-col gap-2 rounded-panel border border-border bg-card px-3.5 py-3">
+            <header class="pack-card-head flex flex-wrap items-baseline gap-2">
+              <span class="pack-card-title text-title font-semibold">{{ t("winExport.serverCustom") }}</span>
+              <span class="pack-card-hint text-meta text-dim">
                 {{ serverOptions.guiConfig ? t("winExport.serverCustomHint") : t("winExport.serverCustomNeedsGui") }}
               </span>
             </header>
-            <div class="check-row-group">
-              <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig || !customUi?.pageInstalled }">
+            <div class="check-row-group flex flex-wrap gap-x-5 gap-y-2">
+              <label class="check-row flex cursor-pointer items-center gap-2 text-body" :class="{ 'is-disabled': !serverOptions.guiConfig || !customUi?.pageInstalled }">
                 <input v-model="serverOptions.page" type="checkbox"
                   :disabled="busy || !serverOptions.guiConfig || !customUi?.pageInstalled" />
                 {{ t("winExport.serverCustomPage") }}
               </label>
-              <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig || !customUi?.css.length }">
+              <label class="check-row flex cursor-pointer items-center gap-2 text-body" :class="{ 'is-disabled': !serverOptions.guiConfig || !customUi?.css.length }">
                 <input v-model="serverOptions.css" type="checkbox"
                   :disabled="busy || !serverOptions.guiConfig || !customUi?.css.length" />
                 {{ t("winExport.serverCustomCss") }}
               </label>
-              <label class="check-row" :class="{ 'is-disabled': !serverOptions.guiConfig || !customHome?.installed }">
+              <label class="check-row flex cursor-pointer items-center gap-2 text-body" :class="{ 'is-disabled': !serverOptions.guiConfig || !customHome?.installed }">
                 <input v-model="serverOptions.home" type="checkbox"
                   :disabled="busy || !serverOptions.guiConfig || !customHome?.installed" />
                 {{ t("winExport.serverCustomHome") }}
@@ -975,15 +976,16 @@ onBeforeUnmount(() => {
           </section>
 
           <!-- 实例：可多选，每个实例在包里各占一份 -->
-          <section class="pack-card">
-            <header class="pack-card-head">
-              <span class="pack-card-title">{{ t("winExport.serverInstance") }}</span>
-              <span class="pack-card-hint">
+          <section class="pack-card flex flex-col gap-2 rounded-panel border border-border bg-card px-3.5 py-3">
+            <header class="pack-card-head flex flex-wrap items-baseline gap-2">
+              <span class="pack-card-title text-title font-semibold">{{ t("winExport.serverInstance") }}</span>
+              <span class="pack-card-hint text-meta text-dim">
                 {{ t("winExport.serverInstanceHint", { count: serverPicked.length }) }}
               </span>
             </header>
-            <div class="instance-list">
-              <label v-for="i in instances" :key="i.uuid" class="instance-row"
+            <div class="instance-list -mx-1 flex max-h-[220px] flex-col gap-0.5 overflow-y-auto">
+              <label v-for="i in instances" :key="i.uuid"
+                class="instance-row flex cursor-pointer items-center gap-2.5 rounded-ctl px-2 py-[5px]"
                 :class="{ 'is-on': serverPicked.includes(i.uuid) }"
                 :title="isOnlyPicked(i.uuid) ? t('winExport.serverInstanceKeepOne') : undefined">
                 <input type="checkbox" :checked="serverPicked.includes(i.uuid)" :disabled="busy || isOnlyPicked(i.uuid)"
@@ -996,10 +998,10 @@ onBeforeUnmount(() => {
           </section>
 
           <!-- 内置 Java：可多选，交互与实例列表一致；玩家没装对应版本也能直接启动 -->
-          <section class="pack-card">
-            <header class="pack-card-head">
-              <span class="pack-card-title">{{ t("winExport.serverJava") }}</span>
-              <span class="pack-card-hint">
+          <section class="pack-card flex flex-col gap-2 rounded-panel border border-border bg-card px-3.5 py-3">
+            <header class="pack-card-head flex flex-wrap items-baseline gap-2">
+              <span class="pack-card-title text-title font-semibold">{{ t("winExport.serverJava") }}</span>
+              <span class="pack-card-hint text-meta text-dim">
                 {{ javas.length ? t("winExport.serverJavaPicked", { count: javaPicked.length }) :
                   t("winExport.serverJavaNone") }}
               </span>
@@ -1194,23 +1196,9 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* 四周留白交给 .frame-body（上下 22 / 左右 26）：这里**不能再加一份 padding**，
-   否则顶部会变成 36px、左右 42px，比别的窗口鼓一圈。
-   内容自己滚，所以滚动条槽位仍留给这个容器 */
-.export-window {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  /* 底部还有一条操作条，这里只占剩下的高度，滚动留给内容自己 */
-  flex: 1;
-  min-height: 0;
-  box-sizing: border-box;
-  /* 常驻滚动槽：WebKit 只在溢出时占位，不钉住两侧留白会随内容长短变，见 styles/scrollbar.css */
-  overflow-y: scroll;
-  /* 两侧都留滚动条槽：只留一侧时右侧会凭空多出一截，和左边不一样宽 */
-  scrollbar-gutter: stable both-edges;
-  /* 见 styles/scrollbar.css */
-}
+/* 页签 / 卡片 / 勾选行的排版已改到模板上的工具类（语义类名都留着：.pack-card 在 themes.css
+   的毛玻璃表里，主题包也按类名覆盖）。这里只留工具类压不住的部分：:deep 穿透、
+   覆盖全局 .field-label 的边距、状态色与标题栏下拉的宽度例外。 */
 
 /* 页签自带的下外边距是给「添加实例」窗口的表单留的，这一页用的是 flex gap，
    不取消就会变成 12 + 14 = 26px */
@@ -1258,73 +1246,10 @@ onBeforeUnmount(() => {
   margin-left: 12px;
 }
 
-/* 服务器包里的勾选项 */
-.check-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-/* 自定义内容三项横排，窄窗口时自动换行 */
-.check-row-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-}
-
 
 .check-row.is-disabled {
   color: var(--text-dim);
   cursor: default;
-}
-
-/* 服务器包的三段：配置 / 自定义内容 / 实例，每段一张卡片 */
-.pack-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-card);
-}
-
-.pack-card-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.pack-card-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.pack-card-hint {
-  font-size: 11.5px;
-  color: var(--text-dim);
-}
-
-/* 实例多选：超过一屏自己滚，行高按列表项，不按控件 32px */
-.instance-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 220px;
-  overflow-y: auto;
-  margin: 0 -4px;
-}
-
-.instance-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 5px 8px;
-  border-radius: 8px;
-  cursor: pointer;
 }
 
 .instance-row:hover {

@@ -435,7 +435,7 @@ function onNoteEnter(event: KeyboardEvent) {
         </button>
         <span class="mod-group-label" :title="groupLabel" @pointerdown.stop="emit('drag-group', $event)"
           @click.stop="emit('toggle-group')">{{ groupLabel }}</span>
-        <span class="badge badge-dim">{{ t("resource.groupCountItems", { n: items.length }) }}</span>
+        <span class="badge badge-dim shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.groupCountItems", { n: items.length }) }}</span>
       </span>
       <span v-for="col in MOD_COLS.slice(1)" :key="col.key" class="mod-cell" />
     </div>
@@ -488,21 +488,21 @@ function onNoteEnter(event: KeyboardEvent) {
             <HighlightText :text="row.item.name || row.item.file" :query="props.query" />
           </span>
           <!-- 内置的**库**：没有模组元数据的内置 jar。它不是模组，与"内置"分开标 -->
-          <span v-if="row.item.library" class="badge badge-dim">
+          <span v-if="row.item.library" class="badge badge-dim shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">
             {{ t("resource.modLibrary") }}
           </span>
-          <span v-else-if="row.depth > 1" class="badge badge-dim">
+          <span v-else-if="row.depth > 1" class="badge badge-dim shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">
             {{ t("resource.modBuiltin") }}
           </span>
-          <span v-if="row.item.jarInJar.length" class="badge">
+          <span v-if="row.item.jarInJar.length" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">
             {{ t("resource.modBuiltinCount", { n: row.item.jarInJar.length }) }}
           </span>
           <!-- 硬链接：这个文件还挂在公共目录，多实例共用一份 -->
-          <span v-if="row.item.hardLink" class="badge badge-link">{{ t("resource.modHardLink") }}</span>
-          <span v-if="row.item.fail" class="badge badge-red">{{ t("resource.modFail") }}</span>
+          <span v-if="row.item.hardLink" class="badge badge-link shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modHardLink") }}</span>
+          <span v-if="row.item.fail" class="badge badge-red shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modFail") }}</span>
           <!-- 「有更新」：这一行在更新检查里查到了新版本；下不下由更新弹窗里勾 -->
-          <span v-if="updateKeys?.has(modSelectKey(row.item))" class="badge">{{ t("resource.updateTag") }}</span>
-          <span v-if="row.item.core" class="badge">{{ t("resource.modCore") }}</span>
+          <span v-if="updateKeys?.has(modSelectKey(row.item))" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.updateTag") }}</span>
+          <span v-if="row.item.core" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modCore") }}</span>
         </span>
 
         <!--

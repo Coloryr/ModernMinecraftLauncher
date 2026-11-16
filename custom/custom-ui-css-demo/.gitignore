@@ -1,7 +1,8 @@
 node_modules/
 *.zip
-# pack 时由 Vite 编出来的入口与中间目录，不提交
+# pack 时由 Vite 编出来的入口、样式与中间目录，不提交
 /custom.js
+/custom.css
 /dist/
 # deps 脚本铺的依赖链接，重新 npm install 会重建
 .mml-deps/

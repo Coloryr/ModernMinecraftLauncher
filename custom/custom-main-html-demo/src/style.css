@@ -86,10 +86,8 @@ body::before {
 /* ---------- 顶栏 ---------- */
 
 .bar {
-  display: flex;
+  /* 横向排布与两端对齐走模板上的工具类（flex items-center justify-between） */
   flex: none;
-  align-items: center;
-  justify-content: space-between;
   height: 46px;
   padding: 0 14px;
   border-bottom: 1px solid var(--line-soft);
@@ -97,9 +95,7 @@ body::before {
 }
 
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  /* 排布与间距走工具类（flex items-center gap-2.5），这里只留伸缩约束 */
   min-width: 0;
 }
 
@@ -132,9 +128,7 @@ body::before {
 }
 
 .bar-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  /* 排布走工具类（flex items-center gap-1.5） */
 }
 
 .online {

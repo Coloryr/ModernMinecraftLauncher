@@ -95,80 +95,26 @@ watch(
 </script>
 
 <template>
-  <div class="hex-view">
-    <div class="hex-rows">
-      <div v-for="row in rows" :key="row.offset" class="hex-row">
-        <span class="hex-off">{{ row.offset }}</span>
-        <span class="hex-bytes">{{ row.hex }}</span>
-        <span class="hex-text">{{ row.text }}</span>
+  <div class="hex-view flex flex-col min-h-0 h-full">
+    <div class="hex-rows flex-1 min-h-0 overflow-auto px-2.5 py-2 [font-family:ui-monospace,Cascadia_Mono,Consolas,monospace] text-[12px] leading-[1.6]">
+      <div v-for="row in rows" :key="row.offset" class="hex-row flex gap-3.5 whitespace-pre">
+        <span class="hex-off text-dim">{{ row.offset }}</span>
+        <span class="hex-bytes shrink-0 text-fg">{{ row.hex }}</span>
+        <span class="hex-text min-w-0 overflow-hidden text-dim">{{ row.text }}</span>
       </div>
       <p v-if="!rows.length && !loading" class="empty-tip">{{ t("config.hexEmpty") }}</p>
     </div>
-    <div class="hex-bar">
+    <div class="hex-bar flex items-center gap-2 pt-2">
       <BaseButton size="sm" :disabled="loading || offset === 0" @click="turn(-1)">
         {{ t("config.hexPrev") }}
       </BaseButton>
       <BaseButton size="sm" :disabled="loading || offset + PAGE >= total" @click="turn(1)">
         {{ t("config.hexNext") }}
       </BaseButton>
-      <span class="hex-info">
+      <span class="hex-info text-dim text-meta">
         {{ t("config.hexRange", { from: offset, to: offset + bytes.length, total }) }}
       </span>
     </div>
   </div>
 </template>
 
-<style scoped>
-.hex-view {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-}
-
-/* 行区自己滚：一行一格，等宽字体 */
-.hex-rows {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 8px 10px;
-  /* 卡片由配置窗口右栏那张统一给，这里只剩内容与滚动 */
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.hex-row {
-  display: flex;
-  gap: 14px;
-  white-space: pre;
-}
-
-.hex-off {
-  color: var(--text-dim);
-}
-
-.hex-bytes {
-  flex-shrink: 0;
-  color: var(--text);
-}
-
-/* ASCII 列可被挤压 */
-.hex-text {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-dim);
-}
-
-.hex-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-top: 8px;
-}
-
-.hex-info {
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
-</style>

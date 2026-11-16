@@ -5,6 +5,9 @@
 
 import type { CustomCssContext } from "mml-ipc";
 import ReplaceButton from "./ReplaceButton.vue";
+// 样式：theme.css 给 Tailwind 入口（token / 工具类），custom.css 是这份皮肤自己的规则
+import "./theme.css";
+import "./custom.css";
 
 /** 主页面实例启动按钮 */
 const BUTTON = ".launch-actions .launch-main-btn";

@@ -22,6 +22,39 @@
 页面与启动器是两个文档：拿不到启动器的 DOM，也不能用 `localStorage` / `cookie`
 （opaque origin 会直接抛错）。要数据就调命令，要事件就订阅。
 
+## Tailwind 是预编译的
+
+`src/tailwind.css` 是**预编译产物**，随包一起压进 zip（`index.html` 里 `<link>` 它），
+所以这个示例仍然零依赖、`npm run pack` 直接能出包。
+
+- 页面里已经在用工具类：`titlebar / brand / titlebar-actions` 上的
+  `flex items-center justify-between`、`gap-2.5`、`gap-0.5`（展开后的声明在
+  `tailwind.css` 里，原来那几条已从 `style.css` 删掉）。
+- **改了类名必须重新生成**，否则新类不会出现在 `tailwind.css` 里、页面上静默失效。
+  生成用的是一次性工程（放在仓库的 `target/temp`，不进版本库）：
+
+  ```bash
+  mkdir -p target/temp/tw-pre && cd target/temp/tw-pre
+  npm init -y && npm i -D tailwindcss @tailwindcss/cli mml-vue@file:../../../mml-vue
+  cat > ui.css <<'EOF'
+  @layer theme, base, components, utilities;
+  @import "tailwindcss/theme.css" layer(theme) source(none);
+  @import "tailwindcss/utilities.css" layer(utilities) source(none);
+  @import "../../../mml-vue/src/styles/tailwind-tokens.css";
+  @source "../../../custom/custom-ui-html-demo/src";
+  EOF
+  npx @tailwindcss/cli -i ui.css -o out.css
+  cp out.css ../../../custom/custom-ui-html-demo/src/tailwind.css
+  ```
+
+  关键两点：`source(none)` 关掉自动扫描，否则会把 mml-vue 整棵树当内容源（产物 70 KB 起）；
+  token 直接引 `mml-vue/src/styles/tailwind-tokens.css`，与启动器同一份。
+- **颜色类依赖主题变量**：iframe 是独立文档，拿不到宿主的 `--bg-card`。页面里的那段监听
+  （`index.html` 的 `<head>`）收到 [theme-tokens 消息](../README.md#iframe-主题拿主题色)
+  会把变量写进 `:root`，`bg-card` / `text-dim` 这类类才算得出颜色；只写排版类（`flex` /
+  `gap-*` / `text-meta`）则不需要它。
+
+
 ## 快速开始
 
 没有 npm 依赖，不用 `npm install`：

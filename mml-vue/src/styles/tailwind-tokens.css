@@ -1,0 +1,72 @@
+/* Tailwind 设计 token：把启动器的主题变量映射成工具类
+ *
+ * 这个文件单独拆出来，是为了让**自定义主题**也能复用同一套映射：
+ *   @import "mml-vue/tailwind.css";
+ * 之后写 bg-card / text-dim / rounded-ctl / text-meta 这类工具类，取到的就是启动器
+ * 当前主题下的颜色与档位，跟着明暗主题、强调色、毛玻璃一起变。
+ *
+ * 规矩：颜色只指回 --* 变量，不写字面色值；字号 / 圆角只用 AGENTS.md §16.3 那几档。
+ */
+@theme {
+  /* 先清掉 Tailwind 自带的色板 / 字号 / 圆角 / 字体 / 阴影 / 动效：
+     这个项目只认主题变量与自己那几档，默认那套一个都用不到，留着纯是体积 */
+  --color-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --font-*: initial;
+  --shadow-*: initial;
+  --blur-*: initial;
+  --ease-*: initial;
+  --animate-*: initial;
+
+  /* ---------- 颜色：全部指回主题变量 ---------- */
+  --color-bg: var(--bg);
+  --color-bg-side: var(--bg-side);
+  --color-bg-card: var(--bg-card);
+  --color-bg-hover: var(--bg-hover);
+  --color-bg-raised: var(--bg-raised);
+  --color-bg-solid: var(--bg-solid);
+  --color-bg-modal: var(--bg-modal);
+  --color-overlay: var(--overlay);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-dim: var(--text-dim);
+  --color-text-sub: var(--text-sub);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-border: var(--accent-border);
+  --color-on-accent: var(--on-accent);
+  --color-green: var(--green);
+  --color-red: var(--red);
+  --color-yellow: var(--yellow);
+
+  /* 短名别名：文档与示例里写 bg-card / text-dim 比 bg-bg-card 顺手得多。
+     长名一律保留（已有代码在用），两套指向同一个变量，不会漂 */
+  --color-page: var(--bg);
+  --color-card: var(--bg-card);
+  --color-side: var(--bg-side);
+  --color-hover: var(--bg-hover);
+  --color-raised: var(--bg-raised);
+  --color-modal: var(--bg-modal);
+  --color-dim: var(--text-dim);
+  --color-sub: var(--text-sub);
+  --color-fg: var(--text);
+
+  /* ---------- 字号：AGENTS.md §16.3 的六档，不多不少 ---------- */
+  --text-caption: 10.5px;
+  --text-meta: 11.5px;
+  --text-body: 12.5px;
+  --text-ctl: var(--ctl-font);
+  --text-title: 13px;
+  --text-heading: 15px;
+  --text-display: 18px;
+
+  /* ---------- 圆角：§16.3 的五档 ---------- */
+  --radius-ctl: var(--ctl-radius);
+  --radius-card: 10px;
+  --radius-panel: 12px;
+  --radius-pill: 999px;
+
+  /* ---------- 尺寸：控件高 ---------- */
+  --spacing-ctl: var(--ctl-h);
+}

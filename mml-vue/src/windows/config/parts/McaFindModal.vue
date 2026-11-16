@@ -52,7 +52,7 @@ function submit() {
           :placeholder="t('config.mcaFindPosTip')" />
       </div>
     </div>
-    <p class="find-hint">{{ t("config.mcaFindPosHint") }}</p>
+    <p class="find-hint mt-1.5 text-dim text-meta">{{ t("config.mcaFindPosHint") }}</p>
 
     <label class="field-label">{{ t("config.mcaFindName") }}</label>
     <input v-model="name" class="field-input" spellcheck="false" @keydown.enter="submit" />
@@ -66,11 +66,3 @@ function submit() {
   </BaseModal>
 </template>
 
-<style scoped>
-/* 坐标说明：讲清"留空 = 全扫"，不给控件加解释性文案 */
-.find-hint {
-  margin: 6px 0 0;
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
-</style>

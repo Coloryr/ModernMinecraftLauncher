@@ -99,18 +99,18 @@ const {
 
   <SettingsGroup id="preview" title-key="winSettings.secPreview">
     <!-- 样例预览：内置纤细皮肤按当前头像 / 皮肤配置实时渲染，配置变化经 URL 版本号重取 -->
-    <div class="sample-row">
-      <div class="sample-box">
-        <img v-if="imageBase" class="sample-img" :src="headPreviewUrl" alt="" />
-        <span class="sample-label">{{ t("winSettings.headSample") }}</span>
+    <div class="sample-row flex items-stretch gap-3 flex-wrap">
+      <div class="sample-box flex flex-col items-center justify-center gap-3 px-3.5 py-2.5 bg-side border border-border rounded-card">
+        <img v-if="imageBase" class="sample-img h-[130px] w-auto [image-rendering:revert]" :src="headPreviewUrl" alt="" />
+        <span class="sample-label text-meta text-dim">{{ t("winSettings.headSample") }}</span>
       </div>
-      <div class="sample-box">
-        <img v-if="imageBase" class="sample-img skin" :src="skinPreviewUrl" alt="" />
-        <span class="sample-label">{{ t("winSettings.skinSample") }}</span>
+      <div class="sample-box flex flex-col items-center justify-center gap-3 px-3.5 py-2.5 bg-side border border-border rounded-card">
+        <img v-if="imageBase" class="sample-img h-[220px] w-auto [image-rendering:revert]" :src="skinPreviewUrl" alt="" />
+        <span class="sample-label text-meta text-dim">{{ t("winSettings.skinSample") }}</span>
       </div>
-      <div class="sample-box">
-        <img v-if="imageBase" class="sample-img cape" :src="capePreviewUrl" alt="" />
-        <span class="sample-label">{{ t("winSettings.capeSample") }}</span>
+      <div class="sample-box flex flex-col items-center justify-center gap-3 px-3.5 py-2.5 bg-side border border-border rounded-card">
+        <img v-if="imageBase" class="sample-img h-[200px] w-auto [image-rendering:revert]" :src="capePreviewUrl" alt="" />
+        <span class="sample-label text-meta text-dim">{{ t("winSettings.capeSample") }}</span>
       </div>
     </div>
   </SettingsGroup>

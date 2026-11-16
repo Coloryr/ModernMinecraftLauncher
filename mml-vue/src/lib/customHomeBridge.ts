@@ -12,11 +12,14 @@
 //   父 → iframe：{ __mml: 1, type: "event", id, event, payload }
 //   父 → iframe：{ __mml: 1, type: "ready", theme: "Dark" | "Light" }
 //   父 → iframe：{ __mml: 1, type: "theme", theme }（主题变化时主动推）
+//   父 → iframe：{ __mml: 1, type: "theme-tokens", theme, tokens }（主题变量，握手后与变化时推）
+//   iframe → 父：{ __mml: 1, type: "theme-tokens?" }，主动要一次上面那份
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { watch } from "vue";
+import { nextTick, watch } from "vue";
 import { GameExit, GameLog, InstanceChange, LaunchError, LaunchState } from "./listens";
-import { resolvedTheme } from "./theme";
+import { accent, customAccent, gradientMode, resolvedTheme } from "./theme";
+import { readThemeTokens } from "./themeTokens";
 
 /** 与 custom_home_bridge.js 约定的协议版本 */
 const PROTOCOL = 1;
@@ -103,6 +106,11 @@ export function attachCustomHomeBridge(iframe: HTMLIFrameElement): () => void {
     if (flushTimer === null) flushTimer = window.setTimeout(flush, FLUSH_INTERVAL);
   }
 
+  /** 下发一次主题变量：iframe 是独立文档，拿不到宿主的 CSS 变量，只能把值送过去 */
+  function pushThemeTokens() {
+    post({ type: "theme-tokens", theme: resolvedTheme(), tokens: readThemeTokens() });
+  }
+
   /** 订阅：白名单外一律拒绝，回一条错误应答让页面自己知道 */
   function subscribe(id: number, event: string) {
     if (!ALLOWED_EVENTS.has(event)) {
@@ -176,6 +184,13 @@ export function attachCustomHomeBridge(iframe: HTMLIFrameElement): () => void {
     if (data.type === "ready") {
       handshaken = true;
       post({ type: "ready", theme: resolvedTheme() });
+      // 握手后紧跟一份主题变量：页面不用再等一次来回
+      pushThemeTokens();
+      return;
+    }
+    // 页面主动要一次（桥接脚本被页面自己的脚本挡掉、或页面是后加载的）
+    if (data.type === "theme-tokens?") {
+      pushThemeTokens();
       return;
     }
     const id = Number(data.id);
@@ -191,6 +206,11 @@ export function attachCustomHomeBridge(iframe: HTMLIFrameElement): () => void {
 
   window.addEventListener("message", onMessage);
 
+  // iframe 重新导航（页面自己刷新）后不会重新握手，但会重新触发 load：补一份变量，
+  // 免得刷新后主题色回到页面写死的默认值
+  const onLoad = () => pushThemeTokens();
+  iframe.addEventListener("load", onLoad);
+
   // 主题：iframe 是独立文档，拿不到启动器 `<html data-theme>` 上的 CSS 变量，
   // 所以握手时先回一份，之后主题变化时再主动推，设置窗口切换或 System 跟随系统都算。
   // 注册 watch 时不会立刻触发（没有 immediate），首屏由握手那条负责，不会重复发。
@@ -198,9 +218,21 @@ export function attachCustomHomeBridge(iframe: HTMLIFrameElement): () => void {
     post({ type: "theme", theme: v });
   });
 
+  // 主题变量：深浅色之外，换强调色 / 开关纯色模式同样会改动根元素上的变量，
+  // 所以三条一起盯。等 nextTick 再取，确保 applyTheme 已把 data-theme / data-accent 写完
+  const stopTokensWatch = watch(
+    () => [resolvedTheme(), accent.value, customAccent.value, gradientMode.value].join("|"),
+    async () => {
+      await nextTick();
+      pushThemeTokens();
+    },
+  );
+
   return () => {
     disposed = true;
     stopThemeWatch();
+    stopTokensWatch();
+    iframe.removeEventListener("load", onLoad);
     window.removeEventListener("message", onMessage);
     if (flushTimer !== null) {
       clearTimeout(flushTimer);
