@@ -31,6 +31,12 @@
   margin-top: 16px;
 }
 
+/* 标题是"分组之间"的间隔，24px，不跟块间距的 16px 走。
+   这条必须留无层：工具类在 @layer utilities，压不过上面那两条无层规则 */
+.settings-layout .setting-group>.group-title {
+  margin-top: 24px;
+}
+
 /* 标签只管"贴住自己的控件"（下边距由下面那条给 8px）；
    上边距**必须留着**：标签往往跟在别的东西后面（GC 模式那行、＋添加按钮……），
    归零会让它贴在上一个控件上，"JVM 环境变量 / JVM 参数"这类标签就看着很挤。
@@ -150,6 +156,17 @@
 
 /* 标题的排版在 SettingsGroup.vue 的工具类上；这里只留伪元素竖条与分组间隔的覆盖 */
 
+
+/* 设置项搜索的结果项：底色走状态规则。不能写成 bg-transparent / hover:bg-hover 工具类 ——
+   两条都是 background-color，谁排在后面谁生效，悬停与键盘选中会被 bg-transparent 压掉 */
+.frame-head .set-search-item {
+  background: transparent;
+}
+
+.frame-head .set-search-item:hover,
+.frame-head .set-search-item.on {
+  background: var(--bg-hover);
+}
 
 .settings-layout .group-title::before {
   content: "";
@@ -425,7 +442,8 @@
   gap: 8px;
 }
 
-.settings-layout .grow {
+/* 占满剩余宽度的表单项。不能叫 .grow：Tailwind 有 flex-grow 工具类同名 */
+.settings-layout .field-grow {
   flex: 1;
   min-width: 120px;
 }

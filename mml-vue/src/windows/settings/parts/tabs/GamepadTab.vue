@@ -194,7 +194,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
 <template>
   <SettingsGroup id="gamepad" :flash="flashGroup === 'gamepad'">
     <!-- 配置：下拉选一份；除保存外都是图标键，文字进提示 -->
-    <div class="gp-bar flex items-center gap-2.5 m-0 px-0 pt-3.5 pb-4 bg-bg-solid border-b border-border">
+    <div class="gp-bar flex items-center gap-2.5 m-0 px-0 pt-3.5 pb-4 border-b border-border">
       <span class="gp-bar-label shrink-0 text-body text-dim">{{ t("winGamepad.profiles") }}</span>
       <select class="field-select gp-select grow-0 shrink basis-[220px] min-w-[120px] max-w-full" :value="editing" :aria-label="t('winGamepad.profiles')"
         @change="onPick">
@@ -255,7 +255,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
         </div>
         <SegmentedTabs v-if="config.separateCursor" class="gp-btn-mode mt-2.5 mb-3" :model-value="buttonMode"
           :options="modeOptions" @update:model-value="setButtonMode" />
-        <div class="gp-row gp-row-head gp-row-button grid items-center gap-2 py-1">
+        <div class="gp-row gp-row-head gp-row-button grid items-center gap-2 py-1 pb-0.5 text-meta text-dim">
           <span>{{ t("winGamepad.button") }}</span>
           <span>{{ t("winGamepad.action") }}</span>
           <span>{{ t("winGamepad.mode") }}</span>
@@ -293,7 +293,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
       <section class="gp-sec mb-6">
         <h3 class="gp-sec-title mt-0 mb-2 text-title font-semibold">{{ t("winGamepad.axes") }}</h3>
         <p class="field-desc">{{ t("winGamepad.axisHint") }}</p>
-        <div class="gp-row gp-row-head gp-row-axis grid items-center gap-2 py-1">
+        <div class="gp-row gp-row-head gp-row-axis grid items-center gap-2 py-1 pb-0.5 text-meta text-dim">
           <span>{{ t("winGamepad.axis") }}</span>
           <span>{{ t("winGamepad.from") }}</span>
           <span>{{ t("winGamepad.to") }}</span>

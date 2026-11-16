@@ -207,7 +207,7 @@ async function copyQq() {
         </div>
         <div class="about-row flex items-baseline gap-2 text-body">
           <span class="about-label min-w-[84px] shrink-0 text-meta text-dim">{{ t("winHelp.exeSha1") }}</span>
-          <code class="about-sha1 text-meta text-fg break-all [font-family:'Cascadia Code',Consolas,monospace]" :class="{ 'is-error': !!exeError }" :title="exePath">
+          <code class="about-sha1 text-meta text-fg break-all [font-family:Cascadia_Code,Consolas,monospace]" :class="{ 'is-error': !!exeError }" :title="exePath">
             <template v-if="exeSha1">{{ exeSha1 }}</template>
 <template v-else-if="exeLoading">{{ t("winHelp.sha1Reading") }}</template>
 <template v-else>{{ exeError || "—" }}</template>

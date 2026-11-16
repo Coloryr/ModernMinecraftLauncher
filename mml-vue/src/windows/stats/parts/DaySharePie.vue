@@ -99,7 +99,7 @@ const totalText = computed(() => textOf(total.value));
 
 <template>
   <div class="ring-card flex min-w-0 flex-col items-center gap-1.5">
-    <svg class="ring h-24 w-24 shrink-0" viewBox="0 0 100 100" role="img" :aria-label="title">
+    <svg class="ring-chart h-24 w-24 shrink-0" viewBox="0 0 100 100" role="img" :aria-label="title">
       <circle :cx="50" :cy="50" :r="R" fill="none" stroke="var(--border)" :stroke-width="W" />
       <circle v-for="seg in segments" :key="seg.uuid" :cx="50" :cy="50" :r="R" fill="none"
         :stroke="instanceColor(seg.uuid)" :stroke-width="W" :stroke-dasharray="seg.dash" :stroke-dashoffset="seg.offset"
@@ -114,11 +114,12 @@ const totalText = computed(() => textOf(total.value));
 <style scoped>
 /* 环的悬停提亮：伪类 + filter，工具类表达不了；不改 stroke-width，
    环宽是相邻段共用的，加粗会互相挤 */
-.ring circle {
+/* 不能叫 .ring：Tailwind 有 box-shadow 环工具类同名，会围着 SVG 画一圈方框 */
+.ring-chart circle {
   transition: filter 0.12s;
 }
 
-.ring circle:hover {
+.ring-chart circle:hover {
   filter: brightness(1.18);
 }
 </style>

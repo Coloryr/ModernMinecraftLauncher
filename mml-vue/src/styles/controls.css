@@ -485,7 +485,7 @@ select.field-select {
   border-radius: 12px 12px 0 0;
 }
 
-.collapse-card > .collapse.open > .collapse-inner > *:first-child {
+.collapse-card > .collapse-panel.open > .collapse-inner > *:first-child {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
   border-top-color: transparent;
@@ -578,7 +578,9 @@ select.field-select {
   color: var(--text);
 }
 
-.block {
+/* BaseButton 的 block 属性（整行按钮）。不能叫 .block：Tailwind 有 display:block 工具类，
+   同名会让所有用 block 工具类排版、又带固定宽度的元素被拉成 100% 宽 */
+.btn-block {
   width: 100%;
 }
 

@@ -58,8 +58,8 @@ async function saveList() {
     <fieldset class="export-options m-0 min-w-0 border-0 p-0" :disabled="busy">
       <!-- 格式：标签与下拉同一行，下拉定宽 —— 三个短选项撑满整行没有必要 -->
       <div class="export-format flex items-center gap-2.5">
-        <label class="field-label m-0 flex-none" for="mod-export-format">{{ t('modExport.format') }}</label>
-        <select id="mod-export-format" v-model="format" class="field-select w-[180px]">
+        <label class="field-label flex-none" for="mod-export-format">{{ t('modExport.format') }}</label>
+        <select id="mod-export-format" v-model="format" class="field-select">
           <option value="txt">TXT</option>
           <option value="csv">CSV</option>
           <option value="json">JSON</option>
@@ -84,4 +84,18 @@ async function saveList() {
     </div>
   </BaseModal>
 </template>
+
+<style scoped>
+/* 导出格式是短下拉：.field-select 的 width: 100% 是无层规则，w-[180px] 工具类压不过 */
+.export-format .field-select {
+  width: 180px;
+}
+
+/* 标签默认带 12/6 的上下外边距（controls.css 的无层规则），这一行要贴着下拉排，
+   模板上的 m-0 压不过它，必须在这里归零 */
+.export-format .field-label {
+  margin: 0;
+}
+</style>
+
 

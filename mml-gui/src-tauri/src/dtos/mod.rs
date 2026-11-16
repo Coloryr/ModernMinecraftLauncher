@@ -108,7 +108,8 @@ pub use server_instance_dto::{
 };
 pub use settings_dto::{
     BgInfoDto, DnsSettingDto, GameCheckSettingDto, LaunchSettingDto, LinkResourceDto,
-    LocalFileChildDto, LocalFileEntryDto, NetworkSettingDto, ResourceMapProgressDto,
+    LinkResourcePageDto, LinkResourceQueryDto, LocalFileChildDto, LocalFileEntryDto,
+    NetworkSettingDto, ResourceMapProgressDto,
     ResourceMapResultDto, RunArgSettingDto, SettingsDefaultsDto, WindowSettingDto,
 };
 pub use stats_dto::{StatsDataDto, StatsInstanceDto, StatsPlayDayDto, StatsPlaytimeDto};

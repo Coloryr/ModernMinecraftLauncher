@@ -2129,7 +2129,7 @@ onBeforeUnmount(() => {
   <BaseModal v-if="noteForm" :title="t('resource.modNoteTitle')" :closable="false" @close="noteForm = null">
     <label class="field-label">{{ noteForm.item.name || noteForm.item.file }}</label>
     <p class="mod-note-file m-0 mb-2 overflow-hidden text-ellipsis whitespace-nowrap text-meta text-dim" :title="noteForm.item.file">{{ noteForm.item.file }}</p>
-    <textarea v-model="noteForm.text" class="field-input mod-note-input min-h-[96px] resize-y leading-[1.5]" :placeholder="t('resource.modNotePlaceholder')"
+    <textarea v-model="noteForm.text" class="field-input mod-note-input" :placeholder="t('resource.modNotePlaceholder')"
       spellcheck="false" @keydown.ctrl.enter="saveNote(noteForm.text)" />
     <div class="modal-actions">
       <BaseButton v-if="noteForm.item.note" :disabled="noteBusy" @click="saveNote('')">
@@ -2323,6 +2323,14 @@ onBeforeUnmount(() => {
 <style scoped>
 /* 弹窗在 body 下，样式走 scoped。排版已移到模板上的工具类，
    这里只留工具类表达不了的两处。 */
+
+/* 备注是整块文本框：.field-input 的控件 min-height（32px）与默认行高都是无层规则，
+   模板上的 min-h- / leading- 工具类压不过它，只能写在这里 */
+.mod-note-input {
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.5;
+}
 
 /* 收起的组：箭头转 -90°，依赖父级的 .collapsed 状态 */
 .dep-group-head.collapsed .dep-group-caret {

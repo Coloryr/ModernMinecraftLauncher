@@ -18,6 +18,7 @@ export type WindowKind =
   | "add_resource"
   | "collect"
   | "download"
+  | "downloaded_resources"
   | "java_download"
   | "block"
   | "log"
@@ -47,6 +48,7 @@ export const WINDOW_REGISTRY: WindowInfo[] = [
   { kind: "add_resource", titleKey: "winTitle.addResource" },
   { kind: "collect", titleKey: "winTitle.collect" },
   { kind: "download", titleKey: "winTitle.download" },
+  { kind: "downloaded_resources", titleKey: "winTitle.downloadedResources" },
   { kind: "java_download", titleKey: "winTitle.javaDownload" },
   { kind: "block", titleKey: "winTitle.block" },
   { kind: "log", titleKey: "winTitle.log" },

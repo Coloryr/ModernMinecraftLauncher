@@ -10,3 +10,18 @@ export type LinkResourceDto = {
   exists: boolean,
 };
 
+export type LinkResourceQueryDto = {
+  keyword: string,
+  page: number,
+  pageSize: number,
+};
+
+export type LinkResourcePageDto = {
+  total: number,
+  totalSize: number,
+  page: number,
+  pages: number,
+  pageSize: number,
+  items: LinkResourceDto[],
+};
+

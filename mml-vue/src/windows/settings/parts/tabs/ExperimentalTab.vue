@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 设置窗口 · 实验性功能页：管理员启动与资源映射已接线；URI / 沙盒启动尚未实现，开关禁用。
 // 客户端设置被锁定时，开关同样隐藏，这一页只剩解锁入口。
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted } from "vue";
 import { t } from "../../../../lib/i18n";
 import {
   attachMapping,
@@ -11,8 +11,8 @@ import {
   startMapping,
 } from "../../../../lib/resourceMap";
 import BaseButton from "../../../../components/ui/BaseButton.vue";
-import LinkResourcesModal from "../LinkResourcesModal.vue";
 import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
+import { openWindow } from "../../../../windows/windowManager";
 import SettingsGroup from "../SettingsGroup.vue";
 import type { useSettingsClient } from "../../composables/useSettingsClient";
 
@@ -34,9 +34,6 @@ const { client, experimental, applyExperimental } = props.settings;
 
 /** 开关属于锁定范围：锁着且本次未解锁时整组隐藏，只留解锁入口 */
 const locked = computed(() => client.value.lockClient && !props.clientUnlocked);
-
-/** 已下载资源列表弹窗是否打开 */
-const showResources = ref(false);
 
 // 存量映射的状态放在 lib/resourceMap 里：切到别的设置页再回来，组件会重建，
 // 状态留在组件里的话进度条就没了
@@ -102,7 +99,7 @@ const mapState = computed(() =>
         <BaseButton size="sm" variant="accent" :disabled="mappingResources" @click="startMapping">
           {{ mappingResources ? t("winSettings.resourceLinkMapping") : t("winSettings.resourceLinkMap") }}
         </BaseButton>
-        <BaseButton size="sm" @click="showResources = true">{{ t("winSettings.resourceLinkList") }}</BaseButton>
+        <BaseButton size="sm" @click="openWindow('downloaded_resources')">{{ t("winSettings.resourceLinkList") }}</BaseButton>
         <span v-if="mapState" class="map-state text-meta text-dim">{{ mapState }}</span>
       </div>
       <div v-if="mappingResources" class="map-progress flex items-center gap-2">
@@ -129,9 +126,6 @@ const mapState = computed(() =>
       <BaseSwitch v-model="experimental.sandboxLaunch" disabled />
     </div>
   </SettingsGroup>
-
-  <!-- 已下载资源列表：只读，用于核对公共目录里到底有哪些文件 -->
-  <LinkResourcesModal v-if="showResources" @close="showResources = false" />
 
   <!-- 锁定客户端设置：那一页在锁定时隐藏，解锁入口放这里 -->
   <SettingsGroup v-if="client.lockClient" id="clientLock" title-key="winSettings.secClientLock"

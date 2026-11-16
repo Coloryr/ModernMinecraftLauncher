@@ -854,7 +854,7 @@ function tokenLabel(acc: AccountStoreDto): string {
     <!-- 微软登录：请求码 + 地址 + 打开浏览器 / 取消 -->
     <BaseModal v-if="showOauth" :title="t('account.oauthTitle')" :closable="false" below-titlebar @close="cancelLogin">
       <label class="field-label">{{ t("account.oauthCode") }}</label>
-      <div class="oauth-code copyable group flex cursor-pointer select-text items-center justify-between gap-2.5 rounded-card border border-border bg-side px-3.5 py-2.5 text-center text-display font-extrabold tracking-[4px] text-accent transition-[border-color] duration-150 hover:border-accent [font-family:'Cascadia Code',Consolas,monospace]" v-tip="t('account.copy')" @click="copyOauthValue(oauthCode)">
+      <div class="oauth-code copyable group flex cursor-pointer select-text items-center justify-between gap-2.5 rounded-card border border-border bg-side px-3.5 py-2.5 text-center text-display font-extrabold tracking-[4px] text-accent transition-[border-color] duration-150 hover:border-accent [font-family:Cascadia_Code,Consolas,monospace]" v-tip="t('account.copy')" @click="copyOauthValue(oauthCode)">
         {{ oauthCode }}
         <svg class="copy-ico shrink-0 opacity-[0.55] group-hover:opacity-100" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -895,7 +895,7 @@ function tokenLabel(acc: AccountStoreDto): string {
       @close="deleteTarget = null">
       <div class="delete-tip mx-0 mb-4 mt-1 flex flex-col gap-1.5">
         <span class="delete-name text-[14px] font-bold break-all">{{ deleteTarget.userName }} - {{ t(typeLabelKey(deleteTarget.authType)) }}</span>
-        <span class="delete-uuid text-meta text-dim break-all [font-family:'Cascadia Code',Consolas,monospace]">{{ deleteTarget.uuid }}</span>
+        <span class="delete-uuid text-meta text-dim break-all [font-family:Cascadia_Code,Consolas,monospace]">{{ deleteTarget.uuid }}</span>
       </div>
       <div class="modal-actions">
         <BaseButton @click="deleteTarget = null">{{ t("add.cancel") }}</BaseButton>
@@ -937,7 +937,7 @@ function tokenLabel(acc: AccountStoreDto): string {
 
       <label class="field-label">{{ t("account.uuid") }}</label>
       <div class="uuid-row flex items-center gap-2">
-        <input v-model="editFields.uuid" class="field-input grow min-w-[140px] flex-1" spellcheck="false" />
+        <input v-model="editFields.uuid" class="field-input field-grow" spellcheck="false" />
         <BaseButton size="sm" @click="randomUuid">{{ t("account.randomUuid") }}</BaseButton>
       </div>
 

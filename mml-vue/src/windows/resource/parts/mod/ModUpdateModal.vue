@@ -87,7 +87,7 @@ function apply() {
     <VirtualList class="upd-list mr-[-8px] flex max-h-[52vh] flex-col gap-2 overflow-y-auto pr-2" :count="updates.length" :row-gap="8" measure-row>
       <template #default="{ start, end }">
         <label v-for="u in updates.slice(start, end)" :key="u.uuid" class="upd-row flex cursor-pointer items-start gap-2.5 rounded-ctl border border-border bg-card px-2.5 py-2"
-          :class="{ 'upd-row-on border-accent-border bg-accent-soft': isChecked(u) }">
+          :class="{ 'upd-row-on': isChecked(u) }">
           <input type="checkbox" class="upd-check m-0 h-[15px] w-[15px] shrink-0 cursor-pointer accent-accent" :checked="isChecked(u)" @change="toggle(u)" />
           <span class="upd-body flex min-w-0 flex-col">
             <span class="upd-head flex flex-wrap items-baseline gap-x-2.5 gap-y-[3px]">
@@ -121,4 +121,14 @@ function apply() {
     </div>
   </BaseModal>
 </template>
+
+<style scoped>
+/* 选中的更新项：底色与描边走 CSS。模板上同时挂 bg-card / border-border，
+   两个同类工具类谁排在后面谁生效，条件类 bg-accent-soft 会被盖掉 */
+.upd-row-on {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+}
+</style>
+
 

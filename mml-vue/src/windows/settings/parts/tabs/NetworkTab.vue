@@ -133,7 +133,7 @@ const {
         <!-- 编辑中只改本地草稿，失焦 / 回车才落盘 -->
         <div class="dns-lines">
           <div v-for="(line, i) in dnsLines" :key="dnsKeys.keys[i]" class="line-row">
-            <input class="field-input grow" :value="line" spellcheck="false" autocomplete="off"
+            <input class="field-input field-grow" :value="line" spellcheck="false" autocomplete="off"
               @input="setDnsLine(i, ($event.target as HTMLInputElement).value)" @change="commitDns(); applyNetwork();"
               @keydown.enter="($event.target as HTMLInputElement).blur()" />
             <button class="line-del" :aria-label="t('args.removeLine')" v-tip="t('args.removeLine')"

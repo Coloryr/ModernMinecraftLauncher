@@ -25,7 +25,9 @@
   --color-bg-card: var(--bg-card);
   --color-bg-hover: var(--bg-hover);
   --color-bg-raised: var(--bg-raised);
-  --color-bg-solid: var(--bg-solid);
+  /* 不透明底只有"有背景图"时才定义，普通主题下要回落到卡片色，否则 bg-bg-solid 取不到值、
+     背景直接变透明（下拉浮层会透出下面的表单） */
+  --color-bg-solid: var(--bg-solid, var(--bg-card));
   --color-bg-modal: var(--bg-modal);
   --color-overlay: var(--overlay);
   --color-border: var(--border);

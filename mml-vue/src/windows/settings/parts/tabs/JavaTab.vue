@@ -55,7 +55,7 @@ useModalKeys((e) => {
       <div class="java-add-row">
         <input v-model="newJavaName" class="field-input java-add-name" :placeholder="t('winSettings.javaName')"
           spellcheck="false" autocomplete="off" />
-        <input v-model="newJavaPath" class="field-input grow" :placeholder="t('winSettings.javaPath')"
+        <input v-model="newJavaPath" class="field-input field-grow" :placeholder="t('winSettings.javaPath')"
           spellcheck="false" autocomplete="off" />
         <BaseButton size="sm" :disabled="scanning || scanningDir" @click="browseJava">{{ t("args.browse") }}
         </BaseButton>

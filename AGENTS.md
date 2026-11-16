@@ -787,6 +787,21 @@ i18n 表，**不写死中文或英文字面量**。三张表各管一摊，改�
 （实测：设置页、侧栏、配置视图的留白全部消失，且不报任何错）。同理，任何"底座"级重置都要分层，
 只有真正要压过工具类的组件覆盖才留在无层。
 
+**语义类名不许与工具类重名**：模板里的类名会被 Tailwind 当候选扫进 utilities，
+同名的语义类立刻被工具类的属性污染，而且不报错。踩过的：
+`.collapse`（→ `visibility: collapse`，展开区整块消失）、`.block`（→ `width: 100%` 被
+display 工具类带着跑）、`.grow` / `.ring` / `.select-text`。起名先查一眼工具类清单；
+撞了就改语义类名（本轮改名：`.collapse-panel` / `.btn-block` / `.field-grow` /
+`.ring-chart` / `.sel-text`）。
+
+**条件工具类会被静态工具类压掉**：同一个元素上 `bg-card` 与 `:class` 里的 `bg-accent-soft`
+是两条 background-color 工具类，胜负看产物里的排序，不是看模板意图（实测：更新列表的选中态、
+设置搜索的键盘选中项都不显示）。**状态色一律写无层 CSS**（`.upd-row-on` / `.set-search-item.on`）。
+
+**带引号的任意值不生成**：`[font-family:'Cascadia Code',Consolas,monospace]` 整条工具类不产出，
+字体静默退回默认。要写就写下划线形式（`Cascadia_Code`），或者放 CSS。
+判据：产物 CSS 里搜不到那条声明，就是没生成。
+
 ## 17. 版本控制
 
 - **不要提交**：不跑 `git commit`、`git tag`、`git push`（含 `--force`），也不改写历史

@@ -1006,8 +1006,8 @@ onBeforeUnmount(() => {
                   t("winExport.serverJavaNone") }}
               </span>
             </header>
-            <div v-if="javas.length" class="instance-list">
-              <label v-for="j in javas" :key="j.name" class="instance-row"
+            <div v-if="javas.length" class="instance-list -mx-1 flex max-h-[220px] flex-col gap-0.5 overflow-y-auto">
+              <label v-for="j in javas" :key="j.name" class="instance-row flex cursor-pointer items-center gap-2.5 rounded-ctl px-2 py-[5px]"
                 :class="{ 'is-on': javaPicked.includes(j.name) }">
                 <input type="checkbox" :checked="javaPicked.includes(j.name)" :disabled="busy"
                   @change="toggleJava(j.name)" />

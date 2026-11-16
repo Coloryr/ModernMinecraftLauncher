@@ -82,14 +82,14 @@ function hidePreview() {
         <div v-if="imageLoading(acc, 'avatar')" class="img-spin absolute inset-0 flex items-center justify-center" />
       </div>
       <!-- 头像拉取失败回退字母头像（与主页面下拉一致），不显示"无头像"占位 -->
-      <span v-else class="row-avatar row-letter flex items-center justify-center text-heading font-bold text-on-accent select-none" :style="{ background: acc.avatarColor }">
+      <span v-else class="row-avatar row-letter flex h-10 w-10 shrink-0 items-center justify-center text-heading font-bold text-on-accent select-none" :style="{ background: acc.avatarColor }">
         {{ acc.userName.charAt(0).toUpperCase() }}
       </span>
       <div class="row-meta flex min-w-0 flex-1 flex-col gap-[3px]">
         <span class="row-name overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-bold text-fg">
           <HighlightText :text="acc.userName" :query="query" />
         </span>
-        <span class="row-sub flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-meta text-dim [font-family:'Cascadia Code',Consolas,monospace]">
+        <span class="row-sub flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-meta text-dim [font-family:Cascadia_Code,Consolas,monospace]">
           <AccountTypeBadge :auth-type="acc.authType" />
           <span class="row-uuid overflow-hidden text-ellipsis">
             <HighlightText :text="acc.uuid" :query="query" />

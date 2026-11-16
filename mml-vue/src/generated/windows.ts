@@ -40,6 +40,7 @@ export { default as WinConfigPartsMcaTable } from "../windows/config/parts/McaTa
 export { default as WinConfigPartsNbtNode } from "../windows/config/parts/NbtNode.vue";
 export { default as WinConfigPartsNbtTree } from "../windows/config/parts/NbtTree.vue";
 export { default as DownloadWindow } from "../windows/download/DownloadWindow.vue";
+export { default as DownloadedResourcesWindow } from "../windows/downloaded_resources/DownloadedResourcesWindow.vue";
 export { default as ExportWindow } from "../windows/export/ExportWindow.vue";
 export { default as WinExportPartsFilePicker } from "../windows/export/parts/FilePicker.vue";
 export { default as WinExportPartsInfoExportButton } from "../windows/export/parts/InfoExportButton.vue";
@@ -103,7 +104,6 @@ export { default as WinSettingsPartsGamepadActionPicker } from "../windows/setti
 export { default as WinSettingsPartsGamepadDiagram } from "../windows/settings/parts/GamepadDiagram.vue";
 export { default as WinSettingsPartsGamepadKeyPicker } from "../windows/settings/parts/GamepadKeyPicker.vue";
 export { default as WinSettingsPartsGamepadTestPanel } from "../windows/settings/parts/GamepadTestPanel.vue";
-export { default as WinSettingsPartsLinkResourcesModal } from "../windows/settings/parts/LinkResourcesModal.vue";
 export { default as WinSettingsPartsSaveStateText } from "../windows/settings/parts/SaveStateText.vue";
 export { default as WinSettingsPartsSettingsGroup } from "../windows/settings/parts/SettingsGroup.vue";
 export { default as WinSettingsPartsSettingsRail } from "../windows/settings/parts/SettingsRail.vue";

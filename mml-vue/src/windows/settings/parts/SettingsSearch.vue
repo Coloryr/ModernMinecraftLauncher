@@ -82,10 +82,10 @@ function onKey(e: KeyboardEvent) {
     <!-- 结果列表：位置由 SearchBox 的定位参照决定，样式在 settings.css 的 .set-search-drop -->
     <template #drop>
       <div v-if="open && query.trim()"
-        class="set-search-drop z-[60] absolute top-[calc(100%+6px)] inset-x-0 max-h-80 overflow-y-scroll [scrollbar-gutter:stable] p-1 bg-card border border-border rounded-card">
+        class="set-search-drop z-[60] absolute top-[calc(100%+6px)] inset-x-0 max-h-80 overflow-y-scroll [scrollbar-gutter:stable] p-1 bg-card border border-border rounded-card shadow-[var(--shadow-lg)]">
         <button v-for="(h, i) in hits" :key="`${h.tab}/${h.group}/${h.label}`" type="button"
-          class="set-search-item flex flex-col gap-[2px] w-full px-2.5 py-2 border-0 rounded-ctl bg-transparent text-fg text-body text-left cursor-pointer hover:bg-hover [font-family:inherit]"
-          :class="{ on: i === active, 'bg-hover': i === active }" @mousedown.prevent @click="choose(i)">
+          class="set-search-item flex flex-col gap-[2px] w-full px-2.5 py-2 border-0 rounded-ctl text-fg text-body text-left cursor-pointer [font-family:inherit]"
+          :class="{ on: i === active }" @mousedown.prevent @click="choose(i)">
           <span class="set-search-label font-semibold">
             <HighlightText :text="h.label" :query="query" />
           </span>

@@ -10,7 +10,8 @@ use super::family::{family_min_size, family_of_label};
 use super::uuids::{
     ACCOUNT_WINDOW_UUID, ADD_MODPACK_WINDOW_UUID, ADD_RESOURCE_WINDOW_UUID, ADD_WINDOW_UUID,
     BLOCK_WINDOW_UUID, COLLECT_WINDOW_UUID, CONFIG_WINDOW_UUID, DOWNLOAD_WINDOW_UUID,
-    EXPORT_WINDOW_UUID, HELP_WINDOW_UUID, JAVA_DOWNLOAD_WINDOW_UUID, LOBBY_WINDOW_UUID,
+    DOWNLOADED_RESOURCES_WINDOW_UUID, EXPORT_WINDOW_UUID, HELP_WINDOW_UUID,
+    JAVA_DOWNLOAD_WINDOW_UUID, LOBBY_WINDOW_UUID,
     LOG_WINDOW_UUID, MAIN_WINDOW_UUID, RESOURCE_WINDOW_UUID, SERVER_INSTANCE_WINDOW_UUID,
     SERVER_PACK_WINDOW_UUID, SETTINGS_WINDOW_UUID, STATS_WINDOW_UUID, uuid_for_kind,
 };
@@ -133,6 +134,12 @@ pub(crate) const STATS_MIN_WIDTH: f64 = 780.0;
 
 /// 游戏统计窗口最小高度
 pub(crate) const STATS_MIN_HEIGHT: f64 = 600.0;
+
+/// 已下载资源窗口最小宽度：六列表格加搜索与翻页
+pub(crate) const DOWNLOADED_RESOURCES_MIN_WIDTH: f64 = 900.0;
+
+/// 已下载资源窗口最小高度
+pub(crate) const DOWNLOADED_RESOURCES_MIN_HEIGHT: f64 = 560.0;
 
 /// 窗口注册表：uuid → 窗口信息
 ///
@@ -290,6 +297,14 @@ pub(crate) static WINDOWS_INFO: LazyLock<HashMap<Uuid, WindowEntry>> = LazyLock:
                 label: "mml-server_instance",
                 min_width: SERVER_INSTANCE_MIN_WIDTH,
                 min_height: SERVER_INSTANCE_MIN_HEIGHT,
+            },
+        ),
+        (
+            DOWNLOADED_RESOURCES_WINDOW_UUID,
+            WindowEntry {
+                label: "mml-downloaded_resources",
+                min_width: DOWNLOADED_RESOURCES_MIN_WIDTH,
+                min_height: DOWNLOADED_RESOURCES_MIN_HEIGHT,
             },
         ),
     ])

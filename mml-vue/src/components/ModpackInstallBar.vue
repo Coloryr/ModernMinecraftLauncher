@@ -204,17 +204,17 @@ async function clearDone() {
 
 /* 滚动落在 CollapsePanel 的内层：外层是 grid，靠 grid-template-rows 做展开过渡、
    自身不滚。展开状态下 1fr 行撑满，内层 overflow 出来就是滚动条 */
-.mp-bar.fill-h :deep(.collapse) {
+.mp-bar.fill-h :deep(.collapse-panel) {
   flex: 1;
   min-height: 0;
 }
 
-.mp-bar.fill-h :deep(.collapse.open) {
+.mp-bar.fill-h :deep(.collapse-panel.open) {
   grid-template-rows: 1fr;
   overflow: hidden;
 }
 
-.mp-bar.fill-h :deep(.collapse.open > .collapse-inner) {
+.mp-bar.fill-h :deep(.collapse-panel.open > .collapse-inner) {
   overflow-y: scroll;
   scrollbar-gutter: stable;
   /* 行与滚动条之间留 8px：滚动容器向外借 8px、再用内边距收回 ——

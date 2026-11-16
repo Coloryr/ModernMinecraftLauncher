@@ -64,6 +64,10 @@ pub(crate) const SERVER_PACK_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-
 /// 服务器实例生成窗口固定 uuid
 pub(crate) const SERVER_INSTANCE_WINDOW_UUID: Uuid = uuid!("00000000-0000-0000-0000-000000000014");
 
+/// 已下载资源窗口固定 uuid
+pub(crate) const DOWNLOADED_RESOURCES_WINDOW_UUID: Uuid =
+    uuid!("00000000-0000-0000-0000-000000000015");
+
 /// 前端窗口 kind → uuid，标签去 `mml-` 前缀匹配
 ///
 /// 窗口族的 kind 拿到的是它的**基准 uuid**，族内窗口还要按实例派生，见

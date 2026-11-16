@@ -173,7 +173,7 @@ function onLoaderPathPick(e: Event) {
           <span class="type-label truncate">{{ typeLabel }}</span>
         </button>
         <div v-if="typeOpen" class="type-drop absolute left-0 right-0 top-[calc(100%+4px)] z-20 max-h-[220px] overflow-y-auto rounded-card border border-border bg-bg-solid p-[5px] shadow-[var(--shadow-lg)]" role="listbox" aria-multiselectable="true">
-          <button v-for="vt in versionTypes" :key="vt" type="button" class="type-opt m-0 block w-full cursor-pointer rounded-ctl border-0 bg-transparent px-3 py-2 text-left text-title text-fg" role="option"
+          <button v-for="vt in versionTypes" :key="vt" type="button" class="type-opt m-0 block w-full cursor-pointer rounded-ctl border-0 bg-transparent px-3 py-2 text-left text-title text-fg [font-family:inherit]" role="option"
             :aria-selected="verTypes.includes(vt)" :disabled="versionBusy" :class="{ selected: verTypes.includes(vt) }"
             @click="toggleType(vt)">
             {{ t(`add.type.${vt}`) }}

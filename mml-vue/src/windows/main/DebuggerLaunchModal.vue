@@ -169,7 +169,7 @@ async function generate() {
           <BaseSwitch v-model="renderOn" />
           <span class="dbg-row-label">{{ t("debugger.render") }}</span>
         </div>
-        <select v-if="renderOn" v-model="picked" class="field-select dbg-select w-[168px]">
+        <select v-if="renderOn" v-model="picked" class="field-select dbg-select">
           <option value="renderdoc">RenderDoc</option>
           <option v-if="nsight" value="nsight">Nsight Graphics</option>
         </select>
@@ -213,7 +213,12 @@ async function generate() {
 </template>
 
 <style scoped>
-/* 两行调试开关的排列与端口 / 下拉宽度都在模板上（dbg-row / dbg-row-head / dbg-port / dbg-select） */
+.dbg-select {
+  width: 168px;
+}
+
+/* 两行调试开关的排列与端口宽度都在模板上；下拉的定宽必须留在这里 ——
+   .field-select 的 width: 100% 是无层规则，w-[168px] 工具类压不过 */
 .dbg-row-label {
   font-size: 13px;
 }

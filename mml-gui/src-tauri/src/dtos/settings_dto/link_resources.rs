@@ -21,3 +21,33 @@ pub struct LinkResourceDto {
     /// 文件是否还在公共目录里
     pub exists: bool,
 }
+
+/// 已下载资源列表的查询条件
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkResourceQueryDto {
+    /// 搜索词，匹配项目 ID、显示名、文件名与 SHA1；空串表示不筛
+    pub keyword: String,
+    /// 页码，从 1 开始；超出末页时回落到末页
+    pub page: u32,
+    /// 每页条数，单位条；0 按默认值处理
+    pub page_size: u32,
+}
+
+/// 已下载资源列表的一页
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkResourcePageDto {
+    /// 筛选后的总条数，单位条
+    pub total: u64,
+    /// 筛选后仍在磁盘上的总占用，单位字节
+    pub total_size: u64,
+    /// 当前页码，从 1 开始
+    pub page: u32,
+    /// 总页数，至少为 1
+    pub pages: u32,
+    /// 每页条数，单位条
+    pub page_size: u32,
+    /// 当前页的记录，按项目 ID 与类型分组后顺序排列
+    pub items: Vec<LinkResourceDto>,
+}

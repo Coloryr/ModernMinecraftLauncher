@@ -410,7 +410,7 @@ watch(
     <!-- 卡片档：主窗口列表模式，名字 + 版本 / 加载器两行 -->
     <button v-if="variant === 'card'" ref="btnEl" type="button" class="select-btn card-btn" :class="{ open }"
       :disabled="disabled" :aria-label="label" aria-haspopup="listbox" :aria-expanded="open" @click="toggle">
-      <span class="select-text">
+      <span class="sel-text">
         <span v-if="selected" class="sel-name">{{ selected.name }}</span>
         <span v-else class="sel-placeholder">{{ placeholder || t("launch.selectInstance") }}</span>
         <span v-if="selected && hasInstanceMeta(selected)" class="sel-sub">
@@ -534,7 +534,8 @@ watch(
   background: var(--bg-hover);
 }
 
-.select-text {
+/* 不能叫 select-text：Tailwind 有同名的 user-select 工具类 */
+.sel-text {
   flex: 1;
   display: flex;
   flex-direction: column;

@@ -42,7 +42,7 @@ const total = computed(() => collectFileKeys(props.tree).length);
         <button type="button" class="files-btn h-ctl cursor-pointer rounded-ctl border border-border bg-raised px-3.5 text-ctl font-semibold text-accent transition-[border-color,background] duration-150" @click="emit('set-all', false)">{{ t("add.filesNone") }}</button>
       </span>
     </div>
-    <div class="file-list -mb-2 min-h-0 flex-1 overflow-y-scroll rounded-card border border-border bg-bg p-1.5 [scrollbar-gutter:stable]">
+    <div class="file-list mb-2 min-h-0 flex-1 overflow-y-scroll rounded-card border border-border bg-bg p-1.5 [scrollbar-gutter:stable]">
       <FileTree :nodes="tree" :checked="checked" :expanded="expanded" @toggle-file="emit('toggle-file', $event)"
         @toggle-dir="(n: FileNode, on: boolean) => emit('toggle-dir', n, on)"
         @toggle-expand="emit('toggle-expand', $event)" @lazy-load="emit('lazy-load', $event)" />

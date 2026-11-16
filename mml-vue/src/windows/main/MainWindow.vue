@@ -2893,7 +2893,7 @@ onMounted(async () => {
                           <!-- 自动加入服务器设置：地址可带 `:端口`，不写就用 25565；另有"启动时加入"开关 -->
                           <div class="server-row">
                             <span class="server-label">{{ t("server.ip") }}</span>
-                            <input class="field-input grow" :value="argsOf(selected.uuid).serverIp"
+                            <input class="field-input field-grow" :value="argsOf(selected.uuid).serverIp"
                               :placeholder="t('server.ipPlaceholder')" spellcheck="false"
                               @input="onServerIp(($event.target as HTMLInputElement).value)" />
                             <label class="chk">

@@ -194,9 +194,9 @@ onBeforeUnmount(deactivate);
         <template v-else>
           <section class="panel setup-panel flex min-w-0 flex-col items-stretch gap-3 rounded-panel border border-border bg-card p-4">
             <div class="section-head flex flex-wrap items-center justify-between gap-3">
-              <div>
+              <div class="grid gap-1.5">
                 <h2 class="m-0 text-heading">{{ t('lobby.terracotta') }}</h2>
-                <span class="muted">{{ view.version || t('lobby.downloadHint') }}</span>
+                <span class="muted text-body leading-[1.6] text-dim">{{ view.version || t('lobby.downloadHint') }}</span>
               </div>
               <BaseButton :disabled="busy || view.downloading" @click="start">
                 {{ t(view.ready ? 'lobby.refreshNodes' : 'lobby.start') }}

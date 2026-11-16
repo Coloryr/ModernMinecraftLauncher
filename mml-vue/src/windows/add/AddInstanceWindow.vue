@@ -1204,4 +1204,13 @@ onUnmounted(() => {
   </WindowFrame>
 </template>
 
+<style scoped>
+/* 整页布局里的底部操作条要贴底：全局 .modal-actions 带 16px 上边距（弹窗里用），
+   在这里得推开到底，光靠 mt-auto 工具类压不住那条无层规则 */
+.add-body > .modal-actions {
+  margin-top: auto;
+}
+</style>
+
+
 

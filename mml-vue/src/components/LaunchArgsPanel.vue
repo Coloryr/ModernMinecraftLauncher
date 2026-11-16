@@ -323,7 +323,7 @@ const gcOptions = computed(() => [
       <div class="args-row">
         <span class="args-label">{{ t("args.java") }}</span>
         <!-- 自动 = jvm_name 留空，启动时按版本要求的 Java 主版本挑（见 core 的取 Java 逻辑） -->
-        <select class="field-select grow" :value="args.javaName"
+        <select class="field-select field-grow" :value="args.javaName"
           @change="update({ javaName: ($event.target as HTMLSelectElement).value })">
           <option value="">{{ t("args.javaAuto") }}</option>
           <option v-for="j in javas" :key="j.name" :value="j.name">
@@ -338,7 +338,7 @@ const gcOptions = computed(() => [
       <!-- 自定义 Java 路径 -->
       <div v-if="args.javaName === 'custom'" class="args-row">
         <span class="args-label">{{ t("args.javaPath") }}</span>
-        <input class="field-input grow" :value="args.javaPath" placeholder="C:\Program Files\Java\jdk-21\bin\java.exe"
+        <input class="field-input field-grow" :value="args.javaPath" placeholder="C:\Program Files\Java\jdk-21\bin\java.exe"
           spellcheck="false" @input="update({ javaPath: ($event.target as HTMLInputElement).value })" />
         <BaseButton size="sm" @click="pickJava">{{ t("args.browse") }}</BaseButton>
       </div>
@@ -358,7 +358,7 @@ const gcOptions = computed(() => [
         <div class="advanced-body">
           <div class="args-row">
             <span class="args-label">{{ t("args.gc") }}</span>
-            <select class="field-select grow" :value="args.gc"
+            <select class="field-select field-grow" :value="args.gc"
               @change="update({ gc: ($event.target as HTMLSelectElement).value })">
               <option v-for="g in gcOptions" :key="g.value" :value="g.value">{{ g.label }}</option>
             </select>
@@ -367,20 +367,20 @@ const gcOptions = computed(() => [
           <!-- 自定义 GC 参数 -->
           <div v-if="args.gc === 'custom'" class="args-row">
             <span class="args-label">{{ t("args.gcCustom") }}</span>
-            <input class="field-input grow" :value="args.gcCustom" placeholder="-XX:+UseZGC -XX:ZCollectionInterval=30"
+            <input class="field-input field-grow" :value="args.gcCustom" placeholder="-XX:+UseZGC -XX:ZCollectionInterval=30"
               spellcheck="false" @input="update({ gcCustom: ($event.target as HTMLInputElement).value })" />
           </div>
 
           <div class="args-row">
             <span class="args-label">{{ t("args.mainClass") }}</span>
-            <input class="field-input grow" :value="args.mainClass" placeholder="net.minecraft.client.main.Main"
+            <input class="field-input field-grow" :value="args.mainClass" placeholder="net.minecraft.client.main.Main"
               spellcheck="false" @input="update({ mainClass: ($event.target as HTMLInputElement).value })" />
           </div>
 
           <!-- 附加 JVM 参数 -->
           <label class="args-label">{{ t("args.jvmExtra") }}</label>
           <div v-for="(line, i) in args.jvmArgs" :key="jvmKeys.keys[i]" class="line-row">
-            <input class="field-input grow" :value="line" placeholder="-XX:+UseG1GC" spellcheck="false"
+            <input class="field-input field-grow" :value="line" placeholder="-XX:+UseG1GC" spellcheck="false"
               @input="setLine('jvmArgs', i, ($event.target as HTMLInputElement).value)" />
             <button class="line-del" v-tip="t('args.removeLine')" @click="removeLine('jvmArgs', i)">
               <GlyphIcon name="close" :size="13" />
@@ -393,7 +393,7 @@ const gcOptions = computed(() => [
           <!-- 附加游戏参数 -->
           <label class="args-label">{{ t("args.gameExtra") }}</label>
           <div v-for="(line, i) in args.gameArgs" :key="gameKeys.keys[i]" class="line-row">
-            <input class="field-input grow" :value="line" placeholder="--server 127.0.0.1:25565" spellcheck="false"
+            <input class="field-input field-grow" :value="line" placeholder="--server 127.0.0.1:25565" spellcheck="false"
               @input="setLine('gameArgs', i, ($event.target as HTMLInputElement).value)" />
             <button class="line-del" v-tip="t('args.removeLine')" @click="removeLine('gameArgs', i)">
               <GlyphIcon name="close" :size="13" />
@@ -406,7 +406,7 @@ const gcOptions = computed(() => [
           <!-- 附加 classpath -->
           <label class="args-label">{{ t("args.classPath") }}</label>
           <div v-for="(line, i) in args.classPath" :key="classKeys.keys[i]" class="line-row">
-            <input class="field-input grow" :value="line" placeholder="libraries/xxx.jar" spellcheck="false"
+            <input class="field-input field-grow" :value="line" placeholder="libraries/xxx.jar" spellcheck="false"
               @input="setLine('classPath', i, ($event.target as HTMLInputElement).value)" />
             <button class="line-del" v-tip="t('args.removeLine')" @click="removeLine('classPath', i)">
               <GlyphIcon name="close" :size="13" />
@@ -433,7 +433,7 @@ const gcOptions = computed(() => [
           <div v-for="(line, i) in args.envVars" :key="envKeys.keys[i]" class="line-row">
             <input class="field-input env-key" :value="line.key" :placeholder="t('args.envKey')" spellcheck="false"
               @input="setEnvKey(i, ($event.target as HTMLInputElement).value)" />
-            <input class="field-input grow" :value="line.value" :placeholder="t('args.envValue')" spellcheck="false"
+            <input class="field-input field-grow" :value="line.value" :placeholder="t('args.envValue')" spellcheck="false"
               @input="setEnvValue(i, ($event.target as HTMLInputElement).value)" />
             <button class="line-del" v-tip="t('args.removeLine')" @click="removeEnv(i)">
               <GlyphIcon name="close" :size="13" />
@@ -474,7 +474,7 @@ const gcOptions = computed(() => [
   padding-top: 10px;
 }
 
-.advanced :deep(.collapse.open) {
+.advanced :deep(.collapse-panel.open) {
   margin-top: 10px;
 }
 
@@ -483,7 +483,8 @@ const gcOptions = computed(() => [
   flex: none;
 }
 
-.grow {
+/* 占满剩余宽度的表单项。不能叫 .grow：Tailwind 有 flex-grow 工具类同名 */
+.field-grow {
   flex: 1;
   min-width: 120px;
 }

@@ -91,7 +91,7 @@ function isCurrent(acc: AccountStoreDto): boolean {
                 <HighlightText :text="acc.userName" :query="query" />
                 <span v-if="isCurrent(acc)" class="current-tag ml-1.5 shrink-0 whitespace-nowrap rounded-pill bg-accent px-2 py-0.5 text-caption text-on-accent">{{ t("account.current") }}</span>
               </td>
-              <td class="mono [font-family:'Cascadia Code',Consolas,monospace]">
+              <td class="mono [font-family:Cascadia_Code,Consolas,monospace]">
                 <HighlightText :text="acc.uuid" :query="query" />
               </td>
               <td>
@@ -101,8 +101,8 @@ function isCurrent(acc: AccountStoreDto): boolean {
               <td>
                 <span class="token-tag shrink-0 whitespace-nowrap rounded-pill px-[9px] py-0.5" :class="acc.tokenStatus">{{ tokenLabel(acc) }}</span>
               </td>
-              <td class="cell-ext max-w-[180px] overflow-hidden text-ellipsis text-meta [font-family:'Cascadia Code',Consolas,monospace]" v-tip="acc.ext1 ?? ''">{{ acc.ext1 ?? "—" }}</td>
-              <td class="cell-ext max-w-[180px] overflow-hidden text-ellipsis text-meta [font-family:'Cascadia Code',Consolas,monospace]" v-tip="acc.ext2 ?? ''">{{ acc.ext2 ?? "—" }}</td>
+              <td class="cell-ext max-w-[180px] overflow-hidden text-ellipsis text-meta [font-family:Cascadia_Code,Consolas,monospace]" v-tip="acc.ext1 ?? ''">{{ acc.ext1 ?? "—" }}</td>
+              <td class="cell-ext max-w-[180px] overflow-hidden text-ellipsis text-meta [font-family:Cascadia_Code,Consolas,monospace]" v-tip="acc.ext2 ?? ''">{{ acc.ext2 ?? "—" }}</td>
             </tr>
           </tbody>
         </table>
