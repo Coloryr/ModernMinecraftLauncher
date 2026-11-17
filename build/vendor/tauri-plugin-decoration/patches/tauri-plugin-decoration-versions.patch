@@ -1,0 +1,13 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 657f66d..75f1dcf 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -36,7 +36,7 @@ tokio = { version = "1.52.3", features = ["sync", "time"] }
+ [target.'cfg(target_os = "macos")'.dependencies]
+ # M²L 本地修改：窗口缩放时同步重摆红黄绿（src/traffic.rs）
+ block2 = "=0.6.2"
+-objc2 = { version = "=0.6.4", features = ["exception"] }
++objc2 = { version = "0.6.5", features = ["exception"] }
+ objc2-app-kit = { version = "=0.3.2", default-features = false, features = [
+     "std",
+     "NSButton",
