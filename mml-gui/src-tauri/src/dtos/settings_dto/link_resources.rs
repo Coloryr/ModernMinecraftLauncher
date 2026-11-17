@@ -10,6 +10,10 @@ pub struct LinkResourceDto {
     pub kind: String,
     /// 项目 ID
     pub pid: String,
+    /// 平台上的文件 ID；旧记录可能为空
+    pub fid: String,
+    /// 项目名；还没记录过项目名时为空
+    pub project: String,
     /// 显示名
     pub name: String,
     /// 公共目录下的文件名
@@ -50,4 +54,26 @@ pub struct LinkResourcePageDto {
     pub page_size: u32,
     /// 当前页的记录，按项目 ID 与类型分组后顺序排列
     pub items: Vec<LinkResourceDto>,
+}
+
+/// 整理已下载资源项目名的进度
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkResourceTidyProgressDto {
+    /// 已处理的项目数，单位个
+    pub done: u32,
+    /// 需要补全的项目总数，单位个
+    pub total: u32,
+}
+
+/// 整理已下载资源项目名的结果
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkResourceTidyResultDto {
+    /// 需要补全的项目总数，单位个
+    pub total: u32,
+    /// 成功补全的项目数，单位个
+    pub filled: u32,
+    /// 查询失败或平台没有返回名字的项目数，单位个
+    pub failed: u32,
 }

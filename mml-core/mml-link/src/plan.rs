@@ -30,9 +30,28 @@ pub fn add_download_info(resource: ResourceType, mut info: ResourceInfoObj, pid:
     {
         info.file = file.to_string();
     }
-
     // 单条写进索引库，反查键由库自己维护；旧版本记录留在主索引里，点查不会互相覆盖
     save_entry(resource, &pid, &info);
+}
+
+/// 记下一个项目的名字
+///
+/// 项目名是项目级信息，与具体文件无关；下载完成时才知道，单独存一份供列表显示
+///
+/// - `resource`: 资源类型
+/// - `pid`: 项目 ID
+/// - `project`: 项目名；空串时不动
+pub fn set_project_name(resource: ResourceType, pid: &str, project: &str) {
+    let project = project.trim();
+    if project.is_empty() {
+        return;
+    }
+    let Some(store) = INDEX.get() else {
+        return;
+    };
+    if let Err(err) = store.put_project(resource.kind(), pid, project) {
+        log_index_error(err);
+    }
 }
 
 /// 获取实例的映射记录

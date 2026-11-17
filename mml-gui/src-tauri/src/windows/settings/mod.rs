@@ -15,6 +15,7 @@ use crate::dtos::{
 pub(crate) mod bg;
 pub(crate) mod icon;
 pub(crate) mod java;
+pub(crate) mod link_tidy;
 pub(crate) mod local_files;
 pub(crate) mod resource_link;
 

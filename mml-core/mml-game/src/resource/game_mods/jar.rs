@@ -244,6 +244,10 @@ pub(super) fn parse_mod_archive(
     // 扫描coremod
     read_core_mod(archive, &mut mod_info)?;
 
+    // 记下 mixin 注入与 ASM 变压器的目标，供冲突排查用
+    super::mixin::read_mixins(archive, &mut mod_info);
+    super::asm::read_asm(archive, &mut mod_info);
+
     // 扫描 jar-in-jar，会递归：内置 jar 里还能再套内置 jar
     read_jar_in_jar(archive, &mut mod_info, base)?;
 

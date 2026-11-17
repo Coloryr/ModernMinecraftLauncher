@@ -3,6 +3,8 @@
 export type LinkResourceDto = {
   kind: string,
   pid: string,
+  fid: string,
+  project: string,
   name: string,
   file: string,
   hash: string,
@@ -23,5 +25,16 @@ export type LinkResourcePageDto = {
   pages: number,
   pageSize: number,
   items: LinkResourceDto[],
+};
+
+export type LinkResourceTidyProgressDto = {
+  done: number,
+  total: number,
+};
+
+export type LinkResourceTidyResultDto = {
+  total: number,
+  filled: number,
+  failed: number,
 };
 

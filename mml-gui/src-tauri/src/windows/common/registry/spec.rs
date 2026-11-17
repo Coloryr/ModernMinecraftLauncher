@@ -136,10 +136,10 @@ pub(crate) const STATS_MIN_WIDTH: f64 = 780.0;
 pub(crate) const STATS_MIN_HEIGHT: f64 = 600.0;
 
 /// 已下载资源窗口最小宽度：六列表格加搜索与翻页
-pub(crate) const DOWNLOADED_RESOURCES_MIN_WIDTH: f64 = 900.0;
+pub(crate) const DOWNLOADED_RESOURCES_MIN_WIDTH: f64 = 980.0;
 
 /// 已下载资源窗口最小高度
-pub(crate) const DOWNLOADED_RESOURCES_MIN_HEIGHT: f64 = 560.0;
+pub(crate) const DOWNLOADED_RESOURCES_MIN_HEIGHT: f64 = 600.0;
 
 /// 窗口注册表：uuid → 窗口信息
 ///

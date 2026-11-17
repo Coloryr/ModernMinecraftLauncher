@@ -166,6 +166,36 @@ pub struct ModItemObj {
     pub side: LoadSideType,
 }
 
+/// 模组改写的一处目标，来自 mixin 注解
+#[derive(Debug, Clone)]
+pub struct MixinTarget {
+    /// 声明这处注入的配置文件，如 `ae2.mixins.json`
+    pub config: String,
+    /// 发起注入的 mixin 类名，点分
+    pub mixin: String,
+    /// 目标类名，点分；`@Mixin(targets = ...)` 写了几条就有几条
+    pub target: String,
+    /// 目标方法名，注解里带 owner 或描述符时只留方法名；生产包里常是 SRG / intermediary 名
+    pub method: String,
+    /// 注入方式 id：inject / redirect / modify_arg / modify_args / modify_variable /
+    /// modify_constant / modify_expression_value / wrap_operation / wrap_with_condition /
+    /// overwrite / accessor / invoker
+    pub kind: String,
+}
+
+/// 模组声明的 ASM 变压器
+#[derive(Debug, Clone)]
+pub struct AsmTarget {
+    /// 声明来源，如 `coremods.json` / `FMLCorePlugin` / `ITransformationService`
+    pub source: String,
+    /// 变压器名字或类名
+    pub transformer: String,
+    /// 目标类名，点分；变压器没声明目标时为空串
+    pub target: String,
+    /// 目标方法；只到类、或变压器没声明方法时为空串
+    pub method: String,
+}
+
 /// 模组目录里的一个文件及其解析结果
 #[derive(Default)]
 pub struct ModObj {
@@ -181,6 +211,10 @@ pub struct ModObj {
     pub hash: FileHash,
     /// 内置的模组，递归展开；没有时为空
     pub jar_in_jar: Vec<ModObj>,
+    /// mixin 注入的目标，见 [`MixinTarget`]
+    pub mixins: Vec<MixinTarget>,
+    /// 声明过的 ASM 变压器，见 [`AsmTarget`]
+    pub asm: Vec<AsmTarget>,
     /// 是否读取失败，为真时 `info` 为空、只剩文件名可用
     pub fail: bool,
     /// 文件完整路径；内置模组存的是包内条目名

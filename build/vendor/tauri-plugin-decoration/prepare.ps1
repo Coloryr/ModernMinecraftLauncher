@@ -36,9 +36,19 @@ $repoRoot = Split-Path (Split-Path (Split-Path $vendorDir -Parent) -Parent) -Par
 $patchDir = Join-Path $vendorDir "patches"
 $outDir = Join-Path $repoRoot "target/vendor/$DirName"
 
+# 产物指纹：ref + 全部 patch 的内容。patch 一改就重新拉取，避免"改了补丁但产物没变"
+$stampFile = Join-Path $outDir ".mml-vendor-stamp"
+$stamp = $Ref + "`n" + ((Get-ChildItem $patchDir -Filter *.patch -ErrorAction SilentlyContinue |
+    Sort-Object Name |
+    ForEach-Object { $_.Name + ":" + (Get-FileHash $_.FullName -Algorithm SHA256).Hash }) -join "`n")
+
 if ((Test-Path (Join-Path $outDir "Cargo.toml")) -and -not $Force) {
-    Write-Host "已存在，跳过：$outDir（要重新拉取加 -Force）"
-    exit 0
+    $old = Get-Content $stampFile -ErrorAction SilentlyContinue -Raw
+    if ($old -and $old.Trim() -eq $stamp.Trim()) {
+        Write-Host "已是最新，跳过：$outDir（要重新拉取加 -Force）"
+        exit 0
+    }
+    Write-Host "补丁有变化，重新拉取：$outDir"
 }
 
 if (Test-Path $outDir) {
@@ -129,4 +139,5 @@ foreach ($p in $patches) {
     Write-Host "已应用：$($p.Name)（改动 $($touched.Count) 个文件）"
 }
 
+Set-Content -Path $stampFile -Value $stamp -Encoding ASCII
 Write-Host "完成：$outDir"

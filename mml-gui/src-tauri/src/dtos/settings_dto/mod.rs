@@ -12,7 +12,10 @@ mod misc;
 mod network;
 
 pub use self::launch::RunArgSettingDto;
-pub use self::link_resources::{LinkResourceDto, LinkResourcePageDto, LinkResourceQueryDto};
+pub use self::link_resources::{
+    LinkResourceDto, LinkResourcePageDto, LinkResourceQueryDto, LinkResourceTidyProgressDto,
+    LinkResourceTidyResultDto,
+};
 pub use self::local_files::{LocalFileChildDto, LocalFileEntryDto};
 pub use self::misc::{
     BgInfoDto, LaunchSettingDto, ResourceMapProgressDto, ResourceMapResultDto, SettingsDefaultsDto,

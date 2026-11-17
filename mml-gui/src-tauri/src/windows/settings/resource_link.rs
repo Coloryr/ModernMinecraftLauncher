@@ -190,6 +190,8 @@ fn list_link_resources(query: &LinkResourceQueryDto) -> LinkResourcePageDto {
     if !keyword.is_empty() {
         list.retain(|item| {
             item.pid.to_lowercase().contains(&keyword)
+                || item.fid.to_lowercase().contains(&keyword)
+                || item.project.to_lowercase().contains(&keyword)
                 || item.name.to_lowercase().contains(&keyword)
                 || item.file.to_lowercase().contains(&keyword)
                 || item.hash.to_lowercase().contains(&keyword)
@@ -238,6 +240,7 @@ fn collect_link_resources() -> Vec<LinkResourceDto> {
         };
         // 先扫目录再逐条查：几千条记录逐个 stat 太慢
         let sizes = dir_file_sizes(&dir);
+        let projects = store.projects(kind).unwrap_or_default();
         let Ok(rows) = store.load(kind) else {
             continue;
         };
@@ -248,6 +251,12 @@ fn collect_link_resources() -> Vec<LinkResourceDto> {
             let size = sizes.get(&info.file).copied();
             list.push(LinkResourceDto {
                 kind: id.to_string(),
+                project: projects.get(&pid).cloned().unwrap_or_default(),
+                fid: if info.fid.is_empty() {
+                    file_id_from_url(&info.url)
+                } else {
+                    info.fid.clone()
+                },
                 pid,
                 name: info.name,
                 file: info.file,
@@ -281,6 +290,36 @@ fn dir_file_sizes(dir: &Path) -> HashMap<String, u64> {
         }
     }
     sizes
+}
+
+/// 从下载地址里取文件 ID
+///
+/// - `url`: 资源记录里的下载地址
+///
+/// # 返回值
+///
+/// Modrinth 取 `/versions/<文件 ID>`；CurseForge 取 `/files/<前段>/<后段>` 拼成文件 ID；
+/// 认不出时为空串
+fn file_id_from_url(url: &str) -> String {
+    let lower = url.to_lowercase();
+    if lower.contains("modrinth")
+        && let Some(rest) = url.split("/versions/").nth(1)
+    {
+        return rest
+            .split(|c| c == '/' || c == '?' || c == '#')
+            .next()
+            .unwrap_or_default()
+            .to_string();
+    }
+    if lower.contains("forgecdn") || lower.contains("curseforge") {
+        let mut parts = url.split("/files/").nth(1).unwrap_or_default().split('/');
+        let first = parts.next().unwrap_or_default();
+        let second = parts.next().unwrap_or_default();
+        if !first.is_empty() && !second.is_empty() {
+            return format!("{first}{second:0>3}");
+        }
+    }
+    String::new()
 }
 
 /// 按条数分页

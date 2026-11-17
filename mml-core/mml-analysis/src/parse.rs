@@ -304,6 +304,7 @@ fn parse_mod_issues(lines: &[&str]) -> Vec<ModEntry> {
                     name: id.to_string(),
                     version: String::new(),
                     states: String::new(),
+                    file: String::new(),
                     line: trimmed.to_string(),
                 });
                 current = Some(mods.len() - 1);
@@ -331,6 +332,7 @@ fn parse_mods(lines: &[&str]) -> Vec<ModEntry> {
                 name: captures[4].to_string(),
                 version: captures[3].to_string(),
                 states: captures[1].to_string(),
+                file: String::new(),
                 line: line.to_string(),
             })
         } else {
@@ -339,6 +341,7 @@ fn parse_mods(lines: &[&str]) -> Vec<ModEntry> {
                 name: captures[2].to_string(),
                 version: captures[3].trim().to_string(),
                 states: captures[1].to_string(),
+                file: String::new(),
                 line: line.to_string(),
             })
         };
@@ -409,7 +412,9 @@ fn parse_mod_line(line: &str) -> Option<ModEntry> {
                 fields[1].to_string()
             },
             version: fields[3].to_string(),
-            states: fields[0].to_string(),
+            // 这一列是 jar 文件名，不是 1.7 那种状态字母
+            states: String::new(),
+            file: fields[0].to_string(),
             line: line.to_string(),
         });
     }
@@ -427,6 +432,7 @@ fn parse_mod_line(line: &str) -> Option<ModEntry> {
             name: id.to_string(),
             version: String::new(),
             states: String::new(),
+            file: String::new(),
             line: line.to_string(),
         });
     }
@@ -449,6 +455,7 @@ fn parse_mod_line(line: &str) -> Option<ModEntry> {
         },
         version: version.to_string(),
         states: String::new(),
+        file: String::new(),
         line: line.to_string(),
     })
 }

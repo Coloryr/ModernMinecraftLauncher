@@ -33,6 +33,8 @@ struct LinkPlan {
     source: PathBuf,
     /// 项目 ID
     pid: String,
+    /// 项目名
+    project: String,
     /// 文件 ID
     fid: String,
     /// 显示名
@@ -239,21 +241,27 @@ pub async fn add_resource_download(
         }
     };
 
-    // 图标从项目缓存取；缓存里没有就留空，界面用首字母占位
-    let project_icon = match source {
-        ModPackType::CurseForge => super::CURSEFOGRE_INFO
-            .read()
-            .await
-            .get(&pid)
-            .and_then(|item| item.logo.url.clone()),
-        ModPackType::Modrinth => super::MODRINTH_INFO
-            .read()
-            .await
-            .get(&pid)
-            .and_then(|item| item.icon_url.clone()),
-        _ => None,
-    }
-    .unwrap_or_default();
+    // 图标与项目名都从项目缓存取；缓存里没有就留空，界面用首字母与项目 ID 占位
+    let (project_icon, project_name) = match source {
+        ModPackType::CurseForge => {
+            let cache = super::CURSEFOGRE_INFO.read().await;
+            match cache.get(&pid) {
+                Some(item) => (
+                    item.logo.url.clone().unwrap_or_default(),
+                    item.name.clone(),
+                ),
+                None => (String::new(), String::new()),
+            }
+        }
+        ModPackType::Modrinth => {
+            let cache = super::MODRINTH_INFO.read().await;
+            match cache.get(&pid) {
+                Some(item) => (item.icon_url.clone().unwrap_or_default(), item.title.clone()),
+                None => (String::new(), String::new()),
+            }
+        }
+        _ => (String::new(), String::new()),
+    };
 
     // 资源映射：公共目录里已有同一份文件就直接硬链接，否则下载到公共目录后再映射回来
     let target = obj.file.clone();
@@ -277,7 +285,10 @@ pub async fn add_resource_download(
             &online_info.sha1,
             &online_info.url,
         ) {
-            Ok(true) => reused = true,
+            Ok(true) => {
+                reused = true;
+                mml_link::set_project_name(resource, &online_info.modid, &project_name);
+            }
             Ok(false) => {
                 if let Some(source) =
                     mml_link::download_path(resource, &online_info.sha1, &online_info.file)
@@ -289,6 +300,7 @@ pub async fn add_resource_download(
                         target: target.clone(),
                         source,
                         pid: online_info.modid.clone(),
+                        project: project_name.clone(),
                         fid: online_info.fileid.clone(),
                         name: online_info.name.clone(),
                         hash: online_info.sha1.clone(),
@@ -350,7 +362,8 @@ pub async fn add_resource_download(
         // 下载到公共目录的任务：收尾时把文件映射回实例，失败要按资源失败处理
         if outcome.is_done()
             && let Some(plan) = link_plan
-            && let Err(err) = mml_link::finish_download(
+        {
+            match mml_link::finish_download(
                 plan.resource,
                 uuid,
                 &plan.base,
@@ -361,10 +374,15 @@ pub async fn add_resource_download(
                 &plan.name,
                 &plan.hash,
                 &plan.url,
-            )
-        {
-            mml_log::error_type(err);
-            mapped = false;
+            ) {
+                Ok(()) => {
+                    mml_link::set_project_name(plan.resource, &plan.pid, &plan.project)
+                }
+                Err(err) => {
+                    mml_log::error_type(err);
+                    mapped = false;
+                }
+            }
         }
 
         // 结束通知用条目里的显示名；先读，标完终态后前端「清除已完成」可能已经把它清掉。

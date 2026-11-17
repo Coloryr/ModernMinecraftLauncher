@@ -295,6 +295,8 @@ pub(super) async fn run_update(
             ) {
                 mml_log::error_type(err);
             }
+            // 更新顺带补一次项目名：老项目没有这个映射时，更新后列表也能显示名字
+            mml_link::set_project_name(ResourceType::Mod, &entry.project_id, &entry.name);
         }
     }
 

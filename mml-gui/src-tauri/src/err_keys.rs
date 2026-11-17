@@ -174,6 +174,8 @@ pub const EXPORT_RUNNING: &str = "err.exportRunning";
 pub const RESOURCE_LINK_OFF: &str = "err.resourceLinkOff";
 /// 资源映射正在处理
 pub const RESOURCE_MAP_RUNNING: &str = "err.resourceMapRunning";
+/// 项目名整理正在处理
+pub const RESOURCE_TIDY_RUNNING: &str = "err.resourceTidyRunning";
 /// 不支持的整合包类型
 pub const EXPORT_PACK_TYPE: &str = "err.exportPackType";
 

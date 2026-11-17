@@ -61,6 +61,7 @@ pub fn try_link(
         resource,
         ResourceInfoObj {
             pid: pid.to_string(),
+            fid: fid.to_string(),
             name: name.to_string(),
             hash,
             file: source
@@ -127,6 +128,7 @@ pub fn finish_download(
         resource,
         ResourceInfoObj {
             pid: pid.to_string(),
+            fid: fid.to_string(),
             name: name.to_string(),
             hash,
             file: source

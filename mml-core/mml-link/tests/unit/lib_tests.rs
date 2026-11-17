@@ -50,6 +50,7 @@ fn link_info_is_written_inside_instance() {
         ResourceType::Mod,
         ResourceInfoObj {
             pid: "p".to_string(),
+            fid: "1001".to_string(),
             name: "Demo".to_string(),
             hash: hash.to_string(),
             file: "demo.jar".to_string(),
@@ -105,6 +106,7 @@ fn link_info_is_written_inside_instance() {
         ResourceType::Mod,
         ResourceInfoObj {
             pid: "p3".to_string(),
+            fid: "2002".to_string(),
             name: "World".to_string(),
             hash: world_hash.to_string(),
             file: format!("{world_hash}.jar"),

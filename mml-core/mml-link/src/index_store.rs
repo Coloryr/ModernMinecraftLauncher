@@ -7,6 +7,7 @@
 //! 有了这三份键，内存里那层 `HashMap` 就不需要了：读直接查库，写由批次合并。
 //! 旧的 JSON 索引整份重写，写到一半崩掉就是半截文件；LSM 引擎是追加写，崩溃不会留下坏数据。
 
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 use fjall::{Database, Keyspace, KeyspaceCreateOptions, PersistMode};
@@ -19,6 +20,8 @@ const INDEX: &str = "download_index";
 const HASH_INDEX: &str = "download_hash";
 /// 项目最新版本键空间
 const LATEST: &str = "download_latest";
+/// 项目名键空间
+const PROJECTS: &str = "download_projects";
 /// 反查键是否已经补齐的标记
 const READY_KEY: &[u8] = b"meta\0ready";
 
@@ -66,6 +69,8 @@ pub struct Store {
     hashes: Keyspace,
     /// 项目最新版本
     latest: Keyspace,
+    /// 项目名
+    projects: Keyspace,
     /// 还没写进库的记录
     pending: Mutex<Vec<PendingRow>>,
 }
@@ -89,11 +94,15 @@ impl Store {
         let latest = db
             .keyspace(LATEST, KeyspaceCreateOptions::default)
             .map_err(|err| err.to_string())?;
+        let projects = db
+            .keyspace(PROJECTS, KeyspaceCreateOptions::default)
+            .map_err(|err| err.to_string())?;
         let store = Self {
             db,
             index,
             hashes,
             latest,
+            projects,
             pending: Mutex::new(Vec::new()),
         };
         store.ensure_secondary()?;
@@ -186,6 +195,47 @@ impl Store {
             .get(key(&kind, pid, &hash))
             .map_err(|err| err.to_string())?;
         Ok(payload.map(|payload| (hash, payload.to_vec())))
+    }
+
+    /// 记下一个项目的名字
+    ///
+    /// - `kind`: 资源类型
+    /// - `pid`: 项目 ID
+    /// - `project`: 项目名
+    ///
+    /// # 返回值
+    ///
+    /// 写入失败时返回错误描述
+    pub fn put_project(&self, kind: IndexKind, pid: &str, project: &str) -> Result<(), String> {
+        self.projects
+            .insert(pid_key(kind.id(), pid), project.as_bytes())
+            .map_err(|err| err.to_string())
+    }
+
+    /// 读出某一类资源下所有项目名
+    ///
+    /// - `kind`: 资源类型
+    ///
+    /// # 返回值
+    ///
+    /// 项目 ID → 项目名
+    pub fn projects(&self, kind: IndexKind) -> Result<HashMap<String, String>, String> {
+        let prefix = format!("{}\0", kind.id()).into_bytes();
+        let mut projects = HashMap::new();
+        for guard in self.projects.prefix(prefix.clone()) {
+            let (key, value) = guard.into_inner().map_err(|err| err.to_string())?;
+            let Some(pid) = key
+                .get(prefix.len()..)
+                .and_then(|pid| std::str::from_utf8(pid).ok())
+            else {
+                continue;
+            };
+            projects.insert(
+                pid.to_string(),
+                String::from_utf8_lossy(&value).into_owned(),
+            );
+        }
+        Ok(projects)
     }
 
     /// 写入一条记录，键相同的覆盖

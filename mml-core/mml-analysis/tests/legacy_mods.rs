@@ -53,6 +53,55 @@ fn forge_17_errored_mods_are_named_as_the_cause() {
     );
 }
 
+const MODERN_LIST_WITH_AE2: &str = r#"---- Minecraft Crash Report ----
+// This doesn't make any sense!
+
+Time: 2026-11-17 20:40:06
+Description: Rendering screen
+
+java.lang.NullPointerException: Cannot invoke "appeng.api.stacks.AEKey.formatAmount(long, appeng.api.stacks.AmountFormat)" because the return value of "appeng.menu.me.crafting.CraftingStatusEntry.getWhat()" is null
+	at appeng.client.gui.me.crafting.CraftingStatusTableRenderer.getEntryDescription(CraftingStatusTableRenderer.java:47) ~[appliedenergistics2-forge-15.4.10.jar%23238!/:?] {re:classloading}
+	at appeng.client.gui.me.crafting.AbstractTableRenderer.render(AbstractTableRenderer.java:98) ~[appliedenergistics2-forge-15.4.10.jar%23238!/:?] {re:mixin,re:classloading}
+	at net.minecraft.client.gui.screens.inventory.AbstractContainerScreen.m_88315_(AbstractContainerScreen.java:116) ~[client-1.20.1-20230612.114412-srg.jar%23306!/:?] {re:mixin,pl:mixin:APP:ae2.mixins.json:AbstractContainerScreenMixin}
+
+-- System Details --
+Details:
+	Minecraft Version: 1.20.1
+	Java Version: 25.0.1, Microsoft
+	Mod List: 
+		chloride-FORGE-mc1.20.1-v1.7.5.jar                |Chloride                      |chloride                      |1.7.5               |DONE      |Manifest: NOSIGNATURE
+		ExtendedAE-1.20-1.4.12-forge.jar                  |ExtendedAE                    |expatternprovider             |1.20-1.4.12-forge   |DONE      |Manifest: NOSIGNATURE
+		Patchouli-1.20.1-85-FORGE.jar                     |Patchouli                     |patchouli                     |1.20.1-85-FORGE     |DONE      |Manifest: NOSIGNATURE
+		appliedenergistics2-forge-15.4.10.jar             |Applied Energistics 2         |ae2                           |15.4.10             |DONE      |Manifest: NOSIGNATURE
+"#;
+
+#[test]
+fn modern_mod_list_file_name_is_not_a_loading_state() {
+    let result = analyze(MODERN_LIST_WITH_AE2);
+
+    assert!(
+        result
+            .findings
+            .iter()
+            .all(|finding| finding.id != FindingId::ModErrored),
+        "jar 文件名里的 E 不是加载状态：{:?}",
+        result
+            .findings
+            .iter()
+            .map(|finding| finding.id.as_str())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        result.primary().map(|finding| finding.id),
+        Some(FindingId::NullPointer)
+    );
+    assert_eq!(
+        result.suspected_mods,
+        ["ae2"],
+        "模组 id 与包名不同，要靠栈帧末尾的 jar 文件名对上"
+    );
+}
+
 #[test]
 fn forge_112_state_table_does_not_parse_headers_as_mods() {
     let result = analyze(

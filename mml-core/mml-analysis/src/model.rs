@@ -97,8 +97,11 @@ pub struct ModEntry {
     pub name: String,
     /// 版本；取不到时为空串
     pub version: String,
-    /// Forge 的状态字母，如 `UCE`；其它格式的列表为空串
+    /// Forge 旧版的状态字母，如 `UCE`；其它格式的列表为空串
     pub states: String,
+    /// 列表给出的 jar 文件名，如 `appliedenergistics2-forge-15.4.10.jar`；
+    /// Fabric 表与加载问题段落取不到时为空串
+    pub file: String,
     /// 列表里的原始行，已去首尾空白；拿不到时为空串
     pub line: String,
 }
@@ -106,11 +109,16 @@ pub struct ModEntry {
 impl ModEntry {
     /// 列表是否把该模组标成 Errored，即状态字母含 `E`
     ///
+    /// 只有旧版 Forge 那串状态字母（`UDLCHIJAE`）才代表加载状态。新版报告的同一列
+    /// 是 `DONE` / `COMMON_SET` 这类阶段名，按字母猜会把正常模组判成出错。
+    ///
     /// # 返回值
     ///
     /// 加载器在这一模组上捕获到异常时返回 `true`
     pub fn errored(&self) -> bool {
-        self.states.contains('E')
+        !self.states.is_empty()
+            && self.states.chars().all(|c| "UDLCHIJAE".contains(c))
+            && self.states.contains('E')
     }
 }
 

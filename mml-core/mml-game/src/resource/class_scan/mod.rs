@@ -1,7 +1,9 @@
-//! 模组 Side 扫描
+//! 模组字节码扫描
 //!
-//! 读模组 jar 里的 class 常量池与注解，判断模组是仅客户端、仅服务端还是两边都要。
-//! 常量池解析在 `const_pool`，class 结构遍历在 `class`，注解判定在 `annotation`。
+//! 读模组 jar 里的 class 常量池与注解：判断模组是仅客户端、仅服务端还是两边都要，
+//! 并从 mixin 类上读出它改写的目标类与目标方法。
+//! 常量池解析在 `const_pool`，class 结构遍历在 `class`，注解判定在 `annotation`，
+//! mixin 注解在 `mixin_class`。
 
 use std::{fs::File, io::Read, path::Path};
 
@@ -14,6 +16,7 @@ mod annotation;
 use self::class::scan_class_for_annotations;
 mod class;
 mod const_pool;
+pub(crate) mod mixin_class;
 
 /// Mod 信息
 #[derive(Debug, Clone)]

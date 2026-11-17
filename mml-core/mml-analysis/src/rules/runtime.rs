@@ -138,20 +138,7 @@ pub(super) fn enrich(report: &CrashReport, findings: &mut [Finding]) {
         .iter()
         .copied()
         .chain(report.detail.lines())
-        .find(|line| {
-            let Some(call) = line.strip_prefix("at ") else {
-                return false;
-            };
-            let call = call.split('(').next().unwrap_or(call).to_lowercase();
-            report.environment.mods.iter().any(|entry| {
-                if super::is_loader_mod(&entry.id) {
-                    return false;
-                }
-                let id = entry.id.to_lowercase();
-                call.split(['.', '/', '$'])
-                    .any(|part| part.split('@').next() == Some(id.as_str()))
-            })
-        });
+        .find(|line| super::mod_of_frame(report, line).is_some());
     if let Some(related) = related.filter(|line| Some(*line) != relevant) {
         push_detail(
             &mut primary.details,

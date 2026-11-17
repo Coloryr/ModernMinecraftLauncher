@@ -209,7 +209,7 @@ pub(crate) fn analyze(report: &CrashReport) -> CrashAnalysis {
     }
 
     runtime::enrich(report, &mut findings);
-    let suspected_mods = collect_suspected(report, &findings, &scan.detail_lower);
+    let suspected_mods = collect_suspected(report, &findings);
 
     CrashAnalysis {
         kind: report.kind,

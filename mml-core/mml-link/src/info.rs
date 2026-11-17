@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 pub struct ResourceInfoObj {
     /// 项目 ID
     pub pid: String,
+    /// 平台上的文件 ID；旧记录可能为空
+    pub fid: String,
     /// 显示名
     pub name: String,
     /// 文件 SHA1，小写
