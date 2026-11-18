@@ -1238,6 +1238,7 @@ function itemMenuItems(item: ModItemDto): RowMenuItem[] {
     label: t("resource.depTree"),
     disabled: !item.hasDependencies,
   });
+
   // 分组那两条挨着：移到别的分组 / 移出分组，后者只在这一行确实在组里时才给
   items.push({
     id: "move",
@@ -1353,6 +1354,7 @@ function onMenuPick(id: string) {
       rememberListScroll();
       emit("open-deps", item);
       break;
+
     case "remove":
       remove(item);
       break;

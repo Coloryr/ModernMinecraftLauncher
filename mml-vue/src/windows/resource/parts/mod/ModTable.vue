@@ -488,13 +488,13 @@ function onNoteEnter(event: KeyboardEvent) {
             <HighlightText :text="row.item.name || row.item.file" :query="props.query" />
           </span>
           <!-- 内置的**库**：没有模组元数据的内置 jar。它不是模组，与"内置"分开标 -->
-          <span v-if="row.item.library" class="badge badge-dim shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">
+          <span v-if="row.item.library" class="badge badge-dim shrink-0 rounded-[6px] px-[7px] py-px text-caption">
             {{ t("resource.modLibrary") }}
           </span>
-          <span v-else-if="row.depth > 1" class="badge badge-dim shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">
+          <span v-else-if="row.depth > 1" class="badge badge-dim shrink-0 rounded-[6px] px-[7px] py-px text-caption">
             {{ t("resource.modBuiltin") }}
           </span>
-          <span v-if="row.item.jarInJar.length" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">
+          <span v-if="row.item.jarInJar.length" class="badge badge-dim shrink-0 rounded-[6px] px-[7px] py-px text-caption">
             {{ t("resource.modBuiltinCount", { n: row.item.jarInJar.length }) }}
           </span>
           <!-- 硬链接：这个文件还挂在公共目录，多实例共用一份 -->
@@ -502,7 +502,12 @@ function onNoteEnter(event: KeyboardEvent) {
           <span v-if="row.item.fail" class="badge badge-red shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modFail") }}</span>
           <!-- 「有更新」：这一行在更新检查里查到了新版本；下不下由更新弹窗里勾 -->
           <span v-if="updateKeys?.has(modSelectKey(row.item))" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.updateTag") }}</span>
-          <span v-if="row.item.core" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modCore") }}</span>
+          <!-- 「CoreMod」：会改写别的类的字节码 —— 老式 coremod 或声明了 ASM 变压器 -->
+          <span v-if="row.item.coremod" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent"
+            v-tip="t('resource.modCoreModTip')">{{ t("resource.modCore") }}</span>
+          <!-- 「Mixin N」：注入了多少处目标；列表视图里展开这一行就能看到具体类与方法 -->
+          <span v-if="row.item.mixins.length" class="badge badge-mixin shrink-0 rounded-[6px] px-[7px] py-px text-caption"
+            v-tip="t('resource.modMixinTip')">{{ t("resource.modMixin", { n: row.item.mixins.length }) }}</span>
         </span>
 
         <!--

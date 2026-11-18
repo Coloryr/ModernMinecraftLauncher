@@ -129,6 +129,15 @@ pub fn on_window_event(window: &tauri::Window<tauri::Wry>, event: &tauri::Window
         // 菜单栏跟着焦点窗口走：macOS 的应用菜单是全局的，只能按窗口类型重建一份
         tauri::WindowEvent::Focused(true) => {
             crate::menu::sync(window.app_handle(), &label);
+            // Windows 上重新获得焦点时补一次材质：装饰插件或系统还原可能把 DWM 背景清掉；
+            // 现在 apply 不再先 clear，补一次没有闪烁
+            #[cfg(target_os = "windows")]
+            if let Some(win) = window.app_handle().get_webview_window(&label) {
+                let effect = crate::gui_config::get().client.window_effect;
+                if effect != "none" {
+                    crate::windows::effects::apply(&win, &effect);
+                }
+            }
         }
         _ => {}
     }

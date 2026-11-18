@@ -164,10 +164,9 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
     use tauri_plugin_decoration::WebviewWindowExt;
 
     if let Err(error) = window.activate_decoration().await {
-        // 回退：先确保原生 frame 还在，再收起它
-        let _ = window.restore_decoration().await;
-        // 原生标题栏不能留：它与自绘顶栏会叠成两条。
-        // 装饰没接管就去掉原生 frame，红黄绿改由前端画，见 useWindowDecoration
+        // 回退时不要再 restore_decoration：它会把窗口按原生 frame 重铺一遍，
+        // 部分 Windows 版本上会连带清掉 DWM 材质与透明，亚克力 / 云母就只剩不透明底。
+        // 原生标题栏不能留，直接去掉原生 frame，红黄绿改由前端画，见 useWindowDecoration
         let _ = window.set_decorations(false);
         // 换成无边框后量到的差值只剩边框带，正好是窗口该有的下限
         if let Some(min) = min_size_of_label(window.label()) {

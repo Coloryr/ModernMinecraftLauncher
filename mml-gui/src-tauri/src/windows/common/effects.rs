@@ -20,13 +20,15 @@ use tauri::WebviewWindow;
 pub fn apply(window: &WebviewWindow, mode: &str) {
     #[cfg(target_os = "windows")]
     {
-        // 换材质要先清掉上一个：它们都是 DWM 的系统背景，直接叠加不会互相替换
-        let _ = window_vibrancy::clear_mica(window);
-        let _ = window_vibrancy::clear_acrylic(window);
-        let _ = window_vibrancy::clear_blur(window);
-
+        // 换材质直接写 DWM 的背景类型即可；先 clear 再 apply 会在同一窗口上连续改两次，
+        // Win11 新版本会把第二次丢掉，表现就是云母 / 亚克力突然没了。只有关掉时才清。
         let applied = match mode {
-            "none" => Ok(()),
+            "none" => {
+                let _ = window_vibrancy::clear_mica(window);
+                let _ = window_vibrancy::clear_acrylic(window);
+                let _ = window_vibrancy::clear_blur(window);
+                Ok(())
+            }
             "mica" => window_vibrancy::apply_mica(window, None),
             "acrylic" => window_vibrancy::apply_acrylic(window, None),
             // 模糊是 Win11 22H1 的老路径，22H2 起铺上去就是整窗全黑（crate 的 README 标着

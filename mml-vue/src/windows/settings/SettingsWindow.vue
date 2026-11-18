@@ -123,7 +123,7 @@ const clientLocked = computed(() => client.client.value.lockClient);
 /** 锁定时要隐藏的设置分组：服主定制内容 + 高级 / 危险项，见 docs 的锁定说明 */
 const LOCKED_GROUPS = [
   "servers", "loginLock", "instanceLock", "autoSave", "customHome",
-  "customCss", "customPage", "music", "gameTitle", "serverPack",
+  "customUi", "music", "gameTitle", "serverPack",
   "theme", "window-look", "bgImage", "jvm", "gameArgs", "launchCmd", "experimental",
 ];
 

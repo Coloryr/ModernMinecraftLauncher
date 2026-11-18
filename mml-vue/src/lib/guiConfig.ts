@@ -199,6 +199,14 @@ export interface CustomCssItem {
   enabled: boolean;
 }
 
+/** 一条已导入的主题包 */
+export interface CustomPageItem {
+  /** 条目 id，主题包在 custom_ui/pages 下叫 <id>.zip */
+  id: string;
+  /** 显示名，优先取包根 theme.json 的 name */
+  name: string;
+}
+
 /** 客户端设置，对应 Rust ClientConfig，wire 为 client */
 export interface ClientConfig {
   /** 主窗口实例设置里显示 MOTD 卡片 */
@@ -237,8 +245,12 @@ export interface ClientConfig {
   customCssOn: boolean;
   /** 已安装的自定义 CSS，顺序即注入顺序 */
   customCss: CustomCssItem[];
-  /** 完全自定义界面总开关；关闭后主窗口回内置界面，整页包保留 */
+  /** 完全自定义界面总开关；关闭后主窗口回内置界面，主题包保留 */
   customPageOn: boolean;
+  /** 当前选中的主题包 id；空串表示没选 */
+  customPageId: string;
+  /** 已导入的主题包；同一时间只有一个被选中 */
+  customPages: CustomPageItem[];
   /** 自定义音乐：启用后主窗口播放 `musicSource` */
   musicOn: boolean;
   /** 自定义音乐来源：本地音频文件路径或 http(s) 直链，空串表示没配 */
@@ -497,6 +509,8 @@ export function defaultConfig(): GuiConfig {
       customCssOn: false,
       customCss: [],
       customPageOn: false,
+      customPageId: "",
+      customPages: [],
       // 自定义音乐：不给 localStorage 兜底，缺省就是没配
       musicOn: false,
       musicSource: "",

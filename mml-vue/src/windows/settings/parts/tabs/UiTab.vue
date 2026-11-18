@@ -95,6 +95,7 @@ const {
   removeCustomCss,
   moveCustomCss,
   importCustomPage,
+  selectCustomPage,
   removeCustomPage,
   openCustomUiDir,
 } = props.look;
@@ -111,10 +112,15 @@ function toggleCustomCss(on: boolean) {
   void applyClient();
 }
 
-/** 完全自定义界面总开关同上；关掉后主窗口回内置界面，整页包保留 */
+/** 完全自定义界面总开关同上；关掉后主窗口回内置界面，主题包保留 */
 function toggleCustomPage(on: boolean) {
   client.value.customPageOn = on;
   void applyClient();
+}
+
+/** 某个主题包的文件数；状态里还没有这一条时按 0 显示 */
+function pageFileCount(id: string): number {
+  return customUi.value?.pages.find((page) => page.id === id)?.fileCount ?? 0;
 }
 </script>
 
@@ -184,7 +190,9 @@ function toggleCustomPage(on: boolean) {
 
   </SettingsGroup>
 
-  <SettingsGroup v-if="!locked" id="customCss" title-key="winSettings.secCustomCss" :flash="flashGroup === 'customCss'">
+  <SettingsGroup v-if="!locked" id="customUi" title-key="winSettings.secCustomUi"
+    :flash="flashGroup === 'customUi'">
+    <h4 class="custom-ui-title">{{ t("winSettings.secCustomCss") }}</h4>
     <p class="field-desc">{{ t("winSettings.customCssDesc") }}</p>
     <div class="switch-row">
       <div class="switch-text">
@@ -222,10 +230,10 @@ function toggleCustomPage(on: boolean) {
       </BaseButton>
       <BaseButton size="sm" @click="openCustomUiDir">{{ t("winSettings.customUiOpenDir") }}</BaseButton>
     </div>
-  </SettingsGroup>
 
-  <SettingsGroup v-if="!locked" id="customPage" title-key="winSettings.secCustomPage"
-    :flash="flashGroup === 'customPage'">
+    <div class="custom-ui-sep" />
+
+    <h4 class="custom-ui-title">{{ t("winSettings.secCustomPage") }}</h4>
     <p class="field-desc">{{ t("winSettings.customPageDesc") }}</p>
     <div class="switch-row">
       <div class="switch-text">
@@ -235,12 +243,28 @@ function toggleCustomPage(on: boolean) {
       <BaseSwitch :model-value="client.customPageOn" @update:model-value="toggleCustomPage" />
     </div>
 
+    <!-- 主题包可以装多份，但同一时间只选中一份；选中即启用 -->
+    <ul v-if="client.customPages.length" class="custom-page-list mt-2 p-0 list-none flex flex-col gap-1.5">
+      <li v-for="item in client.customPages" :key="item.id" class="custom-page-item flex items-center gap-2.5">
+        <label class="custom-page-pick flex flex-1 min-w-0 items-center gap-2.5 cursor-pointer">
+          <input type="radio" name="mml-custom-page" :checked="client.customPageId === item.id"
+            @change="selectCustomPage(item.id)" />
+          <span class="custom-page-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-body"
+            :title="item.name">{{ item.name }}</span>
+          <span class="custom-page-count text-meta text-dim">
+            {{ t("winSettings.customPageFileCount", { count: pageFileCount(item.id) }) }}
+          </span>
+        </label>
+        <BaseButton size="sm" variant="danger" @click="removeCustomPage(item.id)">
+          {{ t("winSettings.customPageRemove") }}
+        </BaseButton>
+      </li>
+    </ul>
+    <p v-else class="field-desc">{{ t("winSettings.customPageEmpty") }}</p>
+
     <div class="custom-ui-actions flex items-center gap-2 mt-2.5 flex-wrap">
       <BaseButton size="sm" variant="accent" :disabled="importingCustomPage" @click="importCustomPage">
         {{ importingCustomPage ? t("winSettings.customUiImporting") : t("winSettings.customPageImport") }}
-      </BaseButton>
-      <BaseButton size="sm" variant="danger" :disabled="!customUi?.pageInstalled" @click="removeCustomPage">
-        {{ t("winSettings.customPageRemove") }}
       </BaseButton>
       <BaseButton size="sm" @click="openCustomUiDir">{{ t("winSettings.customUiOpenDir") }}</BaseButton>
       <span class="custom-ui-state text-meta text-dim">{{ customPageState }}</span>
@@ -405,5 +429,21 @@ function toggleCustomPage(on: boolean) {
 /* 自定义强调色色块上的对勾：描边取深色块上的白 */
 .accent-icon {
   stroke: var(--on-accent);
+}
+
+/* 合并后的自定义界面分组：两小节之间用一条细线分开 */
+.custom-ui-title {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.custom-ui-sep {
+  margin: 16px 0;
+  border-top: 1px solid var(--border);
+}
+
+.custom-page-pick input[type="radio"] {
+  accent-color: var(--accent);
 }
 </style>

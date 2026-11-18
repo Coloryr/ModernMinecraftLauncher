@@ -10,10 +10,21 @@ export type CustomUiCssDto = {
   scriptUrl: string,
 };
 
+export type CustomUiPageDto = {
+  id: string,
+  name: string,
+  fileCount: number,
+  kind: ThemeKindDto,
+  version: string,
+  declared: boolean,
+};
+
 export type CustomUiInfoDto = {
   cssOn: boolean,
   css: CustomUiCssDto[],
   pageOn: boolean,
+  pageId: string,
+  pages: CustomUiPageDto[],
   pageInstalled: boolean,
   kind: ThemeKindDto,
   name: string,

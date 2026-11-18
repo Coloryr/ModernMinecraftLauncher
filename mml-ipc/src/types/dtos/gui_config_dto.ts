@@ -47,6 +47,11 @@ export type CustomCssItemDto = {
   enabled: boolean,
 };
 
+export type CustomPageItemDto = {
+  id: string,
+  name: string,
+};
+
 export type ClientConfigDto = {
   motdCard: boolean,
   motdInterval: number,
@@ -64,6 +69,8 @@ export type ClientConfigDto = {
   customCssOn: boolean,
   customCss: CustomCssItemDto[],
   customPageOn: boolean,
+  customPageId: string,
+  customPages: CustomPageItemDto[],
   musicOn: boolean,
   musicSource: string,
   animations: boolean,

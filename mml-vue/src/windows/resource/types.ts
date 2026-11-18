@@ -2,6 +2,7 @@
 
 import type { ModItemDto } from "../../lib/bindings";
 import type { GlyphName } from "../../components/ui/glyphs";
+import { t } from "../../lib/i18n";
 
 /** 资源分类，即左侧导航的一项 */
 export type CategoryId =
@@ -274,7 +275,61 @@ export function isoDate(iso: string): string {
 export function modHit(item: ModItemDto, q: string, view: ModView): boolean {
   const fields =
     view === "table" ? [item.name, item.modId, item.file, item.author] : [item.name, item.file];
-  return fields.some((value) => value.toLowerCase().includes(q));
+  if (fields.some((value) => value.toLowerCase().includes(q))) return true;
+  // 改写目标也算命中：搜 "GuiGraphics" 应该把那几个 mixin 了它的模组捞出来
+  return patchHit(item, q);
+}
+
+/**
+ * 模组的改写目标是否命中搜索词
+ *
+ * - `item`: 模组条目
+ * - `q`: 已转小写的搜索词
+ *
+ * # 返回值
+ *
+ * 目标类 / 目标方法 / mixin 类名 / 变压器名里任一包含搜索词即为 `true`
+ */
+export function patchHit(item: ModItemDto, q: string): boolean {
+  const mixin = item.mixins.some((target) =>
+    (target.target + " " + target.method + " " + target.mixin).toLowerCase().includes(q),
+  );
+  if (mixin) return true;
+  return item.asm.some((target) =>
+    (target.source + " " + target.transformer + " " + target.target + " " + target.method)
+      .toLowerCase()
+      .includes(q),
+  );
+}
+
+/** 注入方式 id → 文案键，见 [`patchKindLabel`] */
+const PATCH_KINDS: Record<string, string> = {
+  inject: "resource.patchKindInject",
+  redirect: "resource.patchKindRedirect",
+  modify_arg: "resource.patchKindModifyArg",
+  modify_args: "resource.patchKindModifyArgs",
+  modify_variable: "resource.patchKindModifyVariable",
+  modify_constant: "resource.patchKindModifyConstant",
+  modify_expression_value: "resource.patchKindModifyExpression",
+  wrap_operation: "resource.patchKindWrapOperation",
+  wrap_with_condition: "resource.patchKindWrapCondition",
+  overwrite: "resource.patchKindOverwrite",
+  accessor: "resource.patchKindAccessor",
+  invoker: "resource.patchKindInvoker",
+};
+
+/**
+ * 注入方式的显示文案
+ *
+ * - `kind`: 后端给的注入方式 id，如 `inject` / `modify_arg`
+ *
+ * # 返回值
+ *
+ * 本地化文案；认不出的 id 原样返回，日后加载器加了新方式也不至于空白
+ */
+export function patchKindLabel(kind: string): string {
+  const key = PATCH_KINDS[kind];
+  return key ? t(key) : kind;
 }
 
 /**

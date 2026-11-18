@@ -279,6 +279,16 @@ pub struct CustomCssItemObj {
     pub enabled: bool,
 }
 
+/// 一条已导入的主题包
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct CustomPageItemObj {
+    /// 条目 id，主题包在 `custom_ui/pages` 下叫 `<id>.zip`
+    pub id: String,
+    /// 显示名，优先取包根 theme.json 的 name
+    pub name: String,
+}
+
 /// 客户端设置：MOTD 卡片、登录方式锁定、自定义界面、自定义音乐与窗口外观
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "PascalCase")]
@@ -313,6 +323,10 @@ pub struct ClientConfig {
     pub custom_css: Vec<CustomCssItemObj>,
     /// 完全自定义界面总开关；关闭后主窗口回内置界面，整页包保留
     pub custom_page_on: bool,
+    /// 当前选中的主题包 id；空串表示没选
+    pub custom_page_id: String,
+    /// 已导入的主题包；同一时间只有一个被选中
+    pub custom_pages: Vec<CustomPageItemObj>,
     /// 自定义音乐：启用后主窗口播放 `music_source`，标题栏给播放 / 暂停 / 停止入口
     pub music_on: bool,
     /// 自定义音乐来源：本地音频文件路径或 http(s) 直链；空串表示没配
@@ -347,6 +361,8 @@ impl Default for ClientConfig {
             custom_css_on: false,
             custom_css: Vec::new(),
             custom_page_on: false,
+            custom_page_id: String::new(),
+            custom_pages: Vec::new(),
             music_on: false,
             music_source: String::new(),
             animations: true,

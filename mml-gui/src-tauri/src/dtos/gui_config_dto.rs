@@ -12,7 +12,8 @@ use mml_names::Lang;
 
 use crate::gui_config::{
     CapeConfig, CapeDisplay, ClientConfig, CollectWindowConfig, CustomCssItemObj,
-    ExperimentalConfig, GuiConfig, HeadConfig, HeadType, LaunchCheckConfig, LoginLockObj,
+    CustomPageItemObj, ExperimentalConfig, GuiConfig, HeadConfig, HeadType, LaunchCheckConfig,
+    LoginLockObj,
     MainWindowConfig, SidebarSide, SkinConfig, SkinDisplay, StartupPage, Theme, ViewMode,
     WindowMode,
 };
@@ -175,6 +176,48 @@ impl From<CustomCssItemDto> for CustomCssItemObj {
     }
 }
 
+/// 一条已导入的主题包，前端 wire 为 camelCase
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CustomPageItemDto {
+    /// 条目 id，主题包在 `custom_ui/pages` 下叫 `<id>.zip`
+    pub id: String,
+    /// 显示名，优先取包根 theme.json 的 name
+    pub name: String,
+}
+
+impl From<CustomPageItemObj> for CustomPageItemDto {
+    /// 磁盘上的主题包条目 → 前端 wire 形态
+    ///
+    /// - `o`: 磁盘配置里的条目
+    ///
+    /// # 返回值
+    ///
+    /// 返回字段一一对应的 DTO
+    fn from(o: CustomPageItemObj) -> Self {
+        Self {
+            id: o.id,
+            name: o.name,
+        }
+    }
+}
+
+impl From<CustomPageItemDto> for CustomPageItemObj {
+    /// 前端 wire 形态 → 磁盘上的主题包条目，保存配置时用
+    ///
+    /// - `d`: 前端提交的条目
+    ///
+    /// # 返回值
+    ///
+    /// 返回字段一一对应的磁盘配置
+    fn from(d: CustomPageItemDto) -> Self {
+        Self {
+            id: d.id,
+            name: d.name,
+        }
+    }
+}
+
 /// 客户端设置，前端 wire 为 camelCase，字段即 `client`
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
@@ -211,6 +254,10 @@ pub struct ClientConfigDto {
     pub custom_css: Vec<CustomCssItemDto>,
     /// 完全自定义界面总开关
     pub custom_page_on: bool,
+    /// 当前选中的主题包 id；空串表示没选
+    pub custom_page_id: String,
+    /// 已导入的主题包；同一时间只有一个被选中
+    pub custom_pages: Vec<CustomPageItemDto>,
     /// 自定义音乐：启用后主窗口播放 `music_source`
     pub music_on: bool,
     /// 自定义音乐来源：本地音频文件路径或 http(s) 直链，空串表示没配
@@ -251,6 +298,8 @@ impl From<ClientConfig> for ClientConfigDto {
             custom_css_on: c.custom_css_on,
             custom_css: c.custom_css.into_iter().map(Into::into).collect(),
             custom_page_on: c.custom_page_on,
+            custom_page_id: c.custom_page_id,
+            custom_pages: c.custom_pages.into_iter().map(Into::into).collect(),
             music_on: c.music_on,
             music_source: c.music_source,
             animations: c.animations,
@@ -286,6 +335,8 @@ impl From<ClientConfigDto> for ClientConfig {
             custom_css_on: c.custom_css_on,
             custom_css: c.custom_css.into_iter().map(Into::into).collect(),
             custom_page_on: c.custom_page_on,
+            custom_page_id: c.custom_page_id,
+            custom_pages: c.custom_pages.into_iter().map(Into::into).collect(),
             music_on: c.music_on,
             music_source: c.music_source,
             animations: c.animations,
@@ -437,6 +488,8 @@ impl From<GuiConfig> for GuiConfigDto {
                 custom_css_on: c.client.custom_css_on,
                 custom_css: c.client.custom_css.into_iter().map(Into::into).collect(),
                 custom_page_on: c.client.custom_page_on,
+                custom_page_id: c.client.custom_page_id,
+                custom_pages: c.client.custom_pages.into_iter().map(Into::into).collect(),
                 music_on: c.client.music_on,
                 music_source: c.client.music_source,
                 animations: c.client.animations,
@@ -527,6 +580,8 @@ impl From<GuiConfigDto> for GuiConfig {
                 custom_css_on: d.client.custom_css_on,
                 custom_css: d.client.custom_css.into_iter().map(Into::into).collect(),
                 custom_page_on: d.client.custom_page_on,
+                custom_page_id: d.client.custom_page_id,
+                custom_pages: d.client.custom_pages.into_iter().map(Into::into).collect(),
                 music_on: d.client.music_on,
                 music_source: d.client.music_source,
                 animations: d.client.animations,

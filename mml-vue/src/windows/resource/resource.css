@@ -173,6 +173,13 @@
   color: var(--text-dim);
 }
 
+/* 「Mixin N」徽标：紫色，与强调色（CoreMod / 有更新）和灰标签（内置 / 库）都分开；
+   ASM 那类走 --yellow，见 .mod-patch-tag.is-asm 与 CoreMod 标签的分工 */
+.resource-layout .badge-mixin {
+  background: color-mix(in srgb, var(--mixin) 16%, transparent);
+  color: var(--mixin);
+}
+
 /* 加载器徽标：沿用主窗口实例列表那套实心底色（--loader-* 变量），6 种各一色；
    认不出来的加载器（如 OptiFine）退回强调色，与实例列表的兜底一致 */
 .resource-layout .badge-loader {
@@ -382,6 +389,18 @@
   background: var(--bg-raised);
   outline: 1px solid transparent;
   outline-offset: -1px;
+  /* 分组头吸顶：往下翻的时候一直看得到"现在在哪一组"。
+     --bg-raised 是不透明底（浮层用它压住下层文字），行从底下滚过去看不出来；
+     吸顶只在**自己这一组**的范围内生效，滚到下一组时它跟着本组一起走 */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* 背景图模式下 --bg-raised 是半透明的（.62 / .8），吸顶头会让下面的行透出来：
+   这一条换成不透明底，滚过去的内容才被真正盖住 */
+html.has-bg .resource-layout .mod-group-head {
+  background: var(--bg-solid);
 }
 
 /* 分组头的「把手 + 箭头 + 名字」：
@@ -696,6 +715,58 @@
    两个高度与 useVirtualRows 的 LIST_ROW_H / TABLE_ROW_H 同源，改一处要改两处。 */
 .resource-layout .mod-rows .item-row {
   height: 56px;
+}
+
+/* 展开出来的改写目标行：与模组行同高（虚拟窗口按统一行高算），底色压暗、虚线边，
+   与"内置模组"同一档，扫一眼就知道它挂在上面的包下面 */
+.resource-layout .mod-patch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 缩进与内置模组行同一口径（每级 22px），再加一个箭头的宽度对齐名字列 */
+  padding: 0 12px 0 calc(12px + var(--row-depth, 0) * 22px + 18px);
+  /* 纯文本行，比模组行矮一半；高度与 ModList 的 PATCH_ROW_H 同源（变高虚拟窗口按它算） */
+  height: 30px;
+  overflow: hidden;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--bg-side);
+  font-size: 11.5px;
+}
+
+.resource-layout .mod-patch-tag {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  /* 与列表里的「Mixin N」徽标同一色，ASM 走下面那条黄色 */
+  background: color-mix(in srgb, var(--mixin) 16%, transparent);
+  color: var(--mixin);
+  font-size: 10.5px;
+  line-height: 16px;
+}
+
+/* ASM 变压器用状态色区分：它不是 mixin，读的时候不该混在一起 */
+.resource-layout .mod-patch-tag.is-asm {
+  background: color-mix(in srgb, var(--yellow) 18%, transparent);
+  color: var(--yellow);
+}
+
+.resource-layout .mod-patch-target {
+  flex: none;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.resource-layout .mod-patch-detail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
 }
 
 .resource-layout .mod-table .mod-virtual-row {

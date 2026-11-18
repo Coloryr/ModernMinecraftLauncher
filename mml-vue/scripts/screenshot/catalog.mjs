@@ -14,6 +14,7 @@ const WINDOW_LABEL = {
   "add-resource": "添加资源",
   collect: "收藏",
   download: "下载",
+  downloaded: "已下载资源",
   java: "Java 下载",
   block: "方块与物品",
   log: "游戏日志",
@@ -203,6 +204,53 @@ const PHRASE = [
 
 /** 单独给出的完整说明，优先于词元拼接 */
 const OVERRIDE = {
+  // 0.1.14 补漏：整窗与各处弹窗
+  "downloaded-resources": "已下载资源 · 列表",
+  "downloaded-resources-empty": "已下载资源 · 空列表",
+  "downloaded-resources-no-match": "已下载资源 · 搜索无结果",
+  "downloaded-resources-tidy": "已下载资源 · 整理项目名进度",
+  "lobby-mapping": "联机大厅 · 映射大厅",
+  "config-find-chunk": "配置文件 · 查找实体 / 方块",
+  "settings-gamepad-key": "设置 · 手柄 · 选择按键",
+  "settings-gamepad-action": "设置 · 手柄 · 选择键盘 / 鼠标动作",
+  "main-account-menu": "主窗口 · 账户下拉",
+  "main-gamepad-popup": "主窗口 · 手柄弹窗",
+  "main-download-indicator": "主窗口 · 标题栏下载指示器",
+  "main-upgrade-overlay": "主窗口 · 更新数据浮层",
+  "main-debugger": "主窗口 · 使用调试器启动",
+  "main-icon-pick": "主窗口 · 修改实例图标 · 截图范围",
+  "main-modpack-update": "主窗口 · 整合包有新版本",
+  "main-launch-check": "主窗口 · 启动前检查 · 加载器",
+  "main-launch-check-memory": "主窗口 · 启动前检查 · 内存",
+  "main-gamepad-asm": "主窗口 · 手柄需要 ColorASM",
+  "main-launch-command": "主窗口 · 启动命令确认",
+  "main-autosave": "主窗口 · 自动进入存档确认",
+  "main-account-lock": "主窗口 · 账户被占用",
+  "main-launch-cancel": "主窗口 · 同步服务器包时取消",
+  "main-server-pack-update": "主窗口 · 服务器包有新版本",
+  "main-server-pack-mods": "主窗口 · 选择要更新的模组",
+    // 0.1.14 补漏：弹窗
+  "main-stop-modal": "主窗口 · 关闭运行中的游戏",
+  "main-close-ask": "主窗口 · 退出启动器确认",
+  "account-login-error": "账户 · 登录失败",
+  "collect-add-to-group-modal": "收藏 · 移动到分组",
+  "log-upload-done": "游戏日志 · 上传完成",
+  "settings-gamepad-reset": "设置 · 手柄 · 恢复默认键位",
+  "settings-gamepad-delete": "设置 · 手柄 · 删除配置",
+  "resource-save-edit": "资源管理 · 编辑存档",
+  "export-lock-warn": "服务器包 · 实例 / 登录未锁住的提醒",
+  "export-close-confirm": "服务器包 · 导出中关窗确认",
+  "resource-schematic-detail": "资源管理 · 结构文件详情",
+  "resource-save-restore": "资源管理 · 选择要还原的备份",
+  "settings-client-unlock": "设置 · 解锁客户端设置",
+
+  "server-instance-base": "服务器实例 · 基础文件",
+  "resource-rename": "资源管理 · 重命名",
+  "resource-delete-confirm": "资源管理 · 删除确认",
+  "resource-mod-replace": "资源管理 · 更换模组版本",
+  "resource-drop-conflict": "资源管理 · 拖入重名（覆盖 / 跳过 / 重命名）",
+  "resource-mod-targets": "资源管理 · 模组改写目标（Mixin / ASM）",
+  "block-set-icon": "方块与物品 · 设为实例图标 · 选实例",
   "main-group": "主窗口 · 分组视图",
   "main-java-missing": "主窗口 · 启动缺少 Java",
   "java-download-required": "Java 下载 · 缺 Java 时预选版本",
@@ -325,6 +373,7 @@ export const GROUPS = [
   { key: "add-resource", title: "添加资源" },
   { key: "collect", title: "收藏" },
   { key: "download", title: "下载" },
+  { key: "downloaded", title: "已下载资源" },
   { key: "java", title: "Java 下载" },
   { key: "block", title: "方块与物品" },
   { key: "log", title: "游戏日志" },
@@ -351,6 +400,7 @@ export function groupOf(id) {
   if (id === "add-resource") return "add-resource";
   if (id.startsWith("addmodpack")) return "addmodpack";
   if (id.startsWith("add-")) return "add";
+  if (id.startsWith("downloaded-")) return "downloaded";
   if (id.startsWith("server-instance")) return "server-instance";
   if (id.startsWith("server-pack")) return "server-pack";
   return id.split("-")[0];
@@ -358,7 +408,7 @@ export function groupOf(id) {
 
 /** 场景 id 对应的窗口前缀，长的先匹配，避免 `add-resource` 被当成 `add` */
 function prefixOf(id) {
-  for (const prefix of ["server-instance", "server-pack", "add-resource", "addmodpack"]) {
+  for (const prefix of ["server-instance", "server-pack", "add-resource", "addmodpack", "downloaded-resources"]) {
     if (id === prefix || id.startsWith(prefix + "-")) return prefix;
   }
   if (id.startsWith("add-")) return "add";

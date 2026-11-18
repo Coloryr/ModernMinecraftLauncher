@@ -12,8 +12,7 @@ import { SETTINGS_TABS, type SettingsTab } from "./types";
 export const GROUP_TITLES: Record<string, string> = {
   general: "winSettings.secGeneral",
   theme: "winSettings.secTheme",
-  customCss: "winSettings.secCustomCss",
-  customPage: "winSettings.secCustomPage",
+  customUi: "winSettings.secCustomUi",
   window: "winSettings.secWindow",
   mainWindow: "winSettings.secMainWindow",
   bgImage: "winSettings.bgImage",
@@ -68,10 +67,10 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "ui", group: "window", labelKey: "winSettings.animations", extra: ["animation", "动画"] },
   { tab: "ui", group: "theme", labelKey: "winSettings.theme", extra: ["theme", "dark", "light", "深色", "浅色"] },
   { tab: "ui", group: "theme", labelKey: "winSettings.accent", extra: ["accent", "color", "强调色", "主题色"] },
-  { tab: "ui", group: "customCss", labelKey: "winSettings.customCssOn", extra: ["custom css", "style pack", "样式包", "自定义界面", "css", "样式", "换肤"] },
-  { tab: "ui", group: "customCss", labelKey: "winSettings.customCssImport", extra: ["style pack", "css file", "import", "样式包", "选择文件", "导入"] },
-  { tab: "ui", group: "customPage", labelKey: "winSettings.customPageOn", extra: ["custom page", "theme pack", "主题包", "html", "完全自定义界面", "整页"] },
-  { tab: "ui", group: "customPage", labelKey: "winSettings.customPageImport", extra: ["theme pack", "zip", "import page", "主题包", "导入压缩包"] },
+  { tab: "ui", group: "customUi", labelKey: "winSettings.customCssOn", extra: ["custom css", "style pack", "样式包", "自定义界面", "css", "样式", "换肤"] },
+  { tab: "ui", group: "customUi", labelKey: "winSettings.customCssImport", extra: ["style pack", "css file", "import", "样式包", "选择文件", "导入"] },
+  { tab: "ui", group: "customUi", labelKey: "winSettings.customPageOn", extra: ["custom page", "theme pack", "主题包", "html", "完全自定义界面", "整页"] },
+  { tab: "ui", group: "customUi", labelKey: "winSettings.customPageImport", extra: ["theme pack", "zip", "import page", "主题包", "导入压缩包"] },
   { tab: "ui", group: "window", labelKey: "winSettings.windowMode", extra: ["window mode", "多窗口", "单窗口"] },
   {
     tab: "ui",
@@ -288,8 +287,7 @@ export const RESETTABLE_GROUPS = [
   "autoSave",
   "commandNotice",
   "customHome",
-  "customCss",
-  "customPage",
+  "customUi",
   "music",
 ];
 

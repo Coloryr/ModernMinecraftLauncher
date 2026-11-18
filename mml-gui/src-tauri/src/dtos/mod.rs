@@ -59,7 +59,7 @@ pub use config_dto::{
     FileItemType, McaChunkDto, NbtEditDto, NbtKindDto, NbtNodeDto, NbtOpDto,
 };
 pub use custom_home_dto::CustomHomeInfoDto;
-pub use custom_ui_dto::{CustomUiCssDto, CustomUiInfoDto};
+pub use custom_ui_dto::{CustomUiCssDto, CustomUiInfoDto, CustomUiPageDto};
 pub use download_dto::{
     DownloadItemEvent, DownloadStatusDto, DownloadTaskDto, DownloadTaskEvent, DownloadThreadDto,
 };
@@ -71,8 +71,8 @@ pub use gamepad_dto::{
     GamepadLayoutDto, GamepadMouseDto, GamepadProfileDto, GamepadStateDto, GamepadStickDto,
 };
 pub use gui_config_dto::{
-    ClientConfigDto, CustomCssItemDto, ExperimentalConfigDto, GuiConfigDto, GuiThemeDto,
-    LoginLockItemDto, MainWindowConfigDto,
+    ClientConfigDto, CustomCssItemDto, CustomPageItemDto, ExperimentalConfigDto, GuiConfigDto,
+    GuiThemeDto, LoginLockItemDto, MainWindowConfigDto,
 };
 pub use instance_dto::{GroupDto, InstanceInfoDto};
 pub use java_download_dto::{
@@ -91,13 +91,14 @@ pub use minecraft_dto::{
 };
 pub use motd_dto::{MotdDto, MotdSegmentDto};
 pub use resource_dto::{
-    DataPackItemDto, DepProblemDto, DepProblemKindDto, ModAutoMarkDto, ModAutoMarkProgressDto,
-    ModDepEdgeDto, ModDepNodeDto, ModDepTreeDto, ModDuplicateDto, ModDuplicateFileDto, ModGroupDto,
-    ModItemDto, ModPackUpdateDto, ModRenameDto, ModScanProgressDto, ModUpdateApplyDto,
-    ModUpdateCheckDto, ModUpdateDoneDto, ModUpdateDto, ModUpdateProgressDto, ModUpdateProjectDto,
-    ModUpdateRecordDto, PackItemDto, ResourceDropDto, ResourceViewDto, SaveBackupDto, SaveEditDto,
-    SaveItemDto, SchematicBlockDto, SchematicDetailDto, SchematicItemDto, ScreenshotItemDto,
-    ServerItemDto, ServerPackModDto, ShaderItemDto,
+    DataPackItemDto, DepProblemDto, DepProblemKindDto, ModAsmTargetDto, ModAutoMarkDto,
+    ModAutoMarkProgressDto, ModDepEdgeDto, ModDepNodeDto, ModDepTreeDto, ModDuplicateDto,
+    ModDuplicateFileDto, ModGroupDto, ModItemDto, ModMixinTargetDto, ModPackUpdateDto,
+    ModRenameDto, ModScanProgressDto, ModUpdateApplyDto, ModUpdateCheckDto, ModUpdateDoneDto,
+    ModUpdateDto, ModUpdateProgressDto, ModUpdateProjectDto, ModUpdateRecordDto, PackItemDto,
+    ResourceDropDto, ResourceViewDto, SaveBackupDto, SaveEditDto, SaveItemDto, SchematicBlockDto,
+    SchematicDetailDto, SchematicItemDto, ScreenshotItemDto, ServerItemDto, ServerPackModDto,
+    ShaderItemDto,
 };
 pub use server_instance_dto::{
     ServerInstanceChangesDto, ServerInstanceConfigDto, ServerInstanceIdDto,

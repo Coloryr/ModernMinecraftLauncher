@@ -311,15 +311,18 @@ windows/<窗口>/mod.rs 里：
 | --- | --- | --- | --- | --- |
 | 1 自定义主页面 | 主窗口主页内容区 | `home`（`index.html` 或 `custom.js`） | `client.custom_home` | 客户端设置 |
 | 2 自定义 CSS | 内置界面换皮，可装多份 | `custom_ui/css/<id>.zip`，包根 `custom.css`，可选 `custom.js` 入口 | `client.custom_css_on` 加每条 `enabled` | 界面 |
-| 3 完全自定义界面 | 整个主窗口换成整页 / 按 kind 换窗口组件 | `custom_ui/page.zip`（`index.html` 或 `custom.js`） | `client.custom_page_on` | 界面 |
+| 3 完全自定义界面 | 整个主窗口换成整页 / 按 kind 换窗口组件 | `custom_ui/pages/<id>.zip`（`index.html` 或 `custom.js`），可装多份 | `client.custom_page_on` 加 `client.custom_page_id` 选中一份 | 界面 |
 
 - **三者互不联锁**：装 1 不动 2 / 3 的开关，装 3 也不动 2；别把它们做成一个三选一模式。
   3 开着时 1 的页面在它后面，属正常叠加；2 只作用于启动器内置界面，不进 iframe。
-- 1 的压缩包走 `mml-home`，2 的每份 CSS 与 3 的整页包走 `mml-ui`。整页包与 1 共用
+- 1 的压缩包走 `mml-home`，2 的每份 CSS 与 3 的每份整页包走 `mml-ui`。整页包与 1 共用
   `windows/web_assets.rs` 的整包句柄 / 越界防护 / 限额，新加协议直接复用，别另抄一遍
   `..` 检查。
 - 2 的条目列表与两个开关都存 `gui_config.client`，列表只在设置窗口写；文件本身在
   `custom_ui/`。**不要把 CSS 文本或整页 HTML 塞进配置文件**。
+- 3 可以装多份：文件在 `custom_ui/pages/<id>.zip`，`client.custom_page_id` 只选中一份，
+  `client.custom_page_on` 是总开关；旧版单包 `page.zip` 启动时自动迁移成列表条目。
+  设置窗口把 2 / 3 合在同一栏「样式与主题包」，2 的条目可多选启用，3 的条目单选。
 - **三种都打包成 zip 分发**：1 的包根是 `index.html` 或 `custom.js`（可选 `custom.css`），
   2 的包根是 `custom.css`（可选 `custom.js`），3 的包根是 `index.html` 或 `custom.js`；
   整包套一层目录也认。
@@ -385,7 +388,7 @@ windows/<窗口>/mod.rs 里：
 - **CSS 示例的源码不进包**：`src/` 与 `scripts/` 都不进 zip；`pack.ts` 先跑
   `vite build` 把 `src/replace.ts` + `ReplaceButton.vue` 打成 IIFE `dist/custom.js`，
   复制到包根后与 `custom.css` 一起打包，打完删掉 `custom.js` 与 `dist`。
-- **恢复路径**：整页页面自己挂掉时删掉 `custom_ui/page.zip` 或关掉 `customPageOn`；
+- **恢复路径**：整页页面自己挂掉时删掉当前选中的 `custom_ui/pages/<id>.zip` 或关掉 `customPageOn`；
   开发构建的整页右下角另有「退出整页界面」按钮。
 
 ### 12.3 实例选择器统一用 `components/InstanceSelect.vue`

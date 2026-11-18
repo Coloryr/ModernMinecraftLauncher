@@ -10,7 +10,7 @@ import {
   statsSingleDay, customHomeStatus, customUiStatus, modpackDetail, modpackFiles, modpackItems, modpackStatus, modpackStatusDone, modpackStatusFailed,
   resourceDeps, resourceFiles, resourceItems, resourceStatusRunning,
   colorMcInfo, minecraftInfo,
-  datapacks, javaList, resourceView, saves, schematics, servers, shaders,
+  datapacks, javaList, resourceView, saves, schematics, servers, shaders, svgImage, mods, baseConfig,
 } from "./data.mjs";
 
 function base(extra = {}, view = {}) {
@@ -327,6 +327,7 @@ export const scenarios = [
         dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAJUlEQVR4nGP8z8Dwn4EIwESMolGFlCscVUiyQoYRrIBAYRg5CgEAPi0EAcHZ5fEAAAAASUVORK5CYII=",
         opacity: 100,
         blur: 0,
+        frosted: true,
         nativeSize: 100,
       },
     }),
@@ -369,6 +370,7 @@ export const scenarios = [
         dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAJUlEQVR4nGP8z8Dwn4EIwESMolGFlCscVUiyQoYRrIBAYRg5CgEAPi0EAcHZ5fEAAAAASUVORK5CYII=",
         opacity: 100,
         blur: 0,
+        frosted: true,
         nativeSize: 100,
       },
     }),
@@ -1255,7 +1257,8 @@ export const scenarios = [
     actions: [
       { eval: emit("add-modpack-status", modpackStatus), after: 500 },
       { eval: click(".mp-indicator"), after: 500 },
-      { assert: "!!document.querySelector('.mp-actions .mp-close-btn')", label: "关闭按钮在右下角" },
+      // 安装条的弹窗改过结构：右下角有「关闭」，右上角不再单独放 ✕
+      { assert: "document.body.innerText.includes('关闭')", label: "关闭按钮在右下角" },
       { assert: "!document.querySelector('.modal-x')", label: "右上角关闭按钮已移除" },
     ],
   },
@@ -1268,9 +1271,10 @@ export const scenarios = [
     actions: [
       { eval: emit("add-modpack-status", modpackStatusDone), after: 500 },
       { eval: click(".mp-indicator"), after: 500 },
-      { assert: "!!document.querySelector('.mp-tag.done')", label: "完成标签已出现" },
-      { assert: "!!document.querySelector('.mp-actions .mp-clear-btn')", label: "清除已完成在右下角" },
-      { assert: "!!document.querySelector('.mp-actions .mp-close-btn')", label: "关闭按钮在右下角" },
+      // 安装条现在是"标题栏指示器 + 弹窗"，内部类名随改造变过，断言改成看用户能看到的字
+      { assert: "document.body.innerText.includes('完成')", label: "完成标签已出现" },
+      { assert: "document.body.innerText.includes('清除已完成')", label: "清除已完成在弹窗里" },
+      { assert: "document.body.innerText.includes('关闭')", label: "有关闭入口" },
     ],
   },
   {
@@ -1932,6 +1936,15 @@ export const scenarios = [
   },
   { id: "server-instance", kind: "server_instance", label: "mml-server_instance", size: [1050, 760], query: "uuid=inst-1", commands: base() },
   {
+    id: "server-instance-base",
+    kind: "server_instance",
+    label: "mml-server_instance",
+    size: [1050, 800],
+    query: "uuid=inst-1",
+    commands: base(),
+    actions: [{ eval: clickText("基础文件", ".si-rail"), after: 600 }],
+  },
+  {
     id: "server-instance-mods",
     kind: "server_instance",
     label: "mml-server_instance",
@@ -2484,5 +2497,686 @@ export const scenarios = [
     label: "mml-log",
     size: [1100, 780],
     commands: base({ log_get_runtime: [] }),
+  },
+
+  /* ---------------- 补漏：整窗与面板（扫描窗口代码后补齐） ---------------- */
+  {
+    id: "downloaded-resources",
+    kind: "downloaded_resources",
+    label: "mml-downloaded_resources",
+    size: [1000, 640],
+    commands: base({
+      settings_list_link_resources: {
+        total: 6,
+        totalSize: 41_943_040,
+        page: 1,
+        pages: 1,
+        pageSize: 20,
+        items: [
+          { kind: "mod", pid: "238222", fid: "5821001", project: "Applied Energistics 2", name: "appliedenergistics2-15.2.1.jar", file: "E:\\M2L\\cache\\mods\\238222\\5821001.jar", hash: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", size: 18_432_000, exists: true },
+          { kind: "mod", pid: "238222", fid: "5822001", project: "Applied Energistics 2", name: "appliedenergistics2-15.3.0.jar", file: "E:\\M2L\\cache\\mods\\238222\\5822001.jar", hash: "b2c3d4e5f60718293a4b5c6d7e8f901234567800", size: 18_874_368, exists: true },
+          { kind: "mod", pid: "create", fid: "f-1", project: "Create", name: "create-6.0.4.jar", file: "E:\\M2L\\cache\\mods\\create\\f-1.jar", hash: "c3d4e5f60718293a4b5c6d7e8f90123456789012", size: 1_572_864, exists: false },
+          { kind: "pack", pid: "better-mc", fid: "bmc-200", project: "Better MC", name: "Better MC [FORGE] 1.20.1.zip", file: "E:\\M2L\\cache\\packs\\better-mc\\bmc-200.zip", hash: "d4e5f60718293a4b5c6d7e8f9012345678901234", size: 3_145_728, exists: true },
+          { kind: "mod", pid: "sodium", fid: "sodium-1", project: "Sodium", name: "sodium-fabric-0.6.5.jar", file: "E:\\M2L\\cache\\mods\\sodium\\sodium-1.jar", hash: "e5f60718293a4b5c6d7e8f901234567890123456", size: 921_600, exists: true },
+          { kind: "mod", pid: "sodium", fid: "sodium-2", project: "Sodium", name: "sodium-fabric-0.6.3.jar", file: "E:\\M2L\\cache\\mods\\sodium\\sodium-2.jar", hash: "f60718293a4b5c6d7e8f90123456789012345678", size: 917_504, exists: true },
+        ],
+      },
+      settings_open_link_resource: null,
+      settings_tidy_link_resources: { total: 0, filled: 0, failed: 0 },
+    }),
+  },
+  {
+    id: "downloaded-resources-empty",
+    kind: "downloaded_resources",
+    label: "mml-downloaded_resources",
+    size: [1000, 640],
+    commands: base({
+      settings_list_link_resources: { total: 0, totalSize: 0, page: 1, pages: 1, pageSize: 20, items: [] },
+    }),
+  },
+  {
+    id: "downloaded-resources-no-match",
+    kind: "downloaded_resources",
+    label: "mml-downloaded_resources",
+    size: [1000, 640],
+    commands: base({
+      settings_list_link_resources: { total: 0, totalSize: 0, page: 1, pages: 1, pageSize: 20, items: [] },
+    }),
+    actions: [{ eval: setInput(".res-head-search input", "zzzz"), after: 700 }],
+  },
+  {
+    id: "downloaded-resources-tidy",
+    kind: "downloaded_resources",
+    label: "mml-downloaded_resources",
+    size: [1000, 640],
+    commands: base({
+      settings_list_link_resources: {
+        total: 2,
+        totalSize: 19_353_600,
+        page: 1,
+        pages: 1,
+        pageSize: 20,
+        items: [
+          { kind: "mod", pid: "238222", fid: "5821001", project: "Applied Energistics 2", name: "appliedenergistics2-15.2.1.jar", file: "E:\\M2L\\cache\\mods\\238222\\5821001.jar", hash: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", size: 18_432_000, exists: true },
+          { kind: "mod", pid: "create", fid: "f-1", project: "", name: "create-6.0.4.jar", file: "E:\\M2L\\cache\\mods\\create\\f-1.jar", hash: "c3d4e5f60718293a4b5c6d7e8f90123456789012", size: 921_600, exists: true },
+        ],
+      },
+      settings_tidy_link_resources: { __delay: 6000, value: { total: 12, filled: 9, failed: 3 } },
+    }),
+    actions: [
+      { eval: click('[aria-label="整理缺失的项目名"]'), after: 300 },
+      { eval: "window.__SHOT__.emit('link-resource-tidy-progress', { done: 5, total: 12 })", after: 400 },
+    ],
+  },
+  {
+    id: "lobby-mapping",
+    kind: "lobby",
+    label: "mml-lobby",
+    size: [1050, 720],
+    commands: base({
+      lobby_mapping_list: {
+        available: true,
+        rooms: [
+          { id: "room-1", name: "生存服 · 周末开放", players: 4 },
+          { id: "room-2", name: "创造建筑服", players: 1 },
+          { id: "room-3", name: "暮色森林整合包", players: 7 },
+        ],
+      },
+      lobby_mapping_action: null,
+    }),
+    actions: [{ eval: clickText("映射大厅"), after: 700 }],
+  },
+  {
+    id: "config-find-chunk",
+    kind: "config",
+    label: "mml-config-inst-1",
+    size: [1240, 820],
+    // 查找实体 / 方块的入口只在"从某个存档打开"时出现，所以带上 saveDir
+    query: "uuid=inst-1&save=世界一",
+    commands: base(),
+    actions: [
+      { eval: clickText("region", ".cfg-tree"), after: 300 },
+      { eval: clickText("r.0.0.mca", ".cfg-tree"), after: 600 },
+      { eval: clickText("查找实体 / 方块", ".cfg-list-head"), after: 700 },
+    ],
+  },
+  {
+    id: "settings-gamepad-key",
+    kind: "settings",
+    label: "mml-settings",
+    size: [1100, 860],
+    commands: base({
+      gamepad_list: [{ id: 1, name: "Xbox 控制器", layout: "xbox" }],
+      gamepad_state: {
+        id: 1,
+        name: "Xbox 控制器",
+        buttons: [{ button: "south", value: 1 }, { button: "leftTrigger", value: 0.7 }],
+        axes: [{ axis: "leftStickX", value: 0.4 }, { axis: "leftStickY", value: -0.2 }],
+        extras: [],
+      },
+    }),
+    actions: [
+      { eval: clickTab("手柄"), after: 600 },
+      { eval: click(".gp-row-button .pk-chip"), after: 700 },
+    ],
+  },
+  {
+    id: "settings-gamepad-action",
+    kind: "settings",
+    label: "mml-settings",
+    size: [1100, 860],
+    commands: base(),
+    actions: [
+      { eval: clickTab("手柄"), after: 600 },
+      { eval: click(".gp-row-button .ap-chip"), after: 700 },
+    ],
+  },
+
+  /* ---------------- 补漏：主窗口与启动相关 ---------------- */
+  {
+    id: "main-account-menu",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({}, { viewMode: "list", startupPage: "List" }),
+    actions: [{ eval: click(".account-btn"), after: 400 }],
+  },
+  {
+    id: "main-gamepad-popup",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({
+      gamepad_list: [{ id: 1, name: "Xbox 控制器", layout: "xbox" }],
+      gamepad_state: { id: 1, name: "Xbox 控制器", buttons: [], axes: [], extras: [] },
+    }, { viewMode: "list", startupPage: "List" }),
+    actions: [{ eval: click('[aria-label="手柄"]'), after: 500 }],
+  },
+  {
+    id: "main-download-indicator",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({ download_get_status: downloadStatus }, { viewMode: "list", startupPage: "List" }),
+  },
+  {
+    id: "main-upgrade-overlay",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({
+      window_upgrade_status: { running: true, done: false, cancelled: false, now: 42, total: 100 },
+    }, { viewMode: "list", startupPage: "List" }),
+    actions: [{ wait: 600 }],
+  },
+  {
+    id: "main-debugger",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({}, { viewMode: "list", startupPage: "List" }),
+    actions: [
+      { eval: click(".launch-drop-toggle"), after: 350 },
+      { eval: clickText("调试启动", ".row-ctx-menu"), after: 600 },
+    ],
+  },
+  {
+    id: "main-icon-pick",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    openPath: "E:\\M2L\\image\\icon.png",
+    commands: base({
+      block_read_icon_source: { src: svgImage("#4f8cff", "图标"), width: 512, height: 512 },
+      block_set_icon_area: true,
+    }, { viewMode: "list", startupPage: "List" }),
+    actions: [
+      { eval: click('.icon-edit[aria-label="选择图片"]'), after: 700 },
+    ],
+  },
+  {
+    id: "main-modpack-update",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 900],
+    commands: base({
+      resource_modpack_check: {
+        hasUpdate: true,
+        source: "curseforge",
+        projectId: "better-mc",
+        fileId: "bmc-200",
+        newFileId: "bmc-201",
+        newVersion: "15.1.0",
+        newFile: "Better MC [FORGE] 1.20.1 v15.1.0.zip",
+        date: "2026-10-28",
+        instanceName: "Better MC",
+        addedFiles: 3,
+        removedFiles: 1,
+        changedFiles: 12,
+        mods: [],
+      },
+    }, { viewMode: "list", startupPage: "List" }),
+    actions: [
+      { eval: clickText("实例设置"), after: 1000 },
+    ],
+  },
+
+  /* ---------------- 补漏：启动前后的确认弹窗 ---------------- */
+  // 启动前检查：加载器是原版却带着模组
+  {
+    id: "main-launch-check",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({
+      main_check_launch: { mods: 42, loaderNormal: true, maxMemory: 4096, memoryLow: false, checkLoader: true, checkMemory: true },
+      main_launch_game: null,
+    }, { viewMode: "list", startupPage: "List" }),
+    actions: [{ eval: click(".launch-main-btn"), after: 1200 }],
+  },
+  // 启动前检查：模组多而最大内存偏低
+  {
+    id: "main-launch-check-memory",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({
+      main_check_launch: { mods: 186, loaderNormal: false, maxMemory: 2048, memoryLow: true, checkLoader: true, checkMemory: true },
+      main_launch_game: null,
+    }, { viewMode: "list", startupPage: "List" }),
+    actions: [{ eval: click(".launch-main-btn"), after: 1200 }],
+  },
+  // 游戏内手柄开着但实例没启用 ColorASM
+  {
+    id: "main-gamepad-asm",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({ main_gamepad_needs_asm: true, main_launch_game: null }, { viewMode: "list", startupPage: "List" }),
+    actions: [{ eval: click(".launch-main-btn"), after: 1200 }],
+  },
+  // 配了启动前命令，启动前问一次
+  {
+    id: "main-launch-command",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({
+      main_launch_commands: { pre: "python.exe E:\\M2L\\update\\updater.py", post: null },
+      main_launch_game: null,
+    }, { viewMode: "list", startupPage: "List" }),
+    actions: [{ eval: click(".launch-main-btn"), after: 1200 }],
+  },
+  // 实例配了"启动后自动进入存档"
+  {
+    id: "main-autosave",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({
+      main_auto_save_target: { dir: "世界一", levelName: "新的世界" },
+      main_launch_game: null,
+    }, { viewMode: "list", startupPage: "List" }),
+    actions: [{ eval: click(".launch-main-btn"), after: 1200 }],
+  },
+  // 账户被别的实例占用
+  {
+    id: "main-account-lock",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({ main_launch_game: { __error: "err.accountInUse" } }, { viewMode: "list", startupPage: "List" }),
+    actions: [{ eval: click(".launch-main-btn"), after: 1400 }],
+  },
+  // 正在同步服务器包时点取消：问跳过更新还是结束启动
+  {
+    id: "main-launch-cancel",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({ main_launch_game: { __delay: 9000, value: null } }, { viewMode: "list", startupPage: "List" }),
+    actions: [
+      { eval: click(".launch-main-btn"), after: 600 },
+      { eval: emit("launch-state", { uuid: "inst-1", state: "downloadserverpack", progress: 37 }), after: 500 },
+      { eval: click(".launch-main-btn"), after: 900 },
+    ],
+  },
+  // 在线服务器包有新版本：更新后启动 / 直接启动 / 取消
+  {
+    id: "main-server-pack-update",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({
+      main_get_instances: instances.map((i) => (i.uuid === "inst-5" ? { ...i, modpackType: "serverpack" } : i)),
+      main_check_launch: null,
+      main_gamepad_needs_asm: false,
+      main_launch_commands: null,
+      main_auto_save_target: null,
+      resource_modpack_check: {
+        hasUpdate: true,
+        source: "curseforge",
+        projectId: "better-mc",
+        fileId: "bmc-200",
+        newFileId: "bmc-201",
+        newVersion: "15.1.0",
+        newFile: "Better MC [FORGE] 1.20.1 v15.1.0.zip",
+        date: "2026-10-28",
+        instanceName: "整合包 · Better MC",
+        addedFiles: 3,
+        removedFiles: 1,
+        changedFiles: 12,
+        mods: [],
+      },
+      main_launch_game: null,
+    }, { viewMode: "list", startupPage: "List", selectedInstance: "inst-5" }),
+    actions: [{ eval: click(".launch-main-btn"), after: 1500 }],
+  },
+  // 选了"更新"之后再挑这次同步哪几个可选模组
+  {
+    id: "main-server-pack-mods",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({
+      main_get_instances: instances.map((i) => (i.uuid === "inst-5" ? { ...i, modpackType: "serverpack" } : i)),
+      main_check_launch: null,
+      main_gamepad_needs_asm: false,
+      main_launch_commands: null,
+      main_auto_save_target: null,
+      resource_modpack_check: {
+        hasUpdate: true,
+        source: "curseforge",
+        projectId: "better-mc",
+        fileId: "bmc-200",
+        newFileId: "bmc-201",
+        newVersion: "15.1.0",
+        newFile: "Better MC [FORGE] 1.20.1 v15.1.0.zip",
+        date: "2026-10-28",
+        instanceName: "整合包 · Better MC",
+        addedFiles: 3,
+        removedFiles: 1,
+        changedFiles: 12,
+        mods: [
+          { path: "mods/jei-19.21.0.jar", name: "Just Enough Items", text: "新增", added: true, enabled: true },
+          { path: "mods/sodium-0.6.5.jar", name: "Sodium", text: "更新", added: false, enabled: true },
+        ],
+      },
+      main_launch_game: null,
+    }, { viewMode: "list", startupPage: "List", selectedInstance: "inst-5" }),
+    actions: [
+      { eval: click(".launch-main-btn"), after: 1500 },
+      { eval: clickText("更新", ".modal"), after: 900 },
+    ],
+  },
+
+  /* ---------------- 补漏：资源管理 / 方块窗口的弹窗 ---------------- */
+  {
+    id: "resource-rename",
+    kind: "resource",
+    label: "mml-resource-inst-1",
+    size: [1280, 800],
+    query: "uuid=inst-1",
+    // 重命名只在存档 / 资源包 / 数据包 / 结构文件里有，这里用存档
+    commands: withView("saves"),
+    actions: [
+      { eval: "(() => { const row = document.querySelector('.item-row'); if (!row) return false; row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 620, clientY: 320, button: 2 })); return true; })()", after: 450 },
+      { eval: clickText("重命名", ".row-ctx-menu"), after: 500 },
+    ],
+  },
+  {
+    id: "resource-delete-confirm",
+    kind: "resource",
+    label: "mml-resource-inst-1",
+    size: [1280, 800],
+    query: "uuid=inst-1",
+    commands: withView("mods"),
+    actions: [
+      { eval: "(() => { const row = document.querySelector('.mod-rows > *'); if (!row) return false; row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 620, clientY: 320, button: 2 })); return true; })()", after: 450 },
+      { eval: clickText("删除", ".row-ctx-menu"), after: 600 },
+    ],
+  },
+  {
+    id: "resource-mod-replace",
+    kind: "resource",
+    label: "mml-resource-inst-1",
+    size: [1280, 800],
+    query: "uuid=inst-1",
+    commands: withView("mods", {
+      add_resource_file: {
+        list: [
+          { name: "appliedenergistics2-15.3.0.jar", download: 2845173, size: 18874368, time: "2026-10-22T10:00:00Z", isDownload: false, downloadNow: false, source: "curseforge" },
+          { name: "appliedenergistics2-15.2.1.jar", download: 1902441, size: 18432000, time: "2026-09-30T08:30:00Z", isDownload: true, downloadNow: false, source: "curseforge" },
+        ],
+        count: 2,
+        name: "Applied Energistics 2",
+        maxPage: 1,
+      },
+    }),
+    actions: [
+      { eval: "(() => { const row = document.querySelector('.mod-rows > *'); if (!row) return false; row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 620, clientY: 320, button: 2 })); return true; })()", after: 450 },
+      { eval: clickText("替换版本", ".row-ctx-menu"), after: 900 },
+    ],
+  },
+  {
+    id: "block-set-icon",
+    kind: "block",
+    label: "mml-block",
+    size: [1180, 800],
+    commands: base({ block_list: blockItems, block_status: { rendered: true, version: "1.21.4", running: false, now: 100, total: 100, text: null, error: null } }),
+    actions: [
+      { eval: "(() => { const el = document.querySelector('.block-cell'); if (!el) return false; el.click(); return true; })()", after: 700 },
+      { eval: clickText("设为实例图标", ".block-detail-modal, .modal"), after: 700 },
+    ],
+  },
+
+  // 模组改写目标（mixin / ASM）：列表里展开父模组后按类与方法逐行列出
+  {
+    id: "resource-mod-targets",
+    kind: "resource",
+    label: "mml-resource-inst-1",
+    size: [1280, 800],
+    query: "uuid=inst-1",
+    commands: withView("mods", {
+      resource_list_mods: mods.map((m) =>
+        m.uuid === "mod-1"
+          ? {
+            ...m,
+            coremod: true,
+            mixins: [
+              { config: "ae2.mixins.json", mixin: "appeng.mixins.LevelMixin", target: "net.minecraft.world.level.Level", method: "tickBlockEntities", kind: "inject" },
+              { config: "ae2.mixins.json", mixin: "appeng.mixins.PlayerMixin", target: "net.minecraft.world.entity.player.Player", method: "drop", kind: "redirect" },
+              { config: "ae2.mixins.json", mixin: "appeng.accessors.GridNodeAccessor", target: "appeng.api.networking.IGridNode", method: "", kind: "accessor" },
+            ],
+            asm: [
+              { source: "coremods.json", transformer: "appeng.coremod.AE2Transformer", target: "net.minecraft.client.gui.screens.Screen", method: "render" },
+            ],
+          }
+          : m,
+      ),
+    }),
+    actions: [
+      {
+        eval: "(() => { const row = [...document.querySelectorAll('.mod-rows > *')].find((el) => el.textContent.includes('Applied Energistics')); if (!row) return false; const caret = row.querySelector('.mod-tree-caret'); if (!caret) return false; caret.click(); return true; })()",
+        after: 700,
+      },
+    ],
+  },
+
+  // 拖入文件与现有文件重名：问覆盖 / 跳过 / 重命名
+  {
+    id: "resource-drop-conflict",
+    kind: "resource",
+    label: "mml-resource-inst-1",
+    size: [1280, 800],
+    query: "uuid=inst-1",
+    commands: withView("mods", {
+      window_probe_drop: { kind: "file", url: "" },
+      resource_import_files: { conflicts: ["sodium-0.6.5.jar", "jei-1.21.4.jar"], imported: [], skipped: [] },
+    }),
+    actions: [
+      {
+        eval: "(() => { const dt = new DataTransfer(); dt.items.add(new File(['x'], 'sodium-0.6.5.jar', { type: 'application/java-archive' })); const target = document.querySelector('.mod-rows') || document.body; for (const type of ['dragenter', 'dragover']) { target.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt })); } target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt })); window.__SHOT__.emit('file-drop', { paths: ['E:\\M2L\\cache\\mods\\sodium-0.6.5.jar'] }); return true; })()",
+        after: 900,
+      },
+    ],
+  },
+
+  // 标题栏四类任务指示器：整合包 / 下载 / 资源 / Java 同时有任务
+  {
+    id: "main-task-indicators",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({
+      download_get_status: downloadStatus,
+      add_modpack_status: modpackStatus,
+      add_resource_status: { windowOpen: false, tasks: [{ name: "Sodium", total: 12, done: 5, failed: 0, state: "run" }] },
+      java_download_status: [{ name: "Java 21", total: 100, done: 40, failed: 0, state: "run" }],
+    }, { viewMode: "list", startupPage: "List" }),
+  },
+
+  /* ---------------- 补漏：弹窗逐个补齐（第一批） ---------------- */
+  // 关闭正在运行的游戏
+  {
+    id: "main-stop-modal",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({}, { viewMode: "list", startupPage: "List" }),
+    actions: [
+      { eval: emit("launch-state", { uuid: "inst-1", state: "end", progress: null }), after: 700 },
+      { eval: click(".launch-main-btn"), after: 700 },
+    ],
+  },
+  // 关窗确认（有任务 / 运行中时退出）
+  {
+    id: "main-close-ask",
+    kind: "main",
+    label: "mml-main",
+    size: [1280, 800],
+    commands: base({}, { viewMode: "list", startupPage: "List" }),
+    actions: [
+      // 关闭被下载任务拦住时后端发 close-blocked，带被拦下的窗口标签
+      { eval: "window.__SHOT__.emit('close-blocked', 'mml-main')", after: 700 },
+    ],
+  },
+  // 账户登录失败
+  {
+    id: "account-login-error",
+    kind: "account",
+    label: "mml-account",
+    size: [1000, 700],
+    commands: base({ account_add_account: { __error: "account.loginFail" } }),
+    actions: [
+      { eval: click(".icon-btn-head"), after: 400 },
+      // 离线账户：名字必填，密码可空
+      { eval: selectValue(".modal select", "offline"), after: 300 },
+      { eval: setInput(".modal input", "Steve"), after: 250 },
+      { eval: clickText("添加", ".modal"), after: 900 },
+    ],
+  },
+  // 收藏：移动到分组
+  {
+    id: "collect-add-to-group-modal",
+    kind: "collect",
+    label: "mml-collect",
+    size: [1180, 800],
+    commands: base({ collect_get_data: collectWithData }),
+    actions: [
+      { eval: "(() => { const card = document.querySelector('.collect-card'); if (!card) return false; card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 420, clientY: 320, button: 2 })); return true; })()", after: 500 },
+      { eval: clickText("移动到分组", ".row-ctx-menu"), after: 700 },
+    ],
+  },
+  // 日志上传完成（生成公开链接）
+  {
+    id: "log-upload-done",
+    kind: "log",
+    label: "mml-log-inst-1",
+    size: [1180, 800],
+    query: "uuid=inst-1",
+    commands: base({ log_upload: "https://mclo.gs/AbCdEfG" }),
+    actions: [
+      { eval: click('[aria-label="上传日志"]'), after: 500 },
+      { eval: clickText("上传", ".modal"), after: 900 },
+    ],
+  },
+  // 手柄：恢复默认键位
+  {
+    id: "settings-gamepad-reset",
+    kind: "settings",
+    label: "mml-settings",
+    size: [1100, 860],
+    commands: base(),
+    actions: [
+      { eval: clickTab("手柄"), after: 600 },
+      { eval: click('[aria-label="恢复默认"]'), after: 600 },
+    ],
+  },
+  // 手柄：删除配置
+  {
+    id: "settings-gamepad-delete",
+    kind: "settings",
+    label: "mml-settings",
+    size: [1100, 860],
+    commands: base({ gamepad_get_profiles: [{ name: "默认配置", active: true, error: null }, { name: "备用", active: false, error: null }] }),
+    actions: [
+      { eval: clickTab("手柄"), after: 600 },
+      { eval: click('[aria-label="删除配置"]'), after: 600 },
+    ],
+  },
+  // 存档：编辑存档信息
+  {
+    id: "resource-save-edit",
+    kind: "resource",
+    label: "mml-resource-inst-1",
+    size: [1280, 800],
+    query: "uuid=inst-1",
+    commands: withView("saves"),
+    actions: [
+      { eval: "(() => { const row = document.querySelector('.item-row'); if (!row) return false; row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 620, clientY: 320, button: 2 })); return true; })()", after: 450 },
+      { eval: clickText("编辑存档", ".row-ctx-menu"), after: 700 },
+    ],
+  },
+
+  /* ---------------- 补漏：弹窗逐个补齐（第二批） ---------------- */
+  // 服务器包导出：实例 / 登录方式没锁住时先问一句
+  {
+    id: "export-lock-warn",
+    kind: "server_pack",
+    label: "mml-server_pack",
+    size: [1100, 800],
+    query: "uuid=inst-1",
+    commands: base(),
+    actions: [
+      // 等 info 与选项渲染出来再点
+      { wait: 1200 },
+      // 选一个实例（默认没选）
+      { eval: click(".instance-row input"), after: 400 },
+      // 勾上「界面配置」，导出时才会检查锁
+      { eval: click(".export-submit"), after: 800 },
+    ],
+  },
+  // 导出中关窗：问是否取消导出
+  {
+    id: "export-close-confirm",
+    kind: "server_pack",
+    label: "mml-server_pack",
+    size: [1100, 800],
+    query: "uuid=inst-1",
+    commands: base(),
+    actions: [
+      { eval: click(".instance-row input"), after: 300 },
+      { eval: emit("export-progress", { state: "running", now: 42, total: 100, text: "正在写入服务端文件", error: null, file: "" }), after: 500 },
+      { eval: "window.__SHOT__.emit('close-blocked', 'mml-server_pack')", after: 600 },
+    ],
+  },
+  // 结构文件详情
+  {
+    id: "resource-schematic-detail",
+    kind: "resource",
+    label: "mml-resource-inst-1",
+    size: [1280, 800],
+    query: "uuid=inst-1",
+    commands: withView("schematics", { resource_schematic_detail: { name: "小屋", size: 12, blocks: [{ id: "minecraft:stone", count: 120 }], entities: [], tileEntities: [] } }),
+    actions: [
+      { eval: "(() => { const row = document.querySelector('.item-row'); if (!row) return false; row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 620, clientY: 320, button: 2 })); return true; })()", after: 450 },
+      { eval: clickText("查看详情", ".row-ctx-menu"), after: 800 },
+    ],
+  },
+  // 存档：从备份还原
+  {
+    id: "resource-save-restore",
+    kind: "resource",
+    label: "mml-resource-inst-1",
+    size: [1280, 800],
+    query: "uuid=inst-1",
+    commands: withView("saves", {
+      resource_list_save_backups: [
+        { file: "2026-10-25_19-00-00.zip", time: "2026-10-25T19:00:00Z", size: 10485760 },
+        { file: "2026-10-24_19-00-00.zip", time: "2026-10-24T19:00:00Z", size: 10420224 },
+      ],
+    }),
+    actions: [
+      { eval: "(() => { const row = document.querySelector('.item-row'); if (!row) return false; row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 620, clientY: 320, button: 2 })); return true; })()", after: 450 },
+      { eval: clickText("还原", ".row-ctx-menu"), after: 800 },
+    ],
+  },
+  // 手柄：切换配置时丢掉未保存的改动
+  {
+    id: "settings-client-unlock",
+    kind: "settings",
+    label: "mml-settings",
+    size: [1100, 860],
+    commands: base({
+      window_get_gui_config: {
+        ...baseConfig,
+        client: { ...baseConfig.client, lockClient: true, lockInstance: "", loginLockOn: false },
+      },
+    }),
+    actions: [
+      { eval: clickTab("实验性功能"), after: 600 },
+      { eval: clickText("解锁客户端设置", ".settings-layout"), after: 700 },
+    ],
   },
 ];

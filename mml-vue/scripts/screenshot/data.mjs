@@ -19,6 +19,7 @@ export function svgImage(color, text = "") {
 /** 主题 / 窗口 / 客户端设置：与 Rust GuiConfigDto 同形 */
 export const baseConfig = {
   theme: "Light",
+  gradient: true,
   accent: "Default",
   customAccent: "",
   locale: "zh_cn",
@@ -49,6 +50,10 @@ export const baseConfig = {
     customCssOn: false,
     customCss: [],
     customPageOn: false,
+    customPageId: "",
+    customPages: [],
+    animations: true,
+    programIcon: "",
     musicOn: false,
     musicSource: "",
     windowEffect: "none",
@@ -262,6 +267,10 @@ export const customUiStatus = {
   cssOn: false,
   css: [],
   pageOn: false,
+  pageId: "",
+  pages: [
+    { id: "page-1", name: "示例整页主题", fileCount: 12, kind: "page", version: "1.0.0", declared: true },
+  ],
   pageInstalled: false,
   kind: "page",
   name: "",
@@ -305,6 +314,7 @@ export const settingsLaunch = {
   minMemory: 1024,
   maxMemory: 4096,
   colorasm: false,
+  mmlEnv: true,
   launchPreRun: false,
   preRunWithGame: true,
   launchPostRun: false,
@@ -348,6 +358,8 @@ const mod = (uuid, file, modId, name, version, extra = {}) => ({
   disable: false,
   fail: false,
   core: false,
+  coremod: false,
+  hardLink: false,
   library: false,
   modId,
   name,
@@ -363,6 +375,8 @@ const mod = (uuid, file, modId, name, version, extra = {}) => ({
   note: "",
   icon: "",
   jarInJar: [],
+  mixins: [],
+  asm: [],
   hasDependencies: false,
   ...extra,
 });
@@ -423,6 +437,10 @@ export const gamepadActions = [
 export const gamepadProfiles = [{ name: "默认配置", active: true, error: null }];
 export const gamepadConfig = {
   selected: true,
+  enabled: true,
+  device: null,
+  layout: "xbox",
+  swapAb: false,
   // 鼠标模式单独一套按钮：默认打开，界面上的表跟着分段切
   separateCursor: true,
   buttons: [
@@ -763,7 +781,8 @@ export const resourceDeps = [
 export const resourceStatusRunning = {
   windowOpen: true,
   tasks: [
-    { uuid: "res-task-1", source: "modrinth", pid: "sodium", fid: "s-065", name: "Sodium", icon: null, kind: "download", state: "downloadFile", now: 32, total: 100, subText: "sodium-0.6.5.jar", subNow: 40, subTotal: 100, done: false, failed: false, cancelled: false, error: null, instanceUuid: "inst-1" },
+    { pid: "sodium", fid: "s-065", name: "Sodium", icon: "", progress: 32, done: false, failed: false, cancelled: false },
+    { pid: "iris", fid: "i-188", name: "Iris Shaders", icon: "", progress: 68, done: false, failed: false, cancelled: false },
   ],
 };
 
@@ -944,12 +963,15 @@ export function moreCommands(extra = {}) {
     },
     java_download_get_list: [],
     block_get_groups: blockGroups,
+    block_skin_cat: [],
     block_set_groups: null,
     block_list: blockItems,
     log_get_files: [],
     log_get_runtime: logRuntime,
     log_set_setting: null,
     export_get_info: exportInfo,
+    // 导出 / 服务器包生成：截图里不真的落盘
+    export_run: null,
     export_list_dir: {
       __dirs: {
         "": exportRoot,
@@ -959,6 +981,14 @@ export function moreCommands(extra = {}) {
         resourcepacks: [entry("resourcepacks/FreshAnimations.zip", 4_800_000), entry("resourcepacks/Faithful 32x.zip", 12_000_000)],
       }
     },
+    // 服务器实例窗口按顶层目录列"要同步的文件"，目录大小算整棵子树
+    export_list_dir_sized: [
+      { path: "mods", dir: true, size: 24117248, url: "", modId: null, fileId: null, customProjectId: null, customFileId: null, customId: false, sha1: "" },
+      { path: "config", dir: true, size: 1048576, url: "", modId: null, fileId: null, customProjectId: null, customFileId: null, customId: false, sha1: "" },
+      { path: "defaultconfigs", dir: true, size: 524288, url: "", modId: null, fileId: null, customProjectId: null, customFileId: null, customId: false, sha1: "" },
+      { path: "resourcepacks", dir: true, size: 8388608, url: "", modId: null, fileId: null, customProjectId: null, customFileId: null, customId: false, sha1: "" },
+    ],
+    window_log_frontend: null,
     export_list_instance_dir: {
       __dirs: {
         "": exportInstanceRoot,
@@ -1024,6 +1054,7 @@ export function commonCommands(extra = {}) {
       configs: null,
     },
     server_instance_get_ids: [],
+    server_instance_config_diff: { generated: true, added: ["server.properties"], modified: ["ops.json"], deleted: [], files: ["server.properties", "ops.json", "whitelist.json"] },
     server_instance_get_snapshot: { generated: false, mods: [], packs: [] },
     custom_ui_status: customUiStatus,
     custom_home_status: customHomeStatus,
@@ -1048,6 +1079,11 @@ export function commonCommands(extra = {}) {
     main_take_start_arg: null,
     // 启动命令预览：null 表示不弹「确认命令」
     main_launch_commands: null,
+    main_launch_state: null,
+    // 启动流程会按顺序问这几个：默认都不用问，场景里再覆盖
+    main_check_launch: null,
+    main_gamepad_needs_asm: false,
+    main_auto_save_target: null,
     account_add_account: null,
     main_get_versions: addVersions,
     main_refresh_versions: addVersions,
@@ -1089,7 +1125,7 @@ export function commonCommands(extra = {}) {
       mods: [],
     },
     main_get_custom_json: [],
-    settings_get_bg: { source: "", dataUrl: "", opacity: 100, blur: 0, nativeSize: 0 },
+    settings_get_bg: { source: "", dataUrl: "", opacity: 100, blur: 0, frosted: true, nativeSize: 0 },
     // 加载背景图：后端返回处理后的 dataURL，这里给一张 8×8 占位图
     settings_set_bg:
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAJUlEQVR4nGP8z8Dwn4EIwESMolGFlCscVUiyQoYRrIBAYRg5CgEAPi0EAcHZ5fEAAAAASUVORK5CYII=",

@@ -146,8 +146,8 @@ pub(super) fn export_pack(
         }
     }
 
-    let page = crate::windows::custom_ui::page_file();
-    let page_on = options.page && page.is_file();
+    let page = crate::windows::custom_ui::selected_page_file();
+    let page_on = options.page && page.is_some();
     let home = crate::windows::custom_home::zip_path();
     let home_on = options.home && home.is_file();
     let mut ui = gui_config::get();
@@ -181,7 +181,10 @@ pub(super) fn export_pack(
         .retain(|item| options.css && crate::windows::custom_ui::css_package(&item.id).is_file());
     ui.client.custom_home = options.home && home_on;
     ui.client.custom_page_on = options.page && page_on;
-    if page_on {
+    // 导出仍只带选中的那一份，落成旧的单包名；导入端升级逻辑会把它收进 pages/
+    ui.client.custom_pages.clear();
+    ui.client.custom_page_id.clear();
+    if let Some(page) = page {
         files.push(("mml/custom_ui/page.zip".into(), page));
     }
     files.extend(css_packages);

@@ -7,12 +7,12 @@ use std::path::{Path, PathBuf};
 
 use mml_base::file_item::FileHash;
 use mml_game::GameInstance;
-use mml_game::game_mods::{LoadSideType, ModObj};
+use mml_game::game_mods::{ASM_SOURCE_COREMODS, LoadSideType, ModObj};
 use mml_game::loader::LoaderType;
 use mml_names::names;
 use mml_sys::path_helper;
 
-use crate::dtos::{ModItemDto, ModRenameDto};
+use crate::dtos::{ModAsmTargetDto, ModItemDto, ModMixinTargetDto, ModRenameDto};
 
 use crate::err_keys;
 
@@ -118,6 +118,11 @@ pub(super) fn mod_item(item: &ModObj, ctx: &ModCtx, nested: bool) -> Option<ModI
         fail: item.fail,
         hard_link,
         core: item.core,
+        coremod: item.core
+            || item
+                .asm
+                .iter()
+                .any(|target| target.source == ASM_SOURCE_COREMODS),
         library,
         mod_id,
         name,
@@ -137,9 +142,58 @@ pub(super) fn mod_item(item: &ModObj, ctx: &ModCtx, nested: bool) -> Option<ModI
             .iter()
             .filter_map(|child| mod_item(child, ctx, true))
             .collect(),
+        mixins: mod_mixins(item),
+        asm: mod_asm(item),
         has_dependencies,
         file,
     })
+}
+
+/// 一个模组的 mixin 目标，按目标类 → 方法 → 注入方式排好
+///
+/// - `item`: 内核扫描出的模组条目
+///
+/// # 返回值
+///
+/// 列表展开与搜索用的一行行目标；没装 mixin 时是空数组
+fn mod_mixins(item: &ModObj) -> Vec<ModMixinTargetDto> {
+    let mut list: Vec<ModMixinTargetDto> = item
+        .mixins
+        .iter()
+        .map(|target| ModMixinTargetDto {
+            config: target.config.clone(),
+            mixin: target.mixin.clone(),
+            target: target.target.clone(),
+            method: target.method.clone(),
+            kind: target.kind.clone(),
+        })
+        .collect();
+    list.sort_by(|a, b| {
+        (&a.target, &a.method, &a.kind, &a.mixin).cmp(&(&b.target, &b.method, &b.kind, &b.mixin))
+    });
+    list
+}
+
+/// 一个模组的 ASM 变压器，按来源 → 名字排好
+///
+/// - `item`: 内核扫描出的模组条目
+///
+/// # 返回值
+///
+/// 列表展开用的变压器行；没有时是空数组
+fn mod_asm(item: &ModObj) -> Vec<ModAsmTargetDto> {
+    let mut list: Vec<ModAsmTargetDto> = item
+        .asm
+        .iter()
+        .map(|target| ModAsmTargetDto {
+            source: target.source.clone(),
+            transformer: target.transformer.clone(),
+            target: target.target.clone(),
+            method: target.method.clone(),
+        })
+        .collect();
+    list.sort_by(|a, b| (&a.source, &a.transformer).cmp(&(&b.source, &b.transformer)));
+    list
 }
 
 /// 相对实例的路径：`.minecraft\mods\sodium.jar` 这种形态

@@ -244,7 +244,7 @@ pub(super) fn problem_map(
 /// # 返回值
 ///
 /// 找到的条目；没有时返回 `None`
-pub(super) fn find_by_uuid<'a>(list: &'a [ModObj], uuid: &str) -> Option<&'a ModObj> {
+pub(crate) fn find_by_uuid<'a>(list: &'a [ModObj], uuid: &str) -> Option<&'a ModObj> {
     for item in list {
         if item.uuid.to_string() == uuid {
             return Some(item);

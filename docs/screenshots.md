@@ -39,7 +39,7 @@ npm run shots -- --clean
 
 ## 场景表
 
-共 259 个场景，按窗口分组。
+共 304 个场景，按窗口分组。
 「窗口」列是页面的 `kind`，窗口族场景会自动带上实例参数，不需要在命令里另写；
 控件场景的 `control` 是截图工具里的预览页，不是启动器窗口。
 
@@ -75,6 +75,25 @@ npm run shots -- --clean
 | `main-launch` | 主窗口 · 点击启动（断言命令） | `main` | 1280×800 |
 | `main-delete-confirm` | 主窗口 · 删除 · 确认 | `main` | 1280×800 |
 | `main-create-group` | 主窗口 · 新建分组（断言命令） | `main` | 1280×800 |
+| `main-account-menu` | 主窗口 · 账户下拉 | `main` | 1280×800 |
+| `main-gamepad-popup` | 主窗口 · 手柄弹窗 | `main` | 1280×800 |
+| `main-download-indicator` | 主窗口 · 标题栏下载指示器 | `main` | 1280×800 |
+| `main-upgrade-overlay` | 主窗口 · 更新数据浮层 | `main` | 1280×800 |
+| `main-debugger` | 主窗口 · 使用调试器启动 | `main` | 1280×800 |
+| `main-icon-pick` | 主窗口 · 修改实例图标 · 截图范围 | `main` | 1280×800 |
+| `main-modpack-update` | 主窗口 · 整合包有新版本 | `main` | 1280×900 |
+| `main-launch-check` | 主窗口 · 启动前检查 · 加载器 | `main` | 1280×800 |
+| `main-launch-check-memory` | 主窗口 · 启动前检查 · 内存 | `main` | 1280×800 |
+| `main-gamepad-asm` | 主窗口 · 手柄需要 ColorASM | `main` | 1280×800 |
+| `main-launch-command` | 主窗口 · 启动命令确认 | `main` | 1280×800 |
+| `main-autosave` | 主窗口 · 自动进入存档确认 | `main` | 1280×800 |
+| `main-account-lock` | 主窗口 · 账户被占用 | `main` | 1280×800 |
+| `main-launch-cancel` | 主窗口 · 同步服务器包时取消 | `main` | 1280×800 |
+| `main-server-pack-update` | 主窗口 · 服务器包有新版本 | `main` | 1280×800 |
+| `main-server-pack-mods` | 主窗口 · 选择要更新的模组 | `main` | 1280×800 |
+| `main-task-indicators` | 主窗口 · task · indicators | `main` | 1280×800 |
+| `main-stop-modal` | 主窗口 · 关闭运行中的游戏 | `main` | 1280×800 |
+| `main-close-ask` | 主窗口 · 退出启动器确认 | `main` | 1280×800 |
 
 ### 设置
 
@@ -102,6 +121,11 @@ npm run shots -- --clean
 | `settings-gamepad-new` | 设置 · 手柄 · 新建配置 | `settings` | 1100×860 |
 | `settings-custom-css` | 设置 · 界面 · 自定义样式包 | `settings` | 1100×800 |
 | `settings-save` | 设置 · 改动保存 | `settings` | 1100×760 |
+| `settings-gamepad-key` | 设置 · 手柄 · 选择按键 | `settings` | 1100×860 |
+| `settings-gamepad-action` | 设置 · 手柄 · 选择键盘 / 鼠标动作 | `settings` | 1100×860 |
+| `settings-gamepad-reset` | 设置 · 手柄 · 恢复默认键位 | `settings` | 1100×860 |
+| `settings-gamepad-delete` | 设置 · 手柄 · 删除配置 | `settings` | 1100×860 |
+| `settings-client-unlock` | 设置 · 解锁客户端设置 | `settings` | 1100×860 |
 
 ### 资源管理
 
@@ -129,6 +153,14 @@ npm run shots -- --clean
 | `resource-dep-graph` | 资源管理 · 依赖图 | `resource` | 1280×800 |
 | `resource-server-add` | 资源管理 · 服务器 · 添加 | `resource` | 1280×800 |
 | `resource-export-modal` | 资源管理 · 导出弹窗 | `resource` | 1280×800 |
+| `resource-rename` | 资源管理 · 重命名 | `resource` | 1280×800 |
+| `resource-delete-confirm` | 资源管理 · 删除确认 | `resource` | 1280×800 |
+| `resource-mod-replace` | 资源管理 · 更换模组版本 | `resource` | 1280×800 |
+| `resource-mod-targets` | 资源管理 · 模组改写目标（Mixin / ASM） | `resource` | 1280×800 |
+| `resource-drop-conflict` | 资源管理 · 拖入重名（覆盖 / 跳过 / 重命名） | `resource` | 1280×800 |
+| `resource-save-edit` | 资源管理 · 编辑存档 | `resource` | 1280×800 |
+| `resource-schematic-detail` | 资源管理 · 结构文件详情 | `resource` | 1280×800 |
+| `resource-save-restore` | 资源管理 · 选择要还原的备份 | `resource` | 1280×800 |
 
 ### 账户
 
@@ -159,6 +191,7 @@ npm run shots -- --clean
 | `account-oauth-fail` | 账户 · 设备码登录 · 失败 | `account` | 1000×700 |
 | `account-skin` | 账户 · 皮肤 | `account` | 1000×720 |
 | `account-add-ok` | 账户 · 添加成功（断言命令） | `account` | 1000×700 |
+| `account-login-error` | 账户 · 登录失败 | `account` | 1000×700 |
 
 ### 添加实例
 
@@ -249,6 +282,7 @@ npm run shots -- --clean
 | `collect-multi-select` | 收藏 · 多选模式 | `collect` | 1100×760 |
 | `collect-install-modal` | 收藏 · 安装确认弹窗 | `collect` | 1100×760 |
 | `collect-empty` | 收藏 · 空状态 | `collect` | 1100×760 |
+| `collect-add-to-group-modal` | 收藏 · 移动到分组 | `collect` | 1180×800 |
 
 ### 下载
 
@@ -260,6 +294,15 @@ npm run shots -- --clean
 | `download-stop-modal` | 下载 · 停止确认弹窗 | `download` | 1000×700 |
 | `download-pause` | 下载 · 暂停全部 | `download` | 1000×700 |
 | `download-failed` | 下载 · 有失败任务 | `download` | 1000×700 |
+
+### 已下载资源
+
+| 图片 | 画面 | 窗口 | 视口 |
+| --- | --- | --- | --- |
+| `downloaded-resources` | 已下载资源 · 列表 | `downloaded_resources` | 1000×640 |
+| `downloaded-resources-empty` | 已下载资源 · 空列表 | `downloaded_resources` | 1000×640 |
+| `downloaded-resources-no-match` | 已下载资源 · 搜索无结果 | `downloaded_resources` | 1000×640 |
+| `downloaded-resources-tidy` | 已下载资源 · 整理项目名进度 | `downloaded_resources` | 1000×640 |
 
 ### Java 下载
 
@@ -289,6 +332,7 @@ npm run shots -- --clean
 | `block-group-remove` | 方块与物品 · 移除分组 | `block` | 1150×800 |
 | `block-skin-add` | 方块与物品 · 添加皮肤 | `block` | 1150×800 |
 | `block-close-confirm` | 方块与物品 · 关闭确认 | `block` | 1150×800 |
+| `block-set-icon` | 方块与物品 · 设为实例图标 · 选实例 | `block` | 1180×800 |
 
 ### 游戏日志
 
@@ -299,6 +343,7 @@ npm run shots -- --clean
 | `log-crash-modal` | 游戏日志 · 崩溃分析 | `log` | 1100×720 |
 | `log-upload-modal` | 游戏日志 · 上传弹窗 | `log` | 1100×720 |
 | `log-empty` | 日志 · 无输出 | `log` | 1100×780 |
+| `log-upload-done` | 游戏日志 · 上传完成 | `log` | 1180×800 |
 
 ### 导出实例
 
@@ -319,6 +364,8 @@ npm run shots -- --clean
 | `export-hmcl-files` | 导出实例 · HMCL · 文件 | `export` | 1100×800 |
 | `export-mml-files` | 导出实例 · 直接压缩 · 文件 | `export` | 1100×800 |
 | `export-progress` | 导出实例 · 进度 | `export` | 1100×760 |
+| `export-lock-warn` | 服务器包 · 实例 / 登录未锁住的提醒 | `server_pack` | 1100×800 |
+| `export-close-confirm` | 服务器包 · 导出中关窗确认 | `server_pack` | 1100×800 |
 
 ### 联机大厅
 
@@ -327,6 +374,7 @@ npm run shots -- --clean
 | `lobby` | 联机大厅 | `lobby` | 1050×720 |
 | `lobby-waiting` | 联机大厅 · 等待中 | `lobby` | 1050×720 |
 | `lobby-error` | 联机大厅 · 错误 | `lobby` | 1050×720 |
+| `lobby-mapping` | 联机大厅 · 映射大厅 | `lobby` | 1050×720 |
 
 ### 配置文件
 
@@ -342,12 +390,14 @@ npm run shots -- --clean
 | `config-hex` | 配置文件 · 十六进制 | `config` | 1240×820 |
 | `config-context` | 配置文件 · 右键 | `config` | 1240×820 |
 | `config-folder-context` | 配置文件 · 文件夹右键菜单 | `config` | 1240×820 |
+| `config-find-chunk` | 配置文件 · 查找实体 / 方块 | `config` | 1240×820 |
 
 ### 服务器实例
 
 | 图片 | 画面 | 窗口 | 视口 |
 | --- | --- | --- | --- |
 | `server-instance` | 服务器实例 | `server_instance` | 1050×760 |
+| `server-instance-base` | 服务器实例 · 基础文件 | `server_instance` | 1050×800 |
 | `server-instance-mods` | 服务器实例 · 模组 | `server_instance` | 1050×800 |
 | `server-instance-packs` | 服务器实例 · 资源包 | `server_instance` | 1050×800 |
 | `server-instance-configs` | 服务器实例 · 配置 | `server_instance` | 1050×800 |

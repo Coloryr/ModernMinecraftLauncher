@@ -16,6 +16,7 @@ pub use self::depend::{
     DependantProblem, DependantProblemKind, DependantTest, ModDuplicate, ModDuplicateFile,
     ProvidedVersion, loader_modids, mods_dep_test, mods_duplicate_test, provided_version,
 };
+pub use self::asm::{ASM_SOURCE_COREMODS, ASM_SOURCE_PLUGIN, ASM_SOURCE_SERVICE};
 pub use self::jar::{gen_mod_uuid, read_mod_info};
 pub use self::toggle::{add_disable_suffix, remove_disable_suffix};
 pub use self::types::{

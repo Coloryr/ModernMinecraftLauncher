@@ -301,7 +301,9 @@ if (isTauri()) {
 
 // 材质由系统在窗口背后合成：Linux 上没人给它做模糊（见 Rust 侧 windows/effects.rs），
 // 表面调半透明只会变成"透出桌面"，那就保持不透明
-const MATERIAL_PLATFORM = /Windows|Macintosh/.test(navigator.userAgent);
+// 只要不是 Linux 就按有系统材质处理：Windows / macOS 都支持，UA 缺失时也按支持算；
+// Linux 上没人给窗口做模糊，保持不透明，见 Rust 侧 windows/effects.rs
+const MATERIAL_PLATFORM = !/Linux|X11/.test(navigator.userAgent);
 
 /**
  * 窗口材质开关写进 `<html class="has-material">`

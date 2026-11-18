@@ -1491,6 +1491,8 @@ const clientConfig = ref<ClientConfig>({
   customCssOn: false,
   customCss: [],
   customPageOn: false,
+  customPageId: "",
+  customPages: [],
   musicOn: false,
   musicSource: "",
   animations: true,

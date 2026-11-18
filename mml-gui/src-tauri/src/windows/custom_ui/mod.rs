@@ -4,9 +4,9 @@
 //! 1. 自定义主页面：产物 `home`，开关 `client.custom_home`，设置放客户端设置；
 //! 2. 自定义 CSS：可装多份，产物 `custom_ui/css/<id>.zip`，包根要有 `custom.css`，
 //!    可选 `custom.js` 入口脚本，开关 `client.custom_css_on`；
-//! 3. 完全自定义界面：只装一份，产物 `custom_ui/page.zip`，包根要有 `index.html`
+//! 3. 完全自定义界面：可装多份，产物 `custom_ui/pages/<id>.zip`，包根要有 `index.html`
 //!    或 `custom.js`（窗口页面组件回调），可选 `custom.css`（回调页面样式），
-//!    开关 `client.custom_page_on`。
+//!    `client.custom_page_id` 选中一份，开关 `client.custom_page_on`。
 //!
 //! 2 与 3 的设置都在「设置 → 界面」，1 在「设置 → 客户端设置」。条目列表与开关都存
 //! `gui_config.client`，文件本身在运行目录的 `custom_ui/` 下；两种包都走
@@ -27,7 +27,7 @@ use std::time::UNIX_EPOCH;
 
 use tauri::{AppHandle, Emitter};
 
-use crate::dtos::{CustomCssItemDto, CustomUiCssDto, CustomUiInfoDto};
+use crate::dtos::{CustomCssItemDto, CustomUiCssDto, CustomUiInfoDto, CustomUiPageDto};
 use crate::listens;
 use crate::windows::theme::{self, ThemeInfo, ThemeKind};
 
@@ -41,7 +41,9 @@ pub(crate) use self::store::reload;
 pub(crate) const DIR: &str = "custom_ui";
 /// 自定义 CSS 包所在的子目录
 pub(crate) const CSS_DIR: &str = "css";
-/// 整页包的文件名
+/// 主题包所在的子目录
+pub(crate) const PAGES_DIR: &str = "pages";
+/// 升级前单包主题包的文件名，只在迁移时用
 pub(crate) const PAGE_FILE: &str = "page.zip";
 
 // 入口文件名只有一份来源：主题模块的入口签名，三种包共用
@@ -64,9 +66,38 @@ pub(crate) fn css_package(id: &str) -> PathBuf {
     css_dir().join(format!("{id}.zip"))
 }
 
-/// 整页包的绝对路径
+/// 主题包目录的绝对路径
+pub(crate) fn pages_dir() -> PathBuf {
+    dir().join(PAGES_DIR)
+}
+
+/// 一个主题包压缩包的绝对路径
+///
+/// - `id`: 条目 id，即文件名
+pub(crate) fn page_package(id: &str) -> PathBuf {
+    pages_dir().join(format!("{id}.zip"))
+}
+
+/// 升级前单包主题包的绝对路径
 pub(crate) fn page_file() -> PathBuf {
     dir().join(PAGE_FILE)
+}
+
+/// 当前选中、且文件还在的主题包
+///
+/// # 返回值
+///
+/// 选中项不存在时退回旧的单包 `page.zip`；两者都没有时返回 `None`
+pub(crate) fn selected_page_file() -> Option<PathBuf> {
+    let id = crate::gui_config::get().client.custom_page_id;
+    if !id.is_empty() {
+        let path = page_package(&id);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    let legacy = page_file();
+    legacy.is_file().then_some(legacy)
 }
 
 /// `mml-ui` 自定义协议的访问前缀
@@ -94,7 +125,7 @@ pub fn ui_base_url() -> &'static str {
 /// # 返回值
 ///
 /// 毫秒时间戳字符串；取不到 mtime 时返回空串
-fn version_of(path: &Path) -> String {
+pub(super) fn version_of(path: &Path) -> String {
     std::fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
@@ -151,13 +182,39 @@ pub(crate) fn current_info() -> CustomUiInfoDto {
         })
         .collect();
 
+    let pages = client
+        .custom_pages
+        .iter()
+        .map(|item| {
+            let archive = store::page_handle_of(&item.id);
+            let meta = archive
+                .as_ref()
+                .map(|archive| theme::meta_of_archive(archive, ThemeKind::Page))
+                .unwrap_or_else(|| ThemeInfo::plain(ThemeKind::Page));
+            CustomUiPageDto {
+                id: item.id.clone(),
+                name: item.name.clone(),
+                file_count: archive.as_ref().map(|a| a.file_count()).unwrap_or(0),
+                kind: meta.kind.into(),
+                version: meta.version,
+                declared: meta.declared,
+            }
+        })
+        .collect();
+
+    let page_id = client.custom_page_id.clone();
     let page = store::page_handle();
     let page_installed = page.is_some();
     let page_has_index = page
         .as_ref()
         .is_some_and(|archive| archive.has_entry(INDEX_FILE));
+    let page_source = if page_id.is_empty() {
+        page_file()
+    } else {
+        page_package(&page_id)
+    };
     let page_version = if page_installed {
-        version_of(&page_file())
+        version_of(&page_source)
     } else {
         String::new()
     };
@@ -170,25 +227,49 @@ pub(crate) fn current_info() -> CustomUiInfoDto {
         css_on: client.custom_css_on,
         css,
         page_on: client.custom_page_on,
+        page_id: page_id.clone(),
+        pages,
         page_installed,
         kind: meta.kind.into(),
         name: meta.name,
         version: meta.version,
         declared: meta.declared,
         page_entry_url: if page_installed && page_has_index {
-            format!("{}/{}?v={}", ui_base_url(), INDEX_FILE, page_version)
+            format!(
+                "{}/{}?v={}&page={}",
+                ui_base_url(),
+                INDEX_FILE,
+                page_version,
+                page_id
+            )
         } else {
             String::new()
         },
         page_script_url: page
             .as_ref()
             .filter(|archive| archive.has_entry(SCRIPT_FILE))
-            .map(|_| format!("{}/{}?v={}", ui_base_url(), SCRIPT_FILE, page_version))
+            .map(|_| {
+                format!(
+                    "{}/{}?v={}&page={}",
+                    ui_base_url(),
+                    SCRIPT_FILE,
+                    page_version,
+                    page_id
+                )
+            })
             .unwrap_or_default(),
         page_style_url: page
             .as_ref()
             .filter(|archive| archive.has_entry(CSS_FILE))
-            .map(|_| format!("{}/{}?v={}", ui_base_url(), CSS_FILE, page_version))
+            .map(|_| {
+                format!(
+                    "{}/{}?v={}&page={}",
+                    ui_base_url(),
+                    CSS_FILE,
+                    page_version,
+                    page_id
+                )
+            })
             .unwrap_or_default(),
         page_version,
         page_file_count: page.as_ref().map(|p| p.file_count()).unwrap_or(0),
@@ -256,40 +337,42 @@ pub fn custom_ui_remove_css(app: AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 
-/// 导入整页包，全量替换 `page.zip`；只能有一份，再导入就是换掉旧的
+/// 导入一个主题包，落成 `pages/<id>.zip`；可导入多个
 ///
 /// 只校验 + 复制压缩包，**不落盘解压**：请求时直接从包内按条目读。
+/// 选中哪一份由前端写配置决定，后端不替用户切换。
 ///
 /// - `app`: 应用句柄，导入成功后广播变更
 /// - `path`: 要导入的 zip 路径
 ///
 /// # 返回值
 ///
-/// 导入后的新状态；类型与入口不符或 zip 不合法时返回对应错误键
+/// 新条目的 id / 显示名 / 文件数 / 主题元数据；类型与入口不符或 zip 不合法时返回对应错误键
 #[gui_macros::command]
 pub async fn custom_ui_import_page(
     app: AppHandle,
     path: String,
-) -> Result<CustomUiInfoDto, String> {
-    tauri::async_runtime::spawn_blocking(move || store::import_page(Path::new(&path)))
+) -> Result<CustomUiPageDto, String> {
+    let item = tauri::async_runtime::spawn_blocking(move || store::import_page(Path::new(&path)))
         .await
         .map_err(|err| err.to_string())??;
     emit_custom_ui_change(&app);
-    Ok(current_info())
+    Ok(item)
 }
 
-/// 删除整页包；开关不动，删掉后主窗口回内置界面
+/// 删除指定主题包；选中项与开关由前端同步改配置
 ///
 /// - `app`: 应用句柄，删除成功后广播变更
+/// - `id`: 条目 id
 ///
 /// # 返回值
 ///
-/// 删除后的新状态；删除文件失败返回 IO 错误信息
+/// id 不合法返回 `err.customUiId`；删除文件失败返回 IO 错误信息
 #[gui_macros::command]
-pub fn custom_ui_remove_page(app: AppHandle) -> Result<CustomUiInfoDto, String> {
-    store::remove_page()?;
+pub fn custom_ui_remove_page(app: AppHandle, id: String) -> Result<(), String> {
+    store::remove_page(&id)?;
     emit_custom_ui_change(&app);
-    Ok(current_info())
+    Ok(())
 }
 
 /// 在文件管理器里打开 `custom_ui/`，方便用户直接放文件或做备份

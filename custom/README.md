@@ -7,9 +7,9 @@ M²L 的界面有三种互相独立的换皮方式，这里给五个能直接导
 | --- | --- | --- | --- | --- | --- |
 | [custom-main-demo](custom-main-demo/README.md) | 主窗口「主页」的内容区，组件路线 | `custom.js` + `custom.css` | `home` | 客户端设置 → 启用自定义主页面 | `custom-main-demo.zip` |
 | [custom-main-html-demo](custom-main-html-demo/README.md) | 主窗口「主页」的内容区，换成一张 HTML 页面（iframe） | `index.html` | `home` | 客户端设置 → 启用自定义主页面 | `custom-main-html-demo.zip` |
-| [custom-ui-demo](custom-ui-demo/README.md) | 整个主窗口，按 kind 换窗口组件 | `custom.js` + `custom.css` | `page` | 界面 → 主题包 | `custom-ui-demo.zip` |
-| [custom-ui-html-demo](custom-ui-html-demo/README.md) | 整个主窗口，换成一张 HTML 页面（iframe） | `index.html` | `page` | 界面 → 主题包 | `custom-ui-html-demo.zip` |
-| [custom-ui-css-demo](custom-ui-css-demo/README.md) | 内置界面的样式，可装多份叠加 | `custom.css`（可选 `custom.js`） | `css` | 界面 → 样式包 | `custom-ui-css-demo.zip` |
+| [custom-ui-demo](custom-ui-demo/README.md) | 整个主窗口，按 kind 换窗口组件 | `custom.js` + `custom.css` | `page` | 界面 → 样式与主题包 → 主题包 | `custom-ui-demo.zip` |
+| [custom-ui-html-demo](custom-ui-html-demo/README.md) | 整个主窗口，换成一张 HTML 页面（iframe） | `index.html` | `page` | 界面 → 样式与主题包 → 主题包 | `custom-ui-html-demo.zip` |
+| [custom-ui-css-demo](custom-ui-css-demo/README.md) | 内置界面的样式，可装多份叠加 | `custom.css`（可选 `custom.js`） | `css` | 界面 → 样式与主题包 → 样式包 | `custom-ui-css-demo.zip` |
 
 三种方式**互不联锁**：装哪一种都不动另外两种的开关；整页主题开着时自定义主页仍在它
 后面，属正常叠加。

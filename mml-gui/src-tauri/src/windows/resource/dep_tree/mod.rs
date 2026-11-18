@@ -12,7 +12,7 @@
 //! - 游戏 / 加载器提供的"虚拟前置"与内核 `provided_version` 同一份名单；
 //! - 加载器 → minecraft 那条不是谁声明的，是运行环境的常识，两边都在图上时补一条。
 
-mod build;
+pub(crate) mod build;
 mod draft;
 pub(crate) mod related;
 

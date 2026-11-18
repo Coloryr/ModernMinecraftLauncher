@@ -4,10 +4,20 @@ import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   // Tailwind 只用来出 utilities：重置、控件外观、主题变量仍在 styles/ 里，
   // 配置与 token 映射见 src/styles/tailwind.css
   plugins: [vue(), tailwindcss()],
+  // 调试（vite dev）下关闭依赖预构建：运行中才发现的新依赖会触发整页 reload，
+  // 打断调试。发布构建不受影响，Vite 5.1 起构建阶段本来就不预构建依赖。
+  // 不列 include，等于完全不预构建；CJS 依赖若要进调试，需在这里补上。
+  optimizeDeps:
+    command === "serve"
+      ? {
+          noDiscovery: true,
+          include: [],
+        }
+      : undefined,
   resolve: {
     alias: {
       // mml-ipc 是仓库内的本地包，没发到 npm：直接按路径取源码，不经过 node_modules。
@@ -29,4 +39,4 @@ export default defineConfig({
     // 大块超出这个量级，比如误把某个重依赖静态引进了主窗口，构建仍会提醒。
     chunkSizeWarningLimit: 3000,
   },
-});
+}));

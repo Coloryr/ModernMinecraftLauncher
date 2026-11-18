@@ -121,6 +121,8 @@
   --green: #3ecf8e;
   --red: #ff5f56;
   --yellow: #f5b944;
+  /* 改写目标标签：mixin 用紫色，与强调色、状态色、加载器色都分得开；ASM 走 --yellow */
+  --mixin: #a78bfa;
   /* 加载器标签的实心底色：主窗口实例列表与资源窗口的模组行共用。
      色相彼此拉开，一眼能分（蓝 / 黄 / 紫 / 青 / 橙 / 玫红） */
   --loader-forge: #1d4ed8;
@@ -211,6 +213,8 @@
   --green: #16a34a;
   --red: #dc2626;
   --yellow: #d97706;
+  /* 改写目标标签口径同暗色那份 */
+  --mixin: #7c3aed;
   /* 加载器标签口径同暗色那份：实心底色 + 白字，两套主题取同一组值 */
   --loader-forge: #1d4ed8;
   --loader-fabric: #a16207;
@@ -564,7 +568,9 @@ html.has-bg.bg-frosted :is(
   .block-prompt, .block-progress, .block-cell, .size-dock,
   /* 资源收藏 / 资源管理 */
   .collect-empty-box, .collect-card,
-  .mod-table-panel, .mod-search, .mod-tr, .mod-group-body, .shot-cell, .detail-icon, .detail-shot,
+  /* .mod-group-body 不在这里：它是个透明容器，模糊只会把分组头与 modid 小标题
+     背后糊出一条横带，行卡片自己有底色，不需要它 */
+  .mod-table-panel, .mod-search, .mod-tr, .shot-cell, .detail-icon, .detail-shot,
   /* 添加实例 / 整合包 / 资源 */
   .add-card, .probe-card, .modpack-top, .res-top, .save-row, .dep-row,
   .pack-item, .pack-icon, .group-drop, .dep-node, .multi-bar,
@@ -617,8 +623,11 @@ html.no-gradient[data-accent] {
    --bg-raised 不动：下拉 / 菜单这类浮层要压住下层文字，半透明会糊成一片。
    ============================================================ */
 
+html.has-material,
 html.has-material body,
-html.has-material .window-frame {
+html.has-material #app,
+html.has-material .window-frame,
+html.has-material .main-window {
   background: transparent;
 }
 

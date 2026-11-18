@@ -34,8 +34,13 @@ pub struct ModItemDto {
     /// 真的去问系统要链接数，只有大于 1 才算；拷贝出来的文件不是。
     /// 内置模组（jar-in-jar）没有独立文件，恒为 `false`。
     pub hard_link: bool,
-    /// 是否为 Core 模组
+    /// 是否为老式 Core 模组，由 `META-INF/MANIFEST.MF` 的 `FMLCorePlugin` / `TweakClass` 判定
     pub core: bool,
+    /// 会不会改写别的类的字节码：老式 coremod，或声明了 ASM 变压器
+    ///
+    /// 列表里的「CoreMod」标签按它判定。`ITransformationService` 服务不算 ——
+    /// 那是 modlauncher 的服务入口，不一定是转换器。
+    pub coremod: bool,
     /// 是否是**库**，即内置 jar 里没有模组元数据的那些
     ///
     /// 内置 jar 有一大半是"被别的包当依赖带进来"的库，如 asm / mixinextras，
@@ -83,11 +88,48 @@ pub struct ModItemDto {
     ///
     /// 它们装在父 jar 里，没有独立文件：前端只展示，不提供启用 / 删除。
     pub jar_in_jar: Vec<ModItemDto>,
+    /// mixin 注入的目标，按目标类 / 方法排好
+    ///
+    /// 列表里展开这个模组就按它渲染，搜索也按目标类 / 方法 / mixin 类名命中。
+    /// 重度 mixin 的模组能有几百条，但一条只有几个短字段，仍比再开一个命令省事。
+    pub mixins: Vec<ModMixinTargetDto>,
+    /// ASM 变压器，按来源 / 名字排好
+    pub asm: Vec<ModAsmTargetDto>,
     /// 这个包有没有声明前置，右键菜单里「依赖图」靠它置灰
     ///
     /// **前置本身不进前端**：谁依赖谁在后端算（见 AGENTS.md §12.1），
     /// 要看图走 `resource_mods_dep_tree`。只收**当前加载器**那份元数据，与依赖检测同一口径。
     pub has_dependencies: bool,
+}
+
+/// 一条 mixin 注入
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModMixinTargetDto {
+    /// 声明它的配置文件，如 `ae2.mixins.json`
+    pub config: String,
+    /// mixin 类名，点分
+    pub mixin: String,
+    /// 目标类名，点分
+    pub target: String,
+    /// 目标方法名；生产包里多为 SRG / intermediary 名
+    pub method: String,
+    /// 注入方式 id：inject / redirect / modify_arg / overwrite / accessor 等，前端按 id 取文案
+    pub kind: String,
+}
+
+/// 一个 ASM 变压器
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModAsmTargetDto {
+    /// 声明来源：coremods.json / FMLCorePlugin / ITransformationService
+    pub source: String,
+    /// 变压器名字或类名
+    pub transformer: String,
+    /// 目标类名；变压器没声明目标时为空串
+    pub target: String,
+    /// 目标方法；没声明方法时为空串
+    pub method: String,
 }
 
 /// 模组扫描进度，即事件 `resource-list-mods-progress` 的负载

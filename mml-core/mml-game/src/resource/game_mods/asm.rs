@@ -26,7 +26,16 @@ static RE_JS_METHOD: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)['\"]methodName['\"]\s*:\s*['\"]([^'\"]+)['\"]"#).unwrap()
 });
 
-/// modlauncher 的转换服务声明，列在这里的类可以返回 transformer
+/// `META-INF/coremods.json` 声明的 coremod
+pub const ASM_SOURCE_COREMODS: &str = "coremods.json";
+
+/// `MANIFEST.MF` 的 `FMLCorePlugin`，1.7 / 1.12 的老式 coremod 插件
+pub const ASM_SOURCE_PLUGIN: &str = "FMLCorePlugin";
+
+/// modlauncher 的转换服务，列在这里的类可以返回 transformer，但不一定真的改字节码
+pub const ASM_SOURCE_SERVICE: &str = "ITransformationService";
+
+/// modlauncher 的转换服务声明文件
 const TRANSFORMATION_SERVICE: &str =
     "META-INF/services/cpw.mods.modlauncher.api.ITransformationService";
 
@@ -63,7 +72,7 @@ fn read_coremods(archive: &mut ZipArchive<impl Read + Seek>, mod_info: &mut ModO
             (String::new(), String::new())
         };
         mod_info.asm.push(AsmTarget {
-            source: "coremods.json".to_string(),
+            source: ASM_SOURCE_COREMODS.to_string(),
             transformer: name.clone(),
             target,
             method,
@@ -101,7 +110,7 @@ fn read_manifest_plugin(archive: &mut ZipArchive<impl Read + Seek>, mod_info: &m
         return;
     }
     mod_info.asm.push(AsmTarget {
-        source: "FMLCorePlugin".to_string(),
+        source: ASM_SOURCE_PLUGIN.to_string(),
         transformer: class.to_string(),
         target: String::new(),
         method: String::new(),
@@ -119,7 +128,7 @@ fn read_services(archive: &mut ZipArchive<impl Read + Seek>, mod_info: &mut ModO
             continue;
         }
         mod_info.asm.push(AsmTarget {
-            source: "ITransformationService".to_string(),
+            source: ASM_SOURCE_SERVICE.to_string(),
             transformer: line.to_string(),
             target: String::new(),
             method: String::new(),

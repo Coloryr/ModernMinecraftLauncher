@@ -9,6 +9,7 @@ export type ModItemDto = {
   fail: boolean,
   hardLink: boolean,
   core: boolean,
+  coremod: boolean,
   library: boolean,
   modId: string,
   name: string,
@@ -24,7 +25,24 @@ export type ModItemDto = {
   note: string,
   icon: string,
   jarInJar: ModItemDto[],
+  mixins: ModMixinTargetDto[],
+  asm: ModAsmTargetDto[],
   hasDependencies: boolean,
+};
+
+export type ModMixinTargetDto = {
+  config: string,
+  mixin: string,
+  target: string,
+  method: string,
+  kind: string,
+};
+
+export type ModAsmTargetDto = {
+  source: string,
+  transformer: string,
+  target: string,
+  method: string,
 };
 
 export type ModScanProgressDto = {

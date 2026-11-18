@@ -358,10 +358,12 @@ export function useSettingsClient() {
   /** 整页包导入进行中 */
   const importingCustomPage = ref(false);
 
-  /** 整页包状态行：已导入（n 个文件）/ 未导入 */
+  /** 主题包状态行：列表为空 / 未选中 / 选中包的文件数 */
   const customPageState = computed(() => {
     const info = customUi.value;
-    if (!info?.pageInstalled) return t("winSettings.customPageNone");
+    if (!info?.pages.length) return t("winSettings.customPageEmpty");
+    if (!info.pageId) return t("winSettings.customPageUnselected");
+    if (!info.pageInstalled) return t("winSettings.customPageNone");
     return t("winSettings.customPageInstalled", { count: info.pageFileCount });
   });
 
@@ -424,7 +426,7 @@ export function useSettingsClient() {
     }
   }
 
-  /** 导入整页包：只能有一份，再导入就是换掉旧的 */
+  /** 导入主题包：可以装多份，导入后自动选中新的一份并启用 */
   async function importCustomPage() {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const picked = await open({
@@ -435,7 +437,15 @@ export function useSettingsClient() {
     if (typeof picked !== "string") return;
     importingCustomPage.value = true;
     try {
-      customUi.value = await commands.customUi.importPage(picked);
+      const item = await commands.customUi.importPage(picked);
+      client.value.customPages = [
+        ...client.value.customPages,
+        { id: item.id, name: item.name },
+      ];
+      client.value.customPageId = item.id;
+      client.value.customPageOn = true;
+      await applyClient();
+      await refreshCustomUi();
     } catch (e) {
       showToast(`${t("winSettings.customUiImportFailed")}${t("common.detailSep")}${tErr(e)}`);
     } finally {
@@ -443,10 +453,31 @@ export function useSettingsClient() {
     }
   }
 
-  /** 删除整页包；开关不动，删掉后主窗口回内置界面 */
-  async function removeCustomPage() {
+  /**
+   * 选中一个主题包；只能有一个，选中即启用
+   *
+   * - `id`: 主题包条目 id
+   */
+  function selectCustomPage(id: string) {
+    client.value.customPageId = id;
+    client.value.customPageOn = true;
+    void applyClient();
+  }
+
+  /**
+   * 删除一个主题包
+   *
+   * - `id`: 主题包条目 id
+   */
+  async function removeCustomPage(id: string) {
     try {
-      customUi.value = await commands.customUi.removePage();
+      await commands.customUi.removePage(id);
+      client.value.customPages = client.value.customPages.filter((item) => item.id !== id);
+      if (client.value.customPageId === id) {
+        client.value.customPageId = "";
+      }
+      await applyClient();
+      await refreshCustomUi();
     } catch (e) {
       showToast(tErr(e));
     }
@@ -500,12 +531,9 @@ export function useSettingsClient() {
         client.value.musicOn = d.musicOn;
         client.value.musicSource = d.musicSource;
         break;
-      case "customCss":
-        // 只恢复开关；已安装的样式是用户的东西，恢复默认不动它
+      case "customUi":
+        // 只恢复两个总开关；已安装的样式与主题包是用户的东西，恢复默认不动它们
         client.value.customCssOn = d.customCssOn;
-        break;
-      case "customPage":
-        // 同上：整页包保留，只把开关关掉
         client.value.customPageOn = d.customPageOn;
         break;
       case "launchCheck":
@@ -575,6 +603,7 @@ export function useSettingsClient() {
     moveCustomCss,
     removeCustomCss,
     importCustomPage,
+    selectCustomPage,
     removeCustomPage,
     openCustomUiDir,
     load,
