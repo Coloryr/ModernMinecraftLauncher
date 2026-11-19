@@ -175,7 +175,8 @@ pub struct MixinTarget {
     pub mixin: String,
     /// 目标类名，点分；`@Mixin(targets = ...)` 写了几条就有几条
     pub target: String,
-    /// 目标方法名，注解里带 owner 或描述符时只留方法名；生产包里常是 SRG / intermediary 名
+    /// 目标方法名，注解里带 owner、描述符或正则选择器时只留方法名；
+    /// 通配写法保留 `*`，生产包里常是 SRG / intermediary 名
     pub method: String,
     /// 注入方式 id：inject / redirect / modify_arg / modify_args / modify_variable /
     /// modify_constant / modify_expression_value / wrap_operation / wrap_with_condition /

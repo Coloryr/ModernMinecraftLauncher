@@ -19,7 +19,8 @@ const changed = computed(() => {
 <template>
   <BaseModal v-if="serverPackOpen && serverPackResult" :title="t('launch.serverPackTitle')" :closable="false"
     @close="answerServerPackUpdate(false, false)">
-    <p class="pack-line">{{ t("update.instance", { name: serverPackResult.instanceName }) }}</p>
+    <!-- 实例名居中、大一号，与整合包更新弹窗同一套排版 -->
+    <p class="pack-name">{{ serverPackResult.instanceName }}</p>
     <!-- 版本号没变、只换了内容时别写 "1.3 → 1.3"，那看着像没更新 -->
     <p class="pack-version">
       {{
@@ -56,15 +57,19 @@ const changed = computed(() => {
 
 <style scoped>
 /* 三行信息：实例 / 版本变化 / 清单差异，逐行降一级 */
-.pack-line,
+.pack-name,
 .pack-version,
 .pack-changes {
   margin: 0;
   line-height: 1.6;
 }
 
-.pack-line {
-  font-size: 12.5px;
+/* 与整合包更新弹窗同一套：实例名居中、按 heading 档 */
+.pack-name {
+  margin-bottom: 6px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--text);
 }
 

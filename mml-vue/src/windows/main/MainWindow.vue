@@ -2218,13 +2218,13 @@ async function launch(kind: "renderdoc" | "nsight" | null = null, jvmDebug: numb
   }
 }
 
-/** 启动按钮右侧的下拉菜单：目前只有「调试启动」一项 */
+/** 启动按钮右侧的下拉菜单：调试启动与导出启动参数 */
 const launchMenuOpen = ref(false);
 /** 下拉菜单相对视口的位置，打开时按按钮矩形算 */
 const launchMenuPos = ref({ x: 0, y: 0 });
 
-/** 调试启动是否可用：与启动按钮同口径，运行中 / 启动中 / 离线限制都按住 */
-const canDebugLaunch = computed(
+/** 启动附加动作（调试启动 / 导出启动参数）是否可用：与启动按钮同口径，运行中 / 启动中 / 离线限制都按住 */
+const canLaunchMenu = computed(
   () =>
     !!selected.value &&
     !selected.value.running &&
@@ -2233,15 +2233,25 @@ const canDebugLaunch = computed(
     !isPreparing.value,
 );
 
-/** 下拉菜单项：只放调试启动，具体选项交给 DebuggerLaunchModal */
-const launchMenuItems = computed<RowMenuItem[]>(() => [
-  {
-    id: "debug",
-    label: t("debugger.debugLaunch"),
-    tip: t("debugger.entryTip"),
-    disabled: !canDebugLaunch.value,
-  },
-]);
+/** 下拉菜单项：调试启动（macOS 没有）、导出启动参数 */
+const launchMenuItems = computed<RowMenuItem[]>(() => {
+  const items: RowMenuItem[] = [];
+  if (renderdocSupported) {
+    items.push({
+      id: "debug",
+      label: t("debugger.debugLaunch"),
+      tip: t("debugger.entryTip"),
+      disabled: !canLaunchMenu.value,
+    });
+  }
+  items.push({
+    id: "export",
+    label: t("launchMenu.exportArgs"),
+    tip: t("launchMenu.exportArgsTip"),
+    disabled: !canLaunchMenu.value,
+  });
+  return items;
+});
 
 /**
  * 打开启动方式下拉
@@ -2249,7 +2259,7 @@ const launchMenuItems = computed<RowMenuItem[]>(() => [
  * - `event`: 下拉按钮的点击事件，用它的矩形把菜单贴到右下角
  */
 function openLaunchMenu(event: MouseEvent) {
-  if (!renderdocSupported || !canDebugLaunch.value) return;
+  if (!canLaunchMenu.value) return;
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
   // 菜单最小宽 150px，按右边缘对齐；越界由 RowMenu 自己夹回视口
   launchMenuPos.value = { x: rect.right - 150, y: rect.bottom + 6 };
@@ -2264,6 +2274,32 @@ function openLaunchMenu(event: MouseEvent) {
 function onLaunchMenuPick(id: string) {
   launchMenuOpen.value = false;
   if (id === "debug") launchDebugger();
+  if (id === "export") void exportLaunchArgs();
+}
+
+/**
+ * 导出启动参数
+ *
+ * 与「生成调试参数」同一份生成结果，落成一份文本文件。参数里含登录令牌，
+ * 只写进用户自己选的位置。
+ */
+async function exportLaunchArgs() {
+  const item = selected.value;
+  if (!item) return;
+  const name = (item.name || item.uuid).replace(/[\\/:*?"<>|]/g, "_");
+  try {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const path = await save({
+      title: t("launchMenu.exportArgs"),
+      defaultPath: name + "-launch-args.txt",
+      filters: [{ name: "txt", extensions: ["txt"] }],
+    });
+    if (!path) return;
+    await api.exportLaunchArgs(item.uuid, path);
+    showToast(t("launchMenu.exported"));
+  } catch (e) {
+    showToast(tErr(e));
+  }
 }
 
 /** 文件补全失败的原因；非空时弹错误框，可以就地重试 */
@@ -2306,7 +2342,7 @@ const hasNsight = computed(() => !!nsightInstall.value);
 
 /** 右键菜单 / 按钮的调试器入口；非 Windows 不提供。选择交给弹窗，见 DebuggerLaunchModal */
 function launchDebugger() {
-  if (!renderdocSupported || !canDebugLaunch.value) return;
+  if (!renderdocSupported || !canLaunchMenu.value) return;
   debuggerAsk.value = true;
 }
 
@@ -2640,9 +2676,9 @@ onMounted(async () => {
                       <GlyphIcon name="play" :size="15" /> {{ t("launch.play") }}
                     </template>
                   </BaseButton>
-                  <!-- 启动方式下拉：只装「调试启动」，具体选项交给 DebuggerLaunchModal -->
-                  <button v-if="renderdocSupported" type="button" class="launch-drop-toggle"
-                    :disabled="!canDebugLaunch" v-tip="t('debugger.entry')" :aria-label="t('debugger.entry')"
+                  <!-- 启动方式下拉：调试启动与导出启动参数 -->
+                  <button type="button" class="launch-drop-toggle"
+                    :disabled="!canLaunchMenu" v-tip="t('launchMenu.more')" :aria-label="t('launchMenu.more')"
                     :aria-expanded="launchMenuOpen" @click="openLaunchMenu">
                     <GlyphIcon name="chevron-down" :size="14" :weight="2.2" />
                   </button>
@@ -2775,10 +2811,10 @@ onMounted(async () => {
                               <GlyphIcon name="play" :size="15" /> {{ t("launch.play") }}
                             </template>
                           </BaseButton>
-                          <!-- 启动方式下拉：与列表模式同一颗按钮，右侧一块点开只有「调试启动」 -->
-                          <button v-if="renderdocSupported" type="button" class="launch-drop-toggle"
-                            :disabled="!canDebugLaunch" v-tip="t('debugger.entry')"
-                            :aria-label="t('debugger.entry')" :aria-expanded="launchMenuOpen"
+                          <!-- 启动方式下拉：与列表模式同一颗按钮，点开是调试启动与导出启动参数 -->
+                          <button type="button" class="launch-drop-toggle"
+                            :disabled="!canLaunchMenu" v-tip="t('launchMenu.more')"
+                            :aria-label="t('launchMenu.more')" :aria-expanded="launchMenuOpen"
                             @click="openLaunchMenu">
                             <GlyphIcon name="chevron-down" :size="14" :weight="2.2" />
                           </button>

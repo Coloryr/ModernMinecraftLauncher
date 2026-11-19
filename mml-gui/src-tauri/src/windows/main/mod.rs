@@ -8,12 +8,14 @@
 
 mod args;
 mod catalog;
+pub(crate) mod custom_json;
 pub(crate) mod deleting;
 // 带命令的子模块必须 `pub(crate)`：生成的 `tauri_commands!` 从 crate 根引用它们
 pub(crate) mod instance;
 pub(crate) mod launch;
 pub(crate) mod launch_gate;
 pub(crate) mod prepare;
+pub(crate) mod proxy;
 pub(crate) mod query;
 
 use std::collections::{HashMap, HashSet};

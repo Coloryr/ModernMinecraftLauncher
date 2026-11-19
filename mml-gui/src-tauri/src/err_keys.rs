@@ -115,6 +115,11 @@ pub const GROUP_EXISTS: &str = "err.groupExists";
 /// 分组不存在
 pub const GROUP_NOT_FOUND: &str = "err.groupNotFound";
 
+/// 代理地址不合法（空、端口为 0 或解析不出地址）
+pub const PROXY_INVALID: &str = "err.proxyInvalid";
+/// 代理连不上
+pub const PROXY_UNREACHABLE: &str = "err.proxyUnreachable";
+
 // ---------- 配置文件 ----------
 
 /// 无效的文件名

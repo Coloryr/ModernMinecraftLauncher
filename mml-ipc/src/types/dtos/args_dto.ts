@@ -24,6 +24,7 @@ export type InstanceArgsDto = {
   envVars: EnvVarLineDto[],
   isolateHome: boolean,
   mmlEnv: boolean,
+  colorasm: boolean,
   lang: string,
   logEncoding: string,
   preEnabled: boolean,

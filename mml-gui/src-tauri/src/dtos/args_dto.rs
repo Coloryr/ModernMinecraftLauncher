@@ -56,6 +56,8 @@ pub struct InstanceArgsDto {
     pub isolate_home: bool,
     /// 是否把 MML 环境变量（MML_LAUNCHER / ARG_*）传给游戏进程
     pub mml_env: bool,
+    /// 是否给这次启动注入 ColorASM；实例没写过时填的是启动器设置里的生效值
+    pub colorasm: bool,
     /// 游戏内语言
     pub lang: String,
     /// 日志编码：utf8 / gbk
@@ -111,6 +113,7 @@ impl Default for InstanceArgsDto {
             env_vars: Vec::new(),
             isolate_home: true,
             mml_env: true,
+            colorasm: false,
             lang: "zh_cn".into(),
             log_encoding: "utf8".into(),
             pre_enabled: false,

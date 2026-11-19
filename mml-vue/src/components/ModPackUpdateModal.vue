@@ -5,6 +5,7 @@
 // 更新本身在后端跑（挂在共享的整合包任务表上），进度与取消在标题栏 / 整合包任务里，
 // 这里只负责"确认"这一步。
 import { computed } from "vue";
+import { formatIsoTime } from "../lib/format";
 import { t } from "../lib/i18n";
 import BaseButton from "./ui/BaseButton.vue";
 import BaseModal from "./ui/BaseModal.vue";
@@ -34,7 +35,8 @@ const changed = computed(
 <template>
   <BaseModal :title="t(serverPack ? 'resource.serverPackUpdateTitle' : 'resource.modpackUpdateTitle')" :closable="false"
     @close="emit('close')">
-    <p class="pack-line">{{ t("update.instance", { name: props.result.instanceName }) }}</p>
+    <!-- 实例名是这一窗的主角：居中、大一号，不加"实例："之类的引导词 -->
+    <p class="pack-name">{{ props.result.instanceName }}</p>
     <template v-if="serverPack">
       <p class="pack-version">
         {{
@@ -59,7 +61,7 @@ const changed = computed(
         {{ t("resource.modpackNewVersion", { version: props.result.newVersion || props.result.newFile }) }}
       </p>
       <p v-if="props.result.date" class="pack-date">
-        {{ t("resource.modpackNewDate", { date: props.result.date }) }}
+        {{ t("resource.modpackNewDate", { date: formatIsoTime(props.result.date) }) }}
       </p>
     </template>
     <div class="modal-actions">
@@ -74,7 +76,7 @@ const changed = computed(
 
 <style scoped>
 /* 三行信息：实例 / 版本 / 差异（平台包第二行是发布时间），从主到次 */
-.pack-line,
+.pack-name,
 .pack-version,
 .pack-date,
 .pack-changes {
@@ -82,8 +84,12 @@ const changed = computed(
   line-height: 1.6;
 }
 
-.pack-line {
-  font-size: 12.5px;
+/* 实例名居中、按 heading 档：它是"更新哪个实例"的唯一答案，与下面的版本行分得开 */
+.pack-name {
+  margin-bottom: 6px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--text);
 }
 

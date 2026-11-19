@@ -1056,6 +1056,35 @@ pub async fn main_debug_launch_info(
     })
 }
 
+/// 把这次启动的参数导出成文本文件
+///
+/// 与调试器那四项是同一份生成结果，只是不拉起进程。参数里含本次登录令牌，
+/// 所以只写到用户自己选的路径，不进日志。
+///
+/// - `uuid`: 实例 uuid
+/// - `path`: 落点文件绝对路径，由前端的保存框给出
+///
+/// # 返回值
+///
+/// 写成功返回 `Ok(())`；生成参数或写文件失败返回错误文本
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub async fn main_export_launch_args(uuid: String, path: String) -> Result<(), String> {
+    let info = main_debug_launch_info(uuid, None).await?;
+    let mut environment = info.environment;
+    environment.sort();
+    let text = format!(
+        "executable\n{}\n\nworking_dir\n{}\n\narguments\n{}\n\nenvironment\n{}\n",
+        info.executable,
+        info.working_dir,
+        info.arguments,
+        environment.join("\n"),
+    );
+    tokio::fs::write(&path, text)
+        .await
+        .map_err(|err| err.to_string())
+}
+
 /// 把参数列表拼成一行命令行文本
 ///
 /// - `args`: 已拆好的参数

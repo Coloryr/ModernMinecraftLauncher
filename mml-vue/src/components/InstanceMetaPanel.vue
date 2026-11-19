@@ -115,8 +115,12 @@ async function checkModpack(auto = false) {
   }
 }
 
-/** 已经自动查过的实例：实例列表刷新会换掉对象，只认 uuid，免得反复查 */
-const autoChecked = new Set<string>();
+/**
+ * 自动检查只做一次：这是启动器开机时的自检，切换实例不再查
+ *
+ * 放在模块级：面板随实例切换重建，放组件里等于每换一个实例查一次。
+ */
+let autoChecked = false;
 
 // 选中实例后自动按下「检查更新」：有新版就弹确认窗，没有就静默。
 // 同时盯 `updatableModpack`：服务器包的地址是随实例数据异步回来的，来晚一步也要补查一次
@@ -124,8 +128,8 @@ watch(
   [() => props.instance.uuid, updatableModpack] as const,
   ([uuid, ok]) => {
     // 锁定的实例整块整合包设置是隐藏的，自动查到了也没地方弹出确认窗
-    if (!uuid || props.locked || !ok || autoChecked.has(uuid)) return;
-    autoChecked.add(uuid);
+    if (!uuid || props.locked || !ok || autoChecked) return;
+    autoChecked = true;
     void checkModpack(true);
   },
   { immediate: true },
@@ -585,18 +589,20 @@ function onPlatformChange(value: string) {
       </select>
     </template>
 
-    <!-- 日志编码与自动打开日志窗口同一行，两者都是实例级的查看行为 -->
+    <!-- 日志编码：实例级的查看行为 -->
     <span class="meta-label meta-row-start">{{ t("meta.logEncoding") }}</span>
     <select class="field-select" :value="instance.logEncoding ?? 'utf8'"
       @change="change({ logEncoding: ($event.target as HTMLSelectElement).value })">
       <option value="utf8">{{ t("meta.utf8") }}</option>
       <option value="gbk">{{ t("meta.gbk") }}</option>
     </select>
-    <span class="meta-label small">{{ t("meta.logWindow") }}</span>
+
+    <!-- 自动打开日志窗口：一条开关自己说明白，不再拆成"日志窗口 + 自动打开"两格，
+         也不缩到第四列 —— 整行从标签列开始，左对齐 -->
     <label class="meta-switch">
       <BaseSwitch :model-value="logAutoShow" :disabled="!logAutoShowLoaded || logAutoShowBusy"
         @update:model-value="onLogAutoShow" />
-      <span>{{ t("meta.logAutoOpen") }}</span>
+      <span>{{ t("meta.logWindowAutoOpen") }}</span>
     </label>
 
     <!-- 整合包类型：同样是整合包作者的设定，锁定时整块隐藏 -->
@@ -675,9 +681,9 @@ function onPlatformChange(value: string) {
   grid-column: 1;
 }
 
-/* 日志窗口开关独占第 4 列：开关左缘与上面那行的下拉对齐 */
+/* 整行的开关：跨满四列、从标签列起排，开关左缘与标签对齐 */
 .meta-switch {
-  grid-column: 4;
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 8px;

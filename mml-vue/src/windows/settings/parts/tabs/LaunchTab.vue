@@ -149,7 +149,7 @@ watch(memoryConflict, async (bad) => {
     <SettingsGroup id="gameWindow" title-key="winSettings.secGameWindow" :flash="flashGroup === 'gameWindow'">
       <!-- 窗口大小：与实例设置同一套 —— 预设下拉（含全屏）定尺寸，续行给宽 / 高；
            全屏时尺寸无效，续行整行收起 -->
-      <div class="args-row">
+      <div class="args-row size-row">
         <span class="args-label">{{ t("args.windowSize") }}</span>
         <select class="field-select pick-select res-pick" :value="resPick" @change="onResPick">
           <option v-for="r in COMMON_RESOLUTIONS" :key="`${r.w}x${r.h}`" :value="`${r.w}x${r.h}`">
@@ -159,7 +159,7 @@ watch(memoryConflict, async (bad) => {
           <option value="custom">{{ t("args.custom") }}</option>
         </select>
       </div>
-      <div v-if="!win!.fullScreen" class="args-row sub-row">
+      <div v-if="!win!.fullScreen" class="args-row sub-row size-row">
         <span class="sub-tag">{{ t("args.width") }}</span>
         <NumberStepper v-model="win!.width" :min="100" :max="65535" />
         <span class="sub-tag">{{ t("args.height") }}</span>
@@ -168,25 +168,29 @@ watch(memoryConflict, async (bad) => {
     </SettingsGroup>
 
     <SettingsGroup id="memory" title-key="winSettings.secMemory" :flash="flashGroup === 'memory'">
-      <!-- 内存：最小一行、最大续一行，各自预设下拉 + 数值框 + MB，口径与窗口大小、与实例设置都相同 -->
-      <div class="args-row" :class="{ 'field-invalid': memoryConflict }">
+      <!-- 内存：最小与最大并在一行，各自预设下拉 + 数值框 + MB；窄了自动换行 -->
+      <div class="args-row mem-row" :class="{ 'field-invalid': memoryConflict }">
         <span class="args-label">{{ t("args.memory") }}</span>
-        <span class="sub-tag">{{ t("args.minMemory") }}</span>
-        <select class="field-select pick-select" :value="minMemPick" @change="onMinMemPick">
-          <option v-for="m in COMMON_MIN_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
-          <option value="custom">{{ t("args.custom") }}</option>
-        </select>
-        <NumberStepper ref="minMemoryRef" v-model="run!.minMemory" :min="256" :max="65536" :step="256" />
-        <span class="mem-unit">MB</span>
-      </div>
-      <div class="args-row sub-row" :class="{ 'field-invalid': memoryConflict }">
-        <span class="sub-tag">{{ t("args.maxMemory") }}</span>
-        <select class="field-select pick-select" :value="memPick" @change="onMemPick">
-          <option v-for="m in COMMON_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
-          <option value="custom">{{ t("args.custom") }}</option>
-        </select>
-        <NumberStepper v-model="run!.maxMemory" :min="256" :max="65536" :step="256" />
-        <span class="mem-unit">MB</span>
+        <div class="mem-groups">
+          <div class="mem-group">
+            <span class="sub-tag">{{ t("args.minMemory") }}</span>
+            <select class="field-select pick-select" :value="minMemPick" @change="onMinMemPick">
+              <option v-for="m in COMMON_MIN_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
+              <option value="custom">{{ t("args.custom") }}</option>
+            </select>
+            <NumberStepper ref="minMemoryRef" v-model="run!.minMemory" :min="256" :max="65536" :step="256" />
+            <span class="mem-unit">MB</span>
+          </div>
+          <div class="mem-group">
+            <span class="sub-tag">{{ t("args.maxMemory") }}</span>
+            <select class="field-select pick-select" :value="memPick" @change="onMemPick">
+              <option v-for="m in COMMON_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
+              <option value="custom">{{ t("args.custom") }}</option>
+            </select>
+            <NumberStepper v-model="run!.maxMemory" :min="256" :max="65536" :step="256" />
+            <span class="mem-unit">MB</span>
+          </div>
+        </div>
       </div>
       <!-- 本机内存参考值：给设最大内存一个依据（已用 / 共 · 剩余 + 左占用右剩余的条，拿不到会写明原因） -->
       <MemoryHint class="mem-line" />

@@ -55,6 +55,34 @@ export function useMotd(opts: {
     }
   }
 
+  /**
+   * 把实例配的地址补成"主机:端口"
+   *
+   * 地址里已经写了端口的（如 `api.coloryr.com:10002`）原样用，不能再补一次 ——
+   * 拼成 `主机:端口:端口` 后端解析不出端口，卡片就一直是空的。
+   * 裸 IPv6 含多个冒号，补端口时要加方括号。
+   *
+   * - `ip`: 用户填的服务器地址
+   * - `port`: 实例里配的端口，地址自己带端口时不生效
+   *
+   * # 返回值
+   *
+   * 交给 MOTD 查询的地址
+   */
+  function withPort(ip: string, port: number): string {
+    const tail = ip.slice(ip.lastIndexOf(":") + 1);
+    // 方括号写法 `[::1]` / `[::1]:25565`：看最后一个冒号之后是不是端口
+    if (ip.startsWith("[")) {
+      return /^\d{1,5}$/.test(tail) ? ip : `${ip}:${port}`;
+    }
+    // 没有冒号 = 没写端口，补实例里配的那个
+    if (!ip.includes(":")) return `${ip}:${port}`;
+    // 只有一个冒号且后面是数字，说明已经带了端口
+    if (ip.split(":").length === 2 && /^\d{1,5}$/.test(tail)) return ip;
+    // 其余是裸 IPv6：按规范加方括号再补端口
+    return `[${ip}]:${port}`;
+  }
+
   // ---- 实例详情卡：查实例自己配置的服务器地址 ----
 
   const instMotd = ref<MotdDto | null>(null);
@@ -75,7 +103,7 @@ export function useMotd(opts: {
     const port = inst ? argsOf(inst.uuid).serverPort || 25565 : 25565;
     instMotdLoading.value = true;
     try {
-      const dto = await api.getMotd(`${ip}:${port}`);
+      const dto = await api.getMotd(withPort(ip, port));
       if (seq === instMotdSeq) instMotd.value = dto;
     } catch {
       if (seq === instMotdSeq) instMotd.value = null;

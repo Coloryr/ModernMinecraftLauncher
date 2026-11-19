@@ -91,6 +91,11 @@ pub(super) fn args_from_core(inst: &InstanceSettingObj) -> InstanceArgsDto {
         .as_ref()
         .and_then(|jvm| jvm.mml_env)
         .unwrap_or(global.jvm_arg.mml_env.unwrap_or(true));
+    a.colorasm = inst
+        .jvm_arg
+        .as_ref()
+        .and_then(|jvm| jvm.colorasm)
+        .unwrap_or(global.jvm_arg.colorasm.unwrap_or(false));
     // 窗口同理：全屏 / 宽 / 高全都没设才算跟随全局
     a.window_inherit = inst
         .window
@@ -177,6 +182,7 @@ pub(super) fn apply_args_to_core(inst: &mut InstanceSettingObj, a: &InstanceArgs
     );
     jvm.isolate_home = Some(a.isolate_home);
     jvm.mml_env = Some(a.mml_env);
+    jvm.colorasm = Some(a.colorasm);
     jvm.launch_pre_run = Some(a.pre_enabled);
     jvm.pre_run_arg = Some(a.pre_cmd.clone());
     jvm.launch_post_run = Some(a.post_enabled);

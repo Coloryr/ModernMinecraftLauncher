@@ -339,6 +339,9 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
 
       <!-- 展开出来的改写目标：一行一个目标类，不可点、不可选，只用来读 -->
       <div v-else class="mod-patch-row" :style="{ '--row-depth': row.depth }" :title="row.title">
+        <!-- 与同级行落在同一列：勾选框列、箭头列都留空，标签才对齐上面的图标那一列 -->
+        <span class="row-select-gap" />
+        <span class="mod-tree-caret-placeholder" />
         <span class="mod-patch-tag" :class="{ 'is-asm': row.asm }">
           {{ row.asm ? t("resource.patchesAsm") : t("resource.patchesMixin") }}
         </span>

@@ -1174,6 +1174,18 @@ export const api = {
   },
 
   /**
+   * 把这次启动的参数导出成文本文件
+   *
+   * 与调试参数同一份生成结果：可执行文件、工作目录、参数、环境变量。含登录令牌，别外传。
+   *
+   * - `uuid`: 实例 uuid
+   * - `path`: 落点文件绝对路径，由保存框给出
+   */
+  async exportLaunchArgs(uuid: string, path: string): Promise<void> {
+    return commands.main.exportLaunchArgs(uuid, path);
+  },
+
+  /**
    * 跳过这次服务器包更新，继续启动
    *
    * 只停服务器包同步，已经落地的文件保持现状，启动照常进游戏；下次启动会重新比对补上。
@@ -1249,6 +1261,74 @@ export const api = {
    */
   async getCustomJson(uuid: string): Promise<CustomJsonItemDto[]> {
     return commands.main.getCustomJson(uuid);
+  },
+
+  /**
+   * 读一份自定义 JSON 的原文
+   *
+   * - `uuid`: 实例 uuid
+   * - `file`: json/ 里的文件名
+   *
+   * # 返回值
+   *
+   * 文件内容；读不到时抛错
+   */
+  async readCustomJson(uuid: string, file: string): Promise<string> {
+    return commands.main.readCustomJson(uuid, file);
+  },
+
+  /**
+   * 写回一份自定义 JSON
+   *
+   * 后端落盘前会按 JSON 解析一遍，不合法直接报错，不会把坏文件写进去。
+   *
+   * - `uuid`: 实例 uuid
+   * - `file`: json/ 里的文件名
+   * - `text`: 新的文件内容
+   */
+  async saveCustomJson(uuid: string, file: string, text: string): Promise<void> {
+    return commands.main.saveCustomJson(uuid, file, text);
+  },
+
+  /**
+   * 新建一份自定义 JSON
+   *
+   * - `uuid`: 实例 uuid
+   * - `name`: 文件名，重名会报错
+   *
+   * # 返回值
+   *
+   * 实际写下的文件名
+   */
+  async createCustomJson(uuid: string, name: string): Promise<string> {
+    return commands.main.createCustomJson(uuid, name);
+  },
+
+  /**
+   * 打开一份自定义 JSON
+   *
+   * - `uuid`: 实例 uuid
+   * - `file`: json/ 里的文件名
+   * - `reveal`: 为真时在文件管理器里定位，否则用系统默认程序打开
+   */
+  async openCustomJson(uuid: string, file: string, reveal: boolean): Promise<void> {
+    return commands.main.openCustomJson(uuid, file, reveal);
+  },
+
+  /**
+   * 测一次游戏内代理能不能连上
+   *
+   * 只测地址与端口的连通性，账号密码要启动时才带上。
+   *
+   * - `ip`: 代理主机名或 IP
+   * - `port`: 代理端口
+   *
+   * # 返回值
+   *
+   * 连接耗时，单位毫秒；地址不合法或连不上时抛错
+   */
+  async testProxy(ip: string, port: number): Promise<number> {
+    return commands.main.testProxy(ip, port);
   },
 
   /**

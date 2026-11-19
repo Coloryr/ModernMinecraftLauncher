@@ -70,6 +70,11 @@ function update(patch: Partial<InstanceArgsDto>) {
 
 .exec-text {
   width: 100%;
+  /* 最少两行、最多二十行：再高就该在框里滚，不然一条长命令能把整块面板顶下去。
+     18px 是上下内边距 8+8 加边框 1+1，1.4em 是这几行文字的默认行高 */
+  min-height: calc(2 * 1.4em + 18px);
+  max-height: calc(20 * 1.4em + 18px);
+  overflow-y: auto;
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--border);

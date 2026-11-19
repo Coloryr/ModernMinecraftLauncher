@@ -722,9 +722,10 @@ html.has-bg .resource-layout .mod-group-head {
 .resource-layout .mod-patch-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  /* 缩进与内置模组行同一口径（每级 22px），再加一个箭头的宽度对齐名字列 */
-  padding: 0 12px 0 calc(12px + var(--row-depth, 0) * 22px + 18px);
+  /* 间距与 .item-row 同一档：标签到类名、类名到方法的距离才和上下行一致 */
+  gap: 10px;
+  /* 缩进与内置模组行同一口径（每级 22px）；勾选框列与箭头列由模板里的两个占位撑开 */
+  padding: 0 12px 0 calc(12px + var(--row-depth, 0) * 22px);
   /* 纯文本行，比模组行矮一半；高度与 ModList 的 PATCH_ROW_H 同源（变高虚拟窗口按它算） */
   height: 30px;
   overflow: hidden;
@@ -736,7 +737,10 @@ html.has-bg .resource-layout .mod-group-head {
 
 .resource-layout .mod-patch-tag {
   flex: none;
-  padding: 0 6px;
+  /* 占住图标那一列（36px，同 .item-icon）：后面的目标类和上下行的名字才对齐成一列 */
+  min-width: 36px;
+  padding: 0 4px;
+  text-align: center;
   border-radius: 999px;
   /* 与列表里的「Mixin N」徽标同一色，ASM 走下面那条黄色 */
   background: color-mix(in srgb, var(--mixin) 16%, transparent);

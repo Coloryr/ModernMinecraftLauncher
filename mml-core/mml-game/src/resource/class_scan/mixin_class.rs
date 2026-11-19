@@ -185,10 +185,93 @@ fn injection_kind(desc: &str) -> Option<&'static str> {
     })
 }
 
-/// 目标方法名：注解里可能写成 `Lowner;name(desc)V`，只取方法名
+/// 目标方法名
+///
+/// Mixin 的选择器有好几种写法：`Lowner;name(desc)V`、`owner.name`、
+/// `name=/^foo/ desc=/…/`、整条就是一个正则的 `/<init>/`，这里统一只留方法名。
 fn method_of(raw: &str) -> String {
+    let raw = raw.trim();
+    if let Some(value) = selector_value(raw, "name") {
+        return regex_method(&value);
+    }
+    if let Some(body) = raw.strip_prefix('/').and_then(|it| it.strip_suffix('/')) {
+        return body.to_string();
+    }
     let head = raw.split('(').next().unwrap_or(raw);
-    head.rsplit(';').next().unwrap_or(head).trim().to_string()
+    let head = head.rsplit(';').next().unwrap_or(head);
+    let head = head.rsplit('.').next().unwrap_or(head).trim();
+    if head.is_empty() {
+        raw.to_string()
+    } else {
+        head.to_string()
+    }
+}
+
+/// 取 `name=/…/ desc=/…/` 选择器里某个键的值
+fn selector_value(raw: &str, key: &str) -> Option<String> {
+    let needle = format!("{key}=");
+    let mut from = 0;
+    while let Some(found) = raw[from..].find(&needle) {
+        let start = from + found;
+        // 键要落在选择器片段开头，`desc=…` 里的 `name=` 不算
+        let boundary = raw[..start]
+            .chars()
+            .next_back()
+            .map_or(true, char::is_whitespace);
+        if boundary {
+            return Some(selector_value_at(&raw[start + needle.len()..]));
+        }
+        from = start + needle.len();
+    }
+    None
+}
+
+/// 读一个键的值：`/…/` 读到配对的斜杠，裸词读到空白
+fn selector_value_at(text: &str) -> String {
+    let text = text.trim_start();
+    let Some(rest) = text.strip_prefix('/') else {
+        return text
+            .split_whitespace()
+            .next()
+            .unwrap_or_default()
+            .to_string();
+    };
+    let mut value = String::new();
+    let mut escaped = false;
+    for ch in rest.chars() {
+        if escaped {
+            value.push('\\');
+            value.push(ch);
+            escaped = false;
+        } else if ch == '\\' {
+            escaped = true;
+        } else if ch == '/' {
+            break;
+        } else {
+            value.push(ch);
+        }
+    }
+    value
+}
+
+/// 正则选择器里的名字转成读得懂的样子
+///
+/// 只做前缀匹配的 `^renderBreakingTexture` 写成 Mixin 自己的通配写法；
+/// 其余正则原样给出来。
+fn regex_method(regex: &str) -> String {
+    let body = regex.trim_start_matches('^').trim_end_matches('$');
+    let simple = !body.is_empty()
+        && body
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$');
+    if !simple {
+        return regex.to_string();
+    }
+    if regex.starts_with('^') && !regex.ends_with('$') {
+        format!("{body}*")
+    } else {
+        body.to_string()
+    }
 }
 
 /// 取注解里的单个字符串
@@ -343,4 +426,47 @@ fn class_of_descriptor(desc: &str) -> String {
     let desc = desc.strip_prefix('L').unwrap_or(desc);
     let desc = desc.strip_suffix(';').unwrap_or(desc);
     desc.replace('/', ".")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::method_of;
+
+    #[test]
+    fn keeps_plain_method_name() {
+        assert_eq!(method_of("renderBlock"), "renderBlock");
+        assert_eq!(method_of("canAttack*"), "canAttack*");
+        assert_eq!(method_of("<init>"), "<init>");
+        assert_eq!(method_of("*"), "*");
+    }
+
+    #[test]
+    fn drops_owner_and_descriptor() {
+        assert_eq!(
+            method_of(
+                "Lnet/minecraft/client/renderer/BlockRendererDispatcher;renderBlock(Lnet/minecraft/world/World;)V"
+            ),
+            "renderBlock"
+        );
+        assert_eq!(
+            method_of("renderBlock(Lnet/minecraft/world/World;)V"),
+            "renderBlock"
+        );
+        assert_eq!(
+            method_of(
+                "net/minecraft/client/gui/screen/world/EditGameRulesScreen$RuleListWidget$1.createRuleWidget"
+            ),
+            "createRuleWidget"
+        );
+    }
+
+    #[test]
+    fn reads_regex_selector() {
+        assert_eq!(
+            method_of("name=/^renderBreakingTexture/ desc=/ModelData;\\)V$/"),
+            "renderBreakingTexture*"
+        );
+        assert_eq!(method_of("/<init>/"), "<init>");
+        assert_eq!(method_of("name=/^render(Breaking)?/"), "^render(Breaking)?");
+    }
 }

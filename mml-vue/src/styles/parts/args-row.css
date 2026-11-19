@@ -70,3 +70,28 @@
   color: var(--text-dim);
   white-space: nowrap;
 }
+
+/* 窗口大小与内存：行照旧跟满可用宽度，但封顶 —— 宽屏上标签与控件被拉开一大截，
+   读起来要一列一列地找。760 是"标签 + 最小 + 最大"并排还留得下一点余量的宽度 */
+.args-row.size-row,
+.args-row.mem-row {
+  max-width: 760px;
+}
+
+/* 最小 / 最大内存：包一层可换行的容器，装得下并排一行，装不下换成两行。
+   换行后第二组落在容器左缘（= 控件左边界 96px），与原来续行的缩进一致 */
+.mem-groups {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  min-width: 0;
+}
+
+.mem-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}

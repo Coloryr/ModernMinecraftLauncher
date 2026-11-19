@@ -69,6 +69,23 @@ export function formatDate(date: string): string {
 }
 
 /**
+ * ISO 时间文本转本地时间文本
+ *
+ * 接口给的是 UTC，直接显示会是一串 `2026-11-14T23:33:10.967Z`，这里换成本地时区的年月日时分。
+ *
+ * - `iso`: 形如 `2026-11-14T23:33:10.967Z` 的 ISO 时间；空串原样返回
+ *
+ * # 返回值
+ *
+ * 形如 `2026/11/15 07:33`；解析不出来时原样返回
+ */
+export function formatIsoTime(iso: string): string {
+  if (!iso) return "";
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? iso : formatMinute(ms);
+}
+
+/**
  * 内存大小转档位标签
  *
  * - `mib`: 内存大小，单位 MiB

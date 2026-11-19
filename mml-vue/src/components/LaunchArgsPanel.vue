@@ -234,6 +234,31 @@ function addLine(key: LineKey) {
   update({ [key]: [...props.args[key], ""] } as Partial<InstanceArgsDto>);
 }
 
+/**
+ * 失去焦点时删掉没填内容的行
+ *
+ * 「添加」先插一行空行再让人填；没填就离开的，那一行留着只是占地方，还会把空串写进实例配置。
+ *
+ * - `key`: 哪一组参数
+ * - `idx`: 第几行
+ */
+function dropEmptyLine(key: LineKey, idx: number) {
+  if (props.args[key][idx]?.trim()) return;
+  removeLine(key, idx);
+}
+
+/**
+ * 环境变量行：键为空就整行删掉
+ *
+ * 只填了值的行没有意义 —— 启动时拼不出 `KEY=VALUE`。
+ *
+ * - `idx`: 第几行
+ */
+function dropEmptyEnv(idx: number) {
+  if (props.args.envVars[idx]?.key.trim()) return;
+  removeEnv(idx);
+}
+
 // ---- 环境变量（键值对） ----
 function setEnvKey(idx: number, value: string) {
   const arr = props.args.envVars.map((l, i) => (i === idx ? { ...l, key: value } : l));
@@ -273,7 +298,7 @@ const gcOptions = computed(() => [
       <!-- 窗口大小：第一行是下拉（跟随全局 / 预设 / 全屏 / 自定义），第二行是宽 / 高；
            改成下拉里没有的值会自动落到「自定义」。全屏或跟随全局时尺寸不可改，
            但跟随全局时仍然显示（禁用）——那正是会用的数字 -->
-      <div class="args-row">
+      <div class="args-row size-row">
         <span class="args-label">{{ t("args.windowSize") }}</span>
         <select class="field-select pick-select res-pick" :value="resPick" @change="onResPick">
           <option value="global">{{ t("args.useGlobal") }}</option>
@@ -284,7 +309,7 @@ const gcOptions = computed(() => [
           <option value="custom">{{ t("args.custom") }}</option>
         </select>
       </div>
-      <div v-if="resInputs" class="args-row sub-row">
+      <div v-if="resInputs" class="args-row sub-row size-row">
         <span class="sub-tag">{{ t("args.width") }}</span>
         <NumberStepper :model-value="args.width" :min="0" :max="9999" :step="10" :disabled="args.windowInherit"
           @update:model-value="(v: number) => update({ width: v })" />
@@ -293,29 +318,33 @@ const gcOptions = computed(() => [
           @update:model-value="(v: number) => update({ height: v })" />
       </div>
 
-      <!-- 内存：最小一行、最大续一行，各自预设下拉 + 数值框，口径与窗口大小相同 -->
-      <div class="args-row">
+      <!-- 内存：最小与最大并在一行，各自预设下拉 + 数值框；窄面板里自动换行 -->
+      <div class="args-row mem-row">
         <span class="args-label">{{ t("args.memory") }}</span>
-        <span class="sub-tag">{{ t("args.minMemory") }}</span>
-        <select class="field-select pick-select" :value="minMemPick" @change="onMinMemPick">
-          <option value="global">{{ t("args.useGlobal") }}</option>
-          <option v-for="m in COMMON_MIN_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
-          <option value="custom">{{ t("args.custom") }}</option>
-        </select>
-        <NumberStepper :model-value="args.minMemory" :min="256" :max="args.memory" :step="256"
-          :disabled="args.memoryInherit" @update:model-value="(v: number) => update({ minMemory: v })" />
-        <span class="mem-unit">MB</span>
-      </div>
-      <div class="args-row sub-row">
-        <span class="sub-tag">{{ t("args.maxMemory") }}</span>
-        <select class="field-select pick-select" :value="memPick" @change="onMemPick">
-          <option value="global">{{ t("args.useGlobal") }}</option>
-          <option v-for="m in COMMON_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
-          <option value="custom">{{ t("args.custom") }}</option>
-        </select>
-        <NumberStepper :model-value="args.memory" :min="args.minMemory" :max="16384" :step="256"
-          :disabled="args.memoryInherit" @update:model-value="(v: number) => update({ memory: v })" />
-        <span class="mem-unit">MB</span>
+        <div class="mem-groups">
+          <div class="mem-group">
+            <span class="sub-tag">{{ t("args.minMemory") }}</span>
+            <select class="field-select pick-select" :value="minMemPick" @change="onMinMemPick">
+              <option value="global">{{ t("args.useGlobal") }}</option>
+              <option v-for="m in COMMON_MIN_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
+              <option value="custom">{{ t("args.custom") }}</option>
+            </select>
+            <NumberStepper :model-value="args.minMemory" :min="256" :max="args.memory" :step="256"
+              :disabled="args.memoryInherit" @update:model-value="(v: number) => update({ minMemory: v })" />
+            <span class="mem-unit">MB</span>
+          </div>
+          <div class="mem-group">
+            <span class="sub-tag">{{ t("args.maxMemory") }}</span>
+            <select class="field-select pick-select" :value="memPick" @change="onMemPick">
+              <option value="global">{{ t("args.useGlobal") }}</option>
+              <option v-for="m in COMMON_MEMORY" :key="m" :value="String(m)">{{ memoryLabel(m) }}</option>
+              <option value="custom">{{ t("args.custom") }}</option>
+            </select>
+            <NumberStepper :model-value="args.memory" :min="args.minMemory" :max="16384" :step="256"
+              :disabled="args.memoryInherit" @update:model-value="(v: number) => update({ memory: v })" />
+            <span class="mem-unit">MB</span>
+          </div>
+        </div>
       </div>
       <!-- 本机内存参考值：给设最大内存一个依据（已用 / 共 · 剩余 + 左占用右剩余的条，拿不到会写明原因） -->
       <MemoryHint class="mem-line" />
@@ -381,7 +410,8 @@ const gcOptions = computed(() => [
           <label class="args-label">{{ t("args.jvmExtra") }}</label>
           <div v-for="(line, i) in args.jvmArgs" :key="jvmKeys.keys[i]" class="line-row">
             <input class="field-input field-grow" :value="line" placeholder="-XX:+UseG1GC" spellcheck="false"
-              @input="setLine('jvmArgs', i, ($event.target as HTMLInputElement).value)" />
+              @input="setLine('jvmArgs', i, ($event.target as HTMLInputElement).value)"
+              @blur="dropEmptyLine('jvmArgs', i)" />
             <button class="line-del" v-tip="t('args.removeLine')" @click="removeLine('jvmArgs', i)">
               <GlyphIcon name="close" :size="13" />
             </button>
@@ -394,7 +424,8 @@ const gcOptions = computed(() => [
           <label class="args-label">{{ t("args.gameExtra") }}</label>
           <div v-for="(line, i) in args.gameArgs" :key="gameKeys.keys[i]" class="line-row">
             <input class="field-input field-grow" :value="line" placeholder="--server 127.0.0.1:25565" spellcheck="false"
-              @input="setLine('gameArgs', i, ($event.target as HTMLInputElement).value)" />
+              @input="setLine('gameArgs', i, ($event.target as HTMLInputElement).value)"
+              @blur="dropEmptyLine('gameArgs', i)" />
             <button class="line-del" v-tip="t('args.removeLine')" @click="removeLine('gameArgs', i)">
               <GlyphIcon name="close" :size="13" />
             </button>
@@ -407,7 +438,8 @@ const gcOptions = computed(() => [
           <label class="args-label">{{ t("args.classPath") }}</label>
           <div v-for="(line, i) in args.classPath" :key="classKeys.keys[i]" class="line-row">
             <input class="field-input field-grow" :value="line" placeholder="libraries/xxx.jar" spellcheck="false"
-              @input="setLine('classPath', i, ($event.target as HTMLInputElement).value)" />
+              @input="setLine('classPath', i, ($event.target as HTMLInputElement).value)"
+              @blur="dropEmptyLine('classPath', i)" />
             <button class="line-del" v-tip="t('args.removeLine')" @click="removeLine('classPath', i)">
               <GlyphIcon name="close" :size="13" />
             </button>
@@ -416,23 +448,12 @@ const gcOptions = computed(() => [
             <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("args.addLine") }}
           </button>
 
-          <!-- 隔离用户目录 / MML 环境变量：两个开关并排，标签不折行 -->
-          <div class="args-row args-switch-row">
-            <div class="args-switch">
-              <span class="args-label" v-tip="t('args.isolateHomeDesc')">{{ t("args.isolateHome") }}</span>
-              <BaseSwitch :model-value="args.isolateHome" @update:model-value="update({ isolateHome: $event })" />
-            </div>
-            <div class="args-switch">
-              <span class="args-label" v-tip="t('args.mmlEnvDesc')">{{ t("args.mmlEnv") }}</span>
-              <BaseSwitch :model-value="args.mmlEnv" @update:model-value="update({ mmlEnv: $event })" />
-            </div>
-          </div>
-
           <!-- 附加环境变量（键值对） -->
           <label class="args-label">{{ t("args.env") }}</label>
           <div v-for="(line, i) in args.envVars" :key="envKeys.keys[i]" class="line-row">
             <input class="field-input env-key" :value="line.key" :placeholder="t('args.envKey')" spellcheck="false"
-              @input="setEnvKey(i, ($event.target as HTMLInputElement).value)" />
+              @input="setEnvKey(i, ($event.target as HTMLInputElement).value)"
+              @blur="dropEmptyEnv(i)" />
             <input class="field-input field-grow" :value="line.value" :placeholder="t('args.envValue')" spellcheck="false"
               @input="setEnvValue(i, ($event.target as HTMLInputElement).value)" />
             <button class="line-del" v-tip="t('args.removeLine')" @click="removeEnv(i)">
@@ -442,6 +463,21 @@ const gcOptions = computed(() => [
           <button class="line-add" @click="addEnv">
             <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("args.addLine") }}
           </button>
+          <!-- 三个开关并排放在最后一行：隔离用户目录 / MML 环境变量 / ColorASM，标签不折行 -->
+          <div class="args-row args-switch-row">
+            <div class="args-switch">
+              <span class="args-label" v-tip="t('args.isolateHomeDesc')">{{ t("args.isolateHome") }}</span>
+              <BaseSwitch :model-value="args.isolateHome" @update:model-value="update({ isolateHome: $event })" />
+            </div>
+            <div class="args-switch">
+              <span class="args-label" v-tip="t('args.mmlEnvDesc')">{{ t("args.mmlEnv") }}</span>
+              <BaseSwitch :model-value="args.mmlEnv" @update:model-value="update({ mmlEnv: $event })" />
+            </div>
+            <div class="args-switch">
+              <span class="args-label" v-tip="t('args.colorasmDesc')">{{ t("args.colorasm") }}</span>
+              <BaseSwitch :model-value="args.colorasm" @update:model-value="update({ colorasm: $event })" />
+            </div>
+          </div>
         </div>
       </CollapsePanel>
     </div>
@@ -522,10 +558,10 @@ const gcOptions = computed(() => [
   transform: rotate(180deg);
 }
 
-/* 两个开关并排：标签定宽改成内容宽，整行不折行 */
+/* 开关并排：标签按内容宽排；面板窄了就换行，别把第三个挤出去 */
 .args-switch-row {
-  flex-wrap: nowrap;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 10px 16px;
 }
 
 .args-switch {
@@ -574,10 +610,11 @@ const gcOptions = computed(() => [
   background: color-mix(in srgb, var(--red) 10%, transparent);
 }
 
+/* 添加按钮铺满整行：与上面的输入框同宽，四组看起来是同一列 */
 .line-add {
-  align-self: flex-start;
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   /* 图标是 SVG，与文字用 gap 隔开 */
   gap: 6px;
   height: var(--ctl-h);
