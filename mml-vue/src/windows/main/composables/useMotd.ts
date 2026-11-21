@@ -1,8 +1,8 @@
-// 主窗口的两处 MOTD 卡片：启动器下方的悬浮卡查客户端设置里的全局地址，实例详情卡查
-// 实例自己配置的服务器地址。两者都走内核的 Server List Ping。
+// 主窗口的两处 MOTD 卡片：最上方那张查客户端设置里的全局地址，实例「自定义服务器」
+// 里那张查实例自己配的地址。两处都走内核的 Server List Ping。
 //
-// 卡片外观在 components/MotdCard.vue：图标 / 彩色分段 / 人数-版本-延迟都在那边，本窗口的悬浮卡、
-// 实例详情卡、资源窗口服务器列表上方那张，三处共用同一份；这里只管**地址来源、竞态保护与定时刷新**。
+// 卡片外观在 components/MotdCard.vue：图标 / 彩色分段 / 人数-版本-延迟都在那边，
+// 这里只管**地址来源、竞态保护与定时刷新**。
 import { onUnmounted, ref, watch, type Ref } from "vue";
 
 import { api } from "../../../lib/api";
@@ -12,16 +12,16 @@ import type { InstanceArgsDto, InstanceInfoDto, MotdDto } from "../../../lib/bin
 /**
  * 主窗口两处 MOTD 卡片的查询与刷新
  *
- * - `clientConfig`: 客户端设置，含 MOTD 显示开关 / 地址 / 自动刷新间隔
- * - `selected`: 当前选中实例，实例详情卡的地址来源
+ * - `clientConfig`: 客户端设置，含 MOTD 开关 / 全局地址 / 自动刷新间隔
+ * - `selected`: 当前选中实例，实例那张卡的地址来源
  * - `argsOf`: 取实例启动参数，读其中的服务器地址与端口
  *
  * # 返回值
  *
- * - `motdInfo` / `motdLoading`: 悬浮卡的结果与加载态
- * - `instMotd` / `instMotdLoading`: 实例详情卡的结果与加载态
- * - `motdCardVisible`: 悬浮卡是否该显示，由客户端设置的开关决定
- * - `refreshMotd` / `refreshInstMotd`: 立刻重查两张卡
+ * - `motdInfo` / `motdLoading`: 最上方那张卡的结果与加载态
+ * - `instMotd` / `instMotdLoading`: 实例那张卡的结果与加载态
+ * - `motdCardVisible`: 最上方那张卡是否该显示，由客户端设置的开关 + 地址决定
+ * - `refreshMotd` / `refreshInstMotd`: 立刻重查
  * - `restartMotdTimer`: 按客户端设置重建自动刷新定时器
  */
 export function useMotd(opts: {
@@ -31,14 +31,14 @@ export function useMotd(opts: {
 }) {
   const { clientConfig, selected, argsOf } = opts;
 
-  // ---- 悬浮卡：查客户端设置里的全局地址 ----
+  // ---- 最上方那张卡：查客户端设置里的全局地址 ----
 
   const motdInfo = ref<MotdDto | null>(null);
   const motdLoading = ref(false);
   // 竞态保护：旧请求晚到不覆盖新结果
   let motdSeq = 0;
 
-  /** 重查悬浮卡；地址为空时什么都不做，卡片由 MainWindow 按开关隐藏 */
+  /** 重查；地址为空时什么都不做，卡片由 MainWindow 按开关隐藏 */
   async function refreshMotd() {
     const addr = clientConfig.value.motdServer.trim();
     if (!addr) return;
@@ -58,9 +58,8 @@ export function useMotd(opts: {
   /**
    * 把实例配的地址补成"主机:端口"
    *
-   * 地址里已经写了端口的（如 `api.coloryr.com:10002`）原样用，不能再补一次 ——
-   * 拼成 `主机:端口:端口` 后端解析不出端口，卡片就一直是空的。
-   * 裸 IPv6 含多个冒号，补端口时要加方括号。
+   * 地址里已经写了端口的原样用，不能再补一次 —— 拼成 `主机:端口:端口` 后端解析不出端口，
+   * 卡片就一直是空的。裸 IPv6 含多个冒号，补端口时要加方括号。
    *
    * - `ip`: 用户填的服务器地址
    * - `port`: 实例里配的端口，地址自己带端口时不生效
@@ -83,13 +82,14 @@ export function useMotd(opts: {
     return `[${ip}]:${port}`;
   }
 
-  // ---- 实例详情卡：查实例自己配置的服务器地址 ----
+  // ---- 实例「自定义服务器」里那张卡 ----
 
   const instMotd = ref<MotdDto | null>(null);
   const instMotdLoading = ref(false);
   let instMotdSeq = 0;
+  let instMotdTimer: number | null = null;
 
-  /** 重查实例详情卡；没填地址时清空结果，并把在途请求作废 */
+  /** 重查实例配的那台服务器；没填地址时清空结果，并把在途请求作废 */
   async function refreshInstMotd() {
     const inst = selected.value;
     const ip = inst ? argsOf(inst.uuid).serverIp.trim() : "";
@@ -112,23 +112,32 @@ export function useMotd(opts: {
     }
   }
 
-  // 切换实例或改实例服务器地址后重新查询
+  // 切实例或改地址后重查。地址是一边打字一边变的，压 400ms 再发，
+  // 否则每敲一个字符都往服务器打一次
   watch(
     () => {
       const inst = selected.value;
       if (!inst) return "";
       const a = argsOf(inst.uuid);
-      return `${inst.uuid}|${a.serverIp}|${a.serverPort}`;
+      return inst.uuid + "|" + a.serverIp + "|" + a.serverPort;
     },
-    () => void refreshInstMotd(),
+    () => {
+      if (instMotdTimer !== null) clearTimeout(instMotdTimer);
+      instMotdTimer = window.setTimeout(() => {
+        instMotdTimer = null;
+        void refreshInstMotd();
+      }, 400);
+    },
+    { immediate: true },
   );
 
-  // ---- 悬浮卡的显隐与自动刷新定时器（由客户端设置驱动）----
+  // ---- 最上方那张卡的显隐与自动刷新定时器（由客户端设置驱动）----
 
-  /** 悬浮卡是否该显示；由 MainWindow 按客户端设置的开关与地址同步过来 */
+  /** 卡片是否该显示；由 MainWindow 按客户端设置的开关与地址同步过来 */
   const motdCardVisible = ref(true);
   let motdTimer: number | null = null;
 
+  /** 按客户端设置的间隔重建定时刷新；卡片不显示时不挂 */
   function restartMotdTimer() {
     if (motdTimer !== null) clearInterval(motdTimer);
     motdTimer = null;
@@ -139,9 +148,10 @@ export function useMotd(opts: {
     }
   }
 
-  // 定时器随组件卸载一起清掉；原先这段写在主窗口的 onUnmounted 里
+  // 定时器随组件卸载一起清掉
   onUnmounted(() => {
     if (motdTimer !== null) clearInterval(motdTimer);
+    if (instMotdTimer !== null) clearTimeout(instMotdTimer);
   });
 
   return {

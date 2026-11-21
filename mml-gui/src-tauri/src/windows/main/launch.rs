@@ -986,7 +986,19 @@ pub fn main_detect_debuggers() -> DebuggerInfoDto {
     }
 }
 
-/// 生成调试参数：调试器界面启动要填的四项
+/// 一次启动的完整命令：Java、工作目录、参数与环境变量
+struct LaunchCmdParts {
+    /// Java 可执行文件路径
+    java: String,
+    /// 进程工作目录
+    dir: String,
+    /// 原始参数，未加引号
+    args: Vec<String>,
+    /// 环境变量，形如 `KEY=VALUE`，已排序
+    env: Vec<String>,
+}
+
+/// 生成一次启动的完整命令
 ///
 /// 与正常启动走同一套参数生成：登录、挑 Java、拼 JVM 参数与环境变量，只是不拉起进程。
 /// 生成期间占住实例的启动位，免得和真正的启动同时进行。
@@ -996,16 +1008,11 @@ pub fn main_detect_debuggers() -> DebuggerInfoDto {
 ///
 /// # 返回值
 ///
-/// 见 [`DebugLaunchDto`]；实例不存在、没有当前账户或生成参数失败时返回错误
-#[gui_macros::ipc_group("main")]
-#[gui_macros::command]
-pub async fn main_debug_launch_info(
-    uuid: String,
-    jvm_debug: Option<u16>,
-) -> Result<DebugLaunchDto, String> {
-    let id = Uuid::parse_str(&uuid).map_err(|_| err_keys::UUID.to_string())?;
+/// 见 [`LaunchCmdParts`]；实例不存在、没有当前账户或生成参数失败时返回错误
+async fn launch_cmd_parts(uuid: &str, jvm_debug: Option<u16>) -> Result<LaunchCmdParts, String> {
+    let id = Uuid::parse_str(uuid).map_err(|_| err_keys::UUID.to_string())?;
     let _reservation = launch_gate::begin_launch(id)?;
-    let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
+    let core = core_instance(uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
     let auth = auths::get_current()
         .and_then(|key| auths::get(&key.uuid, key.auth_type))
         .ok_or_else(|| err_keys::ACCOUNT_MISSING.to_string())?;
@@ -1041,48 +1048,157 @@ pub async fn main_debug_launch_info(
     .map_err(|err| err.to_string())??;
 
     // qrenderdoc 的环境变量框是一行一条 KEY=VALUE，排序后两次生成的结果也一致
-    let mut environment: Vec<String> = cmd
+    let mut env: Vec<String> = cmd
         .env
         .iter()
         .map(|(key, value)| format!("{key}={value}"))
         .collect();
-    environment.sort();
-
-    Ok(DebugLaunchDto {
-        executable: cmd.java.to_string_lossy().into_owned(),
-        working_dir: cmd.dir.to_string_lossy().into_owned(),
-        arguments: quote_args(&cmd.arg),
-        environment,
+    env.sort();
+    Ok(LaunchCmdParts {
+        java: cmd.java.to_string_lossy().into_owned(),
+        dir: cmd.dir.to_string_lossy().into_owned(),
+        args: cmd.arg,
+        env,
     })
 }
 
-/// 把这次启动的参数导出成文本文件
+/// 生成调试参数：调试器界面启动要填的四项
 ///
-/// 与调试器那四项是同一份生成结果，只是不拉起进程。参数里含本次登录令牌，
-/// 所以只写到用户自己选的路径，不进日志。
+/// 与正常启动走同一套参数生成：登录、挑 Java、拼 JVM 参数与环境变量，只是不拉起进程。
+/// 生成期间占住实例的启动位，免得和真正的启动同时进行。
 ///
 /// - `uuid`: 实例 uuid
-/// - `path`: 落点文件绝对路径，由前端的保存框给出
+/// - `jvm_debug`: JVM 远程调试端口；`None` 表示不加 JDWP 参数
 ///
 /// # 返回值
 ///
-/// 写成功返回 `Ok(())`；生成参数或写文件失败返回错误文本
+/// 见 [`DebugLaunchDto`]；实例不存在、没有当前账户或生成参数失败时返回错误
 #[gui_macros::ipc_group("main")]
 #[gui_macros::command]
-pub async fn main_export_launch_args(uuid: String, path: String) -> Result<(), String> {
-    let info = main_debug_launch_info(uuid, None).await?;
-    let mut environment = info.environment;
-    environment.sort();
-    let text = format!(
-        "executable\n{}\n\nworking_dir\n{}\n\narguments\n{}\n\nenvironment\n{}\n",
-        info.executable,
-        info.working_dir,
-        info.arguments,
-        environment.join("\n"),
-    );
+pub async fn main_debug_launch_info(
+    uuid: String,
+    jvm_debug: Option<u16>,
+) -> Result<DebugLaunchDto, String> {
+    let parts = launch_cmd_parts(&uuid, jvm_debug).await?;
+    Ok(DebugLaunchDto {
+        executable: parts.java,
+        working_dir: parts.dir,
+        arguments: quote_args(&parts.args),
+        environment: parts.env,
+    })
+}
+
+/// 把这次启动导出成可执行脚本
+///
+/// 参数里含本次登录令牌，所以只写到用户自己选的路径，不进日志。
+///
+/// - `uuid`: 实例 uuid
+/// - `path`: 落点文件绝对路径，由前端的保存框给出
+/// - `format`: 脚本格式，`bat` / `ps1` / `sh`
+///
+/// # 返回值
+///
+/// 写成功返回 `Ok(())`；生成参数、格式不认识或写文件失败返回错误文本
+#[gui_macros::ipc_group("main")]
+#[gui_macros::command]
+pub async fn main_export_launch_args(
+    uuid: String,
+    path: String,
+    format: String,
+) -> Result<(), String> {
+    let parts = launch_cmd_parts(&uuid, None).await?;
+    let text = match format.as_str() {
+        "bat" => script_bat(&parts),
+        "ps1" => script_ps1(&parts),
+        "sh" => script_sh(&parts),
+        _ => return Err(err_keys::FILE_TYPE_NOT_FOUND.to_string()),
+    };
     tokio::fs::write(&path, text)
         .await
-        .map_err(|err| err.to_string())
+        .map_err(|err| err.to_string())?;
+    // sh 脚本直接 ./xxx.sh 就能跑，不用用户再 chmod
+    #[cfg(unix)]
+    if format == "sh" {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = tokio::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).await;
+    }
+    Ok(())
+}
+
+/// shell 的单引号字面量
+///
+/// - `text`: 原值
+///
+/// # 返回值
+///
+/// 已按各自规则转义好的字面量
+fn sh_quote(text: &str) -> String {
+    // shell 的单引号里不能再出现单引号：收尾、转义一个单引号、再重新开引号
+    format!("'{}'", text.replace('\'', "'\\''"))
+}
+
+/// PowerShell 的单引号字面量：内部的单引号写成两个
+fn ps_quote(text: &str) -> String {
+    format!("'{}'", text.replace('\'', "''"))
+}
+
+/// 拼一段"命令 + 参数"，每个词用单引号包起来
+fn quoted_cmd(head: &str, args: &[String], quote: fn(&str) -> String) -> String {
+    let mut out = quote(head);
+    for arg in args {
+        out.push(' ');
+        out.push_str(&quote(arg));
+    }
+    out
+}
+
+/// 拆 `KEY=VALUE`；没有等号时按"只有键"处理
+fn split_env(kv: &str) -> (&str, &str) {
+    kv.split_once('=').unwrap_or((kv, ""))
+}
+
+/// Windows 批处理：`cd /d` 切目录、`set` 设环境变量，最后拉起 Java
+fn script_bat(parts: &LaunchCmdParts) -> String {
+    // 批处理按控制台代码页解释，先切到 UTF-8，带中文的安装目录才不会被读成乱码
+    let mut out = String::from("@echo off\r\nchcp 65001 >nul\r\nsetlocal\r\n");
+    out.push_str(&format!("cd /d \"{}\"\r\n", parts.dir));
+    for kv in &parts.env {
+        // 批处理里 `%` 是变量展开符，字面量要写成 `%%`
+        out.push_str(&format!("set \"{}\"\r\n", kv.replace('%', "%%")));
+    }
+    out.push_str(&quoted_cmd(&parts.java, &parts.args, quote_arg));
+    out.push_str("\r\nendlocal\r\n");
+    out
+}
+
+/// PowerShell：`Set-Location` 切目录、`$env:` 设环境变量，`&` 调起 Java
+fn script_ps1(parts: &LaunchCmdParts) -> String {
+    // 带 BOM：PowerShell 5.1 在没有 BOM 时按系统 ANSI 读脚本，中文路径会乱码
+    let mut out = String::from("\u{feff}Set-Location -LiteralPath ");
+    out.push_str(&ps_quote(&parts.dir));
+    out.push_str("\r\n");
+    for kv in &parts.env {
+        let (key, value) = split_env(kv);
+        out.push_str(&format!("$env:{} = {}\r\n", key, ps_quote(value)));
+    }
+    out.push_str("& ");
+    out.push_str(&quoted_cmd(&parts.java, &parts.args, ps_quote));
+    out.push_str("\r\n");
+    out
+}
+
+/// POSIX shell：`cd` 切目录、`export` 设环境变量，`exec` 用 Java 顶掉当前进程
+fn script_sh(parts: &LaunchCmdParts) -> String {
+    let mut out = String::from("#!/bin/sh\n");
+    out.push_str(&format!("cd {} || exit 1\n", sh_quote(&parts.dir)));
+    for kv in &parts.env {
+        let (key, value) = split_env(kv);
+        out.push_str(&format!("export {}={}\n", key, sh_quote(value)));
+    }
+    out.push_str("exec ");
+    out.push_str(&quoted_cmd(&parts.java, &parts.args, sh_quote));
+    out.push('\n');
+    out
 }
 
 /// 把参数列表拼成一行命令行文本

@@ -124,7 +124,7 @@ const clientLocked = computed(() => client.client.value.lockClient);
 const LOCKED_GROUPS = [
   "servers", "loginLock", "instanceLock", "autoSave", "customHome",
   "customUi", "music", "gameTitle", "serverPack",
-  "theme", "window-look", "bgImage", "jvm", "gameArgs", "launchCmd", "experimental",
+  "theme", "bgImage", "jvm", "gameArgs", "launchCmd", "experimental",
 ];
 
 /** 本次是否处于锁定状态；解锁后本次设置窗口全部放开 */
@@ -237,9 +237,9 @@ const confirmResetPage = ref(false);
 async function onResetPage() {
   confirmResetPage.value = false;
   for (const id of pageGroups.value) {
-    for (const h of handlers()) {
-      if (await h.resetGroup(id)) break;
-    }
+    // 一个分组可能横跨两个 composable：窗口组的界面偏好归 ui，材质 / 透明度归 client，
+    // 所以这里不 break，两个都跑一遍（不认这个 id 的会直接返回 false）
+    for (const h of handlers()) await h.resetGroup(id);
   }
   showToast(t("winSettings.resetDone"));
 }

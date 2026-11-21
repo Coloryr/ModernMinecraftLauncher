@@ -79,6 +79,15 @@
 
   /* 主窗口条纹高光 */
   --shine: rgba(255, 255, 255, 0.32);
+
+  /* 设置页「自定义强调色」色块的彩虹环（亮暗主题一致） */
+  --swatch-1: #ff6b6b;
+  --swatch-2: #ffb15c;
+  --swatch-3: #f5d76e;
+  --swatch-4: #5ecf99;
+  --swatch-5: #4fa8ff;
+  --swatch-6: #7c5cff;
+  --swatch-7: #e05cff;
 }
 
 

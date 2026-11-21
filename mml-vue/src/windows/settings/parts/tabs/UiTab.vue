@@ -147,7 +147,6 @@ function pageFileCount(id: string): number {
         </div>
       </div>
     </div>
-    <p class="field-desc">{{ t("winSettings.fontDesc") }}</p>
     <p v-if="fontsLoading" class="hint">{{ t("winSettings.fontLoading") }}</p>
   </SettingsGroup>
 
@@ -188,168 +187,6 @@ function pageFileCount(id: string): number {
       </label>
     </div>
 
-  </SettingsGroup>
-
-  <SettingsGroup v-if="!locked" id="customUi" title-key="winSettings.secCustomUi"
-    :flash="flashGroup === 'customUi'">
-    <h4 class="custom-ui-title">{{ t("winSettings.secCustomCss") }}</h4>
-    <p class="field-desc">{{ t("winSettings.customCssDesc") }}</p>
-    <div class="switch-row">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("winSettings.customCssOn") }}</span>
-        <span class="switch-state">{{ t("winSettings.customCssOnDesc") }}</span>
-      </div>
-      <BaseSwitch :model-value="client.customCssOn" @update:model-value="toggleCustomCss" />
-    </div>
-
-    <!-- 已安装的样式：一行一条，开关 / 文件名 / 上移下移 / 删除；列表顺序即注入顺序 -->
-    <ul v-if="client.customCss.length" class="custom-css-list mt-2 p-0 list-none flex flex-col gap-1.5">
-      <li v-for="(item, index) in client.customCss" :key="item.id" class="custom-css-item flex items-center gap-2.5">
-        <BaseSwitch :model-value="item.enabled" @update:model-value="(v) => setCustomCssEnabled(item.id, v)" />
-        <span class="custom-css-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-body" :title="item.name">{{ item.name }}</span>
-        <!-- 上移 / 下移：排在第一个 / 最后一个时对应的按钮禁用 -->
-        <button class="ui-btn-icon" :disabled="index === 0" v-tip="t('winSettings.customCssMoveUp')"
-          :aria-label="t('winSettings.customCssMoveUp')" @click="moveCustomCss(item.id, -1)">
-          <GlyphIcon name="arrow-up" :size="14" :weight="2" />
-        </button>
-        <button class="ui-btn-icon" :disabled="index === client.customCss.length - 1"
-          v-tip="t('winSettings.customCssMoveDown')" :aria-label="t('winSettings.customCssMoveDown')"
-          @click="moveCustomCss(item.id, 1)">
-          <GlyphIcon name="arrow-down" :size="14" :weight="2" />
-        </button>
-        <BaseButton size="sm" variant="danger" @click="removeCustomCss(item.id)">
-          {{ t("winSettings.customCssRemove") }}
-        </BaseButton>
-      </li>
-    </ul>
-    <p v-else class="field-desc">{{ t("winSettings.customCssEmpty") }}</p>
-
-    <div class="custom-ui-actions flex items-center gap-2 mt-2.5 flex-wrap">
-      <BaseButton size="sm" variant="accent" @click="addCustomCss">
-        {{ t("winSettings.customCssImport") }}
-      </BaseButton>
-      <BaseButton size="sm" @click="openCustomUiDir">{{ t("winSettings.customUiOpenDir") }}</BaseButton>
-    </div>
-
-    <div class="custom-ui-sep" />
-
-    <h4 class="custom-ui-title">{{ t("winSettings.secCustomPage") }}</h4>
-    <p class="field-desc">{{ t("winSettings.customPageDesc") }}</p>
-    <div class="switch-row">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("winSettings.customPageOn") }}</span>
-        <span class="switch-state">{{ t("winSettings.customPageOnDesc") }}</span>
-      </div>
-      <BaseSwitch :model-value="client.customPageOn" @update:model-value="toggleCustomPage" />
-    </div>
-
-    <!-- 主题包可以装多份，但同一时间只选中一份；选中即启用 -->
-    <ul v-if="client.customPages.length" class="custom-page-list mt-2 p-0 list-none flex flex-col gap-1.5">
-      <li v-for="item in client.customPages" :key="item.id" class="custom-page-item flex items-center gap-2.5">
-        <label class="custom-page-pick flex flex-1 min-w-0 items-center gap-2.5 cursor-pointer">
-          <input type="radio" name="mml-custom-page" :checked="client.customPageId === item.id"
-            @change="selectCustomPage(item.id)" />
-          <span class="custom-page-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-body"
-            :title="item.name">{{ item.name }}</span>
-          <span class="custom-page-count text-meta text-dim">
-            {{ t("winSettings.customPageFileCount", { count: pageFileCount(item.id) }) }}
-          </span>
-        </label>
-        <BaseButton size="sm" variant="danger" @click="removeCustomPage(item.id)">
-          {{ t("winSettings.customPageRemove") }}
-        </BaseButton>
-      </li>
-    </ul>
-    <p v-else class="field-desc">{{ t("winSettings.customPageEmpty") }}</p>
-
-    <div class="custom-ui-actions flex items-center gap-2 mt-2.5 flex-wrap">
-      <BaseButton size="sm" variant="accent" :disabled="importingCustomPage" @click="importCustomPage">
-        {{ importingCustomPage ? t("winSettings.customUiImporting") : t("winSettings.customPageImport") }}
-      </BaseButton>
-      <BaseButton size="sm" @click="openCustomUiDir">{{ t("winSettings.customUiOpenDir") }}</BaseButton>
-      <span class="custom-ui-state text-meta text-dim">{{ customPageState }}</span>
-    </div>
-  </SettingsGroup>
-
-  <SettingsGroup id="window" title-key="winSettings.secWindow" :flash="flashGroup === 'window'">
-    <!-- 窗口模式：与主窗口启动页同一套两态分段选择 -->
-    <label class="field-label">{{ t("winSettings.windowMode") }}</label>
-    <SegmentedTabs :model-value="windowMode" :options="[
-      { value: 'Single', label: t('winSettings.single') },
-      { value: 'Multi', label: t('winSettings.multi') },
-    ]" @update:model-value="onModeChange" />
-    <p v-if="inTauri" class="hint">{{ t("winSettings.windowModeRestart") }}</p>
-
-    <!-- 界面动画开关 -->
-    <div class="switch-row">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("winSettings.animations") }}</span>
-        <span class="switch-state">{{ t("winSettings.animationsDesc") }}</span>
-      </div>
-      <BaseSwitch :model-value="animations" @update:model-value="setAnimations" />
-    </div>
-
-    <!-- 渐变色模式：关掉后强调色与实例图标改用纯色 -->
-    <div class="switch-row">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("winSettings.gradient") }}</span>
-        <span class="switch-state">{{ t("winSettings.gradientDesc") }}</span>
-      </div>
-      <BaseSwitch :model-value="gradientMode" @update:model-value="setGradientMode" />
-    </div>
-
-    <!-- 透明高斯模糊：叠在背景图上的表面改用背景模糊；没设背景图时置灰 -->
-    <div class="switch-row">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("winSettings.bgFrosted") }}</span>
-        <span class="switch-state">{{ t("winSettings.bgFrostedDesc") }}</span>
-      </div>
-      <BaseSwitch :model-value="bgFrosted" :disabled="!bgImage" @update:model-value="setBgFrosted" />
-    </div>
-  </SettingsGroup>
-
-  <!-- 窗口外观：材质由系统在窗口背后合成（Rust 侧 windows/effects.rs），落 gui_config.client.windowEffect -->
-  <SettingsGroup v-if="!locked" id="window-look" title-key="winSettings.secWindowLook"
-    :flash="flashGroup === 'window-look'">
-    <template v-if="supportsMaterial">
-      <label class="field-label">{{ t("winSettings.windowEffect") }}</label>
-      <select v-model="client.windowEffect" class="field-select" @change="applyWindowEffect">
-        <option value="none">{{ t("winSettings.windowEffectNone") }}</option>
-        <option value="mica">{{ t("winSettings.windowEffectMica") }}</option>
-        <option value="acrylic">{{ t("winSettings.windowEffectAcrylic") }}</option>
-      </select>
-      <!-- 窗口透明在建窗时定，切换材质要重开窗口才看得到 -->
-      <p class="field-desc">{{ t("winSettings.windowEffectRestart") }}</p>
-    </template>
-
-    <label class="field-label">{{ t("winSettings.windowOpacity") }}</label>
-    <NumberStepper v-model="client.windowOpacity" :min="0" :max="100" :step="5"
-      @update:model-value="applyWindowOpacity" />
-  </SettingsGroup>
-
-  <SettingsGroup id="mainWindow" title-key="winSettings.secMainWindow" :flash="flashGroup === 'mainWindow'">
-    <!-- 启动页：启动器启动后主窗口先落到哪一屏 -->
-    <label class="field-label">{{ t("winSettings.startupPage") }}</label>
-    <SegmentedTabs :model-value="startup" :options="[
-      { value: 'Home', label: t('winSettings.startupHome') },
-      { value: 'List', label: t('winSettings.startupList') },
-    ]" @update:model-value="onStartupChange" />
-    <p class="field-desc">{{ t("winSettings.startupPageDesc") }}</p>
-
-    <!-- 实例列表显示模式：主窗口里不再有这个切换控件，只在这里改 -->
-    <label class="field-label">{{ t("winSettings.viewMode") }}</label>
-    <SegmentedTabs :model-value="view" :options="[
-      { value: 'group', label: t('mode.group') },
-      { value: 'list', label: t('mode.list') },
-    ]" @update:model-value="onViewModeChange" />
-    <p class="field-desc">{{ t("winSettings.viewModeDesc") }}</p>
-
-    <label class="field-label">{{ t("winSettings.sidebar") }}</label>
-    <SegmentedTabs :model-value="side" :options="[
-      { value: 'Left', label: t('winSettings.sidebarLeft') },
-      { value: 'Right', label: t('winSettings.sidebarRight') },
-    ]" @update:model-value="onSideChange" />
-    <p class="field-desc">{{ t("winSettings.sidebarDesc") }}</p>
   </SettingsGroup>
 
   <SettingsGroup v-if="!locked" id="bgImage" title-key="winSettings.bgImage" :flash="flashGroup === 'bgImage'">
@@ -401,6 +238,170 @@ function pageFileCount(id: string): number {
     </template>
   </SettingsGroup>
 
+  <SettingsGroup v-if="!locked" id="customUi" title-key="winSettings.secCustomUi"
+    :flash="flashGroup === 'customUi'">
+    <!-- 主题包在前：整页替换主窗口；启用开关放在标题行右侧 -->
+    <div class="custom-ui-head">
+      <h4 class="custom-ui-title">{{ t("winSettings.secCustomPage") }}</h4>
+      <BaseSwitch :model-value="client.customPageOn" :aria-label="t('winSettings.customPageOn')"
+        v-tip="t('winSettings.customPageOnDesc')" @update:model-value="toggleCustomPage" />
+    </div>
+    <p class="field-desc">{{ t("winSettings.customPageDesc") }}</p>
+
+    <!-- 主题包可以装多份，但同一时间只选中一份；选中即启用 -->
+    <ul v-if="client.customPages.length" class="custom-page-list mt-2 p-0 list-none flex flex-col gap-1.5">
+      <li v-for="item in client.customPages" :key="item.id" class="custom-page-item flex items-center gap-2.5">
+        <label class="custom-page-pick flex flex-1 min-w-0 items-center gap-2.5 cursor-pointer">
+          <input type="radio" name="mml-custom-page" :checked="client.customPageId === item.id"
+            @change="selectCustomPage(item.id)" />
+          <span class="custom-page-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-body"
+            :title="item.name">{{ item.name }}</span>
+          <span class="custom-page-count text-meta text-dim">
+            {{ t("winSettings.customPageFileCount", { count: pageFileCount(item.id) }) }}
+          </span>
+        </label>
+        <BaseButton size="sm" variant="danger" @click="removeCustomPage(item.id)">
+          {{ t("winSettings.customPageRemove") }}
+        </BaseButton>
+      </li>
+    </ul>
+    <p v-else class="field-desc">{{ t("winSettings.customPageEmpty") }}</p>
+
+    <div class="custom-ui-actions flex items-center gap-2 mt-2.5 flex-wrap">
+      <BaseButton size="sm" variant="accent" :disabled="importingCustomPage" @click="importCustomPage">
+        {{ importingCustomPage ? t("winSettings.customUiImporting") : t("winSettings.customPageImport") }}
+      </BaseButton>
+      <BaseButton size="sm" @click="openCustomUiDir">{{ t("winSettings.customUiOpenDir") }}</BaseButton>
+      <span class="custom-ui-state text-meta text-dim">{{ customPageState }}</span>
+    </div>
+
+    <div class="custom-ui-sep" />
+
+    <!-- 样式包在后：只作用于内置界面，同样把启用开关放到标题行 -->
+    <div class="custom-ui-head">
+      <h4 class="custom-ui-title">{{ t("winSettings.secCustomCss") }}</h4>
+      <BaseSwitch :model-value="client.customCssOn" :aria-label="t('winSettings.customCssOn')"
+        v-tip="t('winSettings.customCssOnDesc')" @update:model-value="toggleCustomCss" />
+    </div>
+    <p class="field-desc">{{ t("winSettings.customCssDesc") }}</p>
+
+    <!-- 已安装的样式：一行一条，开关 / 文件名 / 上移下移 / 删除；列表顺序即注入顺序 -->
+    <ul v-if="client.customCss.length" class="custom-css-list mt-2 p-0 list-none flex flex-col gap-1.5">
+      <li v-for="(item, index) in client.customCss" :key="item.id" class="custom-css-item flex items-center gap-2.5">
+        <BaseSwitch :model-value="item.enabled" @update:model-value="(v) => setCustomCssEnabled(item.id, v)" />
+        <span class="custom-css-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-body" :title="item.name">{{ item.name }}</span>
+        <!-- 上移 / 下移：排在第一个 / 最后一个时对应的按钮禁用 -->
+        <button class="ui-btn-icon" :disabled="index === 0" v-tip="t('winSettings.customCssMoveUp')"
+          :aria-label="t('winSettings.customCssMoveUp')" @click="moveCustomCss(item.id, -1)">
+          <GlyphIcon name="arrow-up" :size="14" :weight="2" />
+        </button>
+        <button class="ui-btn-icon" :disabled="index === client.customCss.length - 1"
+          v-tip="t('winSettings.customCssMoveDown')" :aria-label="t('winSettings.customCssMoveDown')"
+          @click="moveCustomCss(item.id, 1)">
+          <GlyphIcon name="arrow-down" :size="14" :weight="2" />
+        </button>
+        <BaseButton size="sm" variant="danger" @click="removeCustomCss(item.id)">
+          {{ t("winSettings.customCssRemove") }}
+        </BaseButton>
+      </li>
+    </ul>
+    <p v-else class="field-desc">{{ t("winSettings.customCssEmpty") }}</p>
+
+    <div class="custom-ui-actions flex items-center gap-2 mt-2.5 flex-wrap">
+      <BaseButton size="sm" variant="accent" @click="addCustomCss">
+        {{ t("winSettings.customCssImport") }}
+      </BaseButton>
+      <BaseButton size="sm" @click="openCustomUiDir">{{ t("winSettings.customUiOpenDir") }}</BaseButton>
+    </div>
+  </SettingsGroup>
+
+  <SettingsGroup id="window" title-key="winSettings.secWindow" :flash="flashGroup === 'window'">
+    <!-- 窗口模式：与主窗口启动页同一套两态分段选择 -->
+    <label class="field-label">{{ t("winSettings.windowMode") }}</label>
+    <SegmentedTabs :model-value="windowMode" :options="[
+      { value: 'Single', label: t('winSettings.single') },
+      { value: 'Multi', label: t('winSettings.multi') },
+    ]" @update:model-value="onModeChange" />
+    <p v-if="inTauri" class="hint">{{ t("winSettings.windowModeRestart") }}</p>
+
+    <!-- 材质下拉与窗口不透明度并排一行；材质由系统在窗口背后合成（Rust 侧 windows/effects.rs），
+         落 gui_config.client.windowEffect -->
+    <div v-if="!locked" class="look-row">
+      <div v-if="supportsMaterial" class="look-item">
+        <span class="look-label">{{ t("winSettings.windowEffect") }}</span>
+        <select v-model="client.windowEffect" class="field-select look-select" @change="applyWindowEffect">
+          <option value="none">{{ t("winSettings.windowEffectNone") }}</option>
+          <option value="mica">{{ t("winSettings.windowEffectMica") }}</option>
+          <option value="acrylic">{{ t("winSettings.windowEffectAcrylic") }}</option>
+        </select>
+      </div>
+      <div class="look-item">
+        <span class="look-label">{{ t("winSettings.windowOpacity") }}</span>
+        <NumberStepper v-model="client.windowOpacity" :min="0" :max="100" :step="5"
+          @update:model-value="applyWindowOpacity" />
+      </div>
+    </div>
+    <!-- 窗口透明在建窗时定，切换材质要重开窗口才看得到 -->
+    <p v-if="!locked && supportsMaterial" class="field-desc">{{ t("winSettings.windowEffectRestart") }}</p>
+
+    <!-- 透明高斯模糊：叠在背景图上的表面改用背景模糊；没设背景图时置灰 -->
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.bgFrosted") }}</span>
+        <span class="switch-state">{{ t("winSettings.bgFrostedDesc") }}</span>
+      </div>
+      <BaseSwitch :model-value="bgFrosted" :disabled="!bgImage" @update:model-value="setBgFrosted" />
+    </div>
+
+    <!-- 界面动画开关 -->
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.animations") }}</span>
+        <span class="switch-state">{{ t("winSettings.animationsDesc") }}</span>
+      </div>
+      <BaseSwitch :model-value="animations" @update:model-value="setAnimations" />
+    </div>
+
+    <!-- 渐变色模式：关掉后强调色与实例图标改用纯色 -->
+    <div class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winSettings.gradient") }}</span>
+        <span class="switch-state">{{ t("winSettings.gradientDesc") }}</span>
+      </div>
+      <BaseSwitch :model-value="gradientMode" @update:model-value="setGradientMode" />
+    </div>
+  </SettingsGroup>
+
+  <SettingsGroup id="mainWindow" title-key="winSettings.secMainWindow" :flash="flashGroup === 'mainWindow'">
+    <!-- 启动页：启动器启动后主窗口先落到哪一屏 -->
+    <label class="field-label">{{ t("winSettings.startupPage") }}</label>
+    <SegmentedTabs :model-value="startup" :options="[
+      { value: 'Home', label: t('winSettings.startupHome') },
+      { value: 'List', label: t('winSettings.startupList') },
+    ]" @update:model-value="onStartupChange" />
+    <p class="field-desc">{{ t("winSettings.startupPageDesc") }}</p>
+
+    <!-- 实例列表显示模式 + 侧栏：并排一行。列表模式没有侧栏，那一列整块不显示 -->
+    <div class="pair-row">
+      <div class="pair-item">
+        <label class="field-label">{{ t("winSettings.viewMode") }}</label>
+        <SegmentedTabs :model-value="view" :options="[
+          { value: 'group', label: t('mode.group') },
+          { value: 'list', label: t('mode.list') },
+        ]" @update:model-value="onViewModeChange" />
+        <p class="field-desc">{{ t("winSettings.viewModeDesc") }}</p>
+      </div>
+      <div v-if="view === 'group'" class="pair-item">
+        <label class="field-label">{{ t("winSettings.sidebar") }}</label>
+        <SegmentedTabs :model-value="side" :options="[
+          { value: 'Left', label: t('winSettings.sidebarLeft') },
+          { value: 'Right', label: t('winSettings.sidebarRight') },
+        ]" @update:model-value="onSideChange" />
+        <p class="field-desc">{{ t("winSettings.sidebarDesc") }}</p>
+      </div>
+    </div>
+  </SettingsGroup>
+
   <!-- 选完本地图问一句：复制进启动器目录后来源改成相对路径，原图删掉、整个目录搬走都不影响 -->
   <BaseModal v-if="bgCopyAsk" :title="t('winSettings.bgCopyAskTitle')" @close="answerBgCopy(false)">
     <p class="modal-text">{{ t("winSettings.bgCopyAskText") }}</p>
@@ -432,10 +433,71 @@ function pageFileCount(id: string): number {
 }
 
 /* 合并后的自定义界面分组：两小节之间用一条细线分开 */
-.custom-ui-title {
+/* 小节标题 + 右侧启用开关同一行 */
+.custom-ui-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   margin-bottom: 6px;
+}
+
+.custom-ui-title {
+  margin: 0;
   font-size: 13px;
   font-weight: 600;
+}
+
+/* 显示模式与侧栏并排：两列等宽，列内是"标签 / 控件 / 说明" */
+.pair-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.pair-item {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.pair-item>.field-label {
+  margin: 0;
+}
+
+.pair-item>.field-label+* {
+  margin-top: 8px;
+}
+
+.pair-item>.field-desc {
+  margin-top: 6px;
+}
+
+/* 窗口透明度与窗口毛玻璃并排一行 */
+.look-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.look-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.look-label {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* 并排时下拉按内容定宽，别把整行撑满（.field-select 默认 width: 100%）；
+   最小宽度要放得下最长那项「亚克力（Windows 10 1809+）」，否则切换材质时整行会跟着跳 */
+.look-select {
+  width: auto;
+  min-width: 220px;
 }
 
 .custom-ui-sep {

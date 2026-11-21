@@ -132,7 +132,8 @@ function onLobby() {
 
     <!-- 当前选中实例：仅在选中时显示（未选中时该槽位留空），点一下即可快捷启动 -->
     <div v-if="currentInstance" class="last-card">
-      <InstanceIcon :name="currentInstance.name" :uuid="currentInstance.uuid" :size="52" />
+      <InstanceIcon :name="currentInstance.name" :uuid="currentInstance.uuid" :loader="currentInstance.loader"
+        :size="52" />
       <span class="last-name">{{ currentInstance.name }}</span>
       <button class="last-play" :disabled="playDisabled" @click="emit('quick-launch')">
         <GlyphIcon name="play" :size="12" /> {{ playLabel }}

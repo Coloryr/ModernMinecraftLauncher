@@ -233,11 +233,19 @@ const listRef = ref<{
 
 /** 滚动容器去掉左右内边距后的宽度，单位 px；占满时的列数按它算 */
 const contentWidth = ref(0);
+/** 列数专用的宽度：最大化动画期间冻住，动画落定后一次性跟上 */
+const layoutWidth = ref(0);
+/** 动画落定后的"是否最大化"：最少列数只在落定后生效 */
+const layoutMaximized = ref(!!props.maximized);
+/** 最大化 / 收回动画的收尾定时器；非空表示宽度正在变 */
+let settleTimer: number | null = null;
 
 /** 占满时每行放几列：按未占满时一行约 300px 的宽度切 */
-const columns = computed(() =>
-  Math.max(1, Math.floor((contentWidth.value + GRID_GAP) / (GRID_MIN + GRID_GAP))),
-);
+const columns = computed(() => {
+  // 最大化时一行至少三个（窗口再窄也压成三列）；未最大化时按宽度能排几个是几个
+  const least = layoutMaximized.value ? 3 : 1;
+  return Math.max(least, Math.floor((layoutWidth.value + GRID_GAP) / (GRID_MIN + GRID_GAP)));
+});
 
 /** 占满时多列行的网格样式：列数必须与脚本切行的口径一致 */
 const gridStyle = computed(() => ({
@@ -252,7 +260,23 @@ function measureWidth() {
   const cs = getComputedStyle(el);
   const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
   contentWidth.value = Math.max(0, el.clientWidth - pad);
+  // 动画期间宽度一路在变：跟着量的话列数会 1→2→3 逐个跳，卡片跟着重排
+  if (settleTimer === null) layoutWidth.value = contentWidth.value;
 }
+
+// 最大化 / 收回是宽度过渡（0.3s）：期间冻住列数，落定后再一次性换
+watch(
+  () => props.maximized,
+  (max) => {
+    if (settleTimer !== null) window.clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(() => {
+      settleTimer = null;
+      layoutMaximized.value = !!max;
+      measureWidth();
+      layoutWidth.value = contentWidth.value;
+    }, 340);
+  },
+);
 
 const widthObserver = new ResizeObserver(() => measureWidth());
 onMounted(() => measureWidth());
@@ -329,6 +353,7 @@ onUnmounted(() => {
   listEl?.removeEventListener("scroll", onListScroll);
   widthObserver.disconnect();
   clearGroupAnims();
+  if (settleTimer !== null) window.clearTimeout(settleTimer);
 });
 
 // 挂载后滚动容器才出现，盯住它挂滚动监听
@@ -627,7 +652,7 @@ defineExpose({ scrollToInstance });
               :style="rowStyle(row)">
               <div class="drop-ghost-row">
                 <InstanceIcon :name="dragActive?.instance?.name ?? ''" :uuid="dragActive?.instance?.uuid ?? '0'"
-                  :size="38" />
+                  :loader="dragActive?.instance?.loader ?? ''" :size="38" />
                 <span class="inst-name">{{ dragActive?.instance?.name ?? "" }}</span>
               </div>
             </div>
@@ -646,7 +671,8 @@ defineExpose({ scrollToInstance });
                   <!-- 落点占位：与实例行同尺寸，拖动时显示将插入的位置 -->
                   <div v-else-if="cell.kind === 'ghost'" class="drop-ghost-row">
                     <InstanceIcon :name="dragActive?.instance?.name ?? ''"
-                      :uuid="dragActive?.instance?.uuid ?? '0'" :size="38" />
+                      :uuid="dragActive?.instance?.uuid ?? '0'" :loader="dragActive?.instance?.loader ?? ''"
+                      :size="38" />
                     <span class="inst-name">{{ dragActive?.instance?.name ?? "" }}</span>
                   </div>
                   <div v-else class="inst-row" :data-uuid="cell.inst.uuid" :data-idx="cell.idx"
@@ -659,7 +685,8 @@ defineExpose({ scrollToInstance });
                     <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(cell.inst.uuid) }">
                       <GlyphIcon name="check" :size="12" :weight="2.6" />
                     </span>
-                    <InstanceIcon :name="cell.inst.name" :uuid="cell.inst.uuid" :size="38" />
+                    <InstanceIcon :name="cell.inst.name" :uuid="cell.inst.uuid" :loader="cell.inst.loader"
+                      :size="38" />
                     <span v-if="cell.inst.loader !== 'normal'" class="loader-text"
                       :class="`loader-${cell.inst.loader}`">{{ t(`add.loader.${cell.inst.loader}`) }}</span>
                     <span class="inst-name">
@@ -682,7 +709,7 @@ defineExpose({ scrollToInstance });
                 <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(row.inst.uuid) }">
                   <GlyphIcon name="check" :size="12" :weight="2.6" />
                 </span>
-                <InstanceIcon :name="row.inst.name" :uuid="row.inst.uuid" :size="38" />
+                <InstanceIcon :name="row.inst.name" :uuid="row.inst.uuid" :loader="row.inst.loader" :size="38" />
                 <span v-if="row.inst.loader !== 'normal'" class="loader-text" :class="`loader-${row.inst.loader}`">{{
                   t(`add.loader.${row.inst.loader}`) }}</span>
                 <span class="inst-name">
@@ -725,7 +752,7 @@ defineExpose({ scrollToInstance });
     <DragGhost v-if="ghost" :x="ghost.item.kind === 'group' ? groupGhostX : ghost.x"
       :y="ghost.y" :width="ghost.item.kind === 'group' ? contentWidth || 300 : undefined">
       <InstanceIcon v-if="ghost.item.kind === 'instance'" :name="ghost.item.instance?.name ?? ''"
-        :uuid="ghost.item.instance?.uuid ?? '0'" :size="32" />
+        :uuid="ghost.item.instance?.uuid ?? '0'" :loader="ghost.item.instance?.loader ?? ''" :size="32" />
       <GlyphIcon v-else name="folder" :size="16" />
       <span>
         {{ ghost.item.kind === "instance" ? (ghost.item.instance?.name ?? "") : (ghost.item.groupName ?? "") }}

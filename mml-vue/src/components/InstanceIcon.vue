@@ -1,10 +1,9 @@
 <script setup lang="ts">
-// 实例图标：优先 mml-image 协议加载真图，缺失 / 失败时回退为
-// 按 uuid 取色的渐变底 + 实例名首字母
+// 实例图标：优先用 mml-image 协议加载真图；没有 / 失败时画占位图 ——
+// 原版是草方块、装了加载器的是那家的标志（见 components/InstancePlaceholder.vue）
 import { computed, onUnmounted, ref, watch } from "vue";
 import { onInstanceChange } from "../lib/api";
-import { instanceColor, instanceGradient } from "../lib/instanceColor";
-import { gradientMode } from "../lib/theme";
+import InstancePlaceholder from "./InstancePlaceholder.vue";
 import {
   cacheIconBlob,
   cachedImageBase,
@@ -16,71 +15,37 @@ import {
 
 const props = withDefaults(
   defineProps<{
-    /** 实例名；取首字母作为占位字 */
+    /** 实例名；真图加载后作为 alt */
     name: string;
-    /** 实例 uuid；真图地址与回退配色都由它算 */
+    /** 实例 uuid；真图地址由它算 */
     uuid: string;
+    /** 加载器 id：占位图按它挑画哪一枚 */
+    loader?: string;
     /** 图标边长，单位 px */
     size?: number;
   }>(),
-  { size: 48 },
+  { loader: "", size: 48 },
 );
 
-// 取色在 lib/instanceColor：统计窗口的单日饼图用同一套，颜色才能和图标对上；
-// 纯色模式直接用色组首色，与饼图色块同色
-const palette = computed(() =>
-  gradientMode.value ? instanceGradient(props.uuid) : instanceColor(props.uuid),
-);
-
-const char = computed(() => props.name.trim().charAt(0).toUpperCase() || "M");
-
-/**
- * 容器样式：真图加载成功后不再画占位底色，原因见 loaded
- *
- * 底色与背景图必须分开写（backgroundColor / backgroundImage），不能用 `background` 简写：
- * 简写会先把渐变写进 background-image，随后 Vue 把 backgroundImage 置空（等于移除该
- * 长写属性），渐变随之被抹掉，占位图就只剩一个透明方块 —— 没设图标的实例全变成"透明色"。
- */
-const iconStyle = computed(() => {
-  const style: Record<string, string> = {
-    width: props.size + "px",
-    height: props.size + "px",
-    backgroundColor: "transparent",
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    fontSize: Math.round(props.size * 0.42) + "px",
-    borderRadius: Math.round(props.size * 0.24) + "px",
-  };
-  // 已加载过的图标同时铺一层背景：重建时即使 <img> 还没触发 load，
-  // 也能直接从浏览器缓存画出原图，不再先露出字母占位
-  if (loaded.value && src.value) {
-    style.backgroundImage = `url("${src.value}")`;
-  } else if (gradientMode.value) {
-    style.backgroundImage = palette.value;
-  } else {
-    style.backgroundColor = palette.value;
-  }
-  return style;
-});
+/** 容器尺寸与圆角；底色交给占位图 / 真图，自己不再铺渐变 */
+const iconStyle = computed(() => ({
+  width: props.size + "px",
+  height: props.size + "px",
+  borderRadius: Math.round(props.size * 0.24) + "px",
+}));
 
 // ---------- 真实图标加载 ----------
 
-// mml-image 协议前缀；浏览器预览无 IPC 时取不到，走回退渐变
+// mml-image 协议前缀；浏览器预览无 IPC 时取不到，画占位图
 const base = ref(cachedImageBase() ?? "");
 const failed = ref(false);
-/**
- * 真图是否已成功加载
- *
- * 加载后必须把字母占位藏掉：方块图标是**透明底** PNG，实测 94%~97% 的像素 alpha=0，
- * 字母留在 DOM 里会从透明处透出来，看着就是"设了图标但占位图没消失"。
- * 加载中 / 失败时仍显示字母，不让图标区空着。
- */
+/** 真图是否已成功加载；加载成功后占位图被 <img> 盖住即可，不用再藏 */
 const loaded = ref(loadedIconUuids.has(props.uuid));
 /** 缓存破坏参数（图标被更换后刷新） */
 const ver = ref(0);
 
 const url = computed(() =>
-  base.value ? `${base.value}/instance/${props.uuid}?v=${ver.value}` : "",
+  base.value ? base.value + "/instance/" + props.uuid + "?v=" + ver.value : "",
 );
 
 /** 当前实际给 <img> 的地址：优先用缓存下来的 Blob URL */
@@ -99,19 +64,13 @@ function syncSrc() {
   if (loadedIconUrls.has(link) || loadedIconUuids.has(props.uuid)) loaded.value = true;
 }
 
-/** 加载失败：退回字母占位 */
+/** 加载失败：回到占位图 */
 function onError() {
   failed.value = true;
   loaded.value = false;
 }
 
-/**
- * 真图加载完成
- *
- * 失败过就忽略：`data-no-fallback` 已经让全局图片兜底不插手了，但万一有别的
- * 来源再触发一次 load（占位图被换进来之类），也不能把 failed 的状态翻回去 ——
- * 那会把字母占位藏掉、图标区变成一片空白。
- */
+/** 真图加载完成 */
 function onLoad() {
   if (failed.value) return;
   if (url.value) {
@@ -146,7 +105,7 @@ onUnmounted(() => {
     if (type !== "icon") return;
     ver.value = Date.now();
     failed.value = false;
-    // 换图期间先回到字母，新图到了再藏（否则旧图会一直挂着）
+    // 换图期间先回到占位图，新图到了再盖上
     loadedIconUuids.delete(props.uuid);
     loaded.value = false;
   });
@@ -168,11 +127,11 @@ watch(
 </script>
 
 <template>
-  <div class="inst-icon" :class="{ 'has-icon': loaded }" :style="iconStyle">
-    <img v-if="src && !failed" class="inst-icon-img" :src="src" alt="" loading="eager" decoding="sync" data-no-fallback
-      @load="onLoad" @error="onError" />
-    <!-- 字母只是回退：真图加载成功后必须移除，透明处不会再透出占位 -->
-    <span v-if="!loaded" class="inst-icon-char">{{ char }}</span>
+  <div class="inst-icon" :style="iconStyle">
+    <!-- 占位图垫在底下：真图加载成功后把它整块盖住，加载中 / 失败时它就是图标本身 -->
+    <InstancePlaceholder :loader="loader" />
+    <img v-if="src && !failed" class="inst-icon-img" :src="src" :alt="name" loading="eager" decoding="sync"
+      data-no-fallback @load="onLoad" @error="onError" />
     <!-- 悬停浮层（如"改图标"入口）：放在图标内部才被圆角与 overflow 裁住 -->
     <slot />
   </div>
@@ -183,19 +142,10 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--on-accent);
-  font-weight: 700;
   flex-shrink: 0;
-  box-shadow: 0 2px 6px var(--overlay-faint);
-  border: 1px solid var(--on-accent-line);
   user-select: none;
   overflow: hidden;
   position: relative;
-}
-
-/* 字母占位：加载中 / 失败时才存在；真图加载成功后由 v-if 移除 */
-.inst-icon-char {
-  line-height: 1;
 }
 
 .inst-icon-img {
@@ -210,23 +160,5 @@ watch(
   image-rendering: auto;
 }
 
-/* 简单的高光装饰；只有占位态才画，真图上方不该再压一层白高光 */
-.inst-icon::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, var(--on-accent-sheen), transparent 45%);
-  pointer-events: none;
-}
-
-.inst-icon.has-icon::after {
-  display: none;
-}
-
-/* 真图加载后连边框与阴影也去掉：底色没了但这两样还在时，整块会读成"白底 + 深色描边"的方框。
-   保留 1px 透明边框而不是 border: none，盒模型尺寸不变，图标不会比占位态偏移 1px。 */
-.inst-icon.has-icon {
-  border-color: transparent;
-  box-shadow: none;
-}
+/* 不再压那层白高光：占位图已经是完整的图形，再叠一层会把上沿洗淡 */
 </style>

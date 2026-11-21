@@ -103,10 +103,11 @@ import type {
   SystemMemoryDto,
   VersionInfoDto,
   GuiThemeDto,
+  SidebarSide,
   ViewMode,
   MenuActionEvent,
 } from "./bindings";
-import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, JavaInstallStatus, JavaMissing, LaunchError, LaunchState, MenuAction, MinecraftProgress, PrepareError, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
+import { AddLoaderProgress, AddModpackStatus, AddNameConflict, AddPackProgress, AddResourceStatus, BlockRender, ClientConfigChange, CloseBlocked, CollectChange, ColormcProgress, CustomHomeChange, CustomUiChange, DownloadItem, DownloadTask, ExportFocus, ExportProgress, GameExit, GameLog, GuiSidebarSideChange, GuiThemeChange, GuiViewModeChange, InstanceChange, JavaChange, JavaInstallStatus, JavaMissing, LaunchError, LaunchState, MenuAction, MinecraftProgress, PrepareError, ResourceListModsProgress, ResourceModsAutoMarkProgress, ResourceModsDuplicate, ResourceModsUpdateDone, ResourceModsUpdateProgress, ServerInstanceFocus, ServerInstanceProgress, StartArg } from "./listens";
 
 export interface CreateInstanceOpts {
   /** 加载器 ID，缺省为 `normal` */
@@ -1180,9 +1181,10 @@ export const api = {
    *
    * - `uuid`: 实例 uuid
    * - `path`: 落点文件绝对路径，由保存框给出
+   * - `format`: 脚本格式，`bat` / `ps1` / `sh`
    */
-  async exportLaunchArgs(uuid: string, path: string): Promise<void> {
-    return commands.main.exportLaunchArgs(uuid, path);
+  async exportLaunchArgs(uuid: string, path: string, format: string): Promise<void> {
+    return commands.main.exportLaunchArgs(uuid, path, format);
   },
 
   /**
@@ -1977,6 +1979,22 @@ export function onClientConfigChange(cb: (e: ClientConfigDto) => void): Promise<
  */
 export function onGuiViewModeChange(cb: (mode: ViewMode) => void): Promise<UnlistenFn> {
   return listen<ViewMode>(GuiViewModeChange, (e) => cb(e.payload));
+}
+
+/**
+ * 侧栏位置变更事件
+ *
+ * - `cb`: 收到新位置时回调，取值 Left / Right
+ *
+ * # 返回值
+ *
+ * 取消监听的函数
+ *
+ * 设置窗口改了「侧栏位置」后广播：多窗口模式下主窗口是另一个 webview，
+ * 只改配置不广播的话要重启才换边
+ */
+export function onGuiSidebarSideChange(cb: (side: SidebarSide) => void): Promise<UnlistenFn> {
+  return listen<SidebarSide>(GuiSidebarSideChange, (e) => cb(e.payload));
 }
 
 /**

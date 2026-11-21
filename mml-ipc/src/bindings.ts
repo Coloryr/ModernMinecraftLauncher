@@ -244,7 +244,7 @@ export function createCommands(invoke: Invoke) {
       deleteInstance: (uuid: string) => invoke<boolean>("main_delete_instance", { uuid }),
       detectDebuggers: () => invoke<DebuggerInfoDto>("main_detect_debuggers"),
       enableColorasm: (uuid: string) => invoke<void>("main_enable_colorasm", { uuid }),
-      exportLaunchArgs: (uuid: string, path: string) => invoke<void>("main_export_launch_args", { uuid, path }),
+      exportLaunchArgs: (uuid: string, path: string, format: string) => invoke<void>("main_export_launch_args", { uuid, path, format }),
       gamepadNeedsAsm: (uuid: string) => invoke<boolean>("main_gamepad_needs_asm", { uuid }),
       getCustomJson: (uuid: string) => invoke<CustomJsonItemDto[]>("main_get_custom_json", { uuid }),
       getGroups: () => invoke<GroupDto[]>("main_get_groups"),

@@ -295,27 +295,28 @@ const gcOptions = computed(() => [
   <div class="args-panel">
     <!-- 启动参数 -->
     <div class="args-block">
-      <!-- 窗口大小：第一行是下拉（跟随全局 / 预设 / 全屏 / 自定义），第二行是宽 / 高；
-           改成下拉里没有的值会自动落到「自定义」。全屏或跟随全局时尺寸不可改，
-           但跟随全局时仍然显示（禁用）——那正是会用的数字 -->
+      <!-- 窗口大小：与内存行同一套两列（标签固定第一列）—— 下拉一行、宽 / 高一行，
+           标签在这两行控件之间垂直居中；改成下拉里没有的值会自动落到「自定义」 -->
       <div class="args-row size-row">
         <span class="args-label">{{ t("args.windowSize") }}</span>
-        <select class="field-select pick-select res-pick" :value="resPick" @change="onResPick">
-          <option value="global">{{ t("args.useGlobal") }}</option>
-          <option v-for="r in COMMON_RESOLUTIONS" :key="`${r.w}x${r.h}`" :value="`${r.w}x${r.h}`">
-            {{ r.w }}×{{ r.h }}
-          </option>
-          <option value="fullscreen">{{ t("args.fullscreen") }}</option>
-          <option value="custom">{{ t("args.custom") }}</option>
-        </select>
-      </div>
-      <div v-if="resInputs" class="args-row sub-row size-row">
-        <span class="sub-tag">{{ t("args.width") }}</span>
-        <NumberStepper :model-value="args.width" :min="0" :max="9999" :step="10" :disabled="args.windowInherit"
-          @update:model-value="(v: number) => update({ width: v })" />
-        <span class="sub-tag">{{ t("args.height") }}</span>
-        <NumberStepper :model-value="args.height" :min="0" :max="9999" :step="10" :disabled="args.windowInherit"
-          @update:model-value="(v: number) => update({ height: v })" />
+        <div class="size-controls">
+          <select class="field-select pick-select res-pick" :value="resPick" @change="onResPick">
+            <option value="global">{{ t("args.useGlobal") }}</option>
+            <option v-for="r in COMMON_RESOLUTIONS" :key="`${r.w}x${r.h}`" :value="`${r.w}x${r.h}`">
+              {{ r.w }}×{{ r.h }}
+            </option>
+            <option value="fullscreen">{{ t("args.fullscreen") }}</option>
+            <option value="custom">{{ t("args.custom") }}</option>
+          </select>
+          <div v-if="resInputs" class="size-sub">
+            <span class="sub-tag">{{ t("args.width") }}</span>
+            <NumberStepper :model-value="args.width" :min="0" :max="9999" :step="10" :disabled="args.windowInherit"
+              @update:model-value="(v: number) => update({ width: v })" />
+            <span class="sub-tag">{{ t("args.height") }}</span>
+            <NumberStepper :model-value="args.height" :min="0" :max="9999" :step="10" :disabled="args.windowInherit"
+              @update:model-value="(v: number) => update({ height: v })" />
+          </div>
+        </div>
       </div>
 
       <!-- 内存：最小与最大并在一行，各自预设下拉 + 数值框；窄面板里自动换行 -->

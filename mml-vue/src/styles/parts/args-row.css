@@ -59,23 +59,38 @@
   text-align: left;
 }
 
-/* 续行：缩进到上一行控件的左边缘（标签列 84 + 行内间距 12）。
-   窗口大小的宽 / 高、内存的最大两处用它，别再加"把控件压窄"的第二个口径 */
-.sub-row {
-  padding-left: 96px;
-}
-
 .mem-unit {
   font-size: 12.5px;
   color: var(--text-dim);
   white-space: nowrap;
 }
 
-/* 窗口大小与内存：行照旧跟满可用宽度，但封顶 —— 宽屏上标签与控件被拉开一大截，
-   读起来要一列一列地找。760 是"标签 + 最小 + 最大"并排还留得下一点余量的宽度 */
+/* 窗口大小与内存：都是"标签 | 控件"两列。这里必须是 grid，不能跟普通行一样用 flex-wrap ——
+   控件那一列的最大内容宽（两组内存控件 / 下拉加宽高）塞不进标签右边时，flex 会把整块折到下一行，
+   看起来就是"窗口大小""内存大小"孤零零占一行。grid 之后控件只在自己那列内部换行，标签始终在左边，
+   并按 align-items 在两行控件之间垂直居中 */
 .args-row.size-row,
 .args-row.mem-row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: center;
   max-width: 760px;
+}
+
+/* 窗口大小右侧：下拉一行、宽 / 高一行，两行都从控件左缘起排 */
+.size-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.size-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* 最小 / 最大内存：包一层可换行的容器，装得下并排一行，装不下换成两行。

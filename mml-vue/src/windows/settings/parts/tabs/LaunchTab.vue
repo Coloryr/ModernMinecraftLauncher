@@ -147,23 +147,25 @@ watch(memoryConflict, async (bad) => {
 <template>
   <template v-if="run && win">
     <SettingsGroup id="gameWindow" title-key="winSettings.secGameWindow" :flash="flashGroup === 'gameWindow'">
-      <!-- 窗口大小：与实例设置同一套 —— 预设下拉（含全屏）定尺寸，续行给宽 / 高；
-           全屏时尺寸无效，续行整行收起 -->
+      <!-- 窗口大小：与实例设置同一套 —— 标签固定第一列，右侧下拉一行、宽 / 高一行，
+           标签在两者之间垂直居中；全屏时尺寸无效，宽 / 高那行整行收起 -->
       <div class="args-row size-row">
         <span class="args-label">{{ t("args.windowSize") }}</span>
-        <select class="field-select pick-select res-pick" :value="resPick" @change="onResPick">
-          <option v-for="r in COMMON_RESOLUTIONS" :key="`${r.w}x${r.h}`" :value="`${r.w}x${r.h}`">
-            {{ r.w }}×{{ r.h }}
-          </option>
-          <option value="fullscreen">{{ t("args.fullscreen") }}</option>
-          <option value="custom">{{ t("args.custom") }}</option>
-        </select>
-      </div>
-      <div v-if="!win!.fullScreen" class="args-row sub-row size-row">
-        <span class="sub-tag">{{ t("args.width") }}</span>
-        <NumberStepper v-model="win!.width" :min="100" :max="65535" />
-        <span class="sub-tag">{{ t("args.height") }}</span>
-        <NumberStepper v-model="win!.height" :min="100" :max="65535" />
+        <div class="size-controls">
+          <select class="field-select pick-select res-pick" :value="resPick" @change="onResPick">
+            <option v-for="r in COMMON_RESOLUTIONS" :key="`${r.w}x${r.h}`" :value="`${r.w}x${r.h}`">
+              {{ r.w }}×{{ r.h }}
+            </option>
+            <option value="fullscreen">{{ t("args.fullscreen") }}</option>
+            <option value="custom">{{ t("args.custom") }}</option>
+          </select>
+          <div v-if="!win!.fullScreen" class="size-sub">
+            <span class="sub-tag">{{ t("args.width") }}</span>
+            <NumberStepper v-model="win!.width" :min="100" :max="65535" />
+            <span class="sub-tag">{{ t("args.height") }}</span>
+            <NumberStepper v-model="win!.height" :min="100" :max="65535" />
+          </div>
+        </div>
       </div>
     </SettingsGroup>
 

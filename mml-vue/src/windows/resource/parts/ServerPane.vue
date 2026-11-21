@@ -4,19 +4,16 @@
 // 添加/编辑的表单状态属于本分类，就放在这一层（草稿 + 保存中标记），
 // 弹窗排版在 ServerFormModal。
 //
-// MOTD 分成两处，与主窗口的 MOTD 卡同一套观感：
-// - **列表上方一张卡**，显示当前**选中**那一台的完整 MOTD：彩色分段、保留换行、人数/版本/延迟；
-//   点列表里的行切换。卡片是 `components/MotdCard.vue`，与主窗口那两张是同一个组件。
-// - **行里只说"能不能连上"** + 地址 —— 一行一句话，扫一眼就知道哪台连得上。
+// MOTD 卡片只在主窗口主页面上方那一处显示，这个窗口不再画卡；这里只把结果
+// **落进每一行**：连接状态 + 地址 + 图标 + 人数，扫一眼就知道哪台连得上。
 //
-// MOTD 查询也是这一层：进分类 / 刷新列表时**并发查全部服务器**，结果填进对应那一行。
+// MOTD 查询在这一层：进分类 / 刷新列表时**并发查全部服务器**，结果填进对应那一行。
 // 并发是必须的 —— 连不上的服要等到超时，串行的话后面的行全被它堵住。
 import { computed, ref, watch } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import { addServer, deleteServer, exportServers, getMotd, importServers, updateServer } from "../../../lib/api";
 import { faviconOf } from "../../../lib/motd";
-import MotdCard from "../../../components/MotdCard.vue";
 import ContentHead from "./ContentHead.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
@@ -96,66 +93,6 @@ async function queryAll() {
  * 之后键会落空，也在下面退回第一台。
  */
 const selectedKey = ref<string | null>(null);
-
-/** 选中的条目；列表为空时是 `null`，上方卡片随之整块不渲染 */
-const selected = computed<ServerItemDto | null>(() => {
-  const list = servers.value;
-  if (!list.length) {
-    return null;
-  }
-  // 选中的那台还在就用它，找不到（删了 / 改名了）先退回第一台
-  return list.find((item) => keyOf(item) === selectedKey.value) ?? list[0];
-});
-
-/**
- * 卡片上"刷新中…"至少露这么久
- *
- * 查本机 / 局域网的服务器常常几十毫秒就回来了，不压住时间的话"刷新中…"一闪而过、
- * 数据又没变，点下去看着就跟没点一样 —— 用户反馈过"点了刷新卡片没有反应"。
- * 500ms 是"能看清有这么一下"又不拖沓的量
- */
-const REFRESH_MIN_MS = 500;
-
-/**
- * 只重查一台（上方卡片上的刷新按钮）
- *
- * 与 [`queryAll`] 的区别只在范围：别的行保持原样、也不进"刷新中"，
- * 所以翻到哪台点刷新，动的就只有那一台
- */
-async function queryOne(item: ServerItemDto) {
-  const key = keyOf(item);
-  const next = new Set(pending.value);
-  next.add(key);
-  pending.value = next; // → 卡片立刻显示"刷新中…"（meta 那一行优先显示它）
-
-  const started = Date.now();
-  let ok = false;
-  let result: MotdDto | null = null;
-
-  try {
-    result = await getMotd(item.ip);
-    ok = true;
-  } catch {
-    // 与 queryAll 同一口径：失败也落一条 null，否则这一行会永远停在"刷新中…"
-  }
-
-  // 先补足最短展示时间，再落结果 —— 否则这一下眨眼就过去了
-  const rest = REFRESH_MIN_MS - (Date.now() - started);
-  if (rest > 0) {
-    await new Promise((resolve) => setTimeout(resolve, rest));
-  }
-
-  motds.value.set(key, result);
-
-  const after = new Set(pending.value);
-  after.delete(key);
-  pending.value = after;
-
-  // 数据可能一点没变（服务器信息本来就那样），给一条"确实刷新过"的回执
-  if (ok) {
-    showToast(t("tip.refreshed"));
-  }
-}
 
 // 列表一换就重查一遍，即首次加载、点刷新、增删改之后重拉；并把选中项落到仍然有效的那台
 watch(
@@ -441,17 +378,6 @@ function onMenuPick(id: string) {
       </template>
     </template>
   </ContentHead>
-
-  <!--
-    上方 MOTD 卡：显示**当前选中**那一台（点列表里的行切换）。
-    与主窗口底部那张、实例详情里那张是同一个组件，所以观感完全一致；
-    右上角的刷新按钮**只重查这一台**（别的行不动），见 queryOne。
-    外面这层只做横向对齐 —— 卡片不在滚动容器里，拿不到 `.item-list` 的内边距
-  -->
-  <div v-if="selected" class="sv-motd">
-    <MotdCard refreshable :motd="motdOf(selected)" :loading="isLoading(selected)" :name="selected.name || selected.ip"
-      @refresh="queryOne(selected)" />
-  </div>
 
   <div v-if="loading" class="item-list">
     <ListSkeleton />

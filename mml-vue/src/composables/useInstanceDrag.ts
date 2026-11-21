@@ -76,6 +76,11 @@ export function useInstanceDrag(deps: DragDeps) {
   /** 跟手浮起副本：内容由调用方按 `ghost.item` 渲染 */
   const dragGhost = useDragGhost<DragCandidate>();
 
+  /** 分组视图里的实例总数：只有一个实例时拖拽没有意义 */
+  const instanceTotal = computed(() =>
+    deps.groups.value.reduce((sum, group) => sum + group.items.length, 0),
+  );
+
   let dragPointerId: number | null = null;
   let dragStartX = 0;
   let dragStartY = 0;
@@ -90,6 +95,10 @@ export function useInstanceDrag(deps: DragDeps) {
    */
   function onDragPointerDown(e: PointerEvent, cand: DragCandidate) {
     if (e.button !== 0 || deps.multiSelect.value) return;
+    // 只有一个分组 / 只有一个实例时没有第二个位置可换，按住也不进入拖拽：
+    // 否则会浮起一个跟手副本、松手又回到原位，看着像拖了却什么都没发生
+    if (cand.kind === "group" && deps.groups.value.length <= 1) return;
+    if (cand.kind === "instance" && instanceTotal.value <= 1) return;
     suppressClick = false;
     dragPointerId = e.pointerId;
     dragStartX = e.clientX;
@@ -162,7 +171,12 @@ export function useInstanceDrag(deps: DragDeps) {
           .find((g) => g.id === groupId)
           ?.items.findIndex((i) => i.uuid === active.instance?.uuid) ?? -1;
       const setIndex = (index: number) => {
-        dragInsert.value = { groupId, index: dragged >= 0 && dragged < index ? index - 1 : index };
+        const next = dragged >= 0 && dragged < index ? index - 1 : index;
+        const cur = dragInsert.value;
+        // 同一个落点不重复写：pointermove 很密，每写一次整个列表都要重算一遍，
+        // 平铺卡里把落点算进行表时就会一直重排，看着是"疯狂闪烁"
+        if (cur && cur.groupId === groupId && cur.index === next) return;
+        dragInsert.value = { groupId, index: next };
       };
 
       // 指针正压在某个实例格上时它自己就是最准的落点：列表行按纵坐标分上下，
@@ -170,7 +184,9 @@ export function useInstanceDrag(deps: DragDeps) {
       const hit = (el?.closest?.(".inst-row, .tile") ?? null) as HTMLElement | null;
       if (hit && hit.dataset.group === groupId && hit.dataset.idx !== undefined) {
         const rect = hit.getBoundingClientRect();
-        const after = hit.classList.contains("tile")
+        // 向右占满后是平铺网格：同一行里按横坐标分左右；普通列表行按纵坐标分上下。
+        // 网格里还用纵坐标分的话，指针左右移动时落点几乎不动，看起来就是"闪"。
+        const after = hit.closest(".inst-grid")
           ? e.clientX > rect.left + rect.width / 2
           : e.clientY > rect.top + rect.height / 2;
         setIndex(Number(hit.dataset.idx) + (after ? 1 : 0));
@@ -184,11 +200,16 @@ export function useInstanceDrag(deps: DragDeps) {
           (r) => r.dataset.group === groupId && r.dataset.idx !== undefined,
         )
         : [];
+      // 平铺网格里"在当前格之前"包含"同一行、在左半边"，只比纵坐标会把整行当成落点
+      const horizontal = !!rows[0]?.closest(".inst-grid");
       let index = 0;
       for (const row of rows) {
         const rect = row.getBoundingClientRect();
         const at = Number(row.dataset.idx ?? 0);
-        if (e.clientY < rect.top + rect.height / 2) {
+        const before = horizontal
+          ? e.clientY < rect.top || (e.clientY < rect.bottom && e.clientX < rect.left + rect.width / 2)
+          : e.clientY < rect.top + rect.height / 2;
+        if (before) {
           index = at;
           break;
         }
@@ -208,7 +229,7 @@ export function useInstanceDrag(deps: DragDeps) {
           break;
         }
       }
-      dragGroupInsert.value = { index };
+      if (dragGroupInsert.value?.index !== index) dragGroupInsert.value = { index };
     }
   }
 

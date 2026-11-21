@@ -8,6 +8,7 @@
 // - `field`：表单与标题栏的一行下拉，外观全走 .field-select，只补对齐与省略
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import VirtualList from "./ui/VirtualList.vue";
+import InstanceIcon from "./InstanceIcon.vue";
 import SearchBox from "./ui/SearchBox.vue";
 import { t } from "../lib/i18n";
 import { api } from "../lib/api";
@@ -212,6 +213,22 @@ function moveActive(delta: number) {
  * 所以只有下面窄到放不下一段可用高度、且上面确实更宽时才向上。
  * 左右都夹进窗口内 —— 浮层挂在 body 上，没有父级帮忙裁。
  */
+/**
+ * 浮层顶端能到的最低处：压在标题栏下面，不盖住窗口拖动区
+ *
+ * 标题栏高度取主题变量 --titlebar-h（自绘标题栏与子窗口框架共用这一个值），取不到就只留
+ * 常规边距 —— 浏览器预览没有这层标题栏。
+ *
+ * # 返回值
+ *
+ * 浮层 top 的下限，单位 px
+ */
+function topLimit(): number {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue("--titlebar-h");
+  const bar = parseFloat(raw);
+  return EDGE + (Number.isFinite(bar) ? bar : 0);
+}
+
 function place() {
   const btn = btnEl.value;
   const menu = menuEl.value;
@@ -231,9 +248,11 @@ function place() {
   // 卡片档：以按钮中心为锚点上下对半分，盖住触发按钮；列表再长也能占满整窗高度。
   // 贴着窗口上下边缘时把整块夹回来，超高就封顶后由列表自己滚。
   if (props.variant === "card") {
-    const maxHeight = Math.max(160, Math.min(natural, window.innerHeight - EDGE * 2));
+    // 最高只到标题栏下沿：卡片档会盖住触发按钮，不夹的话上半截会压到窗口拖动区
+    const minTop = topLimit();
+    const maxHeight = Math.max(160, Math.min(natural, window.innerHeight - minTop - EDGE));
     const top = Math.max(
-      EDGE,
+      minTop,
       Math.min(
         rect.top + rect.height / 2 - maxHeight / 2,
         window.innerHeight - EDGE - maxHeight,
@@ -249,7 +268,9 @@ function place() {
   }
 
   const below = window.innerHeight - rect.bottom - GAP - EDGE;
-  const above = rect.top - GAP - EDGE;
+  const minTop = topLimit();
+  // 向上弹时同样以标题栏下沿为界，别把浮层顶到标题栏上
+  const above = rect.top - GAP - minTop;
   // 下面还能露出 DROP_MIN 就不往上翻：整高放不下时向下滚动，比跳到按钮上方更符合预期
   const up = below < DROP_MIN && above > below;
   const maxHeight = Math.max(160, Math.min(natural, up ? above : below));
@@ -465,6 +486,8 @@ watch(
                   'is-active': activeIndex === start + index,
                   running: row.inst.running,
                 }" @mouseenter="activeIndex = start + index" @click="pick(row.inst)">
+                  <!-- 实例图标：有自定义图就用它，没有就按加载器画草方块 / 加载器标志 -->
+                  <InstanceIcon :name="row.inst.name" :uuid="row.inst.uuid" :loader="row.inst.loader" :size="24" />
                   <span class="option-text">
                     <span class="option-name">{{ row.inst.name }}</span>
                     <span v-if="hasInstanceMeta(row.inst)" class="option-sub">

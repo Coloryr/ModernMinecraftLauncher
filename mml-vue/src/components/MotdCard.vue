@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 服务器 MOTD 卡片：图标 + 名字 + MOTD（彩色分段、保留换行）+ 人数/版本/延迟
 //
-// **三处共用同一份**：主窗口底部的 MOTD 悬浮卡、实例详情里的 MOTD 卡、资源窗口服务器
-// 列表上方的 MOTD 卡。抽成组件而不是各写一遍，是因为 MOTD 的细节不少 —— 两行要保留
+// 用在主窗口两处：主页最上方那张，以及实例「自定义服务器」里紧跟进址输入框的那张。抽成组件而不是
+// 自己写一遍，是因为 MOTD 的细节不少 —— 两行要保留
 // `\n`、彩色分段要过 `motdSegStyle`、图标可能没有、查不到时要分清"查询中"与"离线" ——
 // 三处各写一遍迟早漂移成"一个能上色一个不能"，`lib/motd.ts` 里对同一件事也说过。
 //
@@ -17,14 +17,14 @@ const props = withDefaults(
   defineProps<{
     /** 查询结果；`null` = 还没回来（显示"刷新中…"） */
     motd: MotdDto | null;
-    /** 标题：服务器名或地址，由调用方给，不从 MOTD 里取 */
-    name: string;
     /**
-     * 紧凑版：图标 46px、内边距略松、MOTD 字号大一档
+     * 紧凑版：图标 46px、高度 112px、MOTD 字号大一档
      *
-     * 给"嵌在面板里"的场合用（实例详情）；悬浮卡与列表上方那张用默认大小。
+     * 给"嵌在面板里"的场合用（实例的服务器设置）；主页面最上方那张用默认大小
      */
     compact?: boolean;
+    /** 标题：服务器名或地址，由调用方给，不从 MOTD 里取 */
+    name: string;
     /** 是否显示右上角的刷新按钮（悬停卡片才出现） */
     refreshable?: boolean;
     /** 刷新中：按钮里的箭头转起来 */
@@ -143,12 +143,13 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
   overflow: hidden;
 }
 
-/* 紧凑版（实例详情）：内边距松一点、MOTD 字号大一号，高度跟着补 */
+/* 紧凑版（实例的服务器设置）：内边距松一点、MOTD 字号大一号，高度跟着补 */
 .motd-card.compact {
   gap: 14px;
   padding: 14px 16px;
-  border-radius: 12px;
-  height: 112px;
+  /* 嵌在面板里不需要为"切换时不跳动"定死高度：给个下限，MOTD 两行时自己长 */
+  height: auto;
+  min-height: 92px;
 }
 
 /* 服务器图标：就是 MOTD 里带回来的那个 favicon。
@@ -159,11 +160,6 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
   border-radius: 10px;
   object-fit: cover;
   flex-shrink: 0;
-}
-
-.motd-card.compact .motd-icon {
-  width: 46px;
-  height: 46px;
 }
 
 .motd-info {
@@ -197,13 +193,6 @@ const iconUrl = computed(() => (iconFailed.value ? "" : faviconOf(props.motd)));
      那会把每个彩色分段当成独立的盒，MOTD 会被拆成"一行一段" */
   max-height: calc(2 * 1.35em);
   overflow: hidden;
-}
-
-/* 紧凑版里 MOTD 是主角：大一号、用正文色 */
-.motd-card.compact .motd-text {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
 }
 
 .motd-meta {

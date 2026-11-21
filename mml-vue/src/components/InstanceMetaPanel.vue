@@ -597,8 +597,7 @@ function onPlatformChange(value: string) {
       <option value="gbk">{{ t("meta.gbk") }}</option>
     </select>
 
-    <!-- 自动打开日志窗口：一条开关自己说明白，不再拆成"日志窗口 + 自动打开"两格，
-         也不缩到第四列 —— 整行从标签列开始，左对齐 -->
+    <!-- 自动打开日志窗口：跟日志编码并排，占住同一行的第 3、4 列 -->
     <label class="meta-switch">
       <BaseSwitch :model-value="logAutoShow" :disabled="!logAutoShowLoaded || logAutoShowBusy"
         @update:model-value="onLogAutoShow" />
@@ -681,9 +680,9 @@ function onPlatformChange(value: string) {
   grid-column: 1;
 }
 
-/* 整行的开关：跨满四列、从标签列起排，开关左缘与标签对齐 */
+/* 日志编码那一行右侧的开关：接在第 3、4 列，与编码下拉同一行 */
 .meta-switch {
-  grid-column: 1 / -1;
+  grid-column: 3 / -1;
   display: flex;
   align-items: center;
   gap: 8px;

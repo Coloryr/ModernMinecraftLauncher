@@ -21,6 +21,7 @@ export { default as CompHomePage } from "../components/HomePage.vue";
 export { default as CompInstanceIcon } from "../components/InstanceIcon.vue";
 export { default as CompInstanceLogPanel } from "../components/InstanceLogPanel.vue";
 export { default as CompInstanceMetaPanel } from "../components/InstanceMetaPanel.vue";
+export { default as CompInstancePlaceholder } from "../components/InstancePlaceholder.vue";
 export { default as CompInstanceSelect } from "../components/InstanceSelect.vue";
 export { default as CompJavaInstallBar } from "../components/JavaInstallBar.vue";
 export { default as CompJavaInstallPopup } from "../components/JavaInstallPopup.vue";

@@ -506,7 +506,8 @@ export function useSettingsClient() {
         client.value.motdCard = d.motdCard;
         client.value.motdInterval = d.motdInterval;
         break;
-      case "window-look":
+      case "window":
+        // 窗口组里属于 client 的那部分：材质与透明度
         client.value.windowEffect = d.windowEffect;
         client.value.windowOpacity = d.windowOpacity;
         break;
@@ -549,7 +550,7 @@ export function useSettingsClient() {
       await applyClient();
     }
     // 透明度是纯 CSS 变量，恢复默认后要把窗口里的实际效果一起改回来
-    if (id === "window-look") {
+    if (id === "window") {
       applyWindowAlpha(client.value.windowOpacity);
       applyWindowMaterial(client.value.windowEffect);
     }

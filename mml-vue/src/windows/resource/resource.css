@@ -601,14 +601,6 @@ html.has-bg .resource-layout .mod-group-head {
   outline-offset: -1px;
 }
 
-/* 列表上方那张 MOTD 卡的横向对齐。
-   卡片是 `.pane-swap` 的直接子节点，不在滚动容器里，拿不到 `.item-list` 的内边距 ——
-   这里照抄一份：左与行齐平，`.item-list` 没有左内边距；
-   右 26px + 9px 与 `.content-head` 同一口径（卡片留白 + 滚动条占位） */
-.resource-layout .sv-motd {
-  padding-right: calc(26px + 9px);
-}
-
 /* ---------- 多选勾选框（列表与表格的最左边那一格） ----------
    位置始终占着（固定宽 + gap），所以出现 / 消失都不会让整行左右跳动；
    只在三种情况下露出来：鼠标悬停该行、该行已选中、或**已经在多选状态**

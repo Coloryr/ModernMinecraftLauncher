@@ -93,7 +93,8 @@ pub fn window_client_lock_verify(password: String) -> bool {
 ///
 /// 皮肤显示模式 / 头像配置有变化时广播 `skin-config-change`：渲染缓存键里含这两项，
 /// 各窗口收到后按新模式重取头像 / 皮肤图；实例列表显示模式有变化时广播
-/// `gui-view-mode-change`，主窗口据此立即换视图；背景图的不透明度 / 模糊有变化时
+/// `gui-view-mode-change`、侧栏位置有变化时广播 `gui-sidebar-side-change`，主窗口据此立即换；
+/// 背景图的不透明度 / 模糊有变化时
 /// 广播 `bg-change`，各窗口重取背景状态；主题 / 强调色有变化时广播
 /// `gui-theme-change`，各窗口重新应用主题；窗口材质变化时直接在这里重铺所有窗口，
 /// 透明度是前端 CSS 变量，随 `client-config-change` 由各窗口自己跟上
@@ -155,6 +156,10 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
         }
     }
     let new_view_mode = new_config.main_window.view_mode;
+    // 侧栏位置与显示模式同一类问题：多窗口模式下设置窗口改完，主窗口那个 webview 不知道
+    let sidebar_side_changed = crate::gui_config::get().main_window.sidebar_side
+        != new_config.main_window.sidebar_side;
+    let new_sidebar_side = new_config.main_window.sidebar_side;
     let locale_changed = crate::gui_config::get().locale != new_config.locale;
     let effect_before = crate::gui_config::get().client.window_effect;
     crate::gui_config::set(new_config);
@@ -173,6 +178,9 @@ pub async fn window_save_gui_config(app: AppHandle, config: GuiConfigDto) -> Res
     }
     if view_mode_changed {
         emit_gui_view_mode_change(&app, new_view_mode);
+    }
+    if sidebar_side_changed {
+        emit_gui_sidebar_side_change(&app, new_sidebar_side);
     }
     if bg_view_changed {
         crate::windows::settings::bg::emit_bg_change(&app);
@@ -214,6 +222,18 @@ fn emit_client_config_change(app: &AppHandle, config: crate::dtos::ClientConfigD
 #[gui_macros::emit]
 fn emit_gui_view_mode_change(app: &AppHandle, mode: crate::gui_config::ViewMode) {
     let _ = app.emit(listens::GUI_VIEW_MODE_CHANGE, mode);
+}
+
+/// 侧栏位置变更事件，跨窗口同步
+///
+/// 与显示模式同一类问题：切换入口在设置窗口，多窗口模式下主窗口是另一个 webview，
+/// 不广播的话改完看不出来，要重启才生效。
+///
+/// - `app`: 应用句柄，广播用它
+/// - `side`: 变更后的侧栏位置
+#[gui_macros::emit]
+fn emit_gui_sidebar_side_change(app: &AppHandle, side: crate::gui_config::SidebarSide) {
+    let _ = app.emit(listens::GUI_SIDEBAR_SIDE_CHANGE, side);
 }
 
 /// 主题 / 强调色变更事件，跨窗口同步

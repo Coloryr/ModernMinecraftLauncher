@@ -11,6 +11,7 @@ import {
   onClientConfigChange,
   onCustomHomeChange,
   onGameExit,
+  onGuiSidebarSideChange,
   onGuiViewModeChange,
   onInstanceChange,
   onJavaChange,
@@ -1565,7 +1566,8 @@ watch([lockedTypes, currentAccount], ([lock, acc]) => {
   if (lock.size && acc && !lock.has(acc.authType)) void clearCurrentAccount();
 });
 
-// 两处 MOTD 卡片（悬浮卡 / 实例详情卡）：地址来源、竞态保护与定时刷新都在这里
+// 两处 MOTD 卡片：最上方那张查客户端设置的全局地址，实例「自定义服务器」里那张查
+// 实例自己配的地址；地址来源、竞态保护与定时刷新都在这里
 const {
   motdInfo,
   motdLoading,
@@ -1737,6 +1739,10 @@ async function subscribeEvents() {
     // 显示模式在设置窗口改：多窗口模式下这里是另一个 webview，只能靠这条广播同步
     onGuiViewModeChange((v) => {
       viewMode.value = v;
+    }),
+    // 侧栏位置同理：不广播的话设置里选了「右侧」，主窗口仍停在左边
+    onGuiSidebarSideChange((side) => {
+      sidebarSide.value = side;
     }),
     ].map((p) =>
       p.catch((error) => {
@@ -2280,22 +2286,34 @@ function onLaunchMenuPick(id: string) {
 /**
  * 导出启动参数
  *
- * 与「生成调试参数」同一份生成结果，落成一份文本文件。参数里含登录令牌，
- * 只写进用户自己选的位置。
+ * 与「生成调试参数」同一份生成结果，但落成**能直接双击运行的脚本**：Windows 可选
+ * .bat 或 .ps1，Linux / macOS 只有 .sh。参数里含登录令牌，只写进用户自己选的位置。
  */
 async function exportLaunchArgs() {
   const item = selected.value;
   if (!item) return;
   const name = (item.name || item.uuid).replace(/[\\/:*?"<>|]/g, "_");
+  // 脚本格式跟着平台走：Windows 两选一，其它平台只有 sh
+  const isWin = detectOs() === "windows";
   try {
     const { save } = await import("@tauri-apps/plugin-dialog");
     const path = await save({
       title: t("launchMenu.exportArgs"),
-      defaultPath: name + "-launch-args.txt",
-      filters: [{ name: "txt", extensions: ["txt"] }],
+      defaultPath: name + (isWin ? "-launch.bat" : "-launch.sh"),
+      filters: isWin
+        ? [
+            { name: "BAT", extensions: ["bat"] },
+            { name: "PowerShell", extensions: ["ps1"] },
+          ]
+        : [{ name: "sh", extensions: ["sh"] }],
     });
     if (!path) return;
-    await api.exportLaunchArgs(item.uuid, path);
+    // 格式以落点的扩展名为准：在保存框里切了筛选器、或自己改了后缀都跟着走；
+    // 后缀不认识就按平台补一个，免得写出一个没有扩展名的脚本
+    const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
+    const known = ext === "bat" || ext === "ps1" || ext === "sh";
+    const format = known ? ext : isWin ? "bat" : "sh";
+    await api.exportLaunchArgs(item.uuid, known ? path : path + "." + format, format);
     showToast(t("launchMenu.exported"));
   } catch (e) {
     showToast(tErr(e));
@@ -2554,6 +2572,12 @@ onMounted(async () => {
 
     <!-- ===== 主界面 ===== -->
     <template v-else>
+      <!-- 服务器 MOTD 卡片：整个启动器只有这一处，摆在主页面最上方。
+           地址与开关在客户端设置里配置，外观与内容在 components/MotdCard.vue -->
+      <div v-if="motdCardVisible" class="motd-top">
+        <MotdCard refreshable :motd="motdInfo" :loading="motdLoading" :name="motdInfo?.ip || t('server.name')"
+          @refresh="refreshMotd" />
+      </div>
 
       <!-- 多选模式工具栏：与其它窗口同一套外观。排在内容区最上方，
            出现时把下面的内容一起挤下去，不压住第一行 -->
@@ -2623,9 +2647,10 @@ onMounted(async () => {
                 @quick-launch="quickLaunch" back-label-key="home.backToList" @back="newsActive = false" />
             </section>
 
-            <section v-else key="list" class="list-mode" :class="{ 'has-motd': motdCardVisible }">
+            <section v-else key="list" class="list-mode">
               <!-- 实例图标：悬停压暗并露出改图标入口；方块列表渲染过时多给一个"用方块"的入口 -->
-              <InstanceIcon :name="selected?.name ?? '—'" :uuid="selected?.uuid ?? '0'" :size="120"
+              <InstanceIcon :name="selected?.name ?? '—'" :uuid="selected?.uuid ?? '0'"
+                :loader="selected?.loader ?? ''" :size="120"
                 @mouseenter="onIconHover">
                 <div v-if="selected" class="icon-edit-overlay">
                   <button type="button" class="icon-edit" v-tip="t('actions.pickImage')"
@@ -2685,33 +2710,39 @@ onMounted(async () => {
                   <RowMenu v-if="launchMenuOpen" :x="launchMenuPos.x" :y="launchMenuPos.y"
                     :items="launchMenuItems" @pick="onLaunchMenuPick" @close="launchMenuOpen = false" />
                 </div>
+                <!-- 两组按钮各自贴紧：左边两个文字按钮一组、右边三个图标键一组，
+                     两组之间的间距保持原样（见 main-window.css .launch-sub-actions） -->
                 <div class="launch-sub-actions">
-                  <!-- 实例设置：含启动参数（与分组模式下的设置面板一致）。带文字：这两项是常用入口 -->
-                  <BaseButton size="sm" class="has-text" :aria-label="t('detail.settings')" :disabled="!selected"
-                    @click="toggleSettings">
-                    <GlyphIcon name="gear" :size="15" :weight="1.8" /> {{ t("detail.settings") }}
-                  </BaseButton>
-                  <!-- 资源管理：分组模式的右侧详情面板里有这个入口，而列表模式没有详情面板，
-                       这里不补一个就进不去资源管理窗口 -->
-                  <BaseButton size="sm" class="has-text" :aria-label="t('actions.manageResource')" :disabled="!selected"
-                    @click="onAction('manageResource')">
-                    <GlyphIcon name="package" :size="15" :weight="1.8" /> {{ t("actions.manageResource") }}
-                  </BaseButton>
-                  <!-- 打开实例文件夹：调试启动已挪到启动按钮右侧的下拉里 -->
-                  <BaseButton size="sm" class="icon-btn-head" v-tip="t('actions.openFolder')"
-                    :aria-label="t('actions.openFolder')" :disabled="!selected" @click="onAction('openFolder')">
-                    <GlyphIcon name="folder" :size="15" :weight="1.8" />
-                  </BaseButton>
-                  <!-- 实例日志：主页面不展示日志内容，直接开独立日志窗口 -->
-                  <BaseButton size="sm" class="icon-btn-head" v-tip="t('detail.logs')" :aria-label="t('detail.logs')"
-                    :disabled="!selected" @click="openLogWindow">
-                    <GlyphIcon name="log" :size="15" :weight="1.8" />
-                  </BaseButton>
-                  <!-- 导出实例：与右侧详情面板里的导出按钮同一个动作 -->
-                  <BaseButton size="sm" class="icon-btn-head" v-tip="t('actions.export')"
-                    :aria-label="t('actions.export')" :disabled="!selected" @click="openExportWindow">
-                    <GlyphIcon name="export" :size="15" :weight="1.8" />
-                  </BaseButton>
+                  <div class="launch-sub-group">
+                    <!-- 实例设置：含启动参数（与分组模式下的设置面板一致）。带文字：这两项是常用入口 -->
+                    <BaseButton size="sm" class="has-text" :aria-label="t('detail.settings')" :disabled="!selected"
+                      @click="toggleSettings">
+                      <GlyphIcon name="gear" :size="15" :weight="1.8" /> {{ t("detail.settings") }}
+                    </BaseButton>
+                    <!-- 资源管理：分组模式的右侧详情面板里有这个入口，而列表模式没有详情面板，
+                         这里不补一个就进不去资源管理窗口 -->
+                    <BaseButton size="sm" class="has-text" :aria-label="t('actions.manageResource')"
+                      :disabled="!selected" @click="onAction('manageResource')">
+                      <GlyphIcon name="package" :size="15" :weight="1.8" /> {{ t("actions.manageResource") }}
+                    </BaseButton>
+                  </div>
+                  <div class="launch-sub-group">
+                    <!-- 打开实例文件夹：调试启动已挪到启动按钮右侧的下拉里 -->
+                    <BaseButton size="sm" class="icon-btn-head" v-tip="t('actions.openFolder')"
+                      :aria-label="t('actions.openFolder')" :disabled="!selected" @click="onAction('openFolder')">
+                      <GlyphIcon name="folder" :size="15" :weight="1.8" />
+                    </BaseButton>
+                    <!-- 实例日志：主页面不展示日志内容，直接开独立日志窗口 -->
+                    <BaseButton size="sm" class="icon-btn-head" v-tip="t('detail.logs')" :aria-label="t('detail.logs')"
+                      :disabled="!selected" @click="openLogWindow">
+                      <GlyphIcon name="log" :size="15" :weight="1.8" />
+                    </BaseButton>
+                    <!-- 导出实例：与右侧详情面板里的导出按钮同一个动作 -->
+                    <BaseButton size="sm" class="icon-btn-head" v-tip="t('actions.export')"
+                      :aria-label="t('actions.export')" :disabled="!selected" @click="openExportWindow">
+                      <GlyphIcon name="export" :size="15" :weight="1.8" />
+                    </BaseButton>
+                  </div>
                 </div>
               </div>
               <!-- 设置面板整体展开/收起；宽度与居中由外层槽位承担，与原 .list-args 的占位一致 -->
@@ -2770,7 +2801,8 @@ onMounted(async () => {
                   <div v-if="selected" :key="selected.uuid" class="detail-instance flex flex-col gap-2.5">
                     <div class="detail-top flex items-start gap-[18px]">
                       <!-- 实例图标：悬停压暗并露出改图标入口，与列表模式同一套 -->
-                      <InstanceIcon :name="selected.name" :uuid="selected.uuid" :size="84" @mouseenter="onIconHover">
+                      <InstanceIcon :name="selected.name" :uuid="selected.uuid" :loader="selected.loader" :size="84"
+                        @mouseenter="onIconHover">
                         <div class="icon-edit-overlay">
                           <button type="button" class="icon-edit" v-tip="t('actions.pickImage')"
                             :aria-label="t('actions.pickImage')" @click="pickIconFile(selected)">
@@ -2788,7 +2820,8 @@ onMounted(async () => {
                       <!-- 右侧：启动游戏用大按钮，添加 / 管理资源用小按钮 -->
                       <div class="detail-side">
                         <div class="launch-row">
-                          <BaseButton variant="primary" size="lg" class="play-btn" :class="{ running: selected.running }"
+                          <BaseButton variant="primary" size="lg" class="launch-main-btn play-btn"
+                            :class="{ running: selected.running }"
                             :disabled="!selected.running && !isPreparing && offlineLaunchBlocked"
                             @click="onLaunchAction">
                             <span v-if="selected.running" class="launch-busy">
@@ -2941,8 +2974,8 @@ onMounted(async () => {
                             </label>
                           </div>
 
-                          <!-- MOTD 展示：只在**填了服务器地址**时出现，否则会像"查过但没结果"；
-                               卡片外观在 components/MotdCard.vue，与底部悬浮卡、资源窗口那张同一份 -->
+                          <!-- MOTD 展示：只在填了服务器地址时出现，否则会像"查过但没结果"；
+                               卡片外观在 components/MotdCard.vue，与主页面最上方那张同一份 -->
                           <MotdCard v-if="argsOf(selected.uuid).serverIp.trim()" compact :motd="instMotd"
                             :loading="instMotdLoading" :name="instMotd?.ip || argsOf(selected.uuid).serverIp" />
                         </div>
@@ -2989,13 +3022,6 @@ onMounted(async () => {
 
       </main>
 
-      <!-- 服务器 MOTD 悬浮卡片，摆在启动器下方；地址与开关在客户端设置里配置。
-           `.motd-float` 只管固定摆位，卡片外观与内容在 components/MotdCard.vue —
-           与实例详情里的那张、资源窗口服务器列表上方那张是同一份 -->
-      <div v-if="motdCardVisible" class="motd-float">
-        <MotdCard refreshable :motd="motdInfo" :loading="motdLoading" :name="motdInfo?.ip || t('server.name')"
-          @refresh="refreshMotd" />
-      </div>
 
       <!-- ===== 右键菜单（MainCtxMenu 组件） ===== -->
       <MainCtxMenu :menu="ctxMenu" :groups="groups" :renderdoc-available="renderdocSupported" @close="closeCtxMenu" @select-all="onGroupSelectAll"
