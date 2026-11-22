@@ -45,7 +45,8 @@
   margin-bottom: 0;
 }
 
-.settings-layout .setting-group>.field-label+* {
+.settings-layout .setting-group>.field-label+*,
+.settings-layout .setting-group>.args-label+* {
   margin-top: 8px;
 }
 
@@ -124,9 +125,17 @@
 
 
 /* 右侧内容：自己滚，留白取全 app 内容区那一档 22/26；
-   右内边距减掉滚动条那 9px，内容右缘因此仍落在 26px 上（与 .frame-body.gutter 同一处理） */
-/* .tab-content 的滚动与内边距在 SettingsWindow.vue 的工具类上：
-   右内边距要扣掉滚动条那 9px，内容右缘才落在 26px 上 */
+   右内边距减掉滚动条那 9px，内容右缘因此仍落在 26px 上（与 .frame-body.gutter 同一处理）。
+   左右留白提成变量：吸顶条这类要铺满整条内容宽度的元素按它反向撑开 */
+.settings-layout {
+  --set-pad-l: 26px;
+  --set-pad-r: 17px;
+}
+
+.settings-layout .tab-content {
+  padding-left: var(--set-pad-l);
+  padding-right: var(--set-pad-r);
+}
 
 
 /* 页面顶部留白：必须落在滚动内容里，吸顶元素才不会比内容区顶边低 22px。
@@ -168,12 +177,26 @@
   background: var(--bg-hover);
 }
 
-.settings-layout .group-title::before {
+/* 分组标题与手柄页的分段标题共用同一根竖条 */
+.settings-layout .group-title::before,
+.settings-layout .gp-sec-title::before {
   content: "";
   width: 3px;
   height: 13px;
   border-radius: 2px;
   background: var(--accent);
+}
+
+/* 手柄页的「按钮 / 轴 / 摇杆」：分段标题按分组标题的样子排，视觉层级与其它标签页一致 */
+.settings-layout .gp-sec-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 0 12px;
+  padding-bottom: 9px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
 }
 
 /* 每个标签的第一个分组不额外留上边距 */
@@ -352,17 +375,68 @@
 
 /* ---------- 登录方式锁定 ---------- */
 
-.settings-layout .lock-item-text {
+/* 已锁定条目：一条一行，类型为主、名称与地址为辅，右侧是图标移除键 */
+.settings-layout .lock-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-layout .lock-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  font-size: var(--ctl-font);
+}
+
+.settings-layout .lock-item-type {
+  flex: none;
+  font-weight: 600;
+}
+
+.settings-layout .lock-item-meta {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text-dim);
 }
 
+.settings-layout .lock-item-dot {
+  margin: 0 4px;
+}
+
+/* 移除键：无边框图标键（行本身有边框，再套一层框就成两层控件了），贴到行的右端 */
+.settings-layout .lock-item>.ui-btn-icon {
+  margin-left: auto;
+}
+
+.settings-layout .lock-item>.ui-btn-icon:hover:not(:disabled) {
+  color: var(--red);
+}
+
+/* 添加行：类型 / 名称 / 服务器 / 按钮；窄了自动换行，按钮不跟着挤变形 */
 .settings-layout .lock-add {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.settings-layout .lock-add-btn {
+  flex: none;
+  margin-left: auto;
+}
+
+/* 不用填名称 / 服务器的登录方式：类型下拉撑开，整行铺满，右边留给添加按钮 */
+.settings-layout .lock-add-simple .lock-add-type {
+  flex: 1;
+  width: auto;
 }
 
 .settings-layout .lock-add-type {
@@ -418,14 +492,7 @@
    .ok / .err / .pending 三个类名保留给主题与搜索索引识别 */
 
 
-/* ---------- 参数 textarea 与逐行编辑（DoH / 环境变量） ---------- */
-
-.settings-layout .args-input {
-  min-height: 56px;
-  resize: vertical;
-  font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 12px;
-}
+/* ---------- 逐行编辑（DoH / 环境变量） ---------- */
 
 .settings-layout .dns-lines {
   display: flex;
@@ -440,6 +507,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* 环境变量的键列固定宽、值占剩余：与实例设置的「附加环境变量」同一口径 */
+.settings-layout .env-key {
+  flex: 0 0 140px;
 }
 
 /* 占满剩余宽度的表单项。不能叫 .grow：Tailwind 有 flex-grow 工具类同名 */
@@ -470,8 +542,9 @@
 }
 
 .settings-layout .line-add {
-  align-self: flex-start;
-  display: inline-flex;
+  /* 铺满整行（父级是 column flex）：与上面的输入框同宽，四个附加参数组看起来是同一列 */
+  display: flex;
+  justify-content: center;
   align-items: center;
   /* 图标是 SVG（原来是字形，靠一个空格隔开），间距改由 gap 给 */
   gap: 6px;
@@ -587,6 +660,27 @@
 
 .settings-layout .java-add-row .ui-btn {
   height: auto;
+}
+
+/* 添加行里那枚"添加"图标按钮：这一行的主操作，用强调色与"选择文件"区分 */
+.settings-layout .java-add-row .ui-btn-icon.is-accent {
+  color: var(--accent);
+}
+
+.settings-layout .java-add-row .ui-btn-icon.is-accent:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* 下载 Java 独占右端：与扫描 / 导入那排拉开距离，避免误点 */
+.settings-layout .java-add-actions .java-download {
+  margin-left: auto;
+}
+
+/* 列表底部的"删除全部"：与上面的 Java 分组拉开一档 */
+.settings-layout .java-list-actions {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .settings-layout .java-add-name {

@@ -379,7 +379,6 @@ function pageFileCount(id: string): number {
       { value: 'Home', label: t('winSettings.startupHome') },
       { value: 'List', label: t('winSettings.startupList') },
     ]" @update:model-value="onStartupChange" />
-    <p class="field-desc">{{ t("winSettings.startupPageDesc") }}</p>
 
     <!-- 实例列表显示模式 + 侧栏：并排一行。列表模式没有侧栏，那一列整块不显示 -->
     <div class="pair-row">
@@ -389,7 +388,6 @@ function pageFileCount(id: string): number {
           { value: 'group', label: t('mode.group') },
           { value: 'list', label: t('mode.list') },
         ]" @update:model-value="onViewModeChange" />
-        <p class="field-desc">{{ t("winSettings.viewModeDesc") }}</p>
       </div>
       <div v-if="view === 'group'" class="pair-item">
         <label class="field-label">{{ t("winSettings.sidebar") }}</label>
@@ -397,7 +395,6 @@ function pageFileCount(id: string): number {
           { value: 'Left', label: t('winSettings.sidebarLeft') },
           { value: 'Right', label: t('winSettings.sidebarRight') },
         ]" @update:model-value="onSideChange" />
-        <p class="field-desc">{{ t("winSettings.sidebarDesc") }}</p>
       </div>
     </div>
   </SettingsGroup>
@@ -467,10 +464,6 @@ function pageFileCount(id: string): number {
 
 .pair-item>.field-label+* {
   margin-top: 8px;
-}
-
-.pair-item>.field-desc {
-  margin-top: 6px;
 }
 
 /* 窗口透明度与窗口毛玻璃并排一行 */

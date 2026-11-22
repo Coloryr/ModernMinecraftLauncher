@@ -134,6 +134,9 @@ export const KEYS = {
   /** NBT 树键列宽度，单位像素；0 表示按默认比例，见 NbtTree */
   nbtKeyWidth: "mml.nbtKeyWidth",
 
+  /** 已下载资源窗口的列宽，单位像素（JSON，键是列 key） */
+  downloadedResCols: "mml.downloadedResCols",
+
   // ---- 跨窗口一次性通知 ----
   /** 新增实例 uuid：添加实例 / 整合包窗口写给主窗口，见 AddInstanceWindow */
   addedInstance: "mml.addedInstance",

@@ -23,9 +23,25 @@ import { useInstanceChange } from "../../../composables/useInstanceChange";
 /** 登录方式锁定的候选（复用账户添加类型的文案） */
 const LOGIN_TYPES = ["offline", "microsoft", "littleskin", "selflittleskin", "authlib", "nide8"];
 
-/** 需要服务器信息的类型：外置登录 / 自定义皮肤站填服务器地址，统一通行证填服务器 ID；
+/** 需要服务器信息的类型：外置登录 / 自定义皮肤站填服务器地址，统一通行证填服务器 UUID；
  *  这些类型可重复添加，条目带「登录模型名字」，添加账户时直接下拉选择 */
 const SERVER_LOCK_TYPES = ["authlib", "selflittleskin", "nide8"];
+
+/** 统一通行证的服务器 UUID（nide8 的 serverId），允许省略连字符 */
+const NIDE8_UUID_RE = /^[0-9a-f]{8}(?:-?[0-9a-f]{4}){3}-?[0-9a-f]{12}$/i;
+/**
+ * 统一通行证的服务器 UUID 归一成小写带连字符
+ *
+ * - `raw`: 用户输入；调用方保证已过 {@link NIDE8_UUID_RE}
+ *
+ * # 返回值
+ *
+ * `8-4-4-4-12` 形式，与账户侧存的 serverId 同一口径
+ */
+function normalizeNide8Uuid(raw: string): string {
+  const hex = raw.replace(/-/g, "").toLowerCase();
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 /**
  * 客户端设置的共享状态与保存：客户端设置页与界面页的窗口外观都用这一份
@@ -34,7 +50,7 @@ const SERVER_LOCK_TYPES = ["authlib", "selflittleskin", "nide8"];
  *
  * - `client`: `gui_config.client` 的副本，即改即存
  * - `serverAddr`: 自动进服与 MOTD 共用的服务器地址，可双向绑定
- * - `loginTypeLabel` / `addLock*` / `lockServerError` / `lockServerPlaceholder`: 登录方式锁定的添加表单
+ * - `loginTypeLabel` / `addLock*` / `checkLockServerUuid` / `lockServerError` / `lockServerPlaceholder`: 登录方式锁定的添加表单
  * - `lockInstances` / `refreshLockInstances` / `lockMissing` / `onLockInstanceChange`: 实例锁定
  * - `customHome` / `importingCustomHome` / `customHomeState` / `refreshCustomHome` / `importCustomHome` / `removeCustomHome`: 自定义主页面
  * - `customUi` / `customPageState` / `refreshCustomUi` / `importCustomPage` / `removeCustomPage`: 完全自定义界面的整页包
@@ -165,14 +181,15 @@ export function useSettingsClient() {
     return t(typeLabelKey(ty));
   }
 
-  /** 服务器输入框的占位文案 */
+  /** 服务器输入框的占位文案：统一通行证要的是服务器 UUID，其余是服务器地址 */
   const lockServerPlaceholder = computed(() =>
     addLockType.value === "nide8"
-      ? t("winSettings.lockNide8ServerHint")
+      ? t("winSettings.lockNide8Uuid")
       : addLockType.value === "selflittleskin"
         ? t("winSettings.lockSelfServerHint")
         : t("winSettings.lockAuthlibServerHint"),
   );
+
 
   /** 校验服务器输入：通过则清空错误，否则把原因写进 `lockServerError` */
   function validateLockServer(): boolean {
@@ -185,7 +202,12 @@ export function useSettingsClient() {
       lockServerError.value = t("winSettings.loginLockServerRequired");
       return false;
     }
-    if (client.value.loginLock.some((e) => e.ty === addLockType.value && e.server === v)) {
+    if (addLockType.value === "nide8" && !NIDE8_UUID_RE.test(v)) {
+      lockServerError.value = t("winSettings.loginLockServerUuid");
+      return false;
+    }
+    const server = addLockType.value === "nide8" ? normalizeNide8Uuid(v) : v;
+    if (client.value.loginLock.some((e) => e.ty === addLockType.value && e.server === server)) {
       lockServerError.value = t("winSettings.loginLockServerDup");
       return false;
     }
@@ -203,14 +225,21 @@ export function useSettingsClient() {
       lockServerError.value = t("winSettings.loginLockNameRequired");
       return;
     }
-    client.value.loginLock = [
-      ...client.value.loginLock,
-      { ty, name, server: addLockServer.value.trim() },
-    ];
+    const server =
+      ty === "nide8" ? normalizeNide8Uuid(addLockServer.value.trim()) : addLockServer.value.trim();
+    client.value.loginLock = [...client.value.loginLock, { ty, name, server }];
     addLockName.value = "";
     addLockServer.value = "";
     lockServerError.value = "";
     void applyClient();
+  }
+
+  /** 失焦时就检查统一通行证的服务器 UUID，不必等点「添加」才报错 */
+  function checkLockServerUuid(): void {
+    if (addLockType.value !== "nide8" || !addLockServer.value.trim()) return;
+    lockServerError.value = NIDE8_UUID_RE.test(addLockServer.value.trim())
+      ? ""
+      : t("winSettings.loginLockServerUuid");
   }
 
   /** 删掉第 `i` 条锁定条目并保存 */
@@ -518,10 +547,8 @@ export function useSettingsClient() {
       case "instanceLock":
         client.value.lockInstance = d.lockInstance;
         break;
-      case "autoSave":
-        client.value.autoSaveNotice = d.autoSaveNotice;
-        break;
-      case "commandNotice":
+      case "launchCmd":
+        // 启动命令组里属于 client 的那一项：执行命令前是否确认
         client.value.commandNotice = d.commandNotice;
         break;
       case "customHome":
@@ -538,14 +565,18 @@ export function useSettingsClient() {
         client.value.customPageOn = d.customPageOn;
         break;
       case "launchCheck":
+        // 这一组里有两份数据：检查开关在 launchCheck，自动进入存档在 client
         launchCheck.value = { ...defaultConfig().launchCheck };
+        client.value.autoSaveNotice = d.autoSaveNotice;
+        client.value.autoEnterSave = d.autoEnterSave;
         break;
       default:
         return false;
     }
     if (id === "launchCheck") {
-      // 启动前检查开关不在 client 里，走自己那份提交
+      // 启动前检查开关不在 client 里，走自己那份提交；同一组里的自动进入存档要跟着一起落盘
       await applyLaunchCheck();
+      await applyClient();
     } else {
       await applyClient();
     }
@@ -585,6 +616,7 @@ export function useSettingsClient() {
     removeLock,
     lockServerError,
     lockServerPlaceholder,
+    checkLockServerUuid,
     lockInstances,
     refreshLockInstances,
     lockMissing,

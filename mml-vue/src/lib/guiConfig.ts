@@ -223,6 +223,8 @@ export interface ClientConfig {
   accountCheck: boolean;
   /** 实例配了自动进入存档时，启动前是否弹窗确认 */
   autoSaveNotice: boolean;
+  /** 启动后直接进入实例配的存档，不再询问；开启时 autoSaveNotice 不再生效 */
+  autoEnterSave: boolean;
   /** 实例配了启动前 / 后命令时，启动前是否弹窗确认 */
   commandNotice: boolean;
   /** 游戏自动进服地址：host 或 host:port，空表示不自动进服 */
@@ -494,6 +496,8 @@ export function defaultConfig(): GuiConfig {
       accountCheck: true,
       // 自动进入存档的启动提醒默认开，同样以 gui_config.json 为准
       autoSaveNotice: true,
+      // 直接进入存档默认关：先问一次，用户要"不问"才开
+      autoEnterSave: false,
       // 启动前 / 后命令的提醒同样默认开
       commandNotice: true,
       autoJoinServer: readString(KEYS.autoJoinServer),

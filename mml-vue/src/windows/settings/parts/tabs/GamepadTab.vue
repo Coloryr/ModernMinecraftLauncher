@@ -192,9 +192,17 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
 </script>
 
 <template>
-  <SettingsGroup id="gamepad" :flash="flashGroup === 'gamepad'">
+  <SettingsGroup id="gamepad" title-key="winSettings.secGamepad" :flash="flashGroup === 'gamepad'">
+    <!-- 游戏内手柄总开关：关着时只用于界面上的测试与预览 -->
+    <div v-if="config" class="switch-row">
+      <div class="switch-text">
+        <span class="switch-label">{{ t("winGamepad.ingame") }}</span>
+        <span class="switch-state">{{ t("winGamepad.ingameHint") }}</span>
+      </div>
+      <BaseSwitch :model-value="config.enabled" @update:model-value="(value) => config && (config.enabled = value)" />
+    </div>
     <!-- 配置：下拉选一份；除保存外都是图标键，文字进提示 -->
-    <div class="gp-bar flex items-center gap-2.5 m-0 px-0 pt-3.5 pb-4 border-b border-border">
+    <div class="gp-bar flex items-center gap-2.5 pb-4 border-b border-border">
       <span class="gp-bar-label shrink-0 text-body text-dim">{{ t("winGamepad.profiles") }}</span>
       <select class="field-select gp-select grow-0 shrink basis-[220px] min-w-[120px] max-w-full" :value="editing" :aria-label="t('winGamepad.profiles')"
         @change="onPick">
@@ -229,20 +237,12 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
     <GamepadTestPanel :layout="config?.layout ?? null" :swap-ab="config?.swapAb ?? null"
       @detected="detected = $event" @update:layout="setLayout" @update:swap-ab="setSwapAb" />
 
-    <!-- 游戏内手柄总开关：关着时只用于界面上的测试与预览 -->
-    <div v-if="config" class="switch-row">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("winGamepad.ingame") }}</span>
-        <span class="switch-state">{{ t("winGamepad.ingameHint") }}</span>
-      </div>
-      <BaseSwitch :model-value="config.enabled" @update:model-value="(value) => config && (config.enabled = value)" />
-    </div>
     <p v-if="!editing" class="empty-tip">{{ t("winGamepad.empty") }}</p>
     <p v-else-if="!config" class="empty-tip">{{ t("winGamepad.broken") }}</p>
 
     <template v-else>
       <section class="gp-sec mb-6">
-        <h3 class="gp-sec-title mt-0 mb-2 text-title font-semibold">{{ t("winGamepad.buttons") }}</h3>
+        <h3 class="gp-sec-title">{{ t("winGamepad.buttons") }}</h3>
         <p class="field-desc">{{ t("winGamepad.buttonHint") }}</p>
         <!-- 鼠标模式单独一套时，下面这张表跟着上面的分段切 -->
         <div class="gp-button-mode flex items-center justify-between gap-3 mt-2.5">
@@ -291,7 +291,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
       </section>
 
       <section class="gp-sec mb-6">
-        <h3 class="gp-sec-title mt-0 mb-2 text-title font-semibold">{{ t("winGamepad.axes") }}</h3>
+        <h3 class="gp-sec-title">{{ t("winGamepad.axes") }}</h3>
         <p class="field-desc">{{ t("winGamepad.axisHint") }}</p>
         <div class="gp-row gp-row-head gp-row-axis grid items-center gap-2 py-1 pb-0.5 text-meta text-dim">
           <span>{{ t("winGamepad.axis") }}</span>
@@ -332,7 +332,7 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
       </section>
 
       <section class="gp-sec mb-6">
-        <h3 class="gp-sec-title mt-0 mb-2 text-title font-semibold">{{ t("winGamepad.mouse") }}</h3>
+        <h3 class="gp-sec-title">{{ t("winGamepad.mouse") }}</h3>
         <div class="gp-field-row flex gap-2.5">
           <div class="gp-field flex flex-col flex-1 min-w-0">
             <label class="field-label">{{ t("winGamepad.cursorStick") }}</label>
@@ -418,6 +418,19 @@ function setRuleModifier(rule: { modifier: GamepadButtonDto | null }, value: Gam
   position: sticky;
   top: 0;
   z-index: 1;
+  /* 吸顶后内容从这一条底下滚过去：页面底色 62% + 背景模糊，滚过去是一片毛玻璃而不是透出的字。
+     底色必须跟页面同色（不能用卡片色）：否则空的地方会显出一条色带，看着像块实底；
+     同色时静止状态看不到条，只有内容经过才有糊过的痕迹 */
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.06);
+  backdrop-filter: blur(16px) saturate(1.06);
+  /* 铺满整条内容宽度：负外边距吃掉内容区左右留白、条里再补回来，滚过去时左右不留白边 */
+  margin-left: calc(-1 * var(--set-pad-l));
+  margin-right: calc(-1 * var(--set-pad-r));
+  padding-left: var(--set-pad-l);
+  padding-right: var(--set-pad-r);
+  /* 吸顶时上方留一点空，控件不贴着标题栏 */
+  padding-top: 10px;
 }
 
 /* 生效中的配置：按钮此时禁用，默认的 0.5 透明度会把状态一起压掉，

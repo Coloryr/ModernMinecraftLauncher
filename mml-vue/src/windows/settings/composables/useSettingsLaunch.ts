@@ -34,6 +34,14 @@ function parseEnvLines(text: string): EnvLine[] {
     });
 }
 
+/** 把多行文本拆成逐行草稿（JVM 参数一行一条，空行丢掉） */
+function parseArgLines(text: string): string[] {
+  return text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
 /**
  * 游戏启动标签的状态与保存
  *
@@ -41,6 +49,8 @@ function parseEnvLines(text: string): EnvLine[] {
  *
  * - `run` / `win`: 启动参数与游戏窗口设置，两者一起防抖 500ms 落盘
  * - `envLines` / `addEnvLine` / `removeEnvLine` / `commitEnvLines`: JVM 环境变量的逐行编辑
+ * - `jvmArgLines` / `addJvmArgLine` / `removeJvmArgLine` / `commitJvmArgLines`: JVM 参数的逐行编辑
+ * - `gameArgLines` / `addGameArgLine` / `removeGameArgLine` / `commitGameArgLines`: 游戏参数的逐行编辑
  * - `gcOptions` / `memoryConflict` / `saveState`: 界面选项、内存冲突标记与保存状态
  * - `load` / `applyLaunch` / `saveNow` / `resetGroup`: 加载、落盘与分组级恢复默认
  */
@@ -51,6 +61,13 @@ export function useSettingsLaunch() {
   const envLines = ref<EnvLine[]>([]);
   /** 逐行编辑的稳定 key：删中间一行时后面的输入框不会复用错位 */
   const envKeys = useLineKeys(() => envLines.value.length);
+  /** JVM 参数逐条编辑，一行一条；落盘时按行拼回 run.jvmArgs */
+  const jvmArgLines = ref<string[]>([]);
+  /** 同样是稳定 key，删中间一行不会错位 */
+  const jvmArgKeys = useLineKeys(() => jvmArgLines.value.length);
+  /** 游戏参数同样逐条编辑；落盘时按行拼回 run.gameArgs */
+  const gameArgLines = ref<string[]>([]);
+  const gameArgKeys = useLineKeys(() => gameArgLines.value.length);
 
   const { state, track, markError } = useSaveState();
 
@@ -77,6 +94,8 @@ export function useSettingsLaunch() {
     run.value = launch.run;
     win.value = launch.window;
     envLines.value = parseEnvLines(launch.run.jvmEnv);
+    jvmArgLines.value = parseArgLines(launch.run.jvmArgs);
+    gameArgLines.value = parseArgLines(launch.run.gameArgs);
     loaded = true;
   }
 
@@ -100,6 +119,26 @@ export function useSettingsLaunch() {
     if (run.value.jvmEnv !== merged) run.value.jvmEnv = merged;
   }
 
+  /** 把逐行编辑的 JVM 参数拼回 run.jvmArgs（保存前调用） */
+  function commitJvmArgLines() {
+    if (!run.value) return;
+    const merged = jvmArgLines.value
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join("\n");
+    if (run.value.jvmArgs !== merged) run.value.jvmArgs = merged;
+  }
+
+  /** 把逐行编辑的游戏参数拼回 run.gameArgs（保存前调用） */
+  function commitGameArgLines() {
+    if (!run.value) return;
+    const merged = gameArgLines.value
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join("\n");
+    if (run.value.gameArgs !== merged) run.value.gameArgs = merged;
+  }
+
   async function applyLaunch() {
     if (!run.value || !win.value) return;
     if (memoryConflict.value) {
@@ -114,6 +153,8 @@ export function useSettingsLaunch() {
     conflictNotified = false;
     try {
       commitEnvLines();
+      commitJvmArgLines();
+      commitGameArgLines();
       await track(() => commands.settings.saveLaunch(run.value!, win.value!));
     } catch (e) {
       showToast(tErr(e));
@@ -130,7 +171,7 @@ export function useSettingsLaunch() {
   }
 
   watch(
-    [run, win, envLines],
+    [run, win, envLines, jvmArgLines, gameArgLines],
     () => {
       if (!loaded) return;
       if (timer !== null) clearTimeout(timer);
@@ -150,6 +191,22 @@ export function useSettingsLaunch() {
 
   function removeEnvLine(i: number) {
     envLines.value.splice(i, 1);
+  }
+
+  function addJvmArgLine() {
+    jvmArgLines.value.push("");
+  }
+
+  function removeJvmArgLine(i: number) {
+    jvmArgLines.value.splice(i, 1);
+  }
+
+  function addGameArgLine() {
+    gameArgLines.value.push("");
+  }
+
+  function removeGameArgLine(i: number) {
+    gameArgLines.value.splice(i, 1);
   }
 
   // ---------- 恢复默认 ----------
@@ -182,11 +239,11 @@ export function useSettingsLaunch() {
         run.value.jvmEnv = d.run.jvmEnv;
         // 逐行草稿跟着重建，否则界面还显示旧的环境变量
         envLines.value = parseEnvLines(d.run.jvmEnv);
-        break;
-      case "gameArgs":
-        if (!run.value) return false;
+        jvmArgLines.value = parseArgLines(d.run.jvmArgs);
+        // 游戏参数已并进同一组：恢复默认时一起回到内置值
         run.value.removeGameArg = d.run.removeGameArg;
         run.value.gameArgs = d.run.gameArgs;
+        gameArgLines.value = parseArgLines(d.run.gameArgs);
         break;
       case "launchCmd":
         if (!run.value) return false;
@@ -234,6 +291,16 @@ export function useSettingsLaunch() {
     commitEnvLines,
     addEnvLine,
     removeEnvLine,
+    jvmArgLines,
+    jvmArgKeys,
+    commitJvmArgLines,
+    addJvmArgLine,
+    removeJvmArgLine,
+    gameArgLines,
+    gameArgKeys,
+    commitGameArgLines,
+    addGameArgLine,
+    removeGameArgLine,
     saveState: state,
     resetGroup,
   };

@@ -26,7 +26,7 @@ function update(patch: Partial<InstanceArgsDto>) {
       <input type="checkbox" class="exec-chk" :checked="args.preEnabled"
         @change="update({ preEnabled: ($event.target as HTMLInputElement).checked })" />
     </div>
-    <textarea class="exec-text" rows="2" :value="args.preCmd" :disabled="!args.preEnabled"
+    <textarea class="cmd-text" rows="2" :value="args.preCmd" :disabled="!args.preEnabled"
       :placeholder="t('exec.preContent')" spellcheck="false"
       @input="update({ preCmd: ($event.target as HTMLTextAreaElement).value })"></textarea>
 
@@ -35,7 +35,7 @@ function update(patch: Partial<InstanceArgsDto>) {
       <input type="checkbox" class="exec-chk" :checked="args.postEnabled"
         @change="update({ postEnabled: ($event.target as HTMLInputElement).checked })" />
     </div>
-    <textarea class="exec-text" rows="2" :value="args.postCmd" :disabled="!args.postEnabled"
+    <textarea class="cmd-text" rows="2" :value="args.postCmd" :disabled="!args.postEnabled"
       :placeholder="t('exec.postContent')" spellcheck="false"
       @input="update({ postCmd: ($event.target as HTMLTextAreaElement).value })"></textarea>
   </div>
@@ -50,6 +50,8 @@ function update(patch: Partial<InstanceArgsDto>) {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
+  /* 面板本身是卡片底：命令框压回页面底色，才有凹进去的层次（默认值见 controls.css 的 .cmd-text） */
+  --cmd-text-bg: var(--bg);
 }
 
 .exec-row {
@@ -66,31 +68,5 @@ function update(patch: Partial<InstanceArgsDto>) {
 
 .exec-chk {
   accent-color: var(--accent);
-}
-
-.exec-text {
-  width: 100%;
-  /* 最少两行、最多二十行：再高就该在框里滚，不然一条长命令能把整块面板顶下去。
-     18px 是上下内边距 8+8 加边框 1+1，1.4em 是这几行文字的默认行高 */
-  min-height: calc(2 * 1.4em + 18px);
-  max-height: calc(20 * 1.4em + 18px);
-  overflow-y: auto;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 12.5px;
-  font-family: "Cascadia Code", Consolas, "Courier New", monospace;
-  resize: vertical;
-  outline: none;
-}
-
-.exec-text:focus {
-  border-color: var(--accent);
-}
-
-.exec-text:disabled {
-  opacity: 0.5;
 }
 </style>

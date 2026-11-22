@@ -16,6 +16,8 @@ export type LinkResourceQueryDto = {
   keyword: string,
   page: number,
   pageSize: number,
+  sort: string,
+  desc: boolean,
 };
 
 export type LinkResourcePageDto = {

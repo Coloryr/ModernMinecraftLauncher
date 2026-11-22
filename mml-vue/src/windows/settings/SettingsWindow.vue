@@ -122,9 +122,9 @@ const clientLocked = computed(() => client.client.value.lockClient);
 
 /** 锁定时要隐藏的设置分组：服主定制内容 + 高级 / 危险项，见 docs 的锁定说明 */
 const LOCKED_GROUPS = [
-  "servers", "loginLock", "instanceLock", "autoSave", "customHome",
+  "servers", "loginLock", "instanceLock", "customHome",
   "customUi", "music", "gameTitle", "serverPack",
-  "theme", "bgImage", "jvm", "gameArgs", "launchCmd", "experimental",
+  "theme", "bgImage", "jvm", "launchCmd", "experimental",
 ];
 
 /** 本次是否处于锁定状态；解锁后本次设置窗口全部放开 */
@@ -347,7 +347,7 @@ function onKeyDown(e: KeyboardEvent) {
       <SettingsRail v-model="tab" :tabs="visibleTabs" />
 
       <!-- 右侧内容区：每个标签一个面板，独立滚动 -->
-      <div class="tab-content flex-1 min-w-0 overflow-y-scroll [scrollbar-gutter:stable] pt-0 pr-[17px] pb-[22px] pl-[26px]">
+      <div class="tab-content flex-1 min-w-0 overflow-y-scroll [scrollbar-gutter:stable] pt-0 pb-[22px]">
         <Transition :css="false" mode="out-in" @enter="enterPage" @leave="leavePage">
           <div :key="tab" class="set-page pt-[22px]">
         <!-- 当前页大标题 + 恢复本页默认（整页只保留这一个重置入口） -->
@@ -356,8 +356,7 @@ function onKeyDown(e: KeyboardEvent) {
             <h2 class="set-content-title text-[19px] font-extrabold">{{ t(`winSettings.tab.${tab}`) }}</h2>
             <p class="set-content-sub text-[12px] text-dim mt-[3px]">{{ t(`winSettings.tabDesc.${tab}`) }}</p>
           </div>
-          <BaseButton v-if="canResetPage" size="sm" class="shrink-0" v-tip="t('winSettings.resetPageHint')"
-            @click="confirmResetPage = true">
+          <BaseButton v-if="canResetPage" size="sm" class="shrink-0" @click="confirmResetPage = true">
             {{ t("winSettings.resetPage") }}
           </BaseButton>
         </header>

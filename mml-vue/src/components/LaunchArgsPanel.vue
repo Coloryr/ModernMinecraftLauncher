@@ -20,6 +20,7 @@ import NumberStepper from "./ui/NumberStepper.vue";
 import CollapsePanel from "./ui/CollapsePanel.vue";
 import { memoryLabel } from "../lib/format";
 import { useLineKeys } from "../composables/useLineKeys";
+import { useRowFocus } from "../composables/useRowFocus";
 
 const props = defineProps<{
   /** 当前实例的启动参数 */
@@ -210,6 +211,9 @@ async function pickJava() {
 // ---- 多行字符串参数 ----
 type LineKey = "jvmArgs" | "gameArgs" | "classPath";
 
+/** 点"添加"后新行自动聚焦；组名与模板里的 ref 回调一致 */
+const { focusNew, setRowRef } = useRowFocus();
+
 const jvmKeys = useLineKeys(() => props.args.jvmArgs.length);
 const gameKeys = useLineKeys(() => props.args.gameArgs.length);
 const classKeys = useLineKeys(() => props.args.classPath.length);
@@ -232,6 +236,7 @@ function removeLine(key: LineKey, idx: number) {
 
 function addLine(key: LineKey) {
   update({ [key]: [...props.args[key], ""] } as Partial<InstanceArgsDto>);
+  focusNew(key, props.args[key].length);
 }
 
 /**
@@ -279,6 +284,7 @@ function removeEnv(idx: number) {
 
 function addEnv() {
   update({ envVars: [...props.args.envVars, { key: "", value: "" }] });
+  focusNew("env", props.args.envVars.length);
 }
 
 // 放进 computed：切换语言时下拉文案要跟着变，setup 里取一次会停在旧语言
@@ -386,6 +392,22 @@ const gcOptions = computed(() => [
 
       <CollapsePanel :open="advancedOpen">
         <div class="advanced-body">
+          <!-- 三个开关并排放在最上面：隔离用户目录 / MML 环境变量 / ColorASM，标签不折行 -->
+          <div class="args-row args-switch-row">
+            <div class="args-switch">
+              <span class="args-label" v-tip="t('args.isolateHomeDesc')">{{ t("args.isolateHome") }}</span>
+              <BaseSwitch :model-value="args.isolateHome" @update:model-value="update({ isolateHome: $event })" />
+            </div>
+            <div class="args-switch">
+              <span class="args-label" v-tip="t('args.mmlEnvDesc')">{{ t("args.mmlEnv") }}</span>
+              <BaseSwitch :model-value="args.mmlEnv" @update:model-value="update({ mmlEnv: $event })" />
+            </div>
+            <div class="args-switch">
+              <span class="args-label" v-tip="t('args.colorasmDesc')">{{ t("args.colorasm") }}</span>
+              <BaseSwitch :model-value="args.colorasm" @update:model-value="update({ colorasm: $event })" />
+            </div>
+          </div>
+
           <div class="args-row">
             <span class="args-label">{{ t("args.gc") }}</span>
             <select class="field-select field-grow" :value="args.gc"
@@ -409,7 +431,8 @@ const gcOptions = computed(() => [
 
           <!-- 附加 JVM 参数 -->
           <label class="args-label">{{ t("args.jvmExtra") }}</label>
-          <div v-for="(line, i) in args.jvmArgs" :key="jvmKeys.keys[i]" class="line-row">
+          <div v-for="(line, i) in args.jvmArgs" :key="jvmKeys.keys[i]" class="line-row"
+            :ref="(el) => setRowRef('jvmArgs', i, el)">
             <input class="field-input field-grow" :value="line" placeholder="-XX:+UseG1GC" spellcheck="false"
               @input="setLine('jvmArgs', i, ($event.target as HTMLInputElement).value)"
               @blur="dropEmptyLine('jvmArgs', i)" />
@@ -423,7 +446,8 @@ const gcOptions = computed(() => [
 
           <!-- 附加游戏参数 -->
           <label class="args-label">{{ t("args.gameExtra") }}</label>
-          <div v-for="(line, i) in args.gameArgs" :key="gameKeys.keys[i]" class="line-row">
+          <div v-for="(line, i) in args.gameArgs" :key="gameKeys.keys[i]" class="line-row"
+            :ref="(el) => setRowRef('gameArgs', i, el)">
             <input class="field-input field-grow" :value="line" placeholder="--server 127.0.0.1:25565" spellcheck="false"
               @input="setLine('gameArgs', i, ($event.target as HTMLInputElement).value)"
               @blur="dropEmptyLine('gameArgs', i)" />
@@ -437,7 +461,8 @@ const gcOptions = computed(() => [
 
           <!-- 附加 classpath -->
           <label class="args-label">{{ t("args.classPath") }}</label>
-          <div v-for="(line, i) in args.classPath" :key="classKeys.keys[i]" class="line-row">
+          <div v-for="(line, i) in args.classPath" :key="classKeys.keys[i]" class="line-row"
+            :ref="(el) => setRowRef('classPath', i, el)">
             <input class="field-input field-grow" :value="line" placeholder="libraries/xxx.jar" spellcheck="false"
               @input="setLine('classPath', i, ($event.target as HTMLInputElement).value)"
               @blur="dropEmptyLine('classPath', i)" />
@@ -451,7 +476,8 @@ const gcOptions = computed(() => [
 
           <!-- 附加环境变量（键值对） -->
           <label class="args-label">{{ t("args.env") }}</label>
-          <div v-for="(line, i) in args.envVars" :key="envKeys.keys[i]" class="line-row">
+          <div v-for="(line, i) in args.envVars" :key="envKeys.keys[i]" class="line-row"
+            :ref="(el) => setRowRef('env', i, el)">
             <input class="field-input env-key" :value="line.key" :placeholder="t('args.envKey')" spellcheck="false"
               @input="setEnvKey(i, ($event.target as HTMLInputElement).value)"
               @blur="dropEmptyEnv(i)" />
@@ -464,21 +490,6 @@ const gcOptions = computed(() => [
           <button class="line-add" @click="addEnv">
             <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("args.addLine") }}
           </button>
-          <!-- 三个开关并排放在最后一行：隔离用户目录 / MML 环境变量 / ColorASM，标签不折行 -->
-          <div class="args-row args-switch-row">
-            <div class="args-switch">
-              <span class="args-label" v-tip="t('args.isolateHomeDesc')">{{ t("args.isolateHome") }}</span>
-              <BaseSwitch :model-value="args.isolateHome" @update:model-value="update({ isolateHome: $event })" />
-            </div>
-            <div class="args-switch">
-              <span class="args-label" v-tip="t('args.mmlEnvDesc')">{{ t("args.mmlEnv") }}</span>
-              <BaseSwitch :model-value="args.mmlEnv" @update:model-value="update({ mmlEnv: $event })" />
-            </div>
-            <div class="args-switch">
-              <span class="args-label" v-tip="t('args.colorasmDesc')">{{ t("args.colorasm") }}</span>
-              <BaseSwitch :model-value="args.colorasm" @update:model-value="update({ colorasm: $event })" />
-            </div>
-          </div>
         </div>
       </CollapsePanel>
     </div>
@@ -557,24 +568,6 @@ const gcOptions = computed(() => [
 
 .args-chevron.flip {
   transform: rotate(180deg);
-}
-
-/* 开关并排：标签按内容宽排；面板窄了就换行，别把第三个挤出去 */
-.args-switch-row {
-  flex-wrap: wrap;
-  gap: 10px 16px;
-}
-
-.args-switch {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.args-switch .args-label {
-  flex: none;
-  white-space: nowrap;
 }
 
 /* 多行参数 */

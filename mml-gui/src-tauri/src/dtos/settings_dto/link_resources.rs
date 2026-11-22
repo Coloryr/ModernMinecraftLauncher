@@ -36,6 +36,12 @@ pub struct LinkResourceQueryDto {
     pub page: u32,
     /// 每页条数，单位条；0 按默认值处理
     pub page_size: u32,
+    /// 排序键：`project` / `file` / `fid` / `hash` / `size`；空串表示按项目分组的默认顺序
+    #[serde(default)]
+    pub sort: String,
+    /// 是否倒序；`sort` 为空时忽略
+    #[serde(default)]
+    pub desc: bool,
 }
 
 /// 已下载资源列表的一页
@@ -52,7 +58,7 @@ pub struct LinkResourcePageDto {
     pub pages: u32,
     /// 每页条数，单位条
     pub page_size: u32,
-    /// 当前页的记录，按项目 ID 与类型分组后顺序排列
+    /// 当前页的记录：同一项目的文件相邻；指定排序键时组内按该列排，组按该列的极值排
     pub items: Vec<LinkResourceDto>,
 }
 

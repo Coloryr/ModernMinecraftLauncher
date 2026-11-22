@@ -186,13 +186,9 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="gp-test" :aria-label="t('winGamepad.testTitle')">
-    <div class="gp-test-head">
-      <h3 class="gp-test-title">{{ t("winGamepad.devices") }}</h3>
-      <p class="field-hint">{{ t("winGamepad.testHint") }}</p>
-    </div>
-
-    <!-- 手柄下拉 + 重新扫描：选中哪个就画哪个，断开后回到第一个 -->
+    <!-- 手柄 + 下拉 + 重新扫描同一行：选中哪个就画哪个，断开后回到第一个 -->
     <div class="gp-device-row">
+      <h3 class="gp-test-title">{{ t("winGamepad.devices") }}</h3>
       <select v-if="devices.length" class="field-select gp-device-select"
         :value="selected === null ? '' : String(selected)" :aria-label="t('winGamepad.devices')"
         @change="onPickDevice">
@@ -223,7 +219,6 @@ onBeforeUnmount(() => {
             @update:model-value="pickSwap" />
         </div>
       </div>
-      <p class="field-hint">{{ t("winGamepad.layoutHint") }}</p>
     </div>
 
     <GamepadDiagram v-if="state" :state="state" :layout="effectiveLayout" :swap-ab="swapAb ?? false" />
@@ -242,15 +237,9 @@ onBeforeUnmount(() => {
   background: var(--bg-card);
 }
 
-.gp-test-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .gp-test-title {
   margin: 0;
+  flex: none;
   font-size: 13px;
   font-weight: 600;
 }

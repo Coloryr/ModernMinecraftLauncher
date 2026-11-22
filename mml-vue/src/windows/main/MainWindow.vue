@@ -1483,6 +1483,7 @@ const clientConfig = ref<ClientConfig>({
   autoJoin: false,
   accountCheck: true,
   autoSaveNotice: true,
+  autoEnterSave: false,
   commandNotice: true,
   autoJoinServer: "",
   motdServer: "",

@@ -108,21 +108,13 @@ export function useSettingsSkin() {
     setCapeConfig(v as CapeDisplay);
   }
 
-  /** 分组级"恢复默认"：返回是否处理了该分组；皮肤页拆成"头像"与"皮肤"两组 */
+  /** 分组级"恢复默认"：返回是否处理了该分组；显示模式这一组里含头像 / 皮肤 / 披风三份配置 */
   async function resetGroup(id: string): Promise<boolean> {
-    switch (id) {
-      case "head":
-        setHeadConfig(DEFAULT_HEAD_TYPE, DEFAULT_HEAD_X, DEFAULT_HEAD_Y);
-        return true;
-      case "skin":
-        setSkinConfig(DEFAULT_SKIN_DISPLAY, DEFAULT_SKIN_PITCH, DEFAULT_SKIN_YAW);
-        return true;
-      case "cape":
-        setCapeConfig(DEFAULT_CAPE_DISPLAY, DEFAULT_CAPE_PITCH, DEFAULT_CAPE_YAW);
-        return true;
-      default:
-        return false;
-    }
+    if (id !== "skin") return false;
+    setHeadConfig(DEFAULT_HEAD_TYPE, DEFAULT_HEAD_X, DEFAULT_HEAD_Y);
+    setSkinConfig(DEFAULT_SKIN_DISPLAY, DEFAULT_SKIN_PITCH, DEFAULT_SKIN_YAW);
+    setCapeConfig(DEFAULT_CAPE_DISPLAY, DEFAULT_CAPE_PITCH, DEFAULT_CAPE_YAW);
+    return true;
   }
 
   return {

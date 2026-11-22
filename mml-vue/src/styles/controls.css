@@ -7,6 +7,7 @@
  *
  * 新界面照这张表写，别再自造一套外观：
  *   文本输入      <input class="field-input">
+ *   多行命令      <textarea class="cmd-text">（可拖高）
  *   下拉          <select class="field-select">
  *   工具条小下拉  <select class="field-select filter-select">（用系统原生弹层，更省地方）
  *   按钮          <BaseButton variant="primary|accent|plain|danger|ghost" size="sm|md|lg">
@@ -247,6 +248,42 @@ select.field-select {
 /* 禁用态（加载期间锁住筛选控件）：给个明确的外观，别只有光标变化 */
 .field-input:disabled,
 .field-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 多行命令输入框：启动前 / 启动后的命令，设置窗口与实例设置共用这一份。
+   可拖高：最少两行、最多二十行，再高就在框里滚，免得一条长命令把整块面板顶下去。
+   18px = 上下内边距 8×2 + 上下边框 1×2，1.4em 是这几行文字的默认行高 */
+.cmd-text {
+  width: 100%;
+  min-height: calc(2 * 1.4em + 18px);
+  max-height: calc(20 * 1.4em + 18px);
+  overflow-y: auto;
+  padding: 8px 10px;
+  border-radius: var(--ctl-radius);
+  border: 1px solid var(--border);
+  /* 底色比所在容器亮一档（有背景图时取不透明的那份）：设置页的分组没有卡片底；
+     实例设置的参数面板本身是卡片底，那边用 --cmd-text-bg 压回 --bg，见 CustomExecPanel */
+  background: var(--cmd-text-bg, var(--bg-solid, var(--bg-card)));
+  color: var(--text);
+  font-size: var(--ctl-font);
+  font-family: "Cascadia Code", Consolas, "Courier New", monospace;
+  line-height: 1.4;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.cmd-text:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.cmd-text:focus:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.cmd-text:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }

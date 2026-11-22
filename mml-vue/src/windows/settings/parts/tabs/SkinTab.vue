@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 设置窗口 · 皮肤与头像标签
 //
-// 结构与其它标签一致：每个小节都是「分组标题（强调色竖条 + 分隔线）→ 说明 → 控件」，
-// 所以拆成四组：头像显示模式 / 皮肤显示模式 / 披风显示模式 / 样例预览。
+// 结构与其它标签一致：分组标题（强调色竖条 + 分隔线）→ 内容。
+// 两件互不相干的事才分组：显示模式（头像 / 皮肤 / 披风三份配置）与样例预览。
 import { t } from "../../../../lib/i18n";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
 import SegmentedTabs from "../../../../components/ui/SegmentedTabs.vue";
@@ -46,8 +46,9 @@ const {
 </script>
 
 <template>
-  <SettingsGroup id="head" title-key="winSettings.headDisplay" :flash="flashGroup === 'head'">
-    <p class="field-desc">{{ t("winSettings.headDisplayDesc") }}</p>
+  <SettingsGroup id="skin" title-key="winSettings.secSkinDisplay" :flash="flashGroup === 'skin'">
+    <!-- 头像 / 皮肤 / 披风三份显示模式合在一组：标签 → 分段控件 →（可选）角度 -->
+    <label class="field-label">{{ t("winSettings.headDisplay") }}</label>
     <SegmentedTabs :model-value="headType" :options="headTypeOptions" @update:model-value="onHeadTypeChange" />
     <div v-if="offsetAdjustable" class="grid-2">
       <div>
@@ -61,10 +62,8 @@ const {
           @update:model-value="(v) => setHeadConfig(headType, headX, v)" />
       </div>
     </div>
-  </SettingsGroup>
 
-  <SettingsGroup id="skin" title-key="winSettings.skinDisplay" :flash="flashGroup === 'skin'">
-    <p class="field-desc">{{ t("winSettings.skinDisplayDesc") }}</p>
+    <label class="field-label">{{ t("winSettings.skinDisplay") }}</label>
     <SegmentedTabs :model-value="skinDisplay" :options="skinDisplayOptions" @update:model-value="onSkinDisplayChange" />
     <div v-if="skinAngleAdjustable" class="grid-2">
       <div>
@@ -78,10 +77,8 @@ const {
           @update:model-value="(v) => setSkinConfig(skinDisplay, skinPitch, v)" />
       </div>
     </div>
-  </SettingsGroup>
 
-  <SettingsGroup id="cape" title-key="winSettings.capeDisplay" :flash="flashGroup === 'cape'">
-    <p class="field-desc">{{ t("winSettings.capeDisplayDesc") }}</p>
+    <label class="field-label">{{ t("winSettings.capeDisplay") }}</label>
     <SegmentedTabs :model-value="capeDisplay" :options="capeDisplayOptions" @update:model-value="onCapeDisplayChange" />
     <div v-if="capeAngleAdjustable" class="grid-2">
       <div>

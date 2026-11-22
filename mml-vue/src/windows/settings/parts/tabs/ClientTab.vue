@@ -62,6 +62,7 @@ const {
   removeLock,
   lockServerError,
   lockServerPlaceholder,
+  checkLockServerUuid,
   lockInstances,
   lockMissing,
   onLockInstanceChange,
@@ -195,25 +196,29 @@ watch(lockServerError, async (msg) => {
       </div>
       <BaseSwitch v-model="client.loginLockOn" @update:model-value="applyClient" />
     </div>
-    <!-- 已锁定的条目列表（总开关打开时才可编辑） -->
+    <!-- 已锁定的条目（总开关打开时才可编辑）：一条一行，类型为主、名称与地址为辅，右侧图标键移除 -->
     <template v-if="client.loginLockOn">
-      <div v-if="client.loginLock.length" class="switch-list">
+      <div v-if="client.loginLock.length" class="lock-list">
         <!-- 同一种登录方式可以按不同服务器重复添加，键要带上服务器，不能只用 ty -->
-        <div v-for="(e, i) in client.loginLock" :key="`${e.ty}|${e.server}`" class="switch-row lock-item">
-          <span class="lock-item-text">
-            {{ loginTypeLabel(e.ty) }}<template v-if="e.name"> — {{ e.name }}</template><template v-if="e.server"> — {{
-              e.server }}</template>
+        <div v-for="(e, i) in client.loginLock" :key="`${e.ty}|${e.server}`" class="lock-item">
+          <span class="lock-item-type">{{ loginTypeLabel(e.ty) }}</span>
+          <span v-if="e.name || e.server" class="lock-item-meta">
+            <template v-if="e.name">{{ e.name }}</template>
+            <template v-if="e.name && e.server"><span class="lock-item-dot">·</span></template>
+            <template v-if="e.server">{{ e.server }}</template>
           </span>
-          <BaseButton size="sm" variant="danger" @click="removeLock(i)">
-            {{ t("winSettings.loginLockRemove") }}
-          </BaseButton>
+          <button class="ui-btn-icon lock-item-del" :aria-label="t('winSettings.loginLockRemove')"
+            v-tip="t('winSettings.loginLockRemove')" @click="removeLock(i)">
+            <GlyphIcon name="close" :size="13" />
+          </button>
         </div>
       </div>
       <!-- 空状态：开着总开关但一条都没加时，别让下面直接跟"添加行"显得断片 -->
       <p v-else class="field-desc">{{ t("winSettings.loginLockEmpty") }}</p>
+      <label class="field-label" for="lock-add-type">{{ t("winSettings.loginLockAddTitle") }}</label>
       <!-- 添加条目：选类型；外置登录 / 自定义皮肤站 / 统一通行证必须填服务器信息，可重复添加不同地址 -->
-      <div class="lock-add">
-        <select v-model="addLockType" class="field-select lock-add-type">
+      <div class="lock-add" :class="{ 'lock-add-simple': !addLockHasServer }">
+        <select id="lock-add-type" v-model="addLockType" class="field-select lock-add-type">
           <option v-for="ty in addLockOptions" :key="ty" :value="ty">
             {{ loginTypeLabel(ty) }}
           </option>
@@ -222,9 +227,10 @@ watch(lockServerError, async (msg) => {
           autocomplete="off" :placeholder="t('winSettings.lockModelName')" />
         <input v-if="addLockHasServer" :ref="(el) => (lockServerInput = el as HTMLInputElement | null)"
           v-model="addLockServer" class="field-input lock-add-server" :class="{ 'lock-server-error': lockServerError }"
-          spellcheck="false" autocomplete="off" :placeholder="lockServerPlaceholder" @input="lockServerError = ''" />
-        <BaseButton size="sm" variant="accent" :disabled="!addLockOptions.length" @click="addLock">
-          {{ t("winSettings.loginLockAdd") }}
+          spellcheck="false" autocomplete="off" :placeholder="lockServerPlaceholder" @input="lockServerError = ''"
+          @blur="checkLockServerUuid" />
+        <BaseButton size="sm" variant="accent" class="lock-add-btn" :disabled="!addLockOptions.length" @click="addLock">
+          <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("winSettings.loginLockAdd") }}
         </BaseButton>
       </div>
       <p v-if="lockServerError" class="lock-server-hint">{{ lockServerError }}</p>
@@ -315,17 +321,20 @@ watch(lockServerError, async (msg) => {
         <span>{{ t("winSettings.editTitle") }}</span>
         <BaseSwitch :model-value="win.editTitle" @update:model-value="updateWindow('editTitle', $event)" />
       </div>
-      <div class="switch-row">
+      <!-- 随机 / 循环标题都建立在「自定义窗口标题」之上：总开关关着时只保留状态，不可操作 -->
+      <div class="switch-row" :class="{ dim: !win.editTitle }">
         <span>{{ t("winSettings.randomTitle") }}</span>
-        <BaseSwitch :model-value="win.randomTitle" @update:model-value="updateWindow('randomTitle', $event)" />
+        <BaseSwitch :model-value="win.randomTitle" :disabled="!win.editTitle"
+          @update:model-value="updateWindow('randomTitle', $event)" />
       </div>
-      <div class="switch-row">
+      <div class="switch-row" :class="{ dim: !win.editTitle }">
         <span>{{ t("winSettings.cycleTitle") }}</span>
-        <BaseSwitch :model-value="win.cycleTitle" @update:model-value="updateWindow('cycleTitle', $event)" />
+        <BaseSwitch :model-value="win.cycleTitle" :disabled="!win.editTitle"
+          @update:model-value="updateWindow('cycleTitle', $event)" />
       </div>
     </div>
     <!-- 游戏窗口标题由 coloryrasm 在游戏内改，没装就看不到效果 -->
-    <p v-if="win.editTitle || win.randomTitle || win.cycleTitle" class="tip-note">
+    <p v-if="win.editTitle" class="tip-note">
       {{ t("winSettings.gameTitleAsm") }}
     </p>
     <template v-if="win.editTitle">
@@ -333,7 +342,7 @@ watch(lockServerError, async (msg) => {
       <input :value="win.gameTitle" class="field-input" spellcheck="false" autocomplete="off"
         @input="updateWindow('gameTitle', ($event.target as HTMLInputElement).value)" />
     </template>
-    <template v-if="win.cycleTitle">
+    <template v-if="win.editTitle && win.cycleTitle">
       <label class="field-label">{{ t("winSettings.titleDelay") }}</label>
       <NumberStepper :model-value="win.titleDelay" :min="100" :max="600000" :step="100"
         @update:model-value="updateWindow('titleDelay', $event)" />

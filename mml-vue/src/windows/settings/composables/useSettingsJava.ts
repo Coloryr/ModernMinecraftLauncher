@@ -156,6 +156,23 @@ export function useSettingsJava() {
     }
   }
 
+  /**
+   * 删除一整个发行商分组
+   *
+   * 后端只有"按名字删一个"的命令：这里逐个删完再整体重拉一次列表，
+   * 别每删一个都 load()，否则列表会连着刷新好几遍。
+   *
+   * - `names`: 该分组下所有 Java 的名字
+   */
+  async function removeJavaGroup(names: string[]) {
+    try {
+      for (const name of names) await commands.settings.removeJava(name);
+      await load();
+    } catch (e) {
+      showToast(tErr(e));
+    }
+  }
+
   async function removeAllJava() {
     try {
       await commands.settings.removeAllJava();
@@ -263,6 +280,7 @@ export function useSettingsJava() {
     browseJava,
     addJava,
     removeJava,
+    removeJavaGroup,
     removeAllJava,
     scanJava,
     scanJavaDir,

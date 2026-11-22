@@ -558,10 +558,11 @@ pub fn main_skip_server_pack_update(uuid: String) -> Result<bool, String> {
     }
 }
 
-/// 启动前取实例配的自动进入存档，给前端弹窗确认用
+/// 启动前取实例配的自动进入存档
 ///
-/// 自动进入提醒被关掉、实例没配、版本低于 1.20（没有 quick play）、
-/// 或那个存档已经不在时都返回 `None`，前端直接启动即可。
+/// 只回答"实例配了哪一个存档"：进不进、要不要先问，由前端的「进入存档前确认」/
+/// 「自动进入存档」两个开关决定。实例没配、版本低于 1.20（没有 quick play）、
+/// 或那个存档已经不在时返回 `None`，前端直接启动即可。
 ///
 /// - `uuid`: 实例 uuid
 ///
@@ -571,9 +572,6 @@ pub fn main_skip_server_pack_update(uuid: String) -> Result<bool, String> {
 #[gui_macros::ipc_group("main")]
 #[gui_macros::command]
 pub async fn main_auto_save_target(uuid: String) -> Result<Option<AutoSaveTargetDto>, String> {
-    if !gui_config::get().client.auto_save_notice {
-        return Ok(None);
-    }
     let core = core_instance(&uuid).ok_or_else(|| err_keys::GAME_NOT_FOUND.to_string())?;
     let inst = core.instance.read().unwrap().clone();
     let Some(dir) = inst.auto_save.clone().filter(|dir| !dir.is_empty()) else {

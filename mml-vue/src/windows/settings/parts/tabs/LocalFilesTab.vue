@@ -90,8 +90,9 @@ async function onConfirmClear() {
 </script>
 
 <template>
-  <SettingsGroup id="localFiles" title-key="winSettings.secLocalFiles" :flash="flashGroup === 'localFiles'">
-    <div class="local-files-head flex items-center justify-between gap-3">
+  <!-- 整页只有这一组：不画画分组标题，内容直接跟在页头下面 -->
+  <SettingsGroup id="localFiles" :flash="flashGroup === 'localFiles'">
+    <div class="local-files-head flex items-center justify-between gap-3 mt-3">
       <span class="local-files-total text-body text-dim" v-tip="t('winSettings.localFilesLinkHint')">
         {{ t("winSettings.localFilesTotal") }}
         <b class="text-fg [font-variant-numeric:tabular-nums]" :class="{ 'is-scanning': loading }">
@@ -145,7 +146,7 @@ async function onConfirmClear() {
             <span v-if="clearing === e.id" class="loading-spin sm" />
             <template v-else>{{ formatSize(e.size) }}</template>
           </span>
-          <div class="local-file-actions">
+          <div class="local-file-actions shrink-0 flex items-center gap-2">
             <BaseButton size="sm" @click="open(e.id)">{{ t("winSettings.localFileOpen") }}</BaseButton>
             <BaseButton v-if="e.deletable" size="sm" variant="danger"
               :disabled="!!clearing || loading || downloading || e.size === 0"

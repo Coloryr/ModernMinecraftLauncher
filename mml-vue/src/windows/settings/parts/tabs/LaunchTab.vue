@@ -11,8 +11,8 @@ import BaseSwitch from "../../../../components/ui/BaseSwitch.vue";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
 import MemoryHint from "../../../../components/MemoryHint.vue";
 import NumberStepper from "../../../../components/ui/NumberStepper.vue";
-import SegmentedTabs from "../../../../components/ui/SegmentedTabs.vue";
 import SettingsGroup from "../SettingsGroup.vue";
+import { useRowFocus } from "../../../../composables/useRowFocus";
 import type { useSettingsLaunch } from "../../composables/useSettingsLaunch";
 import type { useSettingsClient } from "../../composables/useSettingsClient";
 
@@ -37,7 +37,62 @@ const {
   commitEnvLines,
   addEnvLine,
   removeEnvLine,
+  jvmArgLines,
+  jvmArgKeys,
+  commitJvmArgLines,
+  addJvmArgLine,
+  removeJvmArgLine,
+  gameArgLines,
+  gameArgKeys,
+  commitGameArgLines,
+  addGameArgLine,
+  removeGameArgLine,
 } = props.settings;
+
+/** 点"添加"后新行自动聚焦（与实例设置的启动参数面板共用一份） */
+const { focusNew, setRowRef } = useRowFocus();
+
+/** 加一行环境变量并聚焦 */
+function addEnv() {
+  addEnvLine();
+  focusNew("env", envLines.value.length - 1);
+}
+
+/** 加一行 JVM 参数并聚焦 */
+function addJvmArg() {
+  addJvmArgLine();
+  focusNew("jvm", jvmArgLines.value.length - 1);
+}
+
+/** 加一行游戏参数并聚焦 */
+function addGameArg() {
+  addGameArgLine();
+  focusNew("game", gameArgLines.value.length - 1);
+}
+
+/**
+ * 失去焦点时删掉没填内容的行
+ *
+ * 与实例设置同一个口径：「添加」先插空行再让人填，没填就离开的留着只是占地方，
+ * 还会把空行写进配置 —— 环境变量另外要求键非空，只填值拼不出 KEY=VALUE。
+ *
+ * - `kind`: 哪一组行
+ * - `index`: 行下标
+ */
+function dropEmptyLine(kind: "env" | "jvm" | "game", index: number) {
+  if (kind === "env") {
+    if (envLines.value[index]?.key.trim()) return;
+    removeEnvLine(index);
+    return;
+  }
+  if (kind === "jvm") {
+    if (jvmArgLines.value[index]?.trim()) return;
+    removeJvmArgLine(index);
+    return;
+  }
+  if (gameArgLines.value[index]?.trim()) return;
+  removeGameArgLine(index);
+}
 
 const { client, applyClient, launchCheck, applyLaunchCheck } = props.look;
 
@@ -146,6 +201,41 @@ watch(memoryConflict, async (bad) => {
 
 <template>
   <template v-if="run && win">
+    <SettingsGroup id="launchCheck" title-key="winSettings.secLaunchCheck" :flash="flashGroup === 'launchCheck'">
+      <div class="switch-row">
+        <div class="switch-text">
+          <span class="switch-label">{{ t("winSettings.checkLoader") }}</span>
+          <span class="switch-state">{{ t("winSettings.checkLoaderDesc") }}</span>
+        </div>
+        <BaseSwitch v-model="launchCheck.checkLoader" @update:model-value="applyLaunchCheck" />
+      </div>
+      <div class="switch-row">
+        <div class="switch-text">
+          <span class="switch-label">{{ t("winSettings.checkMemory") }}</span>
+          <span class="switch-state">{{ t("winSettings.checkMemoryDesc") }}</span>
+        </div>
+        <BaseSwitch v-model="launchCheck.checkMemory" @update:model-value="applyLaunchCheck" />
+      </div>
+      <!-- 自动进入存档：属服主定制，锁定时不显示 -->
+      <template v-if="!locked">
+        <!-- 开了下面的"直接进入"就不再询问，这条随之禁用 -->
+        <div class="switch-row" :class="{ dim: client.autoEnterSave }">
+          <div class="switch-text">
+            <span class="switch-label">{{ t("winSettings.autoSaveNotice") }}</span>
+            <span class="switch-state">{{ t("winSettings.autoSaveNoticeDesc") }}</span>
+          </div>
+          <BaseSwitch v-model="client.autoSaveNotice" :disabled="client.autoEnterSave"
+            @update:model-value="applyClient" />
+        </div>
+        <div class="switch-row">
+          <div class="switch-text">
+            <span class="switch-label">{{ t("winSettings.autoEnterSave") }}</span>
+            <span class="switch-state">{{ t("winSettings.autoEnterSaveDesc") }}</span>
+          </div>
+          <BaseSwitch v-model="client.autoEnterSave" @update:model-value="applyClient" />
+        </div>
+      </template>
+    </SettingsGroup>
     <SettingsGroup id="gameWindow" title-key="winSettings.secGameWindow" :flash="flashGroup === 'gameWindow'">
       <!-- 窗口大小：与实例设置同一套 —— 标签固定第一列，右侧下拉一行、宽 / 高一行，
            标签在两者之间垂直居中；全屏时尺寸无效，宽 / 高那行整行收起 -->
@@ -200,139 +290,150 @@ watch(memoryConflict, async (bad) => {
       <p v-if="memoryConflict" class="lock-server-hint">{{ t("winSettings.memoryConflict") }}</p>
     </SettingsGroup>
 
-    <SettingsGroup v-if="!locked" id="jvm" title-key="winSettings.secJvm" :flash="flashGroup === 'jvm'">
-      <div class="switch-row">
-        <div class="switch-text">
-          <span class="switch-label">{{ t("winSettings.isolateHome") }}</span>
-          <span class="switch-state">{{ t("winSettings.isolateHomeDesc") }}</span>
-        </div>
-        <BaseSwitch v-model="run!.isolateHome" />
-      </div>
-
-      <div class="grid-2">
-        <div>
-          <label class="field-label">{{ t("winSettings.gcMode") }}</label>
-          <SegmentedTabs v-model="run!.gcMode" :options="gcOptions" />
-        </div>
-        <div class="switch-list">
-          <div class="switch-row">
-            <span>{{ t("winSettings.colorasm") }}</span>
+    <!-- JVM 与游戏参数合成一组：开关统一放最上面（与实例设置的扩展参数同一顺序），
+         下面依次是 GC、环境变量、JVM 参数、游戏参数 -->
+    <SettingsGroup v-if="!locked" id="jvm" title-key="winSettings.secJvmGameArgs" :flash="flashGroup === 'jvm'">
+      <div class="tight-stack">
+        <div class="args-row args-switch-row">
+          <div class="args-switch">
+            <span class="args-label" v-tip="t('winSettings.isolateHomeDesc')">{{ t("winSettings.isolateHome") }}</span>
+            <BaseSwitch v-model="run!.isolateHome" />
+          </div>
+          <div class="args-switch">
+            <span class="args-label" v-tip="t('winSettings.mmlEnvDesc')">{{ t("winSettings.mmlEnv") }}</span>
+            <BaseSwitch v-model="run!.mmlEnv" />
+          </div>
+          <div class="args-switch">
+            <span class="args-label">{{ t("winSettings.colorasm") }}</span>
             <BaseSwitch v-model="run!.colorasm" />
           </div>
-          <div class="switch-row">
-            <span>{{ t("winSettings.removeJvmArg") }}</span>
+          <div class="args-switch">
+            <span class="args-label">{{ t("winSettings.removeJvmArg") }}</span>
             <BaseSwitch v-model="run!.removeJvmArg" />
           </div>
+          <div class="args-switch">
+            <span class="args-label">{{ t("winSettings.removeGameArg") }}</span>
+            <BaseSwitch v-model="run!.removeGameArg" />
+          </div>
         </div>
-      </div>
 
-      <div class="switch-row">
-        <div class="switch-text">
-          <span class="switch-label">{{ t("winSettings.mmlEnv") }}</span>
-          <span class="switch-state">{{ t("winSettings.mmlEnvDesc") }}</span>
+        <div class="args-row">
+          <span class="args-label">{{ t("winSettings.gcMode") }}</span>
+          <!-- 与实例设置的扩展参数同一副控件：下拉选择，不再用分段按钮 -->
+          <select v-model="run!.gcMode" class="field-select field-grow">
+            <option v-for="g in gcOptions" :key="g.value" :value="g.value">{{ g.label }}</option>
+          </select>
         </div>
-        <BaseSwitch v-model="run!.mmlEnv" />
-      </div>
 
-      <label class="field-label">{{ t("winSettings.jvmEnv") }}</label>
-      <div class="dns-lines">
-        <div v-for="(_, i) in envLines" :key="envKeys.keys[i]" class="line-row">
-          <input v-model="envLines[i].key" class="field-input field-grow" spellcheck="false" autocomplete="off"
-            :placeholder="t('winSettings.envKey')" @change="commitEnvLines" />
-          <input v-model="envLines[i].value" class="field-input field-grow" spellcheck="false" autocomplete="off"
-            :placeholder="t('winSettings.envValue')" />
-          <button class="line-del" :aria-label="t('args.removeLine')" v-tip="t('args.removeLine')"
-            @click="removeEnvLine(i)">
-            <GlyphIcon name="close" :size="13" />
+        <label class="args-label">{{ t("winSettings.jvmEnv") }}</label>
+        <div class="dns-lines">
+          <div v-for="(_, i) in envLines" :key="envKeys.keys[i]" class="line-row"
+            :ref="(el) => setRowRef('env', i, el)">
+            <input v-model="envLines[i].key" class="field-input env-key" spellcheck="false" autocomplete="off"
+              :placeholder="t('winSettings.envKey')" @change="commitEnvLines" @blur="dropEmptyLine('env', i)" />
+            <input v-model="envLines[i].value" class="field-input field-grow" spellcheck="false" autocomplete="off"
+              :placeholder="t('winSettings.envValue')" />
+            <button class="line-del" :aria-label="t('args.removeLine')" v-tip="t('args.removeLine')"
+              @click="removeEnvLine(i)">
+              <GlyphIcon name="close" :size="13" />
+            </button>
+          </div>
+          <button class="line-add" @click="addEnv">
+            <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("args.addLine") }}
           </button>
         </div>
-        <button class="line-add" @click="addEnvLine">
-          <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("args.addLine") }}
-        </button>
-      </div>
 
-      <label class="field-label">{{ t("winSettings.jvmArgs") }}</label>
-      <textarea v-model="run!.jvmArgs" class="field-input args-input" spellcheck="false" />
-    </SettingsGroup>
+        <label class="args-label">{{ t("winSettings.jvmArgs") }}</label>
+        <div class="dns-lines">
+          <div v-for="(_, i) in jvmArgLines" :key="jvmArgKeys.keys[i]" class="line-row"
+            :ref="(el) => setRowRef('jvm', i, el)">
+            <input v-model="jvmArgLines[i]" class="field-input field-grow" spellcheck="false" autocomplete="off"
+              :placeholder="t('winSettings.jvmArgPlaceholder')" @change="commitJvmArgLines"
+              @blur="dropEmptyLine('jvm', i)" />
+            <button class="line-del" :aria-label="t('args.removeLine')" v-tip="t('args.removeLine')"
+              @click="removeJvmArgLine(i)">
+              <GlyphIcon name="close" :size="13" />
+            </button>
+          </div>
+          <button class="line-add" @click="addJvmArg">
+            <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("args.addLine") }}
+          </button>
+        </div>
 
-    <SettingsGroup v-if="!locked" id="gameArgs" title-key="winSettings.secGameArgs" :flash="flashGroup === 'gameArgs'">
-      <div class="switch-row">
-        <span>{{ t("winSettings.removeGameArg") }}</span>
-        <BaseSwitch v-model="run!.removeGameArg" />
+        <label class="args-label">{{ t("winSettings.gameArgs") }}</label>
+        <div class="dns-lines">
+          <div v-for="(_, i) in gameArgLines" :key="gameArgKeys.keys[i]" class="line-row"
+            :ref="(el) => setRowRef('game', i, el)">
+            <input v-model="gameArgLines[i]" class="field-input field-grow" spellcheck="false" autocomplete="off"
+              :placeholder="t('winSettings.gameArgPlaceholder')" @change="commitGameArgLines"
+              @blur="dropEmptyLine('game', i)" />
+            <button class="line-del" :aria-label="t('args.removeLine')" v-tip="t('args.removeLine')"
+              @click="removeGameArgLine(i)">
+              <GlyphIcon name="close" :size="13" />
+            </button>
+          </div>
+          <button class="line-add" @click="addGameArg">
+            <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("args.addLine") }}
+          </button>
+        </div>
       </div>
-      <label class="field-label">{{ t("winSettings.gameArgs") }}</label>
-      <textarea v-model="run!.gameArgs" class="field-input args-input" spellcheck="false" />
     </SettingsGroup>
 
     <SettingsGroup v-if="!locked" id="launchCmd" title-key="winSettings.secLaunchCmd"
       :flash="flashGroup === 'launchCmd'">
-      <div class="switch-list">
-        <div class="switch-row">
-          <span>{{ t("winSettings.preLaunch") }}</span>
-          <BaseSwitch v-model="run!.launchPreRun" />
-        </div>
-        <div class="switch-row" :class="{ dim: !run.launchPreRun }">
-          <span>{{ t("winSettings.preSameTime") }}</span>
-          <BaseSwitch v-model="run!.preRunWithGame" :disabled="!run.launchPreRun" />
-        </div>
-        <div class="switch-row">
-          <span>{{ t("winSettings.postLaunch") }}</span>
-          <BaseSwitch v-model="run!.launchPostRun" />
-        </div>
-      </div>
-      <template v-if="run.launchPreRun">
-        <label class="field-label">{{ t("winSettings.preCmd") }}</label>
-        <input v-model="run!.preRunArg" class="field-input" spellcheck="false" autocomplete="off" />
-      </template>
-      <template v-if="run.launchPostRun">
-        <label class="field-label">{{ t("winSettings.postCmd") }}</label>
-        <input v-model="run!.postRunArg" class="field-input" spellcheck="false" autocomplete="off" />
-      </template>
-    </SettingsGroup>
-
-    <!-- 自动进入存档：实例配了启动后自动进入某个存档时，先弹窗确认；关掉后直接进入 -->
-    <SettingsGroup v-if="!locked" id="autoSave" title-key="winSettings.secAutoSave" :flash="flashGroup === 'autoSave'">
+      <!-- 每条命令就是「开关 + 它自己的输入框」：开关决定跑不跑，输入框一直显示、只在关着时变灰 -->
       <div class="switch-row">
-        <div class="switch-text">
-          <span class="switch-label">{{ t("winSettings.autoSaveNotice") }}</span>
-          <span class="switch-state">{{ t("winSettings.autoSaveNoticeDesc") }}</span>
-        </div>
-        <BaseSwitch v-model="client.autoSaveNotice" @update:model-value="applyClient" />
-      </div>
-    </SettingsGroup>
-
-    <!-- 启动命令提示：实例配了启动前 / 后命令时，启动前先问一次 -->
-    <SettingsGroup v-if="!locked" id="commandNotice" title-key="winSettings.secLaunchCmdNotice"
-      :flash="flashGroup === 'commandNotice'">
-      <div class="switch-row">
-        <div class="switch-text">
-          <span class="switch-label">{{ t("winSettings.commandNotice") }}</span>
-          <span class="switch-state">{{ t("winSettings.commandNoticeDesc") }}</span>
-        </div>
+        <span>{{ t("winSettings.commandNotice") }}</span>
         <BaseSwitch v-model="client.commandNotice" @update:model-value="applyClient" />
       </div>
+      <div class="switch-row">
+        <span>{{ t("winSettings.preLaunch") }}</span>
+        <BaseSwitch v-model="run!.launchPreRun" />
+      </div>
+      <label class="field-label">{{ t("winSettings.preCmd") }}</label>
+      <textarea v-model="run!.preRunArg" class="cmd-text" rows="2" spellcheck="false"
+        :disabled="!run.launchPreRun"></textarea>
+      <div class="switch-row" :class="{ dim: !run.launchPreRun }">
+        <span>{{ t("winSettings.preSameTime") }}</span>
+        <BaseSwitch v-model="run!.preRunWithGame" :disabled="!run.launchPreRun" />
+      </div>
+      <div class="switch-row">
+        <span>{{ t("winSettings.postLaunch") }}</span>
+        <BaseSwitch v-model="run!.launchPostRun" />
+      </div>
+      <label class="field-label">{{ t("winSettings.postCmd") }}</label>
+      <textarea v-model="run!.postRunArg" class="cmd-text" rows="2" spellcheck="false"
+        :disabled="!run.launchPostRun"></textarea>
     </SettingsGroup>
 
-    <!-- 启动前检查：加载器与内存，开关存 gui_config -->
-    <SettingsGroup id="launchCheck" title-key="winSettings.secLaunchCheck" :flash="flashGroup === 'launchCheck'">
-      <div class="switch-row">
-        <div class="switch-text">
-          <span class="switch-label">{{ t("winSettings.checkLoader") }}</span>
-          <span class="switch-state">{{ t("winSettings.checkLoaderDesc") }}</span>
-        </div>
-        <BaseSwitch v-model="launchCheck.checkLoader" @update:model-value="applyLaunchCheck" />
-      </div>
-      <div class="switch-row">
-        <div class="switch-text">
-          <span class="switch-label">{{ t("winSettings.checkMemory") }}</span>
-          <span class="switch-state">{{ t("winSettings.checkMemoryDesc") }}</span>
-        </div>
-        <BaseSwitch v-model="launchCheck.checkMemory" @update:model-value="applyLaunchCheck" />
-      </div>
-    </SettingsGroup>
   </template>
   <p v-else class="field-desc">{{ t("winSettings.tauriOnly") }}</p>
 </template>
 
 <!-- 参数行的行 / 标签 / 子标签 / 预设下拉：与实例设置（LaunchArgsPanel）共用这一份 -->
 <style scoped src="../../../../styles/parts/args-row.css"></style>
+
+<style scoped>
+/* 与实例设置的「扩展参数」同一档间距：内容按 6px 竖排，
+   标签 / 列表 / 添加按钮之间不再各带一套外边距（设置页 16px 的块节奏放在这一组太散） */
+.tight-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tight-stack>* {
+  margin-top: 0;
+}
+
+/* 列布局里 flex-basis 会作用到高度：标签必须重置，否则每行标题会被撑出 84px 的空白 */
+.tight-stack>.args-label {
+  flex: none;
+}
+
+/* 这两条在设置页各带上边距（列表 10px、添加按钮 6px），进容器后归零 */
+.tight-stack>.dns-lines,
+.tight-stack .line-add {
+  margin-top: 0;
+}
+</style>

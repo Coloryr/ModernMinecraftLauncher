@@ -59,6 +59,25 @@
   text-align: left;
 }
 
+/* 开关并排：标签紧跟开关，不推到行尾 —— 实例设置的扩展参数与设置窗口的游戏启动共用。
+   面板窄了就换行，别把最后一个挤出去 */
+.args-switch-row {
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.args-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.args-switch .args-label {
+  flex: none;
+  white-space: nowrap;
+}
+
 .mem-unit {
   font-size: 12.5px;
   color: var(--text-dim);

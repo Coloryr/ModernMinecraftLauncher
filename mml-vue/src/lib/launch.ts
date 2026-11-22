@@ -11,7 +11,7 @@ import { askLaunchCommand } from "./launchCommandPrompt";
 import { askLaunchCheck } from "./launchCheck";
 import { askServerPackUpdate } from "./serverPackPrompt";
 import { askServerPackMods } from "./serverPackMods";
-import { saveGuiConfig } from "./guiConfig";
+import { loadGuiConfig, saveGuiConfig } from "./guiConfig";
 import { openWindow } from "../windows/windowManager";
 
 /**
@@ -89,23 +89,36 @@ export async function launchGame(
     // 读设置失败不影响启动本身
   }
 
-  // 实例配了"启动后自动进入存档"时先确认；提醒开关、版本与存档是否存在都由后端判断，
-  // 返回 null 表示这次不用问
+  // 实例配了"启动后自动进入存档"时，两个开关决定怎么办：
+  // - 自动进入存档：直接进，不问
+  // - 进入存档前确认：问一次再决定
+  // - 两个都关：不进也不问
+  // 目标是否可用（版本、存档是否存在）由后端判断，null 表示实例没配或不适用
   let enterWorld = world;
   let autoSave: boolean | undefined;
   if (!world) {
+    const config = await loadGuiConfig().catch(() => null);
+    const autoEnter = config?.client.autoEnterSave ?? false;
+    const notice = config?.client.autoSaveNotice ?? true;
     const target = await api.autoSaveTarget(uuid).catch(() => null);
     if (target) {
-      const answer = await askAutoSave(target);
-      if (!answer.notice) {
-        await saveGuiConfig({ client: { autoSaveNotice: false } }).catch(() => { });
+      if (autoEnter) {
+        enterWorld = target.dir;
+      } else if (!notice) {
+        autoSave = false;
+      } else {
+        const answer = await askAutoSave(target);
+        if (!answer.notice) {
+          // "不再提醒" = 以后照这次的选择办：进去了就把直接进入打开；没进就两个都关，以后不再进
+          await saveGuiConfig({ client: { autoSaveNotice: false, autoEnterSave: answer.enter } }).catch(() => { });
+        }
+        if (answer.disable) {
+          await api.updateInstance(uuid, { autoSave: null }).catch(() => { });
+        }
+        // 选"进入"就按这个目录显式进（配置可能刚被清掉）；选"不进入"则让后端忽略配置
+        if (answer.enter) enterWorld = target.dir;
+        else autoSave = false;
       }
-      if (answer.disable) {
-        await api.updateInstance(uuid, { autoSave: null }).catch(() => { });
-      }
-      // 选"进入"就按这个目录显式进（配置可能刚被清掉）；选"不进入"则让后端忽略配置
-      if (answer.enter) enterWorld = target.dir;
-      else autoSave = false;
     }
   }
 

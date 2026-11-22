@@ -159,7 +159,7 @@ const PAGE_SIZE_MAX: u32 = 200;
 /// 读的是索引库里的记录；文件已被删掉的也列出来，标 `exists = false`。
 /// 同一项目 ID 的多份文件排在一起，方便按项目核对。
 ///
-/// - `query`: 搜索词与分页参数
+/// - `query`: 搜索词、分页与排序参数
 ///
 /// # 返回值
 ///
@@ -174,7 +174,7 @@ pub async fn settings_list_link_resources(query: LinkResourceQueryDto) -> LinkRe
 
 /// 按查询条件收集一页资源记录
 ///
-/// - `query`: 搜索词与分页参数
+/// - `query`: 搜索词、分页与排序参数
 ///
 /// # 返回值
 ///
@@ -197,13 +197,7 @@ fn list_link_resources(query: &LinkResourceQueryDto) -> LinkResourcePageDto {
                 || item.hash.to_lowercase().contains(&keyword)
         });
     }
-    // 同一个项目的多个版本挨在一起，组内大的排前面
-    list.sort_by(|a, b| {
-        cmp_pid(&a.pid, &b.pid)
-            .then_with(|| a.kind.cmp(&b.kind))
-            .then_with(|| b.size.cmp(&a.size))
-            .then_with(|| a.name.cmp(&b.name))
-    });
+    let list = order_link_resources(list, &query.sort, query.desc);
     let total_size = list
         .iter()
         .filter(|item| item.exists)
@@ -338,6 +332,121 @@ fn page_bounds(total: usize, page_size: usize, page: u32) -> (u32, u32, usize, u
     let start = (page as usize - 1) * page_size;
     let end = (start + page_size).min(total);
     (page, pages, start, end)
+}
+
+/// 一组的排序代表值
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum GroupRank {
+    /// 文本列：项目名 / 文件名 / 文件 ID / 哈希
+    Text(String),
+    /// 文件大小，单位字节
+    Size(u64),
+}
+
+/// 项目排序用的名字：没有项目名时退回项目 ID
+fn project_sort_key(item: &LinkResourceDto) -> String {
+    if item.project.is_empty() {
+        item.pid.to_lowercase()
+    } else {
+        item.project.to_lowercase()
+    }
+}
+
+/// 按某一列比较两条记录
+///
+/// - `a` / `b`: 两条记录
+/// - `key`: 排序键
+/// - `desc`: 是否倒序
+///
+/// # 返回值
+///
+/// 见 [`std::cmp::Ordering`]；不认识的键视为相等
+fn cmp_field(a: &LinkResourceDto, b: &LinkResourceDto, key: &str, desc: bool) -> std::cmp::Ordering {
+    let ord = match key {
+        "project" => project_sort_key(a).cmp(&project_sort_key(b)),
+        "file" => a.file.to_lowercase().cmp(&b.file.to_lowercase()),
+        "fid" => a.fid.cmp(&b.fid),
+        "hash" => a.hash.cmp(&b.hash),
+        "size" => a.size.cmp(&b.size),
+        _ => std::cmp::Ordering::Equal,
+    };
+    if desc {
+        ord.reverse()
+    } else {
+        ord
+    }
+}
+
+/// 一组的排序代表值
+///
+/// 组内已按同一列排好，取第一条就是这一方向上的极值。
+///
+/// - `group`: 同一项目的记录，已排好序
+/// - `key`: 排序键
+///
+/// # 返回值
+///
+/// 见 [`GroupRank`]
+fn group_rank(group: &[LinkResourceDto], key: &str) -> GroupRank {
+    let first = &group[0];
+    match key {
+        "size" => GroupRank::Size(first.size),
+        "file" => GroupRank::Text(first.file.to_lowercase()),
+        "fid" => GroupRank::Text(first.fid.clone()),
+        "hash" => GroupRank::Text(first.hash.clone()),
+        _ => GroupRank::Text(project_sort_key(first)),
+    }
+}
+
+/// 排好一页记录要用的顺序
+///
+/// 默认按项目分组，组内大的在前；指定排序键时同一项目的文件仍留在一组、
+/// 组按该列在这一方向上的极值排 —— 项目列被 rowspan 合并，打散分组会让合并格失去意义。
+///
+/// - `list`: 已按关键词筛过的记录
+/// - `key`: 排序键，空串或未知值按默认顺序
+/// - `desc`: 是否倒序
+///
+/// # 返回值
+///
+/// 排序后的记录
+fn order_link_resources(list: Vec<LinkResourceDto>, key: &str, desc: bool) -> Vec<LinkResourceDto> {
+    let key = match key {
+        "project" | "file" | "fid" | "hash" | "size" => key,
+        _ => "",
+    };
+    if key.is_empty() {
+        let mut list = list;
+        list.sort_by(|a, b| {
+            cmp_pid(&a.pid, &b.pid)
+                .then_with(|| a.kind.cmp(&b.kind))
+                .then_with(|| b.size.cmp(&a.size))
+                .then_with(|| a.name.cmp(&b.name))
+        });
+        return list;
+    }
+    // 先按（类型, 项目）收组，组内按这一列排；组之间取组内极值
+    let mut groups: Vec<Vec<LinkResourceDto>> = Vec::new();
+    let mut index: HashMap<(String, String), usize> = HashMap::new();
+    for item in list {
+        let group_key = (item.kind.clone(), item.pid.clone());
+        match index.get(&group_key) {
+            Some(&i) => groups[i].push(item),
+            None => {
+                index.insert(group_key, groups.len());
+                groups.push(vec![item]);
+            }
+        }
+    }
+    for group in &mut groups {
+        group.sort_by(|a, b| cmp_field(a, b, key, desc).then_with(|| a.name.cmp(&b.name)));
+    }
+    groups.sort_by(|a, b| {
+        group_rank(a, key)
+            .cmp(&group_rank(b, key))
+            .then_with(|| cmp_pid(&a[0].pid, &b[0].pid))
+    });
+    groups.into_iter().flatten().collect()
 }
 
 /// 项目 ID 排序：两边都是数字时按数值比，否则按字符串比
