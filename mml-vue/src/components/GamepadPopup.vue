@@ -1,11 +1,10 @@
 <script setup lang="ts">
-// 顶栏的手柄入口：选哪个手柄、用哪份配置、开关游戏内手柄
+// 顶栏的手柄入口：选哪个手柄、用哪份配置
 //
-// 只改当前生效的那份配置里的 device / enabled 与生效配置，映射细节仍在设置窗口的手柄页。
+// 只改当前生效的那份配置里的 device 与生效配置；游戏内开关、映射细节都在设置窗口的手柄页。
 import { ref, watch } from "vue";
 import BaseModal from "./ui/BaseModal.vue";
 import BaseButton from "./ui/BaseButton.vue";
-import BaseSwitch from "./ui/BaseSwitch.vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
 import { t, tErr } from "../lib/i18n";
 import { showToast } from "../lib/toast";
@@ -100,16 +99,6 @@ async function pickProfile(name: string) {
   }
 }
 
-/**
- * 开关游戏内手柄
- *
- * - `value`: 新状态
- */
-async function toggleEnabled(value: boolean) {
-  if (!config.value) return;
-  config.value.enabled = value;
-  await save();
-}
 
 /** 收起弹窗，打开设置窗口的「手柄」页 —— 映射细节与轴区间都在那边 */
 function openSettings() {
@@ -119,7 +108,8 @@ function openSettings() {
 </script>
 
 <template>
-  <BaseModal v-if="open" :title="t('gamepadPopup.title')" :width="480" @close="emit('close')">
+  <BaseModal v-if="open" :title="t('gamepadPopup.title')" :width="480" :closable="false"
+    @close="emit('close')">
     <section class="pick-sec">
       <div class="pick-head">
         <span class="pick-title">{{ t("gamepadPopup.pads") }}</span>
@@ -157,14 +147,6 @@ function openSettings() {
       <p v-if="!profiles.length" class="empty-tip">{{ t("gamepadPopup.emptyProfiles") }}</p>
     </section>
 
-    <div class="switch-row">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("gamepadPopup.enabled") }}</span>
-        <span class="switch-state">{{ t("gamepadPopup.enabledHint") }}</span>
-      </div>
-      <BaseSwitch :model-value="!!config?.enabled" :disabled="!config"
-        @update:model-value="toggleEnabled" />
-    </div>
 
     <div class="modal-actions">
       <BaseButton @click="emit('close')">{{ t("gamepadPopup.close") }}</BaseButton>
@@ -234,28 +216,5 @@ function openSettings() {
   color: var(--red);
 }
 
-.switch-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
 
-.switch-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.switch-label {
-  color: var(--text);
-  font-size: 12.5px;
-}
-
-.switch-state {
-  color: var(--text-dim);
-  font-size: 11.5px;
-}
 </style>

@@ -239,6 +239,12 @@ const layoutWidth = ref(0);
 const layoutMaximized = ref(!!props.maximized);
 /** 最大化 / 收回动画的收尾定时器；非空表示宽度正在变 */
 let settleTimer: number | null = null;
+/** 换列定时器：淡到最暗时把列数换好，恰好在动画结束时淡回 1 */
+let swapTimer: number | null = null;
+
+/** 换列时的压暗态：整段宽度动画里列表暗到 0.3，落定后换列再淡回 */
+const layoutFading = ref(false);
+
 
 /** 占满时每行放几列：按未占满时一行约 300px 的宽度切 */
 const columns = computed(() => {
@@ -253,6 +259,32 @@ const gridStyle = computed(() => ({
   gap: `${GRID_GAP}px`,
 }));
 
+/**
+ * 动画结束后的列表内容宽度
+ *
+ * 换列必须在动画结束前完成，才能让透明度正好在结束时回到 1，所以先按最终宽度算好列数；
+ * 占满时侧栏铺满主区域，未占满时是 300，描边按当前实际值量（占满会去掉右边框）。
+ *
+ * - `max`: 动画结束后是否占满
+ *
+ * # 返回值
+ *
+ * 内容宽度，单位像素
+ */
+function targetContentWidth(max: boolean): number {
+  const el = listRef.value?.el ?? null;
+  if (!el) return contentWidth.value;
+  const cs = getComputedStyle(el);
+  const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+  const side = el.closest(".sidebar") as HTMLElement | null;
+  const sideStyle = side ? getComputedStyle(side) : null;
+  const border = sideStyle
+    ? (parseFloat(sideStyle.borderLeftWidth) || 0) + (parseFloat(sideStyle.borderRightWidth) || 0)
+    : 0;
+  const slot = max ? (el.closest(".main")?.clientWidth ?? contentWidth.value) : 300;
+  return Math.max(0, Math.round(slot - border - pad));
+}
+
 /** 量一次滚动容器去掉内边距后的内容宽度 */
 function measureWidth() {
   const el = listRef.value?.el ?? null;
@@ -264,16 +296,28 @@ function measureWidth() {
   if (settleTimer === null) layoutWidth.value = contentWidth.value;
 }
 
-// 最大化 / 收回是宽度过渡（0.3s）：期间冻住列数，落定后再一次性换
+// 最大化 / 收回是宽度过渡（0.3s）：先淡到最暗，透明时换列，再淡回 1 —— 0.3s 时正好回到 1
 watch(
   () => props.maximized,
   (max) => {
     if (settleTimer !== null) window.clearTimeout(settleTimer);
+    if (swapTimer !== null) window.clearTimeout(swapTimer);
+    const target = !!max;
+    const changed = layoutMaximized.value !== target;
+    if (changed) {
+      layoutFading.value = true;
+      swapTimer = window.setTimeout(() => {
+        swapTimer = null;
+        // 此刻最暗：按最终宽度把列数一次换好，动画结束时不用再改列
+        layoutWidth.value = targetContentWidth(target);
+        layoutMaximized.value = target;
+        layoutFading.value = false;
+      }, 40);
+    }
     settleTimer = window.setTimeout(() => {
-      settleTimer = null;
-      layoutMaximized.value = !!max;
+      // 动画结束：量一次实际宽度（只更新 contentWidth，不改列数，免得最后再跳一下）
       measureWidth();
-      layoutWidth.value = contentWidth.value;
+      settleTimer = null;
     }, 340);
   },
 );
@@ -411,8 +455,9 @@ const rows = computed<Row[]>(() => {
     if (props.isGroupInsert(gi)) out.push({ kind: "ghost-group", key: "gg-" + gi, gi });
     out.push({ kind: "group", key: "g-" + g.id, gi, group: g });
     if (!isGroupOpen(g.id)) return;
-    // 占满时整组按容器宽度切成多列行，每列仍是原来的实例行
-    if (props.maximized) {
+    // 占满时整组按容器宽度切成多列行，每列仍是原来的实例行；
+    // 用 layoutMaximized 而不是 props：换列要等透明度到 0，不能在点下去的一瞬间就换
+    if (layoutMaximized.value) {
       const cells: GridCell[] = [];
       if (!props.multiSelect) cells.push({ kind: "add" });
       g.items.forEach((inst, idx) => {
@@ -610,6 +655,7 @@ defineExpose({ scrollToInstance });
     <div class="sidebar-list-wrap relative flex min-h-0 flex-1 flex-col">
       <!-- 分组列表的虚拟列表：行表由脚本按分组铺好，这里只按行种画 -->
       <VirtualList ref="listRef" class="sidebar-list group-list"
+        :class="{ 'is-fading': layoutFading }"
         :count="rows.length" :heights="rowHeights" :row-gap="0">
         <template #default="{ start, end }">
           <template v-for="row in rows.slice(start, end)" :key="row.key">
@@ -771,6 +817,18 @@ defineExpose({ scrollToInstance });
   /* 取值以顶部那一行为准：收起按钮到右边的距离 */
   --side-pad-x: 12px;
 }
+
+/* 换列：宽度用 ease-out 时，0.3s 动画在约 40ms 走到一半 —— 淡出也卡这个时刻，
+   此时透明度正好 0 并换列，再在剩下的 0.26s 里淡回 1，与宽度动画同时结束 */
+.sidebar-list {
+  transition: opacity 0.26s var(--ease-out);
+}
+
+.sidebar-list.is-fading {
+  opacity: 0;
+  transition-duration: 0.04s;
+}
+
 
 /* 顶部留白写成无层规则：模板上的 pt-3 在 @layer utilities 里，压不过无层同名声明 */
 .sidebar-head {

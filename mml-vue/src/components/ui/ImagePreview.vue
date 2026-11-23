@@ -90,7 +90,8 @@ function onWheel(e: WheelEvent) {
 
 <template>
   <Teleport to="body">
-    <transition name="img-preview-fade">
+    <!-- appear 不能省：调用方普遍是 v-if 挂本组件，不挂 appear 时首次挂载不播进场动画 -->
+    <transition name="img-preview-fade" appear>
       <div v-if="src" class="img-preview" :class="{ pannable: scale > 1, panning: dragged }" @click="onClick"
         @wheel.prevent="onWheel" @pointerdown="onDown">
         <img :src="src" alt="" :style="{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }" />
@@ -164,13 +165,39 @@ function onWheel(e: WheelEvent) {
   pointer-events: none;
 }
 
-.img-preview-fade-enter-active,
+/* 打开 / 关闭大图：浮层淡入淡出，图先小一号再放大到位。
+   缩放用独立的 scale 属性，不碰 img 上的行内 transform —— 那是滚轮缩放和拖动平移用的 */
+.img-preview-fade-enter-active {
+  transition: opacity 0.22s var(--ease-out);
+}
+
 .img-preview-fade-leave-active {
-  transition: opacity 0.15s ease;
+  transition: opacity 0.14s var(--ease-out);
 }
 
 .img-preview-fade-enter-from,
 .img-preview-fade-leave-to {
   opacity: 0;
+}
+
+/* 图的动画比浮层短一档：enter-active 一撤，动画就被掐掉，别让它停在半路 */
+.img-preview-fade-enter-active img {
+  animation: img-preview-zoom 0.2s var(--ease-out) both;
+}
+
+.img-preview-fade-leave-active img {
+  animation: img-preview-zoom 0.12s var(--ease-out) reverse both;
+}
+
+@keyframes img-preview-zoom {
+  from {
+    opacity: 0;
+    scale: 0.9;
+  }
+
+  to {
+    opacity: 1;
+    scale: 1;
+  }
 }
 </style>

@@ -187,6 +187,45 @@
   justify-content: flex-end;
 }
 
+/* 收起 / 展开时侧栏内容不能跟着槽位一起被压扁：宽度锁在展开宽，由槽位的 overflow 裁切。
+   .sidebar 的 w-full 会一路跟着缩，标题与按钮在 0.3s 里不停重排，看着就是"动画卡" */
+.sidebar-slot .sidebar {
+  min-width: 300px;
+}
+
+/* 展开 / 收起期间侧栏内容跟着淡入淡出：宽度过渡是裁切，不淡一下会先露出一条被裁剩的边 */
+.main.sidebar-anim .sidebar-slot .sidebar {
+  transition: opacity 0.2s var(--ease-out);
+}
+
+.sidebar-slot.collapsed .sidebar {
+  opacity: 0;
+}
+
+/* 列表 ↔ 分组：换排布的一帧里侧栏从 0 宽展开、内容淡入，避免直接跳过去 */
+.main.mode-swap .sidebar-slot {
+  animation: mode-sidebar-in 0.26s var(--ease-out);
+}
+
+.main.mode-swap .detail,
+.main.mode-swap .list-mode {
+  animation: mode-fade-in 0.22s var(--ease-out);
+}
+
+@keyframes mode-sidebar-in {
+  from {
+    width: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes mode-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
 /* 展开把手：绝对定位挂在槽位外缘，不参与占位，收起时淡入 */
 .sidebar-expand {
   position: absolute;

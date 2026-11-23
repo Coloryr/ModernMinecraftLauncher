@@ -1,6 +1,6 @@
 use super::*;
 
-/// 清理只删内容：目录本身、图片缓存与界面数据都留着
+/// 清理只删内容：目录本身与界面数据目录留着，图片缓存随缓存一起清掉
 #[test]
 fn clear_removes_children_but_keeps_reserved_dirs() {
     let dir = mml_testutil::temp_dir().join(format!(
@@ -24,7 +24,8 @@ fn clear_removes_children_but_keeps_reserved_dirs() {
     clear(&cache).unwrap();
 
     assert!(dir.exists());
-    assert!(dir.join(names::IMAGE_DIR).join("i.png").exists());
+    // 图片缓存是缓存的一部分，清理时要删掉；界面数据目录留给 WebView2 自己回收
+    assert!(!dir.join(names::IMAGE_DIR).exists());
     assert!(dir.join(names::WEBVIEW_DIR).join("db").exists());
     assert!(!dir.join("a.zip").exists());
     assert!(!dir.join(names::TEMP_DIR).exists());

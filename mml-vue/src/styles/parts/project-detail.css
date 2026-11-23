@@ -300,19 +300,11 @@
   padding: 0;
 }
 
-/* 内容到货的入场：简介与截图整块升起，版本行按顺序落下（--row-i 由模板给）。
-   与页面进场同一套观感：不透明度 + 8px 上移 */
+/* 内容到货的入场：简介与截图整块升起，与页面进场同一套观感。
+   版本行不在这里 —— 换筛选项 / 翻页时也要重新进场，那一段走 useStaggerEnter */
 .detail-intro,
-.detail-loading,
-.detail-files .sk-row,
-.detail-files .file-row {
+.detail-loading {
   animation: detail-rise 0.18s var(--ease-out) both;
-}
-
-/* 行多时压住总时长：最多错峰 8 行，再往后的行跟着最后一批一起出 */
-.detail-files .sk-row,
-.detail-files .file-row {
-  animation-delay: calc(var(--row-i, 0) * 24ms);
 }
 
 @keyframes detail-rise {
@@ -500,6 +492,12 @@
 
 /* 版本列表：无外框，行间用分隔线 */
 .detail-files {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 换页 / 换筛选时整块替换的那一层：骨架、失败、空结果、版本行都装在里面 */
+.detail-rows {
   display: flex;
   flex-direction: column;
 }

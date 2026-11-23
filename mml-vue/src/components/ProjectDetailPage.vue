@@ -18,6 +18,7 @@ import { formatCount, t, tErr } from "../lib/i18n";
 import { svgIcon } from "../lib/modrinthIcon";
 import { usePageActive } from "../lib/pageActive";
 import { usePageKeys } from "../composables/usePageKeys";
+import { useStaggerEnter } from "../composables/useStaggerEnter";
 import { toggleStar } from "../lib/projectCollect";
 import { popStar } from "../lib/starPop";
 import { scrollToElementSmooth } from "../lib/scrollTop";
@@ -86,6 +87,16 @@ const fileVersion = ref("");
 let detailSeq = 0;
 /** 版本列表代次：换筛选 / 换页 / 换项目时丢弃旧一发的返回 */
 let fileSeq = 0;
+
+/** 版本行内容序号：数据真换掉时 +1，列表整块重挂，版本行才能重新进场 */
+const filesView = ref(0);
+
+/** 版本行的入场：换筛选项 / 翻页后一行一行落下；没有行时（骨架、失败、空结果）整块淡入 */
+const { enter: enterFiles, leave: leaveFiles } = useStaggerEnter(".file-row", {
+  duration: 240,
+  step: 22,
+  max: 12,
+});
 
 const isModrinth = computed(() => current.value?.source.source === "modrinth");
 
@@ -171,6 +182,7 @@ async function fetchFiles(pid: string, page: number) {
     if (page === 0) {
       latestFile.value = res.list[0] ?? null;
     }
+    filesView.value += 1;
   } catch (e) {
     // 旧一发的失败、或窗口关闭时后端取消，都不算失败
     if (mine !== fileSeq || String(e) === "err.cancelled") return;
@@ -180,6 +192,7 @@ async function fetchFiles(pid: string, page: number) {
     fileTotal.value = 0;
     latestFile.value = null;
     filesError.value = tErr(e);
+    filesView.value += 1;
   } finally {
     if (mine === fileSeq) filesLoading.value = false;
   }
@@ -215,6 +228,8 @@ function turnFilePage(delta: number) {
   filePage.value = next;
   // 翻页先把版本列表拉回它的开头：停在上一页的滚动位置就看不到新一页的头几条
   scrollToVersions();
+  // Modrinth 一次拿全部版本、本地切片，换页不会有数据回来，这里自己换 key
+  if (isModrinth.value) filesView.value += 1;
   if (isModrinth.value || !current.value) return;
 
   fetchFiles(current.value.source.pid, next);
@@ -338,7 +353,7 @@ function onStarClick(e: MouseEvent) {
     UI 与行为都在共用的 `ImagePreview` 里，资源窗口的截图预览用的是同一份。
     Esc 的"先关预览、再关详情页"层次由本组件处理，见 onKey
   -->
-  <ImagePreview v-if="preview" :src="preview" @close="closePreview" />
+  <ImagePreview :src="preview" @close="closePreview" />
 
   <Teleport to="body">
     <transition name="detail-page">
@@ -460,45 +475,50 @@ function onStarClick(e: MouseEvent) {
                   </div>
                 </div>
                 <div class="detail-files" :class="{ 'is-loading-dim': filesLoading }">
-                  <!-- 首次加载用骨架；翻页时保留旧内容并压暗（结果到了才整体替换）。
-                       骨架与真行都按顺序落下，见项目详情 css 里的 --row-i 错峰 -->
-                  <template v-if="filesLoading && pageFiles.length === 0">
-                    <div v-for="(n, index) in 5" :key="n" class="sk-row compact" :style="{ '--row-i': index }">
-                      <div class="sk-lines">
-                        <div class="sk sk-line w70"></div>
-                        <div class="sk sk-line w45"></div>
+                  <!-- 首次加载用骨架；换筛选项或翻页时旧内容保留并压暗，结果到了整块换掉。
+                       换掉的那一块按数据重挂（key 跟 filesView 走），版本行依次落下，见 useStaggerEnter -->
+                  <Transition :css="false" mode="out-in" @enter="enterFiles" @leave="leaveFiles">
+                    <div v-if="filesLoading && pageFiles.length === 0" key="sk" class="detail-rows">
+                      <div v-for="n in 5" :key="n" class="sk-row compact">
+                        <div class="sk-lines">
+                          <div class="sk sk-line w70"></div>
+                          <div class="sk sk-line w45"></div>
+                        </div>
                       </div>
                     </div>
-                  </template>
-                  <!-- 失败与"没有版本"必须分开：前者可重试，后者是空结果 -->
-                  <div v-else-if="filesError" class="error-text detail-error" role="alert">
-                    {{ t("modpack.versionFail") }}
-                    <button class="retry-btn" @click="reloadFiles">{{ t("modpack.retry") }}</button>
-                  </div>
-                  <div v-else-if="pageFiles.length === 0" class="empty-tip">{{ t("modpack.noVersions") }}</div>
-                  <template v-else>
-                    <div v-for="(file, index) in pageFiles" :key="file.source.fid" class="file-row"
-                      :style="{ '--row-i': Math.min(index, 8) }">
-                      <div class="file-info">
-                        <span class="file-name">
-                          {{ file.name }}
-                          <span v-if="fileInstalled(file)" class="pack-badge">{{ t("modpack.installed") }}</span>
-                          <span v-else-if="fileRunning(file)" class="pack-badge busy">{{ t("modpack.downloading")
-                          }}</span>
-                        </span>
-                        <span class="file-meta">
-                          {{ t("modpack.fileMeta", {
-                            n: formatCount(file.download),
-                            date: formatDate(file.time),
-                            size: formatSize(file.size),
-                          }) }}
-                        </span>
+                    <!-- 失败与"没有版本"必须分开：前者可重试，后者是空结果 -->
+                    <div v-else-if="filesError" key="err" class="detail-rows">
+                      <div class="error-text detail-error" role="alert">
+                        {{ t("modpack.versionFail") }}
+                        <button class="retry-btn" @click="reloadFiles">{{ t("modpack.retry") }}</button>
                       </div>
-                      <button class="install-btn" @click="emit('download', file)">
-                        {{ props.actionLabel }}
-                      </button>
                     </div>
-                  </template>
+                    <div v-else-if="pageFiles.length === 0" key="empty" class="detail-rows">
+                      <div class="empty-tip">{{ t("modpack.noVersions") }}</div>
+                    </div>
+                    <div v-else :key="`rows-${filesView}`" class="detail-rows">
+                      <div v-for="file in pageFiles" :key="file.source.fid" class="file-row">
+                        <div class="file-info">
+                          <span class="file-name">
+                            {{ file.name }}
+                            <span v-if="fileInstalled(file)" class="pack-badge">{{ t("modpack.installed") }}</span>
+                            <span v-else-if="fileRunning(file)" class="pack-badge busy">{{ t("modpack.downloading")
+                            }}</span>
+                          </span>
+                          <span class="file-meta">
+                            {{ t("modpack.fileMeta", {
+                              n: formatCount(file.download),
+                              date: formatDate(file.time),
+                              size: formatSize(file.size),
+                            }) }}
+                          </span>
+                        </div>
+                        <button class="install-btn" @click="emit('download', file)">
+                          {{ props.actionLabel }}
+                        </button>
+                      </div>
+                    </div>
+                  </Transition>
                 </div>
               </div>
             </div>

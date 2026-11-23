@@ -116,6 +116,9 @@ onBeforeUnmount(() => gridObserver?.disconnect());
 /** 当前预览的截图，`null` 表示没开大图 */
 const preview = ref<ScreenshotItemDto | null>(null);
 
+/** 大图地址，空串 = 收起。组件常驻、靠这个空串收起来，关闭时才有退场动画 */
+const previewSrc = computed(() => (preview.value ? shotUrl(preview.value) : ""));
+
 /**
  * Esc 关掉大图
  *
@@ -344,16 +347,18 @@ function onMenuPick(id: string) {
     全屏浮层 + 滚轮缩放 + 放大后拖动平移 + 点空白关闭。
     两个操作放进浮层底部的槽里：原来的弹窗有它们，换成浮层不该弄丢
   -->
-  <ImagePreview v-if="preview" :src="shotUrl(preview)" @close="preview = null">
-    <button class="mini-btn" @click="copyShot(preview)">
-      {{ t("resource.copyShot") }}
-    </button>
-    <button class="mini-btn" @click="openFolder('screenshots', preview.name)">
-      {{ t("resource.openFolder") }}
-    </button>
-    <button class="mini-btn danger" @click="remove(preview)">
-      {{ t("resource.delete") }}
-    </button>
+  <ImagePreview :src="previewSrc" @close="preview = null">
+    <template v-if="preview">
+      <button class="mini-btn" @click="copyShot(preview)">
+        {{ t("resource.copyShot") }}
+      </button>
+      <button class="mini-btn" @click="openFolder('screenshots', preview.name)">
+        {{ t("resource.openFolder") }}
+      </button>
+      <button class="mini-btn danger" @click="remove(preview)">
+        {{ t("resource.delete") }}
+      </button>
+    </template>
   </ImagePreview>
 </template>
 

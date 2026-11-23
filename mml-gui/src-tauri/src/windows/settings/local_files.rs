@@ -30,34 +30,22 @@ struct LocalFileKind {
 
 /// 本标签列出的文件夹，顺序即界面顺序
 ///
-/// `cache` 这一项是**互斥**的：它不含 `image` 与 `webview` 两个子目录 —— 那两项各自单独成行，
-/// 否则几行的数字加起来会比磁盘实际占用大一截，清理时也会删掉别的行承诺保留的东西。
+/// 图片缓存与界面数据都是「缓存」目录的子目录，因此不再单独成行：它们作为缓存的明细出现，
+/// 缓存的占用按明细求和，几行的数字加起来不会比磁盘实际占用大。
 ///
 /// # 返回值
 ///
-/// 六个文件夹的 id / 路径 / 可清理性
+/// 四个文件夹的 id / 路径 / 可清理性
 fn kinds() -> Vec<LocalFileKind> {
-    let cache = mml_downloader::get_cache_path();
     vec![
         LocalFileKind {
             id: "cache",
-            dir: cache.clone(),
-            deletable: true,
-        },
-        LocalFileKind {
-            id: "image",
-            dir: crate::image_manager::icon_cache_dir(),
+            dir: mml_downloader::get_cache_path(),
             deletable: true,
         },
         LocalFileKind {
             id: "download",
             dir: mml_downloader::get_download_path(),
-            deletable: true,
-        },
-        LocalFileKind {
-            id: "webview",
-            dir: cache.join(names::WEBVIEW_DIR),
-            // 目录本身删不得：WebView2 运行时一直占着它，走浏览数据接口清，见 clear_webview_data
             deletable: true,
         },
         LocalFileKind {
@@ -81,17 +69,23 @@ fn kinds() -> Vec<LocalFileKind> {
 ///
 /// 目录总字节数；`cache` 已扣掉图片缓存与界面数据
 fn size_of(kind: &LocalFileKind) -> u64 {
-    let total = path_helper::get_folder_size(&kind.dir);
-    if kind.id != "cache" {
-        return total;
+    if kind.id == "cache" {
+        return cache_own_size(&kind.dir);
     }
-    total
-        .saturating_sub(path_helper::get_folder_size(
-            kind.dir.join(names::IMAGE_DIR),
-        ))
-        .saturating_sub(path_helper::get_folder_size(
-            kind.dir.join(names::WEBVIEW_DIR),
-        ))
+    path_helper::get_folder_size(&kind.dir)
+}
+
+/// 缓存目录里除图片缓存与界面数据之外的占用，单位字节
+///
+/// - `dir`: 缓存目录
+///
+/// # 返回值
+///
+/// 扣掉两个子目录后的字节数
+fn cache_own_size(dir: &Path) -> u64 {
+    path_helper::get_folder_size(dir)
+        .saturating_sub(path_helper::get_folder_size(dir.join(names::IMAGE_DIR)))
+        .saturating_sub(path_helper::get_folder_size(dir.join(names::WEBVIEW_DIR)))
 }
 
 /// 采集全部文件夹的占用
@@ -106,10 +100,12 @@ fn collect() -> Vec<LocalFileEntryDto> {
             let children = match kind.id {
                 "instances" => instance_sizes(),
                 "download" => download_sizes(),
+                "cache" => cache_sizes(),
+                "java" => java_sizes(),
                 _ => Vec::new(),
             };
-            // 实例行按明细求和，避免为了一个总数再整棵实例目录扫第二遍
-            let size = if kind.id == "instances" {
+            // 带明细的行按明细求和：避免为一个总数再扫一遍目录，也保证明细之和等于总数
+            let size = if matches!(kind.id, "instances" | "cache" | "java") {
                 children.iter().map(|item| item.size).sum()
             } else {
                 size_of(&kind)
@@ -242,6 +238,72 @@ fn download_sizes() -> Vec<LocalFileChildDto> {
     .collect()
 }
 
+/// 缓存这一行的明细：其余缓存、图片缓存、界面数据
+///
+/// 三者加起来就是缓存目录的完整占用（缓存本体扣掉了另外两个子目录）。
+///
+/// # 返回值
+///
+/// 三条明细，顺序固定
+fn cache_sizes() -> Vec<LocalFileChildDto> {
+    let cache = mml_downloader::get_cache_path();
+    let image = crate::image_manager::icon_cache_dir();
+    let webview = cache.join(names::WEBVIEW_DIR);
+    [
+        (String::from("cacheOther"), cache.clone(), cache_own_size(&cache)),
+        (
+            String::from("image"),
+            image.clone(),
+            path_helper::get_folder_size(&image),
+        ),
+        (
+            String::from("webview"),
+            webview.clone(),
+            path_helper::get_folder_size(&webview),
+        ),
+    ]
+    .into_iter()
+    .map(|(kind, path, size)| LocalFileChildDto {
+        id: kind.clone(),
+        kind,
+        name: String::new(),
+        size,
+        path: path.to_string_lossy().to_string(),
+    })
+    .collect()
+}
+
+/// Java 运行时目录下每个运行时的占用，按大小降序
+///
+/// 只统计启动器自己下载 / 解压出来的运行时目录；系统里已有的 Java 不计入。
+///
+/// # 返回值
+///
+/// 每个运行时一条明细；目录不存在时为空列表
+fn java_sizes() -> Vec<LocalFileChildDto> {
+    let dir = mml_jvms::get_java_dir();
+    let Ok(entries) = fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+    let mut list: Vec<LocalFileChildDto> = entries
+        .flatten()
+        .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
+        .map(|entry| {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().into_owned();
+            LocalFileChildDto {
+                id: name.clone(),
+                kind: String::from("java"),
+                name,
+                size: path_helper::get_folder_size(&path),
+                path: path.to_string_lossy().to_string(),
+            }
+        })
+        .collect();
+    list.sort_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
+    list
+}
+
 /// 读取各文件夹占用，界面打开本标签时调用一次
 ///
 /// 统计要遍历整棵树，实例目录可能有几万个文件，所以放到阻塞线程池里跑，别卡住 IPC。
@@ -259,7 +321,9 @@ pub async fn settings_get_local_files() -> Vec<LocalFileEntryDto> {
 
 /// 清理一项缓存目录，只删目录里的东西、目录本身留着
 ///
-/// - `app`: 应用句柄，清理「界面数据」时用来取任意一个 webview
+/// 「缓存」这一行的图片缓存与界面数据都在它下面，所以先删目录内容，再走浏览数据接口清界面数据。
+///
+/// - `app`: 应用句柄，清理「缓存」时用来取任意一个 webview
 /// - `id`: 文件夹 id，取自 [`settings_get_local_files`] 的返回值
 ///
 /// # 返回值
@@ -274,7 +338,10 @@ pub async fn settings_clear_local_file(app: AppHandle, id: String) -> Result<(),
     if !kind.deletable {
         return Err(err_keys::LOCAL_FILE_LOCKED.to_string());
     }
-    if kind.id == "webview" {
+    if kind.id == "cache" {
+        tauri::async_runtime::spawn_blocking(move || clear(&kind))
+            .await
+            .map_err(|_| err_keys::LOCAL_FILE_CLEAR.to_string())??;
         return clear_webview_data(&app);
     }
     tauri::async_runtime::spawn_blocking(move || clear(&kind))
@@ -282,7 +349,7 @@ pub async fn settings_clear_local_file(app: AppHandle, id: String) -> Result<(),
         .map_err(|_| err_keys::LOCAL_FILE_CLEAR.to_string())?
 }
 
-/// 清掉 WebView2 的用户数据，即「界面数据」那一行
+/// 清掉 WebView2 的用户数据，即「缓存 › 界面数据」那一条明细
 ///
 /// 浏览器数据由 WebView2 自己回收：直接删目录只会删掉没被占用的那部分，
 /// 还把正在运行的 profile 拆成半套。
@@ -315,10 +382,25 @@ fn clear(kind: &LocalFileKind) -> Result<(), String> {
     if kind.id == "cache" || kind.id == "download" {
         mml_downloader::cancel_all();
     }
-    let keep_image = kind.dir.join(names::IMAGE_DIR);
-    let keep_webview = kind.dir.join(names::WEBVIEW_DIR);
+    let keep = if kind.id == "cache" {
+        // 界面数据删不得：WebView2 一直占着这个目录，清理「缓存」后另走浏览数据接口
+        vec![kind.dir.join(names::WEBVIEW_DIR)]
+    } else {
+        Vec::new()
+    };
+    clear_contents(&kind.dir, &keep)
+}
 
-    let Ok(entries) = fs::read_dir(&kind.dir) else {
+/// 清空目录里的内容，跳过 `keep` 里的路径
+///
+/// - `dir`: 目标目录
+/// - `keep`: 要保留的绝对路径
+///
+/// # 返回值
+///
+/// 全部删掉或目录本来就不存在返回 `Ok(())`；有文件删不掉返回错误键，明细进日志
+fn clear_contents(dir: &Path, keep: &[PathBuf]) -> Result<(), String> {
+    let Ok(entries) = fs::read_dir(dir) else {
         // 目录不在就是已经干净了，没什么可删
         return Ok(());
     };
@@ -326,8 +408,7 @@ fn clear(kind: &LocalFileKind) -> Result<(), String> {
     let mut failed = false;
     for entry in entries.flatten() {
         let path = entry.path();
-        // 图片缓存与界面数据各自有归属：清理「缓存」时不能顺手动它们
-        if kind.id == "cache" && (path == keep_image || path == keep_webview) {
+        if keep.contains(&path) {
             continue;
         }
         let result = if path.is_dir() {
@@ -352,6 +433,157 @@ fn clear(kind: &LocalFileKind) -> Result<(), String> {
     } else {
         Ok(())
     }
+}
+
+/// 解析一条明细对应的目录
+///
+/// 只认本页登记的条目与它自己的子项，**不接受前端传路径**：缓存与下载内容按固定子目录解析，
+/// Java 按运行时目录名匹配，游戏实例按 uuid 查实例根目录。
+///
+/// - `entry`: 行 id，见 [`settings_get_local_files`]
+/// - `child`: 明细 id，见同行返回的 `children`
+///
+/// # 返回值
+///
+/// 明细目录；id 不认识或目录查不到时返回错误键
+fn child_dir(entry: &str, child: &str) -> Result<PathBuf, String> {
+    let cache = mml_downloader::get_cache_path();
+    match (entry, child) {
+        ("cache", "cacheOther") => Ok(cache),
+        ("cache", "image") => Ok(crate::image_manager::icon_cache_dir()),
+        ("cache", "webview") => Ok(cache.join(names::WEBVIEW_DIR)),
+        ("download", "mods") => Ok(mml_downloader::get_download_path().join(names::GAME_MODS_DIR)),
+        ("download", "resourcepacks") => {
+            Ok(mml_downloader::get_download_path().join(names::GAME_RESOURCEPACKS_DIR))
+        }
+        ("java", name) => java_child_dir(name),
+        ("instances", uuid) => instance_child_dir(uuid),
+        _ => Err(err_keys::LOCAL_FILE_UNKNOWN.to_string()),
+    }
+}
+
+/// 按运行时目录名找 Java 运行时的目录
+///
+/// 逐个比对 `java/` 下的子目录，而不是直接拼路径，免得名字里带分隔符时跳出目录。
+///
+/// - `name`: 运行时目录名
+///
+/// # 返回值
+///
+/// 运行时目录；找不到时返回错误键
+fn java_child_dir(name: &str) -> Result<PathBuf, String> {
+    let Ok(entries) = fs::read_dir(mml_jvms::get_java_dir()) else {
+        return Err(err_keys::FILE_NOT_FOUND.to_string());
+    };
+    entries
+        .flatten()
+        .find(|entry| {
+            entry
+                .file_type()
+                .map(|kind| kind.is_dir())
+                .unwrap_or(false)
+                && entry.file_name().to_string_lossy() == name
+        })
+        .map(|entry| entry.path())
+        .ok_or_else(|| err_keys::FILE_NOT_FOUND.to_string())
+}
+
+/// 按实例 uuid 取实例根目录
+///
+/// - `uuid`: 实例 uuid，取自明细 id
+///
+/// # 返回值
+///
+/// 实例根目录；uuid 非法或实例已不在时返回错误键
+fn instance_child_dir(uuid: &str) -> Result<PathBuf, String> {
+    let id = uuid::Uuid::parse_str(uuid).map_err(|_| err_keys::LOCAL_FILE_UNKNOWN.to_string())?;
+    mml_game::get_instance(&id)
+        .map(|instance| instance.read().unwrap().get_base_path())
+        .ok_or_else(|| err_keys::FILE_NOT_FOUND.to_string())
+}
+
+/// 在资源管理器里打开一条明细的目录
+///
+/// - `entry`: 行 id，见 [`settings_get_local_files`]
+/// - `child`: 明细 id
+///
+/// # 返回值
+///
+/// 成功返回 `Ok(())`；id 不认识、目录不存在且不该凭空建时返回错误键
+#[gui_macros::ipc_group("settings")]
+#[gui_macros::command]
+pub fn settings_open_local_child(entry: String, child: String) -> Result<(), String> {
+    let dir = child_dir(&entry, &child)?;
+    if !dir.exists() {
+        // 缓存与下载内容下的子目录可能还没建出来；实例与 Java 不凭空造目录
+        if matches!(entry.as_str(), "cache" | "download") {
+            path_helper::create_dir_all(&dir).map_err(|_| err_keys::FILE_NOT_FOUND.to_string())?;
+        } else {
+            return Err(err_keys::FILE_NOT_FOUND.to_string());
+        }
+    }
+    open_helper::open_dir(&dir);
+    Ok(())
+}
+
+/// 删除一条明细
+///
+/// 缓存类清空目录内容（界面数据走浏览数据接口），Java 运行时连目录一起删；
+/// 游戏实例不走这里 —— 删除实例要挪回收站、关窗口、广播变更，走主窗口的删除命令。
+///
+/// - `app`: 应用句柄，清界面数据时用来取任意一个 webview
+/// - `entry`: 行 id，见 [`settings_get_local_files`]
+/// - `child`: 明细 id
+///
+/// # 返回值
+///
+/// 删除成功返回 `Ok(())`；id 不认识、这一项不支持在这里删、或文件删不掉时返回错误键
+#[gui_macros::ipc_group("settings")]
+#[gui_macros::command]
+pub async fn settings_clear_local_child(
+    app: AppHandle,
+    entry: String,
+    child: String,
+) -> Result<(), String> {
+    let dir = child_dir(&entry, &child)?;
+    match (entry.as_str(), child.as_str()) {
+        // 界面数据由 WebView2 自己回收，删目录会把正在运行的 profile 拆坏
+        ("cache", "webview") => clear_webview_data(&app),
+        ("cache", "cacheOther") => {
+            let keep = [dir.join(names::IMAGE_DIR), dir.join(names::WEBVIEW_DIR)];
+            tauri::async_runtime::spawn_blocking(move || clear_contents(&dir, &keep))
+                .await
+                .map_err(|_| err_keys::LOCAL_FILE_CLEAR.to_string())?
+        }
+        ("cache", _) => tauri::async_runtime::spawn_blocking(move || clear_contents(&dir, &[]))
+            .await
+            .map_err(|_| err_keys::LOCAL_FILE_CLEAR.to_string())?,
+        ("download", _) => {
+            mml_downloader::cancel_all();
+            tauri::async_runtime::spawn_blocking(move || clear_contents(&dir, &[]))
+                .await
+                .map_err(|_| err_keys::LOCAL_FILE_CLEAR.to_string())?
+        }
+        // Java 运行时是整个目录一起删
+        ("java", _) => tauri::async_runtime::spawn_blocking(move || remove_dir(&dir))
+            .await
+            .map_err(|_| err_keys::LOCAL_FILE_CLEAR.to_string())?,
+        _ => Err(err_keys::LOCAL_FILE_UNKNOWN.to_string()),
+    }
+}
+
+/// 连目录一起删掉
+///
+/// - `dir`: 目标目录
+///
+/// # 返回值
+///
+/// 目录不在也算成功；删不掉时返回错误键
+fn remove_dir(dir: &Path) -> Result<(), String> {
+    if !dir.exists() {
+        return Ok(());
+    }
+    fs::remove_dir_all(dir).map_err(|_| err_keys::LOCAL_FILE_CLEAR.to_string())
 }
 
 /// 在资源管理器里打开一项的目录，不存在就先建出来

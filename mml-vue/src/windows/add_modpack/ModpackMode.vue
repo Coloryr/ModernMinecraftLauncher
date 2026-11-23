@@ -14,6 +14,7 @@ import { toggleStar } from "../../lib/projectCollect";
 import { useCollectStars } from "../../lib/useCollectStars";
 import { useRefreshKey } from "../../composables/useRefreshKey";
 import { usePageKeys } from "../../composables/usePageKeys";
+import { useStaggerEnter } from "../../composables/useStaggerEnter";
 import { scrollToContentTop } from "../../lib/scrollTop";
 import { projectParamToItem, targetProject } from "../windowManager";
 import type { FileListItemDto, GroupDto, ModPackStatusDto, ProjectItemDto } from "../../lib/bindings";
@@ -117,6 +118,16 @@ const page = ref(0);
 const searching = ref(false);
 const error = ref("");
 
+/** 结果区内容序号：换成另一批结果时 +1，列表整块重挂，卡片才能重新进场 */
+const listView = ref(0);
+
+/** 结果区换页 / 换筛选的入场：卡片按顺序落下；没有卡片时（骨架、空、失败）整块淡入 */
+const { enter: enterList, leave: leaveList } = useStaggerEnter(".pack-item", {
+  duration: 260,
+  step: 26,
+  max: 12,
+});
+
 /** 详情页展示的项目；null = 收起。详情与版本列表的状态都在共用组件里 */
 const detailItem = ref<ProjectItemDto | null>(null);
 
@@ -155,6 +166,7 @@ async function loadSource() {
   total.value = 0;
   page.value = 0;
   error.value = "";
+  listView.value += 1;
   closeDetail();
   filter.value = "";
   version.value = "";
@@ -238,6 +250,7 @@ async function search() {
     items.value = res.items;
     total.value = res.count;
     error.value = "";
+    listView.value += 1;
   } catch (e) {
     // 被更新的一发顶掉、或窗口关闭时后端取消，都不算失败，不弹错
     if (mine !== searchSeq || String(e) === "err.cancelled") return;
@@ -255,6 +268,7 @@ async function search() {
     items.value = [];
     total.value = 0;
     error.value = tErr(e);
+    listView.value += 1;
   } finally {
     // 只有最新一发负责收掉锁定弹窗
     if (mine === searchSeq) searching.value = false;
@@ -418,27 +432,30 @@ watch(source, loadSource);
     <!-- 列表加载指示：翻页 / 换筛选只在结果区上方走一条细进度，不再全窗口遮罩 -->
     <div class="list-bar" :class="{ on: searching }" aria-hidden="true"><span /></div>
 
-    <!-- 结果列表：加载状态内联在本区，旧内容保留并压暗 -->
+    <!-- 结果列表：加载状态内联在本区，旧内容保留并压暗。
+         换一批结果时整块重挂（key 跟数据走），卡片按顺序落下，见 useStaggerEnter -->
     <div class="modpack-list -mx-2 flex min-h-[120px] flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2"
       :class="{ 'is-loading-dim': searching }">
-      <!-- 首次加载（还没有内容）：骨架行 -->
-      <template v-if="searching && items.length === 0">
-        <div v-for="n in 6" :key="n" class="sk-row">
-          <div class="sk sk-icon"></div>
-          <div class="sk-lines">
-            <div class="sk sk-line w60"></div>
-            <div class="sk sk-line w90"></div>
-            <div class="sk sk-line w40"></div>
+      <Transition :css="false" mode="out-in" @enter="enterList" @leave="leaveList">
+        <!-- 首次加载（还没有内容）：骨架行 -->
+        <div v-if="searching && items.length === 0" key="sk" class="flex shrink-0 flex-col gap-2">
+          <div v-for="n in 6" :key="n" class="sk-row">
+            <div class="sk sk-icon"></div>
+            <div class="sk-lines">
+              <div class="sk sk-line w60"></div>
+              <div class="sk sk-line w90"></div>
+              <div class="sk sk-line w40"></div>
+            </div>
           </div>
         </div>
-      </template>
-      <div v-else-if="error" class="empty-tip load-error" role="alert">{{ error }}</div>
-      <div v-else-if="items.length === 0" class="empty-tip">{{ t("modpack.empty") }}</div>
-      <template v-else>
-        <ProjectCard v-for="item in items" :key="item.source.pid" :item="item" :filter="filter"
-          :installed="projectInstalled(item)" :running="projectRunning(item)"
-          @star="toggleStar" @open="openDetail" />
-      </template>
+        <div v-else-if="error" key="err" class="empty-tip load-error" role="alert">{{ error }}</div>
+        <div v-else-if="items.length === 0" key="empty" class="empty-tip">{{ t("modpack.empty") }}</div>
+        <div v-else :key="`items-${listView}`" class="flex shrink-0 flex-col gap-2">
+          <ProjectCard v-for="item in items" :key="item.source.pid" :item="item" :filter="filter"
+            :installed="projectInstalled(item)" :running="projectRunning(item)"
+            @star="toggleStar" @open="openDetail" />
+        </div>
+      </Transition>
     </div>
 
     <!-- 分页 -->

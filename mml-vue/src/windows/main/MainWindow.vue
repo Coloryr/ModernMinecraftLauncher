@@ -313,6 +313,23 @@ function animateSidebar() {
   }, SIDEBAR_ANIM_MS);
 }
 
+/** 列表 ↔ 分组换排布时的短暂动画开关：侧栏从 0 宽展开、内容淡入 */
+const modeSwapping = ref(false);
+let modeSwapTimer: number | undefined;
+
+/** 重新挂一次换排布的动画类，播完自动摘掉 */
+function playModeSwap() {
+  modeSwapping.value = false;
+  requestAnimationFrame(() => {
+    modeSwapping.value = true;
+    window.clearTimeout(modeSwapTimer);
+    modeSwapTimer = window.setTimeout(() => {
+      modeSwapping.value = false;
+    }, 300);
+  });
+}
+
+
 /** 用户主动收起 / 展开侧栏（唯一会播放动画的入口） */
 function collapseSidebar(collapsed: boolean) {
   // 收起时一定先收回占满：占满态下槽位吃掉整行，收起按钮就没意义了
@@ -1532,6 +1549,9 @@ const lockMissing = computed(
 /** 锁定生效时强制按列表模式渲染；只覆盖渲染，不写回 gui_config，解锁后自动回到原模式 */
 const effectiveMode = computed<ViewMode>(() => (lockActive.value ? "list" : mode.value));
 
+// 显示模式切换（设置里改 / 锁定生效）时整块淡入，侧栏同时从 0 宽展开
+watch(effectiveMode, () => playModeSwap());
+
 // 锁定生效时把选中实例压到锁定实例：切换入口已隐藏，若还停在别处（比如上次退出时选的是另一个）
 // 就会启动错的实例。不走 select()——那会关掉启动器主页。
 watch(
@@ -2610,7 +2630,7 @@ onMounted(async () => {
       <!-- 主体 -->
       <main class="main relative flex flex-1 min-h-0"
         :class="{ 'side-right': sidebarSide === 'Right', 'sidebar-anim': sidebarAnim, 'pane-max': paneMaximized, 'pane-absolute': paneAbsolute,
-          'sidebar-collapsed': sidebarCollapsed, 'home-active': newsActive }">
+          'sidebar-collapsed': sidebarCollapsed, 'home-active': newsActive, 'mode-swap': modeSwapping }">
         <!-- 锁定的实例已不存在，例如整合包作者的实例被删 / 改名：整块换成错误页，顶部栏保留 -->
         <template v-if="lockMissing">
           <section class="lock-error">
