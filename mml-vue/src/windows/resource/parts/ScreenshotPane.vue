@@ -13,6 +13,7 @@ import AsyncImage from "../../../components/ui/AsyncImage.vue";
 import ImagePreview from "../../../components/ui/ImagePreview.vue";
 import { t } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
+import { previewOriginOf, type PreviewOrigin } from "../../../lib/previewOrigin";
 import { clearScreenshots, deleteScreenshot } from "../../../lib/api";
 import ContentHead from "./ContentHead.vue";
 import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
@@ -119,6 +120,9 @@ const preview = ref<ScreenshotItemDto | null>(null);
 /** 大图地址，空串 = 收起。组件常驻、靠这个空串收起来，关闭时才有退场动画 */
 const previewSrc = computed(() => (preview.value ? shotUrl(preview.value) : ""));
 
+/** 展开起点：被点的那张缩略图的位置，大图从那儿飞过去；null = 直接淡入 */
+const previewOrigin = ref<PreviewOrigin | null>(null);
+
 /**
  * Esc 关掉大图
  *
@@ -183,6 +187,7 @@ function onCellClick(payload: { event: MouseEvent; item: ScreenshotItemDto }) {
     onRowClick(payload);
     return;
   }
+  previewOrigin.value = previewOriginOf(payload.event.currentTarget as Element | null);
   preview.value = payload.item;
 }
 
@@ -347,7 +352,7 @@ function onMenuPick(id: string) {
     全屏浮层 + 滚轮缩放 + 放大后拖动平移 + 点空白关闭。
     两个操作放进浮层底部的槽里：原来的弹窗有它们，换成浮层不该弄丢
   -->
-  <ImagePreview :src="previewSrc" @close="preview = null">
+  <ImagePreview :src="previewSrc" :origin="previewOrigin" @close="preview = null">
     <template v-if="preview">
       <button class="mini-btn" @click="copyShot(preview)">
         {{ t("resource.copyShot") }}

@@ -22,6 +22,7 @@ import { useStaggerEnter } from "../composables/useStaggerEnter";
 import { toggleStar } from "../lib/projectCollect";
 import { popStar } from "../lib/starPop";
 import { scrollToElementSmooth } from "../lib/scrollTop";
+import { previewOriginOf, type PreviewOrigin } from "../lib/previewOrigin";
 import { cardTags, hiddenTagTip } from "../lib/projectTags";
 import type {
   FileListItemDto,
@@ -257,7 +258,17 @@ const bodyHtml = computed(() => {
  */
 const preview = ref("");
 
-function openPreview(url: string) {
+/** 展开起点：被点的那张缩略图的位置，预览图从那儿飞到大图位置；null = 直接淡入 */
+const previewOrigin = ref<PreviewOrigin | null>(null);
+
+/**
+ * 打开截图预览
+ *
+ * - `url`: 图片地址
+ * - `event`: 点击事件，用来取缩略图的视口矩形做展开动画
+ */
+function openPreview(url: string, event?: MouseEvent) {
+  previewOrigin.value = previewOriginOf(event?.currentTarget as Element | null);
   preview.value = url;
 }
 
@@ -353,7 +364,7 @@ function onStarClick(e: MouseEvent) {
     UI 与行为都在共用的 `ImagePreview` 里，资源窗口的截图预览用的是同一份。
     Esc 的"先关预览、再关详情页"层次由本组件处理，见 onKey
   -->
-  <ImagePreview :src="preview" @close="closePreview" />
+  <ImagePreview :src="preview" :origin="previewOrigin" @close="closePreview" />
 
   <Teleport to="body">
     <transition name="detail-page">
@@ -444,7 +455,7 @@ function onStarClick(e: MouseEvent) {
                   <div class="detail-section detail-block">{{ t("modpack.screenshots") }}</div>
                   <div class="detail-shots">
                     <AsyncImage v-for="shot in detail.screenshots" :key="shot.logo" class="detail-shot" :src="shot.logo"
-                      v-tip="shot.name || shot.description" @click="openPreview(shot.logo)" />
+                      v-tip="shot.name || shot.description" @click="openPreview(shot.logo, $event)" />
                   </div>
                 </template>
               </div>
