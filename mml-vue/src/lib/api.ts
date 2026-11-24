@@ -3036,6 +3036,7 @@ export function getResourceView(uuid: string): Promise<ResourceViewDto> {
  * - `order`: 左侧分类顺序
  * - `category`: 上次选中的类别
  * - `modView`: 模组展示方式
+ * - `modSearchField`: 模组搜索按哪些字段匹配
  * - `modColWidths`: 模组表格列宽
  *
  * 整份覆盖这一块；排序与默认值的口径在前端 useResourceView
@@ -3045,9 +3046,10 @@ export function setResourceView(
   order: string[],
   category: string,
   modView: string,
+  modSearchField: string,
   modColWidths: Record<string, number>,
 ): Promise<void> {
-  return commands.resource.viewSet(uuid, order, category, modView, modColWidths);
+  return commands.resource.viewSet(uuid, order, category, modView, modSearchField, modColWidths);
 }
 
 /**

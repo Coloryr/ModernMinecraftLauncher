@@ -55,8 +55,13 @@ defineEmits<{
   (e: "close"): void;
 }>();
 
-/** 切换分类：内容标题只渐变、不位移；列表行按顺序落下 */
-const { enter: enterPane, leave: leavePane } = useStaggerEnter(".item-row", {
+/**
+ * 切换分类：内容标题只渐变、不位移；列表里的块按顺序落下
+ *
+ * 模组页的"块"是分组：分组全收起时里面没有行，只认 `.item-row` 等于切回来没动画，
+ * 所以两层都写在这里 —— useStaggerEnter 只取最外层，行跟着它所在的分组一起入场。
+ */
+const { enter: enterPane, leave: leavePane } = useStaggerEnter(".mod-group, .item-row", {
   fade: ".content-head",
 });
 

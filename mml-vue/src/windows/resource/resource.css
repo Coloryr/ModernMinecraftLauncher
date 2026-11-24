@@ -376,7 +376,9 @@
 .resource-layout .mod-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  /* 不用 gap：头与内容之间的 6px 放进 .mod-group-body 的上内边距里。
+     写成 gap 的话，收起时那条间距会跟着高度一起缩到 0（负外边距去抵会跳 6px），
+     而内边距在折叠面板的裁切区内，收起期间一直存在，不会突然贴上分组头 */
   border-radius: 12px;
 }
 
@@ -395,12 +397,26 @@
   position: sticky;
   top: 0;
   z-index: 2;
+  transition: border-radius 0.12s, background-color 0.12s;
 }
 
 /* 背景图模式下 --bg-raised 是半透明的（.62 / .8），吸顶头会让下面的行透出来：
    这一条换成不透明底，滚过去的内容才被真正盖住 */
 html.has-bg .resource-layout .mod-group-head {
   background: var(--bg-solid);
+}
+
+/* 真的粘在上沿时（.is-stuck 由 ModPane 量位置后挂上）：换成一条直角、半透明加毛玻璃的横条，
+   压在它下面的行透出来但被糊掉，滚动时一眼能看出"这一条是浮在上面的"。
+   第二条选择器是为了压过上面那条 has-bg 的不透明底 */
+.resource-layout .mod-group-head.is-stuck,
+html.has-bg .resource-layout .mod-group-head.is-stuck {
+  border-radius: 0;
+  /* 一条下边线：内容从底下穿过去时，直角横条与行之间还有个明确的分界 */
+  box-shadow: 0 1px 0 0 var(--border);
+  background: color-mix(in srgb, var(--bg-raised) 78%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.06);
+  backdrop-filter: blur(14px) saturate(1.06);
 }
 
 /* 分组头的「把手 + 箭头 + 名字」：
@@ -494,22 +510,16 @@ html.has-bg .resource-layout .mod-group-head {
   white-space: nowrap;
 }
 
-/* 分组末尾的「新建分组」：外观走全局 .add-row-btn，这里只管两处布局：
-   列表视图里它是 flex 子项、不参与压缩；表格视图的按钮在白底卡片外面，留 12px */
-.resource-layout .item-list.mod-groups>.add-row-btn {
-  flex: none;
-}
 
-.resource-layout .item-list.mod-groups-table>.add-row-btn {
-  margin-top: 12px;
-}
 
 
 .resource-layout .mod-group-body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-left: 2px;
+  /* 上边那条就是分组头与第一条内容之间的间距，见 .mod-group 的说明。
+     给 8px 而不是行与行之间的 6px：分组头是一条通栏色块，紧贴第一张卡片看着像粘住了 */
+  padding: 8px 0 0 2px;
 }
 
 /* 空分组：把「该分组没有模组」那行字放进一块虚线区里。
@@ -523,8 +533,8 @@ html.has-bg .resource-layout .mod-group-head {
 .resource-layout .mod-group-empty .mod-group-body {
   border: 1px dashed var(--border);
   border-radius: 9px;
-  /* 比一行卡片略高一点，看着像一块区域而不是一行说明文字 */
-  padding: 14px 12px;
+  /* 上边距含与分组头之间的 6px；比一行卡片略高一点，看着像一块区域而不是一行说明文字 */
+  padding: 20px 12px 14px;
   background: var(--bg-side);
 }
 
@@ -540,29 +550,61 @@ html.has-bg .resource-layout .mod-group-head {
   background: var(--accent-soft);
 }
 
-/* 模组搜索框：工具条里的小号输入，高度与同一行的按钮一样走全 app 那一档 32px */
-.resource-layout .mod-search {
-  width: 140px;
-  height: var(--ctl-h);
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-side);
-  color: var(--text);
-  font-size: 12.5px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color 0.12s, width 0.15s;
+/* 模组搜索框的外壳：外观整块交给 SearchBox（.field-input + 放大镜 + 清空键），
+   与主窗口的实例搜索同一份；这里只管它在工具条里占多宽 ——
+   占满剩下的空间、最宽 320px，再宽就离右边的按钮太远 */
+.resource-layout .mod-search-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 140px;
+  max-width: 320px;
 }
 
-.resource-layout .mod-search:focus {
-  width: 180px;
-  border-color: var(--accent);
+/* 工具条上"一进一出"的两块（搜索字段下拉 / 那组图标按钮）：宽度在 0fr ↔ 1fr 之间过渡，
+   内容被裁掉、跟着 width 一起展开收拢。inert 由模板绑，收起时点不到也聚焦不到 */
+.resource-layout .bar-slot {
+  display: grid;
+  grid-template-columns: 0fr;
+  flex: none;
+  transition: grid-template-columns 0.2s var(--ease-out);
 }
 
-.resource-layout .mod-search::placeholder {
-  color: var(--text-dim);
+/* 收起时宽度为 0，但那两条行内间距还在：用负外边距抵掉，展开时还原（间距与同行控件一致） */
+.resource-layout .bar-slot:not(.open) {
+  margin-inline: -4px;
 }
+
+.resource-layout .bar-slot.open {
+  grid-template-columns: 1fr;
+}
+
+.resource-layout .bar-slot-inner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  transition: opacity 0.15s var(--ease-out);
+}
+
+.resource-layout .bar-slot:not(.open)>.bar-slot-inner {
+  opacity: 0;
+}
+
+/* 搜索字段下拉：搜索时**占满输入框右边剩下的宽度**，这样它与「列表 / 表格」之间的间距
+   就跟输入框与它之间的一样（都是同行的标准间距），不会一边 8px 一边几十像素 */
+.resource-layout .bar-slot.field-slot.open {
+  flex: 1 1 auto;
+  min-width: 96px;
+}
+
+.resource-layout .sel-search-field {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+
 
 /* 多选选中的行：列表的 .item-row 与表格的 .mod-tr 共用这个类，
    **各分类都用**（除截图那个自绘网格，它见下面的 `.shot-cell.row-selected`），
@@ -725,6 +767,75 @@ html.has-bg .resource-layout .mod-group-head {
   border-radius: 8px;
   background: var(--bg-side);
   font-size: 11.5px;
+}
+
+/* 「改写目标」子项：与目标行同一套行框，整行可点，点开才列那一串目标类 */
+.resource-layout .mod-patch-list {
+  cursor: pointer;
+  color: var(--text);
+}
+
+/* 展开出来的子项被**父行包住**：父行是框头（去下边框、去下圆角），
+   子项依次接在下面（只留左右两条边），最后一行收口 —— 整块读起来是一张卡片。
+   行间距由负外边距吃掉，行高那本账在 ModList 的 rowHeights 里同步扣过 */
+/* 接缝处把描边改成**透明**而不是把宽度置 0：宽度置 0 会让内容盒多出 1px，
+   行里的图标与文字整体往下挪半格，展开前后对不齐（用户报的"高度不一样、会往下移动"）。
+   透明描边仍在布局里占 1px，卡的底色会从它下面透出来，接缝看不出线。 */
+.resource-layout .item-row.box-start,
+.resource-layout .mod-patch-row.box-start {
+  border-radius: 9px 9px 0 0;
+  border-bottom-color: transparent;
+  margin-bottom: -6px;
+}
+
+.resource-layout .item-row.box-mid,
+.resource-layout .mod-patch-row.box-mid {
+  border-radius: 0;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  margin-bottom: -6px;
+}
+
+.resource-layout .item-row.box-end,
+.resource-layout .mod-patch-row.box-end {
+  border-radius: 0 0 9px 9px;
+  border-top-color: transparent;
+}
+
+/* 框里的行一律实线：外壳是父行那张卡片，子项再画虚线会显得是两层框 */
+.resource-layout .item-row.box-mid,
+.resource-layout .item-row.box-end,
+.resource-layout .mod-patch-row.box-mid,
+.resource-layout .mod-patch-row.box-end,
+.resource-layout .mod-patch-row.box-start {
+  border-style: solid;
+}
+
+.resource-layout .mod-patch-list:hover {
+  border-color: var(--accent-border);
+  background: var(--bg-hover);
+}
+
+.resource-layout .mod-patch-list-label {
+  flex: none;
+  font-weight: 600;
+}
+
+.resource-layout .mod-patch-list-count {
+  flex: none;
+  color: var(--text-dim);
+}
+
+/* 展开出来的一行：轻轻淡入并往下落一点。收起不做动画 —— 行是从虚拟列表里直接移除的 */
+.resource-layout .mod-rows .row-enter {
+  animation: mod-row-enter 0.24s var(--ease-out) both;
+}
+
+@keyframes mod-row-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
 }
 
 .resource-layout .mod-patch-tag {

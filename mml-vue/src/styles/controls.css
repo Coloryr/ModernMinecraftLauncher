@@ -322,6 +322,27 @@ select.field-select {
   color: var(--text);
 }
 
+/* 带清空键的搜索框：外面套一层 .search-wrap 当定位参照，清空键压在输入框右端内部。
+   输入框自己撑满外壳，右侧留出清空键的位置（与 SearchBox 组件同一枚 .input-clear） */
+.search-wrap {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.search-wrap>.field-input,
+.search-wrap>.search-input {
+  padding-right: 30px;
+}
+
+.search-clear {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+}
+
 .range {
   width: 100%;
   accent-color: var(--accent);

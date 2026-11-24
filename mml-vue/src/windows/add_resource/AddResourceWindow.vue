@@ -13,6 +13,7 @@ import InstanceSelect from "../../components/InstanceSelect.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
+import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import AsyncImage from "../../components/ui/AsyncImage.vue";
 import ProjectCard from "../../components/ProjectCard.vue";
 import ProjectDetailPage from "../../components/ProjectDetailPage.vue";
@@ -72,6 +73,8 @@ const LOADERS = ["normal", "forge", "fabric", "quilt", "neoforge", "cleanroom"];
 const instanceUuid = ref("");
 const instanceName = ref("");
 const instanceVersion = ref("");
+/** 目标实例的加载器 ID，如 fabric / forge；原版、自定义加载器或没有实例时是 normal */
+const instanceLoader = ref("normal");
 
 /** 详情是否展开：详情铺满窗口后，返回键放到标题栏 */
 const detailOpen = ref(false);
@@ -146,6 +149,20 @@ const loaderChoices = computed(() => {
   const supported = supportedLoaders.value;
   return supported ? LOADERS.filter((item) => supported.includes(item)) : LOADERS;
 });
+
+/**
+ * 模组加载器筛选的默认值：跟着目标实例走
+ *
+ * 从实例进来时用户就是给这个实例装东西，默认落在实例自己的加载器上；
+ * 浏览模式、原版实例、自定义加载器，或该加载器不在本版本的候选里，都还是「全部」。
+ *
+ * # 返回值
+ *
+ * LOADERS 里的取值之一
+ */
+function instanceLoaderChoice(): string {
+  return loaderChoices.value.includes(instanceLoader.value) ? instanceLoader.value : "normal";
+}
 
 // 换实例（版本跟着变）就重查一次：内核按版本缓存，同一版本只查一趟
 watch(
@@ -282,7 +299,7 @@ async function loadSource() {
   filter.value = "";
   version.value = "";
   category.value = "";
-  loader.value = "normal";
+  loader.value = instanceLoaderChoice();
   sort.value = "";
   sorts.value = [];
   versions.value = [];
@@ -739,6 +756,7 @@ async function refreshInstance() {
   if (!instanceUuid.value) {
     instanceName.value = "";
     instanceVersion.value = "";
+    instanceLoader.value = "normal";
     return;
   }
   try {
@@ -746,9 +764,11 @@ async function refreshInstance() {
     const found = list.find((i) => i.uuid === instanceUuid.value);
     instanceName.value = found?.name ?? "";
     instanceVersion.value = found?.version ?? "";
+    instanceLoader.value = found?.loader || "normal";
   } catch {
     instanceName.value = "";
     instanceVersion.value = "";
+    instanceLoader.value = "normal";
   }
 }
 
@@ -804,6 +824,9 @@ watch(instanceUuid, async () => {
   if (found) {
     instanceName.value = found.name;
     instanceVersion.value = found.version;
+    instanceLoader.value = found.loader || "normal";
+    // 模组筛选跟着换到新实例的加载器上；原版 / 自定义回「全部」
+    if (type.value === "mod") loader.value = instanceLoaderChoice();
     // 游戏版本跟着落到实例的版本上，与进来时定默认值的口径一致；候选里没有就留着「全部版本」
     if (versions.value.includes(found.version)) {
       version.value = found.version;
@@ -877,8 +900,14 @@ onActivated(async () => {
           </select>
 
           <div class="res-search flex min-w-[220px] flex-1 gap-2">
-            <input v-model="filter" class="field-input search-input" :placeholder="t('addResource.searchHint')"
-              spellcheck="false" :disabled="searching" @keydown.enter="submitSearch" />
+            <div class="search-wrap">
+              <input v-model="filter" class="field-input search-input" :placeholder="t('addResource.searchHint')"
+                spellcheck="false" :disabled="searching" @keydown.enter="submitSearch" />
+              <button v-if="filter" class="input-clear search-clear" :aria-label="t('common.clearSearch')"
+                @mousedown.prevent @click="filter = ''">
+                <GlyphIcon name="close" :size="12" :weight="2.4" />
+              </button>
+            </div>
             <button class="search-btn" :disabled="searching" @click="submitSearch">
               <span v-if="searching" class="btn-spinner"></span>
               {{ t("modpack.search") }}

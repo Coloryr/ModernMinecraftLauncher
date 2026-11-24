@@ -634,7 +634,8 @@ defineExpose({ scrollToInstance });
         </svg>
         <input :value="searchText" class="search-input" :placeholder="t('search.placeholder')" spellcheck="false"
           @input="onSearchInput" />
-        <button v-if="searchText" class="input-clear" @click="emit('update:searchText', '')">
+        <button v-if="searchText" class="input-clear" :aria-label="t('common.clearSearch')"
+          @click="emit('update:searchText', '')">
           <GlyphIcon name="close" :size="12" :weight="2.4" />
         </button>
       </div>

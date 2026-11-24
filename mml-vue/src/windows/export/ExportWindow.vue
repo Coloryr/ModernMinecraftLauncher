@@ -1080,8 +1080,14 @@ onBeforeUnmount(() => {
             <!-- 模组 -->
             <template v-else-if="shownTab === 'mods'">
               <div class="sec-bar">
-                <input v-model="modKeyword" class="field-input search" spellcheck="false"
-                  :placeholder="t('winExport.searchMods')" />
+                <div class="search-wrap">
+                  <input v-model="modKeyword" class="field-input search" spellcheck="false"
+                    :placeholder="t('winExport.searchMods')" />
+                  <button v-if="modKeyword" class="input-clear search-clear"
+                    :aria-label="t('common.clearSearch')" @mousedown.prevent @click="modKeyword = ''">
+                    <GlyphIcon name="close" :size="12" :weight="2.4" />
+                  </button>
+                </div>
                 <BaseButton size="sm" @click="pickAllMods(true)">{{ t("winExport.selectAll") }}</BaseButton>
                 <BaseButton size="sm" @click="pickAllMods(false)">{{ t("winExport.selectNone") }}</BaseButton>
               </div>

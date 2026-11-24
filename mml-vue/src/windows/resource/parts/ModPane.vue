@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // 模组分类：列表 / 表格两种展示方式 + 自定义分组
 //
-// - 顶栏（ContentHead）：搜索 + 视图切换 + 新建分组；有选中项时整条换成批量操作
+// - 顶栏（ContentHead）：搜索框 + 搜索字段 + 视图切换 + 新建分组 + 「更多」菜单（依赖检测 / 更新 / 自动标记 / 导出…）
+//   有选中项时整条换成批量操作
 // - 每个自建分组一块，后面按顺序表跟着「已启用 / 已禁用 / 识别失败」三个状态分组
 // - 归组走「移到分组」弹窗与单行右键菜单的「移出分组」，**不支持拖动模组改分组**
 //
@@ -17,6 +18,8 @@ import BaseSwitch from "../../../components/ui/BaseSwitch.vue";
 import DragGhost from "../../../components/ui/DragGhost.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import ContentHead from "./ContentHead.vue";
+import SearchBox from "../../../components/ui/SearchBox.vue";
+import CollapsePanel from "../../../components/ui/CollapsePanel.vue";
 import LoaderQueryProgress from "../../../components/LoaderQueryProgress.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ModExportModal from "./mod/ModExportModal.vue";
@@ -71,7 +74,14 @@ import type {
   ModUpdateDoneDto,
   ModUpdateDto,
 } from "../../../lib/bindings";
-import { modHit, modSelectKey, sortedMods, type ModStateGroup } from "../types";
+import {
+  SEARCH_FIELDS,
+  modHit,
+  modSelectKey,
+  sortedMods,
+  type ModSearchField,
+  type ModStateGroup,
+} from "../types";
 import { orderedMods } from "../modColumns";
 import type { ModView } from "../types";
 
@@ -161,6 +171,9 @@ const UPDATE_GROUP_ID = "00000000-0000-0000-0000-000000000003";
  * 是会出问题的，比"有更新"更该先看到。
  */
 const DUPLICATE_GROUP_ID = "00000000-0000-0000-0000-000000000004";
+
+/** 固定画在最前、不进顺序表也不参与拖拽排序的两个虚拟块 */
+const FIXED_GROUP_IDS = new Set([UPDATE_GROUP_ID, DUPLICATE_GROUP_ID]);
 
 /**
  * 去掉禁用后缀的文件名，用来把更新结果与列表里的行对上
@@ -671,7 +684,8 @@ async function exportDuplicates() {
   showToast(ok ? t("resource.copied") : t("resource.copyFail"));
 }
 
-const { modView, setModView, colWidths, setColWidth, sort, setSort } = props.view;
+const { modView, setModView, modSearchField, setModSearchField, colWidths, setColWidth, sort, setSort } =
+  props.view;
 
 /**
  * 列表的滚动状态：行虚拟化靠它算窗口，见 composables/useVirtualRows
@@ -1207,6 +1221,80 @@ const rowMenu = ref<{
   item: ModItemDto | null;
 } | null>(null);
 
+/** 工具条「更多」菜单的落点与菜单项；null = 没开 */
+const moreMenu = ref<{ x: number; y: number; items: RowMenuItem[] } | null>(null);
+
+/**
+ * 工具条「更多」里的菜单项
+ *
+ * 依赖检测 / 更新检查 / 下载更新 / 自动标记 / 更新记录 / 导出原来各占一个图标按钮，
+ * 收进一个按钮之后工具条只剩「新建分组 / 更多 / 刷新」。
+ * 「下载更新」只在这一轮查出可更新项时才给，与原来那颗条件按钮同口径。
+ */
+function toolbarMoreItems(): RowMenuItem[] {
+  const items: RowMenuItem[] = [
+    { id: "dep-test", label: t("resource.depTest"), disabled: depBusy.value || loading.value },
+    {
+      id: "update-check",
+      label: t("resource.updateCheck"),
+      disabled: updateBusy.value || loading.value,
+    },
+  ];
+  if (updateResult.value) {
+    items.push({
+      id: "update-download",
+      label: t("resource.updateDownload"),
+      disabled: busy.value || updateBusy.value || loading.value,
+    });
+  }
+  items.push(
+    {
+      id: "auto-mark",
+      label: t("resource.autoMark"),
+      disabled: markBusy.value || busy.value || loading.value,
+    },
+    { id: "update-log", label: t("resource.updateLog") },
+    {
+      id: "export",
+      label: t("modExport.title"),
+      separated: true,
+      disabled: busy.value || loading.value,
+    },
+  );
+  return items;
+}
+
+/** 打开「更多」菜单：贴着按钮下沿弹出 */
+function openMoreMenu(event: MouseEvent) {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  moreMenu.value = { x: rect.left, y: rect.bottom + 6, items: toolbarMoreItems() };
+}
+
+/** 菜单选中：分发到工具栏原来那几个动作 */
+function onMorePick(id: string) {
+  moreMenu.value = null;
+  switch (id) {
+    case "dep-test":
+      runDepTest();
+      break;
+    case "update-check":
+      runUpdateCheck();
+      break;
+    case "update-download":
+      updateOpen.value = true;
+      break;
+    case "auto-mark":
+      markAsk.value = true;
+      break;
+    case "update-log":
+      openUpdateLog();
+      break;
+    case "export":
+      exportOpen.value = true;
+      break;
+  }
+}
+
 /** 单行菜单项 */
 function itemMenuItems(item: ModItemDto): RowMenuItem[] {
   const items: RowMenuItem[] = [
@@ -1366,6 +1454,8 @@ function onMenuPick(id: string) {
 /** 搜索词；**不持久化**，这是一次性的筛选而不是视图偏好，重开窗口该是干净的 */
 const keyword = ref("");
 const query = computed(() => keyword.value.trim().toLowerCase());
+/** 搜索框里有没有内容：工具条据此在"图标按钮"与"搜索字段下拉"之间切换 */
+const searchActive = computed(() => query.value.length > 0);
 
 /**
  * 命中判定：按展示方式选字段（见 `modHit`），表格模式**再往里看一层**
@@ -1383,8 +1473,9 @@ const query = computed(() => keyword.value.trim().toLowerCase());
  * 本条或它的任一内置模组命中即为 `true`
  */
 function hit(item: ModItemDto, q: string, view: ModView): boolean {
-  if (modHit(item, q, view)) return true;
-  return view === "table" && item.jarInJar.some((child) => hit(child, q, view));
+  const field = modSearchField.value;
+  if (modHit(item, q, view, field)) return true;
+  return view === "table" && item.jarInJar.some((child) => modHit(child, q, view, field));
 }
 
 /** 当前要显示的模组（搜索词为空时就是全部）；两种模式搜的字段不同，见 `hit` */
@@ -1547,7 +1638,9 @@ const sections = computed<ModSection[]>(() => {
   const update = byId.get(UPDATE_GROUP_ID);
   if (update && visible(update)) list.push(update);
   for (const key of groups.order.value) {
-    if (key === UPDATE_GROUP_ID) continue;
+    // 两个固定块不在顺序表里，前面已经画过：**跳过，否则会多出一条同样的分组**
+    // （旧数据里可能残留它们，见 moveSection）
+    if (FIXED_GROUP_IDS.has(key)) continue;
     const sec = byId.get(key);
     if (!sec || !visible(sec)) continue;
     list.push(sec);
@@ -1555,8 +1648,7 @@ const sections = computed<ModSection[]>(() => {
   // 兜底：分组是刚建的、顺序表还没回来时，别把它漏掉（后端也会在下次下发时补上）。
   // 两个固定块不在顺序表里，前面已经画过，这里要排除，否则会重复一遍
   for (const [key, sec] of byId) {
-    const fixed = key === UPDATE_GROUP_ID || key === DUPLICATE_GROUP_ID;
-    if (!fixed && !groups.order.value.includes(key) && visible(sec)) {
+    if (!FIXED_GROUP_IDS.has(key) && !groups.order.value.includes(key) && visible(sec)) {
       list.push(sec);
     }
   }
@@ -1642,9 +1734,104 @@ function isOpen(id: string): boolean {
   return !groups.isCollapsed(id);
 }
 
+/** 分组收起 / 展开的过渡时长，单位 ms；与 CollapsePanel 的 .22s 同源 */
+const COLLAPSE_ANIM_MS = 240;
+
+/** 正在做"只动画可见段"的面板，键是分组 id；连点两下时用它清场 */
+const collapseTimers = new Map<string, number>();
+
+/**
+ * 动画期间逐帧报"布局变了"
+ *
+ * 分组高度是过渡出来的，中间每一帧下面各块的位置都在变：不报的话它们会按动画中途的高度
+ * 画行，项目多的分组展开时下面整块乱跳。
+ *
+ * - `ms`: 持续时长，单位 ms
+ */
+function bumpWhileAnimating(ms: number) {
+  const end = performance.now() + ms;
+  const step = () => {
+    listScroll.bump();
+    if (performance.now() < end) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+/**
+ * 把内联样式还给组件：过渡结束、或又要开始下一次时调
+ *
+ * **顺序不能反**：先把高度与行轨道清成布局状态（此时过渡还是关闭的），再恢复组件的过渡。
+ * 反过来的话，行轨道从内联的 `1fr` 退回 `0fr` 会触发组件自带的那次 grid 过渡 ——
+ * 同一段收起会再播一遍（先弹回全高、再收一次）。
+ */
+function releasePanel(panel: HTMLElement | null | undefined) {
+  if (!panel) return;
+  panel.style.transition = "none";
+  panel.style.height = "";
+  panel.style.gridTemplateRows = "";
+  // 读一次布局：让上面这些清场先生效，再恢复过渡时才不会有属性变化被它接住
+  void panel.offsetHeight;
+  panel.style.transition = "";
+}
+
+/**
+ * 只动画屏幕上看得见的那一段
+ *
+ * 整块的高度过渡在几千像素高的分组上其实看不见效果：面板底边在屏幕外，前 200ms 什么都不动，
+ * 最后几十毫秒才把看得见的几百像素一把冲上去。所以先把面板压到"可见高度"——被砍掉的部分
+ * 全在屏幕外，肉眼无感——再让 height 在这一段里过渡到 0（收起）或长回来（展开）。
+ *
+ * - `panel`: 折叠面板
+ * - `vis`: 屏幕内可见的高度，单位 px
+ * - `expand`: true = 展开
+ */
+function animateVisiblePart(panel: HTMLElement, vis: number, expand: boolean) {
+  panel.style.transition = "none";
+  panel.style.gridTemplateRows = "1fr";
+  panel.style.height = (expand ? 0 : vis) + "px";
+  // 读一次布局：让上面那个起点先生效，紧接着换上的 height 过渡才有起点
+  void panel.offsetHeight;
+  panel.style.transition = `height ${COLLAPSE_ANIM_MS}ms var(--ease-out)`;
+  panel.style.height = (expand ? vis : 0) + "px";
+}
+
 /** 收起 / 展开这一块并落盘 */
 function toggleCollapse(id: string) {
+  const section = sectionEls.get(id);
+  const panel = section?.querySelector<HTMLElement>(".collapse-panel");
+  const body = section?.querySelector<HTMLElement>(".mod-group-body");
+  const container = listScroll.container.value;
+  const wasOpen = isOpen(id);
+
+  // 上一次动画还没跑完又点了一下：先把它清掉，从当前布局重新开始
+  const pending = collapseTimers.get(id);
+  if (pending) {
+    window.clearTimeout(pending);
+    collapseTimers.delete(id);
+    releasePanel(panel);
+  }
+
+  const contentH = body?.offsetHeight ?? 0;
+  // 面板顶边到滚动区底边之间还剩多少地方：这就是"屏幕上看得见的那一段"
+  const room = panel && container
+    ? container.getBoundingClientRect().bottom - panel.getBoundingClientRect().top
+    : 0;
+  const vis = Math.max(0, Math.min(contentH, room));
+
   groups.toggleCollapsed(id);
+  if (!panel || contentH <= 0 || vis >= contentH || vis <= 0) {
+    // 矮分组、整块都在屏幕外、或量不到：普通的高度过渡就够（也可能是即时切换）
+    bumpWhileAnimating(COLLAPSE_ANIM_MS);
+    return;
+  }
+
+  animateVisiblePart(panel, vis, !wasOpen);
+  bumpWhileAnimating(COLLAPSE_ANIM_MS);
+  const timer = window.setTimeout(() => {
+    collapseTimers.delete(id);
+    releasePanel(panel);
+  }, COLLAPSE_ANIM_MS + 40);
+  collapseTimers.set(id, timer);
 }
 
 // ---------- 分组头拖拽排序 ----------
@@ -1664,15 +1851,56 @@ function bindSection(id: string, el: Element | null) {
 }
 
 /** 当前渲染的块 id；拖拽排序的坐标轴，与 DOM 里的顺序一致 */
-const sectionIds = computed(() => sections.value.map((sec) => sec.id));
+/** 当前渲染的块 id；拖拽排序的坐标轴，与 DOM 里的顺序一致。去重：顺序表残留过固定块，重复 id 会让拖动算错 */
+const sectionIds = computed(() => [...new Set(sections.value.map((sec) => sec.id))]);
+
+/**
+ * 正粘在滚动区上沿的分组头
+ *
+ * 只有它们切换成"无圆角 + 半透明毛玻璃"的吸顶观感，见 resource.css 的 .mod-group-head.is-stuck。
+ * 纯 CSS 判断不了"粘住了"（没有 :stuck 这种伪类），只能量位置。
+ */
+const stuckHeads = ref<Set<string>>(new Set());
+
+/**
+ * 重算哪些分组头吸在顶部
+ *
+ * 分组头是 `position: sticky; top: 0`：贴到滚动区上沿就算吸住；被本组末尾顶出去时它会滑到
+ * 上沿之上，同样算 —— 那一段它正压在下一条内容上，毛玻璃与直角同样成立。
+ */
+function syncStuckHeads() {
+  const container = listScroll.container.value;
+  // 表格视图的分组行不吸顶；没滚动时分组头本来就在顶上，也不算"粘住"
+  // —— 否则首屏第一组一进来就是直角半透明
+  if (modView.value !== "list" || !container || container.scrollTop <= 0) {
+    if (stuckHeads.value.size) stuckHeads.value = new Set();
+    return;
+  }
+  const edge = container.getBoundingClientRect().top;
+  const next = new Set<string>();
+  for (const [id, section] of sectionEls) {
+    const head = section.querySelector(".mod-group-head");
+    if (head && head.getBoundingClientRect().top <= edge + 0.5) next.add(id);
+  }
+  // 集合没变就别换引用：滚动时每帧都会走到这里，换一次就是一整屏重渲染
+  if (next.size === stuckHeads.value.size && [...next].every((id) => stuckHeads.value.has(id))) return;
+  stuckHeads.value = next;
+}
 
 // 分组折叠 / 展开、搜索过滤、分组排序都会让各组整体挪位置，而挪位置不触发滚动事件：
-// 这些变化之后报一次"布局变了"，让各分组重新量位置（flush: post —— 等 DOM 更新完再量）
+// 这些变化之后报一次"布局变了"，让各分组重新量位置（flush: post —— 等 DOM 更新完再量）。
+// 吸顶态跟着一起重算：位置变了，哪几个分组头贴在上沿也就变了
 watch(
   [sections, modView, () => groups.collapsed.value, () => groups.order.value],
-  () => listScroll.bump(),
+  () => {
+    listScroll.bump();
+    syncStuckHeads();
+  },
   { flush: "post" },
 );
+
+// 滚动时吸顶态会变（bump 不必重跑：虚拟窗口本来就跟着 scroll.top 算）
+watch([() => listScroll.top.value, () => listScroll.height.value], syncStuckHeads, { flush: "post" });
 
 const {
   dragKey: draggingSection,
@@ -1705,8 +1933,8 @@ const sectionGhostCount = computed(() => {
  * 落盘的就是**分组 uuid**；状态分组与自建分组同一套键空间，不用转换。
  */
 async function moveSection(from: string, insertAt: number) {
-  // 「有更新」固定在最前，拖它没有意义；也不让它混进顺序表
-  if (from === UPDATE_GROUP_ID) return;
+  // 两个固定块画在最前、不归顺序表管：拖它们没有意义，也不让它们混进顺序表
+  if (FIXED_GROUP_IDS.has(from)) return;
   const ids = sectionIds.value;
   const index = ids.indexOf(from);
   if (index < 0) return;
@@ -1718,7 +1946,12 @@ async function moveSection(from: string, insertAt: number) {
   // 它们在顺序表里的位置由后端保留原样，这里按原顺序补回去
   const shown = new Set(ids);
   const hidden = groups.order.value.filter((id) => !shown.has(id));
-  await groups.setOrder([...next.filter((id) => id !== UPDATE_GROUP_ID), ...hidden]);
+  // 固定块写进顺序表的话，下次渲染会"先按固定位置画一遍、再按顺序表画一遍"，
+  // 每拖一次就多出一块 —— 这里与读的时候都把它们挡掉
+  await groups.setOrder([
+    ...next.filter((id) => !FIXED_GROUP_IDS.has(id)),
+    ...hidden.filter((id) => !FIXED_GROUP_IDS.has(id)),
+  ]);
 }
 
 /** 插入线画不画在第 index 块之前 */
@@ -1897,7 +2130,31 @@ onBeforeUnmount(() => {
 <template>
   <ModExportModal v-if="exportOpen" :uuid="instanceUuid" :selected-ids="selectedItems.map(item => item.uuid)"
     @close="exportOpen = false" />
-  <ContentHead :data="data" :busy="depBusy || updateBusy">
+  <ContentHead :data="data" :busy="depBusy || updateBusy" :show-refresh="!searchActive">
+    <!--
+      搜索框放在左侧弹性区：默认占满工具条剩下的宽度，超过上限停在 .mod-search-wrap 的 max-width。
+      搜索字段下拉紧挨着它（同一组，间距走 .head-lead 的 8px）：它只服务于搜索框，
+      隔到右侧那排按钮旁边会离输入框一大截。选中项出现时整条让位。
+    -->
+    <template v-if="!selectedCount">
+      <!-- 与主窗口的实例搜索同一个组件、同一套外观（放大镜 + 清空键 + .field-input） -->
+      <div class="mod-search-wrap">
+        <SearchBox v-model="keyword" :placeholder="t('resource.searchPlaceholder')"
+          :clear-label="t('resource.searchClear')" width="100%" />
+      </div>
+      <!-- 搜索字段：宽度用 0fr ↔ 1fr 过渡，收起时被裁掉并 inert，见 resource.css 的 .bar-slot -->
+      <div class="bar-slot field-slot" :class="{ open: searchActive }" :inert="!searchActive">
+        <div class="bar-slot-inner">
+          <select class="field-select sel-search-field" :value="modSearchField" :disabled="loading"
+            :aria-label="t('resource.searchField')"
+            @change="setModSearchField(($event.target as HTMLSelectElement).value as ModSearchField)">
+            <option v-for="field in SEARCH_FIELDS" :key="field.value" :value="field.value">
+              {{ t(field.labelKey) }}
+            </option>
+          </select>
+        </div>
+      </div>
+    </template>
     <template #actions>
       <!--
         有选中项时顶栏换成批量操作条，用户选的口径是"顶栏出现批量按钮"。
@@ -1927,6 +2184,11 @@ onBeforeUnmount(() => {
           :aria-label="t('resource.delete')" @click="batchRemove">
           <GlyphIcon name="trash" :size="14" />
         </button>
+        <!-- 导出选中的这批：普通模式里这一项在「更多」菜单里 -->
+        <button class="mini-btn icon-btn icon-only" :disabled="busy || loading" v-tip="t('modExport.title')"
+          :aria-label="t('modExport.title')" @click="exportOpen = true">
+          <GlyphIcon name="export-list" :size="14" />
+        </button>
         <button class="mini-btn icon-btn icon-only" :disabled="busy" v-tip="t('resource.clearSelection')"
           :aria-label="t('resource.clearSelection')" @click="clearSelection">
           <GlyphIcon name="close" :size="14" />
@@ -1934,47 +2196,26 @@ onBeforeUnmount(() => {
       </template>
 
       <template v-else>
-        <input v-model="keyword" class="mod-search" :placeholder="t('resource.searchPlaceholder')" spellcheck="false"
-          autocomplete="off" />
         <SegmentedTabs :model-value="modView" :options="[
           { value: 'list', label: t('resource.viewList') },
           { value: 'table', label: t('resource.viewTable') },
         ]" @update:model-value="setModView($event as ModView)" />
-        <!-- 依赖检测要重扫一遍模组，跑的时候按钮置灰并把图标转起来 -->
-        <button class="mini-btn icon-btn icon-only" :disabled="depBusy || loading" v-tip="t('resource.depTest')"
-          :aria-label="t('resource.depTest')" @click="runDepTest">
-          <GlyphIcon :name="depBusy ? 'refresh' : 'puzzle'" :size="14" :class="{ 'dep-spin': depBusy }" />
-        </button>
-        <!-- 更新检查要重扫一遍模组、再逐个问平台；按钮只放图标，进度在工具条下方 -->
-        <button class="mini-btn icon-btn icon-only" :disabled="updateBusy || loading" v-tip="t('resource.updateCheck')"
-          :aria-label="t('resource.updateCheck')" @click="runUpdateCheck">
-          <GlyphIcon :name="updateStage === 'check' ? 'refresh' : 'update'" :size="14"
-            :class="{ 'dep-spin': updateStage === 'check' }" />
-        </button>
-        <!-- 下载更新：勾选要更新的模组再下。**只在检查出可更新项之后出现** ——
-             没点过检查、或查完一个都没有时整颗不显示；下载完成后结果作废，按钮跟着消失 -->
-        <button v-if="updateResult" class="mini-btn icon-btn icon-only" :disabled="busy || updateBusy || loading"
-          v-tip="t('resource.updateDownload')" :aria-label="t('resource.updateDownload')" @click="updateOpen = true">
-          <GlyphIcon name="download" :size="14" />
-        </button>
-        <!-- 自动标记：按 SHA512 去 Modrinth 认模组，回填项目号 / 文件号 / 下载源 -->
-        <button class="mini-btn icon-btn icon-only" :disabled="markBusy || busy || loading"
-          v-tip="t('resource.autoMark')" :aria-label="t('resource.autoMark')" @click="markAsk = true">
-          <GlyphIcon :name="markBusy ? 'refresh' : 'check-square'" :size="14" :class="{ 'dep-spin': markBusy }" />
-        </button>
-        <!-- 更新记录：这个实例换过的模组，新的在前；记录由后端在换文件成功时追加 -->
-        <button class="mini-btn icon-btn icon-only" v-tip="t('resource.updateLog')"
-          :aria-label="t('resource.updateLog')" @click="openUpdateLog()">
-          <GlyphIcon name="history" :size="14" />
-        </button>
+        <!-- 正在搜索时整组图标按钮让位：此刻要找的是那一条结果，不是批量操作 -->
+        <div class="bar-slot" :class="{ open: !searchActive }" :inert="searchActive">
+          <div class="bar-slot-inner">
+            <!-- 新建分组：原来在列表底部那行文字按钮，挪成图标 -->
+            <button class="mini-btn icon-btn icon-only" :disabled="busy" v-tip="t('resource.groupAdd')"
+              :aria-label="t('resource.groupAdd')" @click="openGroupForm()">
+              <GlyphIcon name="folder-plus" :size="14" />
+            </button>
+            <!-- 其余操作收进一个按钮：点开是下拉菜单，见 toolbarMoreItems -->
+            <button class="mini-btn icon-btn icon-only" v-tip="t('resource.moreActions')" aria-haspopup="menu"
+              :aria-expanded="!!moreMenu" :aria-label="t('resource.moreActions')" @click="openMoreMenu">
+              <GlyphIcon name="more" :size="14" />
+            </button>
+          </div>
+        </div>
       </template>
-
-      <!-- 导出模组列表：名称走悬浮提示与 aria-label，不占工具条宽度。
-           放在图标组末尾、两种模式都在 —— 导出弹窗可以只导选中的模组 -->
-      <button class="mini-btn icon-btn icon-only" :disabled="busy || loading" v-tip="t('modExport.title')"
-        :aria-label="t('modExport.title')" @click="exportOpen = true">
-        <GlyphIcon name="export-list" :size="14" />
-      </button>
     </template>
   </ContentHead>
 
@@ -2034,11 +2275,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- 表格视图的「新建分组」：白底卡片下方，同样落在分组末尾 -->
-    <button class="add-row-btn" :disabled="busy" @click="openGroupForm()">
-      <GlyphIcon name="plus" :size="14" />
-      {{ t("resource.groupAdd") }}
-    </button>
+
   </div>
 
   <!-- 列表视图：按块渲染，自建分组与三个状态分组各一块 -->
@@ -2055,7 +2292,7 @@ onBeforeUnmount(() => {
         'mod-group-dragging': draggingSection === sec.id,
         'mod-group-empty': !sec.items.length,
       }">
-        <div class="mod-group-head" @contextmenu.prevent="openGroupMenu({
+        <div class="mod-group-head" :class="{ 'is-stuck': stuckHeads.has(sec.id) }" @contextmenu.prevent="openGroupMenu({
           event: $event, id: sec.id, label: sec.label, custom: sec.custom, count: sec.items.length,
         })">
           <!--
@@ -2078,21 +2315,24 @@ onBeforeUnmount(() => {
                悬停按钮，与表格视图同一套入口 -->
         </div>
 
-        <div v-show="isOpen(sec.id)" class="mod-group-body">
-          <p v-if="!sec.items.length" class="empty-tip">
-            {{ t("resource.groupEmptyHint") }}
-          </p>
-          <!-- 「modid 重复」块按 modid 分区，每个 modid 一个小标题；其它块只有一区、不画小标题 -->
-          <div v-for="part in partsOf(sec)" :key="part.key">
-            <div v-if="part.label" class="mod-part-head flex items-center gap-2 px-2 pb-1 pt-0.5 text-body font-semibold opacity-75">
-              <span class="mod-part-name">{{ part.label }}</span>
-              <span class="mod-part-count font-normal">{{ part.items.length }}</span>
+        <!-- 收起 / 展开是高度过渡（见 CollapsePanel）：内容常驻不卸载，行虚拟化不必重算一屏 -->
+        <CollapsePanel :open="isOpen(sec.id)">
+          <div class="mod-group-body">
+            <p v-if="!sec.items.length" class="empty-tip">
+              {{ t("resource.groupEmptyHint") }}
+            </p>
+            <!-- 「modid 重复」块按 modid 分区，每个 modid 一个小标题；其它块只有一区、不画小标题 -->
+            <div v-for="part in partsOf(sec)" :key="part.key">
+              <div v-if="part.label" class="mod-part-head flex items-center gap-2 px-2 pb-1 pt-0.5 text-body font-semibold opacity-75">
+                <span class="mod-part-name">{{ part.label }}</span>
+                <span class="mod-part-count font-normal">{{ part.items.length }}</span>
+              </div>
+              <ModList :items="part.items" :busy="busy" :selected-keys="selected" :update-keys="updateKeys" :query="query"
+                @toggle="toggle" @remove="remove" @note="openNote" @open-folder="openFolder('mods', $event.file)"
+                @select="toggleSelect" @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="anchorKey" />
             </div>
-            <ModList :items="part.items" :busy="busy" :selected-keys="selected" :update-keys="updateKeys" :query="query"
-              @toggle="toggle" @remove="remove" @note="openNote" @open-folder="openFolder('mods', $event.file)"
-              @select="toggleSelect" @item-menu="openItemMenu" @row-click="onRowClick" :anchor-key="anchorKey" />
           </div>
-        </div>
+        </CollapsePanel>
       </section>
 
       <!-- 尾部插入线：拖到最末一块之后 -->
@@ -2102,11 +2342,7 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <!-- 新建分组：放在分组最下面，不占工具条 -->
-    <button class="add-row-btn" :disabled="busy" @click="openGroupForm()">
-      <GlyphIcon name="plus" :size="14" />
-      {{ t("resource.groupAdd") }}
-    </button>
+
   </div>
 
   <!-- 新建 / 重命名分组 -->
@@ -2214,6 +2450,10 @@ onBeforeUnmount(() => {
     :count="groupMenu.count" :can-enable="groupMenu.canEnable" :can-disable="groupMenu.canDisable"
     :all-selected="groupMenu.allSelected" @action="onGroupMenuAction" @close="groupMenu = null" />
 
+  <!-- 工具条「更多」：与右键菜单同一个组件，贴着按钮下沿弹 -->
+  <RowMenu v-if="moreMenu" :x="moreMenu.x" :y="moreMenu.y" :items="moreMenu.items" @pick="onMorePick"
+    @close="moreMenu = null" />
+
   <!-- 模组行右键菜单：单行与批量共用 RowMenu，菜单项见 itemMenuItems / batchMenuItems -->
   <RowMenu v-if="rowMenu" :x="rowMenu.x" :y="rowMenu.y" :items="rowMenu.items" :title="rowMenu.title" @pick="onMenuPick"
     @close="rowMenu = null" />
@@ -2231,24 +2471,26 @@ onBeforeUnmount(() => {
           <span class="dep-group-count text-meta font-normal text-dim">{{ g.items.length }}</span>
         </button>
 
-        <div v-show="isDepOpen(g.kind)" class="dep-rows flex flex-col gap-2.5 pb-0.5 pl-[21px] pt-1.5">
-          <div v-for="(p, i) in g.items" :key="`${p.modid}-${i}`" class="dep-row flex items-start gap-2.5">
-            <div class="dep-body min-w-0">
-              <div class="dep-head flex flex-wrap items-baseline gap-x-2.5 gap-y-[3px]">
-                <span class="dep-modid break-all text-body font-semibold text-fg">{{ p.modid }}</span>
-                <span v-if="p.installed" class="dep-meta text-body text-dim">
-                  {{ t("resource.depInstalled", { version: p.installed }) }}
-                </span>
-                <span v-if="p.required !== '*'" class="dep-meta text-body text-dim">
-                  {{ t("resource.depRequired", { range: p.required }) }}
-                </span>
-              </div>
-              <div v-if="p.requiredBy.length" class="dep-note break-all text-meta text-dim">
-                {{ t("resource.depBy", { list: p.requiredBy.join(", ") }) }}
+        <CollapsePanel :open="isDepOpen(g.kind)">
+          <div class="dep-rows flex flex-col gap-2.5 pb-0.5 pl-[21px] pt-1.5">
+            <div v-for="(p, i) in g.items" :key="`${p.modid}-${i}`" class="dep-row flex items-start gap-2.5">
+              <div class="dep-body min-w-0">
+                <div class="dep-head flex flex-wrap items-baseline gap-x-2.5 gap-y-[3px]">
+                  <span class="dep-modid break-all text-body font-semibold text-fg">{{ p.modid }}</span>
+                  <span v-if="p.installed" class="dep-meta text-body text-dim">
+                    {{ t("resource.depInstalled", { version: p.installed }) }}
+                  </span>
+                  <span v-if="p.required !== '*'" class="dep-meta text-body text-dim">
+                    {{ t("resource.depRequired", { range: p.required }) }}
+                  </span>
+                </div>
+                <div v-if="p.requiredBy.length" class="dep-note break-all text-meta text-dim">
+                  {{ t("resource.depBy", { list: p.requiredBy.join(", ") }) }}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </CollapsePanel>
       </div>
     </div>
 

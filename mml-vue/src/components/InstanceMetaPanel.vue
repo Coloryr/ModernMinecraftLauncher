@@ -11,6 +11,7 @@ import BaseSwitch from "./ui/BaseSwitch.vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
 import ModPackUpdateModal from "./ModPackUpdateModal.vue";
 import { askServerPackMods } from "../lib/serverPackMods";
+import { takeModpackAutoCheck } from "../lib/modpackAutoCheck";
 import LoaderQueryProgress from "./LoaderQueryProgress.vue";
 import type { InstanceInfoDto, ModPackUpdateDto, VersionInfoDto } from "../lib/bindings";
 
@@ -115,21 +116,15 @@ async function checkModpack(auto = false) {
   }
 }
 
-/**
- * 自动检查只做一次：这是启动器开机时的自检，切换实例不再查
- *
- * 放在模块级：面板随实例切换重建，放组件里等于每换一个实例查一次。
- */
-let autoChecked = false;
-
 // 选中实例后自动按下「检查更新」：有新版就弹确认窗，没有就静默。
-// 同时盯 `updatableModpack`：服务器包的地址是随实例数据异步回来的，来晚一步也要补查一次
+// 同时盯 `canCheckModpack`：服务器包的地址、平台包的 pid / fid 都是随实例数据异步回来的，
+// 来晚一步也要补查一次。每个实例一次运行只查一次，判据在 takeModpackAutoCheck
 watch(
-  [() => props.instance.uuid, updatableModpack] as const,
+  [() => props.instance.uuid, canCheckModpack] as const,
   ([uuid, ok]) => {
     // 锁定的实例整块整合包设置是隐藏的，自动查到了也没地方弹出确认窗
-    if (!uuid || props.locked || !ok || autoChecked) return;
-    autoChecked = true;
+    if (!uuid || props.locked || !ok) return;
+    if (!takeModpackAutoCheck(uuid)) return;
     void checkModpack(true);
   },
   { immediate: true },

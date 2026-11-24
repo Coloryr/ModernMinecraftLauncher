@@ -64,6 +64,8 @@ export const GLYPHS = {
   "export-list": '<rect x="3" y="6" width="11.5" height="14.5" rx="2" /><path d="M6.5 11.5h5M6.5 15.5h3.5" /><path d="M14.5 10.5 21 4" /><path d="M16 4h5v5" />',
   /** 新建分组：文件夹 + 加号 */
   "folder-plus": '<path d="M4 7a2 2 0 0 1 2-2h3.2l2 2.4H18a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" /><path d="M12 11v6M9 14h6" />',
+  /** 更多：三个点，工具条里"其余操作"的入口 */
+  more: '<circle cx="5.5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="18.5" cy="12" r="1.5" />',
 
   // ---------- 文件与资源 ----------
   /** 文件夹：分组相关动作 */

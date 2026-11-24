@@ -31,6 +31,7 @@ pub fn resource_view_get(uuid: String) -> Result<ResourceViewDto, String> {
         order: view.resource_order,
         category: view.resource_category,
         mod_view: view.resource_mod_view,
+        mod_search_field: view.resource_mod_search_field,
         mod_col_widths: view.resource_mod_col_widths,
     })
 }
@@ -41,6 +42,7 @@ pub fn resource_view_get(uuid: String) -> Result<ResourceViewDto, String> {
 /// - `order`: 左侧分类顺序，元素是分类键
 /// - `category`: 上次打开的类别，空串表示没有记录
 /// - `mod_view`: 模组的展示方式，前端自己解释的枚举串
+/// - `mod_search_field`: 模组搜索按哪些字段匹配，同样是前端自己解释的枚举串
 /// - `mod_col_widths`: 模组列表各列的宽度，列名 → 像素宽，单位像素
 ///
 /// # 返回值
@@ -53,6 +55,7 @@ pub fn resource_view_set(
     order: Vec<String>,
     category: String,
     mod_view: String,
+    mod_search_field: String,
     mod_col_widths: HashMap<String, u32>,
 ) -> Result<(), String> {
     let instance = parse_instance(&uuid)?;
@@ -64,6 +67,7 @@ pub fn resource_view_set(
     setting.view.resource_order = order;
     setting.view.resource_category = category;
     setting.view.resource_mod_view = mod_view;
+    setting.view.resource_mod_search_field = mod_search_field;
     setting.view.resource_mod_col_widths = mod_col_widths;
     crate::gui_setting::save(&game, &setting);
 

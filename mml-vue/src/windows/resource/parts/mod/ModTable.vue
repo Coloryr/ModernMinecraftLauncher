@@ -26,6 +26,7 @@
 import { computed, nextTick, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
+import CollapsePanel from "../../../../components/ui/CollapsePanel.vue";
 import HighlightText from "../../../../components/ui/HighlightText.vue";
 import type { ModItemDto } from "../../../../lib/bindings";
 import {
@@ -440,131 +441,134 @@ function onNoteEnter(event: KeyboardEvent) {
       <span v-for="col in MOD_COLS.slice(1)" :key="col.key" class="mod-cell" />
     </div>
 
-    <!-- 数据行：行虚拟化，只渲染视口附近那几行，上下留白撑住总高度（见 composables/useVirtualRows） -->
-    <div ref="rowsEl" class="mod-rows" :style="{ paddingTop: padTop + 'px', paddingBottom: padBottom + 'px' }">
-      <div v-for="row in visibleRows" :key="modRowKey(row.item)" class="mod-tr mod-virtual-row" :style="{
-        gridTemplateColumns: gridTemplate,
-        '--row-depth': row.depth - 1,
-      }" :class="{
-      'row-selected': selectedKeys.has(modSelectKey(row.item)),
-      'row-anchor': modSelectKey(row.item) === anchorKey,
-      'row-selecting': selectedKeys.size > 0,
-      'mod-nested': row.depth > 1,
-    }" @contextmenu.prevent="row.depth === 1 ? emit('item-menu', { event: $event, item: row.item }) : undefined"
-        @click="row.depth === 1 ? emit('row-click', { event: $event, item: row.item }) : undefined">
-        <!-- 多选勾选框（与列表视图同一套）：内置行在父 jar 里、没有独立文件，留等宽占位保持各列对齐 -->
-        <span class="mod-cell row-select-cell">
-          <input v-if="row.depth === 1" type="checkbox" class="row-select"
-            :checked="selectedKeys.has(modSelectKey(row.item))" @pointerdown.stop
-            @change.stop="emit('select', row.item)" @click.stop />
-          <span v-else class="row-select-gap" />
-        </span>
-
-        <!--
-        树列在最左：**缩进 + 展开箭头都放这里**，用户要求"把展开放在左边"。
-        层级靠 16px 一级的缩进；箭头只给带内置模组的行，其余留等宽占位。
-        组名只在分组行那一行出现，模组行这一格是空的。
-      -->
-        <span class="mod-cell mod-group-cell">
-          <span class="mod-tree-indent" :style="{ width: `${(row.depth - 1) * 16}px` }" />
-          <button v-if="row.item.jarInJar.length" class="mod-tree-caret" :class="{ collapsed: !isOpen(row.item) }"
-            v-tip="isOpen(row.item)
-              ? t('resource.modBuiltinCollapse')
-              : t('resource.modBuiltinExpand')
-              " @click.stop="toggleExpand(modRowKey(row.item))" @pointerdown.stop>
-            <GlyphIcon name="chevron-down" :size="13" :weight="2.4" />
-          </button>
-          <span v-else class="mod-tree-caret-placeholder" />
-        </span>
-
-        <!-- 启用：复选框，勾 = 启用、取消 = 禁用；内置模组没有独立文件，不给 -->
-        <span class="mod-cell mod-enable-cell" @pointerdown.stop>
-          <input v-if="row.depth === 1" type="checkbox" class="mod-check" :checked="!row.item.disable"
-            :disabled="busy || row.item.fail" @change="emit('toggle', row.item)" />
-        </span>
-
-        <span class="mod-cell mod-name-cell">
-          <span class="mod-name" :title="row.item.name || row.item.file">
-            <HighlightText :text="row.item.name || row.item.file" :query="props.query" />
+    <!-- 数据行：行虚拟化，只渲染视口附近那几行，上下留白撑住总高度（见 composables/useVirtualRows）。
+         包一层 CollapsePanel：分组收起 / 展开走高度过渡，收起的动画期间行仍挂在 DOM 里，虚拟窗口不受影响 -->
+    <CollapsePanel :open="groupOpen">
+      <div ref="rowsEl" class="mod-rows" :style="{ paddingTop: padTop + 'px', paddingBottom: padBottom + 'px' }">
+        <div v-for="row in visibleRows" :key="modRowKey(row.item)" class="mod-tr mod-virtual-row" :style="{
+          gridTemplateColumns: gridTemplate,
+          '--row-depth': row.depth - 1,
+        }" :class="{
+        'row-selected': selectedKeys.has(modSelectKey(row.item)),
+        'row-anchor': modSelectKey(row.item) === anchorKey,
+        'row-selecting': selectedKeys.size > 0,
+        'mod-nested': row.depth > 1,
+      }" @contextmenu.prevent="row.depth === 1 ? emit('item-menu', { event: $event, item: row.item }) : undefined"
+          @click="row.depth === 1 ? emit('row-click', { event: $event, item: row.item }) : undefined">
+          <!-- 多选勾选框（与列表视图同一套）：内置行在父 jar 里、没有独立文件，留等宽占位保持各列对齐 -->
+          <span class="mod-cell row-select-cell">
+            <input v-if="row.depth === 1" type="checkbox" class="row-select"
+              :checked="selectedKeys.has(modSelectKey(row.item))" @pointerdown.stop
+              @change.stop="emit('select', row.item)" @click.stop />
+            <span v-else class="row-select-gap" />
           </span>
-          <!-- 内置的**库**：没有模组元数据的内置 jar。它不是模组，与"内置"分开标 -->
-          <span v-if="row.item.library" class="badge badge-dim shrink-0 rounded-[6px] px-[7px] py-px text-caption">
-            {{ t("resource.modLibrary") }}
-          </span>
-          <span v-else-if="row.depth > 1" class="badge badge-dim shrink-0 rounded-[6px] px-[7px] py-px text-caption">
-            {{ t("resource.modBuiltin") }}
-          </span>
-          <span v-if="row.item.jarInJar.length" class="badge badge-dim shrink-0 rounded-[6px] px-[7px] py-px text-caption">
-            {{ t("resource.modBuiltinCount", { n: row.item.jarInJar.length }) }}
-          </span>
-          <!-- 硬链接：这个文件还挂在公共目录，多实例共用一份 -->
-          <span v-if="row.item.hardLink" class="badge badge-link shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modHardLink") }}</span>
-          <span v-if="row.item.fail" class="badge badge-red shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modFail") }}</span>
-          <!-- 「有更新」：这一行在更新检查里查到了新版本；下不下由更新弹窗里勾 -->
-          <span v-if="updateKeys?.has(modSelectKey(row.item))" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.updateTag") }}</span>
-          <!-- 「CoreMod」：会改写别的类的字节码 —— 老式 coremod 或声明了 ASM 变压器 -->
-          <span v-if="row.item.coremod" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent"
-            v-tip="t('resource.modCoreModTip')">{{ t("resource.modCore") }}</span>
-          <!-- 「Mixin N」：注入了多少处目标；列表视图里展开这一行就能看到具体类与方法 -->
-          <span v-if="row.item.mixins.length" class="badge badge-mixin shrink-0 rounded-[6px] px-[7px] py-px text-caption"
-            v-tip="t('resource.modMixinTip')">{{ t("resource.modMixin", { n: row.item.mixins.length }) }}</span>
-        </span>
 
-        <!--
-        备注：紧挨名字右边，这是用户要求；**双击原地书写**，用 `contenteditable` 不弹输入框。
-        内置行没有备注，双击也不进编辑（它没有独立文件，写不了备注）。
-      -->
-        <span class="mod-cell mod-note-cell" :class="{ 'mod-note-editing': isEditing(row) }"
-          :contenteditable="isEditing(row) ? 'true' : undefined"
-          :title="isEditing(row) ? '' : row.item.note || (row.depth === 1 ? t('resource.modNoteDoubleClick') : '')"
-          @dblclick.stop="row.depth === 1 ? startEdit(row.item, $event) : undefined" @keydown.enter="onNoteEnter"
-          @keydown.esc.prevent="cancelEdit($event)" @blur="commitEdit($event)" @pointerdown.stop>{{ row.item.note
-          }}</span>
+          <!--
+          树列在最左：**缩进 + 展开箭头都放这里**，用户要求"把展开放在左边"。
+          层级靠 16px 一级的缩进；箭头只给带内置模组的行，其余留等宽占位。
+          组名只在分组行那一行出现，模组行这一格是空的。
+        -->
+          <span class="mod-cell mod-group-cell">
+            <span class="mod-tree-indent" :style="{ width: `${(row.depth - 1) * 16}px` }" />
+            <button v-if="row.item.jarInJar.length" class="mod-tree-caret" :class="{ collapsed: !isOpen(row.item) }"
+              v-tip="isOpen(row.item)
+                ? t('resource.modBuiltinCollapse')
+                : t('resource.modBuiltinExpand')
+                " @click.stop="toggleExpand(modRowKey(row.item))" @pointerdown.stop>
+              <GlyphIcon name="chevron-down" :size="13" :weight="2.4" />
+            </button>
+            <span v-else class="mod-tree-caret-placeholder" />
+          </span>
 
-        <span class="mod-cell" :title="row.item.modId">
-          <HighlightText :text="row.item.modId" :query="props.query" />
-        </span>
-        <span class="mod-cell" :title="row.item.version">{{ row.item.version }}</span>
-        <span class="mod-cell" :title="loaderNames(row.item.loaders)">
-          {{ loaderNames(row.item.loaders) }}
-        </span>
-        <span class="mod-cell">{{ sideName(row.item.side) }}</span>
-        <!-- 下载源 / 项目编号 / 文件编号：双击就地改，见本文件 startOnline 的说明 -->
-        <span class="mod-cell mod-inline-cell" :title="row.depth === 1 ? t('resource.onlineDoubleClick') : ''"
-          @dblclick.stop="startOnline(row.item, 'source', $event)">
-          <select v-if="isEditingOnline(row, 'source')" class="field-select mod-inline-select" :value="row.item.source"
-            @change="commitOnline('source', ($event.target as HTMLSelectElement).value, row.item)" @blur="cancelOnline"
-            @keydown.esc.prevent="cancelOnline" @pointerdown.stop>
-            <option value="">—</option>
-            <option value="curseforge">CurseForge</option>
-            <option value="modrinth">Modrinth</option>
-          </select>
-          <template v-else>{{ sourceName(row.item.source) }}</template>
-        </span>
-        <span class="mod-cell mod-inline-cell"
-          :title="row.depth === 1 ? t('resource.onlineDoubleClick') : row.item.projectId"
-          :contenteditable="isEditingOnline(row, 'projectId') ? 'true' : undefined"
-          @dblclick.stop="startOnline(row.item, 'projectId', $event)"
-          @keydown.enter.prevent="commitOnline('projectId', ($event.target as HTMLElement).textContent ?? '', row.item)"
-          @keydown.esc.prevent="cancelOnline"
-          @blur="isEditingOnline(row, 'projectId') ? commitOnline('projectId', ($event.target as HTMLElement).textContent ?? '', row.item) : undefined"
-          @pointerdown.stop>{{ row.item.projectId }}</span>
-        <span class="mod-cell mod-inline-cell"
-          :title="row.depth === 1 ? t('resource.onlineDoubleClick') : row.item.fileId"
-          :contenteditable="isEditingOnline(row, 'fileId') ? 'true' : undefined"
-          @dblclick.stop="startOnline(row.item, 'fileId', $event)"
-          @keydown.enter.prevent="commitOnline('fileId', ($event.target as HTMLElement).textContent ?? '', row.item)"
-          @keydown.esc.prevent="cancelOnline"
-          @blur="isEditingOnline(row, 'fileId') ? commitOnline('fileId', ($event.target as HTMLElement).textContent ?? '', row.item) : undefined"
-          @pointerdown.stop>{{ row.item.fileId }}</span>
-        <!-- 路径不挂 title：用户明确不要悬浮 -->
-        <span class="mod-cell mod-path">{{ row.item.path }}</span>
-        <span class="mod-cell" :title="row.item.author">
-          <HighlightText :text="row.item.author" :query="props.query" />
-        </span>
-        <span class="mod-cell" :title="row.item.url">{{ row.item.url }}</span>
+          <!-- 启用：复选框，勾 = 启用、取消 = 禁用；内置模组没有独立文件，不给 -->
+          <span class="mod-cell mod-enable-cell" @pointerdown.stop>
+            <input v-if="row.depth === 1" type="checkbox" class="mod-check" :checked="!row.item.disable"
+              :disabled="busy || row.item.fail" @change="emit('toggle', row.item)" />
+          </span>
+
+          <span class="mod-cell mod-name-cell">
+            <span class="mod-name" :title="row.item.name || row.item.file">
+              <HighlightText :text="row.item.name || row.item.file" :query="props.query" />
+            </span>
+            <!-- 内置的**库**：没有模组元数据的内置 jar。它不是模组，与"内置"分开标 -->
+            <span v-if="row.item.library" class="badge badge-dim shrink-0 rounded-[6px] px-[7px] py-px text-caption">
+              {{ t("resource.modLibrary") }}
+            </span>
+            <span v-else-if="row.depth > 1" class="badge badge-dim shrink-0 rounded-[6px] px-[7px] py-px text-caption">
+              {{ t("resource.modBuiltin") }}
+            </span>
+            <span v-if="row.item.jarInJar.length" class="badge badge-dim shrink-0 rounded-[6px] px-[7px] py-px text-caption">
+              {{ t("resource.modBuiltinCount", { n: row.item.jarInJar.length }) }}
+            </span>
+            <!-- 硬链接：这个文件还挂在公共目录，多实例共用一份 -->
+            <span v-if="row.item.hardLink" class="badge badge-link shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modHardLink") }}</span>
+            <span v-if="row.item.fail" class="badge badge-red shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.modFail") }}</span>
+            <!-- 「有更新」：这一行在更新检查里查到了新版本；下不下由更新弹窗里勾 -->
+            <span v-if="updateKeys?.has(modSelectKey(row.item))" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent">{{ t("resource.updateTag") }}</span>
+            <!-- 「CoreMod」：会改写别的类的字节码 —— 老式 coremod 或声明了 ASM 变压器 -->
+            <span v-if="row.item.coremod" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent"
+              v-tip="t('resource.modCoreModTip')">{{ t("resource.modCore") }}</span>
+            <!-- 「Mixin N」：注入了多少处目标；列表视图里展开这一行就能看到具体类与方法 -->
+            <span v-if="row.item.mixins.length" class="badge badge-mixin shrink-0 rounded-[6px] px-[7px] py-px text-caption"
+              v-tip="t('resource.modMixinTip')">{{ t("resource.modMixin", { n: row.item.mixins.length }) }}</span>
+          </span>
+
+          <!--
+          备注：紧挨名字右边，这是用户要求；**双击原地书写**，用 `contenteditable` 不弹输入框。
+          内置行没有备注，双击也不进编辑（它没有独立文件，写不了备注）。
+        -->
+          <span class="mod-cell mod-note-cell" :class="{ 'mod-note-editing': isEditing(row) }"
+            :contenteditable="isEditing(row) ? 'true' : undefined"
+            :title="isEditing(row) ? '' : row.item.note || (row.depth === 1 ? t('resource.modNoteDoubleClick') : '')"
+            @dblclick.stop="row.depth === 1 ? startEdit(row.item, $event) : undefined" @keydown.enter="onNoteEnter"
+            @keydown.esc.prevent="cancelEdit($event)" @blur="commitEdit($event)" @pointerdown.stop>{{ row.item.note
+            }}</span>
+
+          <span class="mod-cell" :title="row.item.modId">
+            <HighlightText :text="row.item.modId" :query="props.query" />
+          </span>
+          <span class="mod-cell" :title="row.item.version">{{ row.item.version }}</span>
+          <span class="mod-cell" :title="loaderNames(row.item.loaders)">
+            {{ loaderNames(row.item.loaders) }}
+          </span>
+          <span class="mod-cell">{{ sideName(row.item.side) }}</span>
+          <!-- 下载源 / 项目编号 / 文件编号：双击就地改，见本文件 startOnline 的说明 -->
+          <span class="mod-cell mod-inline-cell" :title="row.depth === 1 ? t('resource.onlineDoubleClick') : ''"
+            @dblclick.stop="startOnline(row.item, 'source', $event)">
+            <select v-if="isEditingOnline(row, 'source')" class="field-select mod-inline-select" :value="row.item.source"
+              @change="commitOnline('source', ($event.target as HTMLSelectElement).value, row.item)" @blur="cancelOnline"
+              @keydown.esc.prevent="cancelOnline" @pointerdown.stop>
+              <option value="">—</option>
+              <option value="curseforge">CurseForge</option>
+              <option value="modrinth">Modrinth</option>
+            </select>
+            <template v-else>{{ sourceName(row.item.source) }}</template>
+          </span>
+          <span class="mod-cell mod-inline-cell"
+            :title="row.depth === 1 ? t('resource.onlineDoubleClick') : row.item.projectId"
+            :contenteditable="isEditingOnline(row, 'projectId') ? 'true' : undefined"
+            @dblclick.stop="startOnline(row.item, 'projectId', $event)"
+            @keydown.enter.prevent="commitOnline('projectId', ($event.target as HTMLElement).textContent ?? '', row.item)"
+            @keydown.esc.prevent="cancelOnline"
+            @blur="isEditingOnline(row, 'projectId') ? commitOnline('projectId', ($event.target as HTMLElement).textContent ?? '', row.item) : undefined"
+            @pointerdown.stop>{{ row.item.projectId }}</span>
+          <span class="mod-cell mod-inline-cell"
+            :title="row.depth === 1 ? t('resource.onlineDoubleClick') : row.item.fileId"
+            :contenteditable="isEditingOnline(row, 'fileId') ? 'true' : undefined"
+            @dblclick.stop="startOnline(row.item, 'fileId', $event)"
+            @keydown.enter.prevent="commitOnline('fileId', ($event.target as HTMLElement).textContent ?? '', row.item)"
+            @keydown.esc.prevent="cancelOnline"
+            @blur="isEditingOnline(row, 'fileId') ? commitOnline('fileId', ($event.target as HTMLElement).textContent ?? '', row.item) : undefined"
+            @pointerdown.stop>{{ row.item.fileId }}</span>
+          <!-- 路径不挂 title：用户明确不要悬浮 -->
+          <span class="mod-cell mod-path">{{ row.item.path }}</span>
+          <span class="mod-cell" :title="row.item.author">
+            <HighlightText :text="row.item.author" :query="props.query" />
+          </span>
+          <span class="mod-cell" :title="row.item.url">{{ row.item.url }}</span>
+        </div>
       </div>
-    </div>
+    </CollapsePanel>
 
     <!--
       空分组：一级节点那一行已经把组名画出来了（可折叠、可拖动排序），

@@ -261,18 +261,66 @@ export function isoDate(iso: string): string {
 }
 
 /**
- * 一个模组条目的搜索命中：**按展示方式选字段**
+ * 模组搜索按哪些字段匹配
+ *
+ * `all` 是"按展示方式选字段"的默认口径，见 [`modHit`]；其余几项只认那一个字段，
+ * 用户在下拉框里明确选了就不该被别的字段干扰。
+ */
+export type ModSearchField =
+  | "all"
+  | "modid"
+  | "name"
+  | "file"
+  | "loader"
+  | "author"
+  | "mixin";
+
+/** 搜索字段下拉的选项，顺序即显示顺序；名字走 i18n */
+export const SEARCH_FIELDS: { value: ModSearchField; labelKey: string }[] = [
+  { value: "all", labelKey: "resource.searchFieldAll" },
+  { value: "modid", labelKey: "resource.searchFieldModid" },
+  { value: "name", labelKey: "resource.searchFieldName" },
+  { value: "file", labelKey: "resource.searchFieldFile" },
+  { value: "loader", labelKey: "resource.searchFieldLoader" },
+  { value: "author", labelKey: "resource.searchFieldAuthor" },
+  { value: "mixin", labelKey: "resource.searchFieldMixin" },
+];
+
+/**
+ * 存下来的搜索字段是否合法；不认识的取值退回「全部」
+ *
+ * - `value`: 实例里存的原样字符串
+ */
+export function isModSearchField(value: unknown): value is ModSearchField {
+  return SEARCH_FIELDS.some((field) => field.value === value);
+}
+
+/**
+ * 一个模组条目的搜索命中
  *
  * - `item`: 模组条目
  * - `q`: 已转小写的搜索词
  * - `view`: 列表模式只认名字与文件名，一行里只显示了这两样；
  *   表格模式还有 modid / 作者两列
+ * - `field`: 搜索字段；`all` 按展示方式选字段，其余只认那一个字段
  *
  * # 返回值
  *
- * 任一字段包含搜索词即为 `true`
+ * 指定字段（或默认口径）里包含搜索词即为 `true`
  */
-export function modHit(item: ModItemDto, q: string, view: ModView): boolean {
+export function modHit(
+  item: ModItemDto,
+  q: string,
+  view: ModView,
+  field: ModSearchField = "all",
+): boolean {
+  if (field === "mixin") return patchHit(item, q);
+  if (field === "modid") return item.modId.toLowerCase().includes(q);
+  if (field === "name") return item.name.toLowerCase().includes(q);
+  if (field === "file") return item.file.toLowerCase().includes(q);
+  if (field === "author") return item.author.toLowerCase().includes(q);
+  if (field === "loader") return item.loaders.some((name) => name.toLowerCase().includes(q));
+
   const fields =
     view === "table" ? [item.name, item.modId, item.file, item.author] : [item.name, item.file];
   if (fields.some((value) => value.toLowerCase().includes(q))) return true;

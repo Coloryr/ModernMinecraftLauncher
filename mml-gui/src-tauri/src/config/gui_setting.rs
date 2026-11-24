@@ -157,6 +157,10 @@ pub struct GameViewSettingObj {
     /// 资源窗口：模组的展示方式，取值 list / table / tree；空串表示没记过
     #[serde(rename = "ResourceModView")]
     pub resource_mod_view: String,
+    /// 资源窗口：模组搜索按哪些字段匹配，取值见前端 ModSearchField；
+    /// 空串表示没记过，前端按「全部」
+    #[serde(rename = "ResourceModSearchField")]
+    pub resource_mod_search_field: String,
     /// 资源窗口：**表格视图的列宽**，键是列 key，值是像素宽
     ///
     /// 与 `resource_order` 同理：后端只当它是"一串键值对"保管，不认识有哪几列，

@@ -352,7 +352,7 @@ export function createCommands(invoke: Invoke) {
       serversImport: (uuid: string, path: string) => invoke<void>("resource_servers_import", { uuid, path }),
       shaderSet: (uuid: string, file: string | null) => invoke<void>("resource_shader_set", { uuid, file }),
       viewGet: (uuid: string) => invoke<ResourceViewDto>("resource_view_get", { uuid }),
-      viewSet: (uuid: string, order: string[], category: string, modView: string, modColWidths: Record<string, number>) => invoke<void>("resource_view_set", { uuid, order, category, modView, modColWidths }),
+      viewSet: (uuid: string, order: string[], category: string, modView: string, modSearchField: string, modColWidths: Record<string, number>) => invoke<void>("resource_view_set", { uuid, order, category, modView, modSearchField, modColWidths }),
     },
     serverInstance: {
       configDiff: (uuid: string) => invoke<ServerInstanceConfigDiffDto>("server_instance_config_diff", { uuid }),

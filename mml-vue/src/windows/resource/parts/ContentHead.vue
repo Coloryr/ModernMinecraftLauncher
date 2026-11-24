@@ -10,12 +10,17 @@ import { t } from "../../../lib/i18n";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import type { useResourceData } from "../composables/useResourceData";
 
-const props = defineProps<{
-  /** 数据层，顶栏只用它的加载态与重拉 */
-  data: ReturnType<typeof useResourceData>;
-  /** 额外的禁用条件；置真时刷新也不可用，如模组在跑依赖检测，默认不禁用 */
-  busy?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** 数据层，顶栏只用它的加载态与重拉 */
+    data: ReturnType<typeof useResourceData>;
+    /** 额外的禁用条件；置真时刷新也不可用，如模组在跑依赖检测，默认不禁用 */
+    busy?: boolean;
+    /** 还画不画这颗刷新键；模组页在搜索时整条工具条让位，见 ModPane，默认画 */
+    showRefresh?: boolean;
+  }>(),
+  { busy: false, showRefresh: true },
+);
 const { loading, reloadCurrent } = props.data;
 </script>
 
@@ -26,8 +31,8 @@ const { loading, reloadCurrent } = props.data;
     </div>
     <div class="head-actions ml-auto flex shrink-0 items-center gap-1.5">
       <slot name="actions" />
-      <button class="mini-btn icon-btn icon-only" :disabled="busy || loading" v-tip="t('resource.refresh')"
-        :aria-label="t('resource.refresh')" @click="reloadCurrent">
+      <button v-if="props.showRefresh" class="mini-btn icon-btn icon-only" :disabled="busy || loading"
+        v-tip="t('resource.refresh')" :aria-label="t('resource.refresh')" @click="reloadCurrent">
         <GlyphIcon name="refresh" :size="14" />
       </button>
     </div>

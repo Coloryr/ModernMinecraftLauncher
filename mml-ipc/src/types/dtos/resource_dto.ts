@@ -60,6 +60,7 @@ export type ResourceViewDto = {
   order: string[],
   category: string,
   modView: string,
+  modSearchField: string,
   modColWidths: Record<string, number>,
 };
 

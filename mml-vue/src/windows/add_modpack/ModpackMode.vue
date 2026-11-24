@@ -4,6 +4,7 @@
 // 项目详情是共用的 components/ProjectDetailPage.vue（与资源窗口同一份）
 import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, toRef, watch } from "vue";
 import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
+import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import ProjectCard from "../../components/ProjectCard.vue";
 import ProjectDetailPage from "../../components/ProjectDetailPage.vue";
 import { api, getAddModpackSource, setAddModpackSource } from "../../lib/api";
@@ -420,8 +421,14 @@ watch(source, loadSource);
 
       <!-- 搜索 -->
       <div class="modpack-search flex gap-2">
-        <input v-model="filter" class="field-input search-input" :placeholder="t('modpack.searchHint')"
-          spellcheck="false" :disabled="searching" @keydown.enter="submitSearch" />
+        <div class="search-wrap">
+          <input v-model="filter" class="field-input search-input" :placeholder="t('modpack.searchHint')"
+            spellcheck="false" :disabled="searching" @keydown.enter="submitSearch" />
+          <button v-if="filter" class="input-clear search-clear" :aria-label="t('common.clearSearch')"
+            @mousedown.prevent @click="filter = ''">
+            <GlyphIcon name="close" :size="12" :weight="2.4" />
+          </button>
+        </div>
         <button class="search-btn" :disabled="searching" @click="submitSearch">
           <span v-if="searching" class="btn-spinner"></span>
           {{ t("modpack.search") }}

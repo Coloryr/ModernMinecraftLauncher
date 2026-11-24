@@ -557,6 +557,23 @@ fn duplicate_modids_are_reported() {
     );
 }
 
+/// TweakClass / FMLCorePlugin 的类名不是 modid：两个包声明同一个 tweaker 不算重复
+#[test]
+fn core_class_names_are_not_duplicates() {
+    let mut a = mod_item("extendedae.jar", "extendedae", "1.0", vec![]);
+    a.info.push(ModItemObj {
+        mod_id: "org.spongepowered.asm.launch.MixinTweaker".to_string(),
+        ..Default::default()
+    });
+    let mut b = mod_item("glodium.jar", "glodium", "1.0", vec![]);
+    b.info.push(ModItemObj {
+        mod_id: "org.spongepowered.asm.launch.MixinTweaker".to_string(),
+        ..Default::default()
+    });
+
+    assert!(mods_duplicate_test(&vec![a, b]).is_empty());
+}
+
 /// 禁用的包不算重复
 #[test]
 fn disabled_duplicate_is_silent() {

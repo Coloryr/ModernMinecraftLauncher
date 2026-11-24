@@ -390,7 +390,9 @@ pub fn mods_dep_test(game: &InstanceSettingObj, mods: &[ModObj]) -> CoreResult<D
 /// 口径：
 /// - 只看启用状态的顶层文件，禁用包与内置 jar-in-jar 都不算；
 /// - 同一个包里多份元数据声明了同一个 modid 不算重复，只有不同文件才算；
-/// - 同一个 modid 声明了多个版本时，各文件的版本分别列出。
+/// - 同一个 modid 声明了多个版本时，各文件的版本分别列出；
+/// - **带点的条目不算 modid**：`MANIFEST.MF` 里的 `TweakClass` / `FMLCorePlugin` 是类名，
+///   见 `read_core_mod`，多个包声明同一个 tweaker 时会被误判成"同一个 modid 装了两份"。
 ///
 /// - `mods`: 已经扫描出的模组列表，见 `InstanceSettingObj::read_mod`
 ///
@@ -404,7 +406,9 @@ pub fn mods_duplicate_test(mods: &[ModObj]) -> Vec<ModDuplicate> {
     for item in mods.iter().filter(|item| !item.fail && !item.disable) {
         let file = mod_file_name(item);
         for info in item.info.iter() {
-            if info.mod_id.is_empty() {
+            // modid 里不会有 "."：带点的是 MANIFEST 里的类名（TweakClass / FMLCorePlugin），
+            // 不是这个包提供的模组，见上面口径的最后一条
+            if info.mod_id.is_empty() || info.mod_id.contains('.') {
                 continue;
             }
             top.entry(info.mod_id.clone())

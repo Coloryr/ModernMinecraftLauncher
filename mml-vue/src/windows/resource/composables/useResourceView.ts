@@ -1,4 +1,4 @@
-// 资源管理窗口的视图偏好：左侧分类顺序 / 上次打开的类别 / 模组展示方式 / 表格列宽
+// 资源管理窗口的视图偏好：左侧分类顺序 / 上次打开的类别 / 模组展示方式 / 搜索字段 / 表格列宽
 //
 // **存在实例自己的 `gui_setting.json` 里**，即 `Gui` 字段，见后端 `gui_setting::GameViewSettingObj`。
 // 不走前端本地存储：这几项都是"这个实例我习惯怎么看"，换个实例就该换一套 ——
@@ -10,7 +10,13 @@
 import { ref } from "vue";
 import { getResourceView, setResourceView } from "../../../lib/api";
 import { defaultColWidths, normalizeColWidths, type ModSort } from "../modColumns";
-import { RESOURCE_CATEGORIES, type CategoryId, type ModView } from "../types";
+import {
+  RESOURCE_CATEGORIES,
+  isModSearchField,
+  type CategoryId,
+  type ModSearchField,
+  type ModView,
+} from "../types";
 import type { useResourceData } from "./useResourceData";
 
 /** 实例里存的那份视图偏好 */
@@ -21,6 +27,8 @@ interface ViewPref {
   category: string;
   /** 模组的展示方式：列表 / 表格 */
   modView: string;
+  /** 模组搜索按哪些字段匹配 */
+  modSearchField: string;
   /** 表格视图的列宽，列 key → 像素宽 */
   modColWidths: Record<string, number>;
 }
@@ -89,6 +97,8 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
   const initialCategory = ref<CategoryId>(DEFAULT_CATEGORY);
   /** 模组的展示方式：列表 / 表格 */
   const modView = ref<ModView>("list");
+  /** 模组搜索按哪些字段匹配，默认「全部」；换实例各记各的 */
+  const modSearchField = ref<ModSearchField>("all");
   /** 表格视图的列宽，列 key → 像素宽；拖动即改，落盘做了防抖 */
   const colWidths = ref<Record<string, number>>(defaultColWidths());
   /**
@@ -120,6 +130,7 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
       order: order.value,
       category: lastCategory,
       modView: modView.value,
+      modSearchField: modSearchField.value,
       modColWidths: colWidths.value,
     };
     // 失败只提示、不回滚：偏好记不住不该打断使用
@@ -128,6 +139,7 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
       value.order,
       value.category,
       value.modView,
+      value.modSearchField,
       value.modColWidths,
     ).catch(() => { });
   }
@@ -139,6 +151,7 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
       // 没有实例：回到默认顺序与默认类别
       order.value = normalizeOrder([]);
       modView.value = "list";
+      modSearchField.value = "all";
       colWidths.value = defaultColWidths();
       sort.value = null;
       initialCategory.value = DEFAULT_CATEGORY;
@@ -150,13 +163,15 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
     try {
       pref = await getResourceView(uuid);
     } catch {
-      pref = { order: [], category: "", modView: "", modColWidths: {} };
+      pref = { order: [], category: "", modView: "", modSearchField: "", modColWidths: {} };
     }
     // 慢的那一发回来时可能已经切到别的实例了：丢弃
     if (seq !== loadSeq) return;
 
     order.value = normalizeOrder(pref.order);
     modView.value = isModView(pref.modView) ? pref.modView : "list";
+    // 搜索字段：不认识的取值（旧版本 / 手改过文件）退回「全部」
+    modSearchField.value = isModSearchField(pref.modSearchField) ? pref.modSearchField : "all";
     // 列宽：只认已知列 + 夹在合理范围，存过一半 / 存的是旧版本都能安全落地
     colWidths.value = normalizeColWidths(pref.modColWidths);
     // 排序是临时状态，切实例就回到默认
@@ -184,6 +199,12 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
     save();
   }
 
+  /** 切换搜索字段；下拉一改就落盘 */
+  function setModSearchField(next: ModSearchField) {
+    modSearchField.value = next;
+    save();
+  }
+
   /**
    * 记下拖出来的列宽；拖动过程高频调用，所以**存盘防抖 400ms**
    *
@@ -208,12 +229,14 @@ export function useResourceView(data: ReturnType<typeof useResourceData>) {
     order,
     initialCategory,
     modView,
+    modSearchField,
     colWidths,
     sort,
     load,
     rememberCategory,
     setOrder,
     setModView,
+    setModSearchField,
     setColWidth,
     setSort,
   };

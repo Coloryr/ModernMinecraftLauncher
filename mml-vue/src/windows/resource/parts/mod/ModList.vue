@@ -53,13 +53,26 @@ const emit = defineEmits<ModViewEmits>();
  */
 const expanded = ref<Set<string>>(new Set());
 
-/** 展开 / 收起这一行 */
+/**
+ * **展开**的「改写目标」子项 key（同样默认收起）
+ *
+ * 目标列表单独一套状态：一个包可能带几百上千条 mixin，跟着父行一起摊开会把整屏冲掉，
+ * 虚拟列表的高度与滚动位置也会一跳几千像素。所以父行展开只多出一条「改写目标」子项，
+ * 点它才列具体的类。
+ */
+const patchesOpen = ref<Set<string>>(new Set());
+
+/** 展开 / 收起这一行；收起时把目标列表一起收掉，下次展开仍是默认收起 */
 function toggleExpand(key: string) {
   const next = new Set(expanded.value);
   if (next.has(key)) {
     next.delete(key);
+    const patches = new Set(patchesOpen.value);
+    patches.delete(key);
+    patchesOpen.value = patches;
   } else {
     next.add(key);
+    expandPending = true;
   }
   expanded.value = next;
 }
@@ -69,8 +82,47 @@ function isOpen(key: string): boolean {
   return expanded.value.has(key);
 }
 
-/** 展开后的一行：模组行，或这个模组改写的一个目标类 */
-type FlatRow = ModFlatRow | PatchFlatRow;
+/** 「改写目标」子项是不是展开的 */
+function isPatchesOpen(key: string): boolean {
+  return patchesOpen.value.has(key);
+}
+
+/** 展开 / 收起某个模组的改写目标列表 */
+function togglePatches(key: string) {
+  const next = new Set(patchesOpen.value);
+  if (next.has(key)) {
+    next.delete(key);
+  } else {
+    next.add(key);
+    expandPending = true;
+  }
+  patchesOpen.value = next;
+}
+
+/** 刚点开了一行：下一次行列表变化算"展开"，新出现的行播进场动画 */
+let expandPending = false;
+
+/** 这次展开出来的行：挂一段进场动画；滚动时才挂上来的行不在里面，不会闪 */
+const entering = ref<Set<string>>(new Set());
+let enterTimer = 0;
+
+/**
+ * 给这批新出现的行挂进场标记
+ *
+ * - `keys`: 行的 key
+ */
+function markEntering(keys: string[]) {
+  if (!keys.length) return;
+  entering.value = new Set([...entering.value, ...keys]);
+  window.clearTimeout(enterTimer);
+  // 动画结束后清掉标记：之后滚动挂上来的行不该再播一次
+  enterTimer = window.setTimeout(() => {
+    entering.value = new Set();
+  }, 420);
+}
+
+/** 展开后的一行：模组行，「改写目标」子项行，或这个模组改写的一个目标类 */
+type FlatRow = ModFlatRow | PatchListRow | PatchFlatRow;
 
 /** 模组行 */
 interface ModFlatRow {
@@ -82,6 +134,33 @@ interface ModFlatRow {
   item: ModItemDto;
   /** 层级：与最外层同层是 0，每往下嵌一层 +1（缩进与"给不给操作入口"都看它） */
   depth: number;
+  /** 在"框"里的位置，见 {@link PatchListRow.box}；展开出子项时才填 */
+  box?: "start" | "end" | "mid" | "single";
+  /** 下一行紧贴着它（吃掉行间距） */
+  tight?: boolean;
+}
+
+/**
+ * 「改写目标」子项行：一个模组一条，展开后才列出具体的类
+ *
+ * 单独拆一层是因为数量：重度 mixin 的包有几百上千条目标，跟着父行一起摊开会把整屏冲掉，
+ * 虚拟列表的高度也会一跳几千像素。默认收起，想看再点。
+ */
+interface PatchListRow {
+  /** 行类别 */
+  kind: "patches";
+  /** v-for 的 key */
+  key: string;
+  /** 层级，与内置模组行同层 */
+  depth: number;
+  /** 属于哪个模组行：展开 / 收起用它自己的 key */
+  parent: string;
+  /** 目标条数 */
+  count: number;
+  /** 在"框"里的位置：start = 框头，end = 框尾，mid = 中间；拼框时才填 */
+  box?: "start" | "end" | "mid" | "single";
+  /** 下一行紧贴着它（吃掉行间距），虚拟窗口按这个扣高度 */
+  tight?: boolean;
 }
 
 /** 改写目标行：一个目标类一行 */
@@ -100,6 +179,10 @@ interface PatchFlatRow {
   detail: string;
   /** 悬停提示：完整的目标与方法 */
   title: string;
+  /** 在"框"里的位置，见 {@link PatchListRow.box}；拼框时才填 */
+  box?: "start" | "end" | "mid" | "single";
+  /** 下一行紧贴着它（吃掉行间距） */
+  tight?: boolean;
 }
 
 /**
@@ -173,10 +256,11 @@ function patchRowsOf(item: ModItemDto, q: string): PatchFlatRow[] {
 }
 
 /**
- * 拍平：父行 + **已展开**的内置行与目标行，每一层各自排序
+ * 拍平：父行 + **已展开**的内置行，以及「改写目标」子项（它自己再展开才列目标类）
  *
  * 内置的行跟着父行走，所以展开只会让后面那些行的下标往后挪，不会打乱父行的顺序。
- * 搜索时命中的目标行直接摊开：用户搜的就是那些类名，还要再点一次箭头才看得见太绕。
+ * **搜索时也照状态来**：不强制摊开 —— 搜到的行本来就会留在列表里（命中改写目标的模组
+ * 也会出现），点箭头展开才看得到具体命中的类；强制摊开会让搜索中点箭头收不起来。
  *
  * - `items`: 这一层要显示的模组
  * - `depth`: 这一层的层级
@@ -185,22 +269,52 @@ function patchRowsOf(item: ModItemDto, q: string): PatchFlatRow[] {
 function flatten(items: ModItemDto[], depth: number, out: FlatRow[]) {
   for (const item of sortedMods(items)) {
     const key = modRowKey(item);
+    const start = out.length;
     out.push({ kind: "mod", key, item, depth });
 
-    // 收起且没在搜索时不用算改写目标，省掉几百个模组的目标分组
-    const open = isOpen(key);
-    if (!open && !props.query) continue;
+    // 收起时不用算改写目标，省掉几百个模组的目标分组
+    if (!isOpen(key)) continue;
 
     const patches = patchRowsOf(item, props.query);
-    if (!open && !patches.length) continue;
-
     if (item.jarInJar.length) {
       flatten(item.jarInJar, depth + 1, out);
     }
-    for (const patch of patches) {
-      out.push({ ...patch, key: key + "|" + patch.key, depth: depth + 1 });
+    if (patches.length) {
+      // 目标列表只算**一条**子项：几百上千条目标摊在这里会把整屏冲掉
+      out.push({ kind: "patches", key: key + "|patches", depth: depth + 1, parent: key, count: patches.length });
+      if (isPatchesOpen(key)) {
+        for (const patch of patches) {
+          out.push({ ...patch, key: key + "|" + patch.key, depth: depth + 2 });
+        }
+      }
     }
+
+    // 这一行下面有内容：父行与它的子项拼成**一个框**，父行是框头
+    if (out.length > start + 1) markBox(out, start, out.length - 1);
   }
+}
+
+/**
+ * 把 [start, end] 这些行拼成一个框
+ *
+ * 框头（父行）去掉下边框与下圆角，中间只留左右两条边，框尾收口 ——
+ * 于是父行的卡片把子项整个包住，与「本地文件」的缓存分组一个观感。
+ * 行间距由 CSS 的负外边距吃掉，虚拟窗口那边按 `tight` 扣高度，见 `rowHeights`。
+ *
+ * - `rows`: 全部行
+ * - `start`: 框头的下标
+ * - `end`: 框尾的下标
+ */
+function markBox(rows: FlatRow[], start: number, end: number) {
+  const head = rows[start];
+  head.box = "start";
+  head.tight = true;
+  for (let index = start + 1; index < end; index += 1) {
+    rows[index].box = "mid";
+    rows[index].tight = true;
+  }
+  rows[end].box = "end";
+  rows[end].tight = false;
 }
 
 /** 本视图要渲染的全部行，已按展开状态拍平 */
@@ -223,7 +337,11 @@ const PATCH_ROW_H = 30;
 
 /** 每行高度，顺序与 rows 一致；变高虚拟窗口按它算。用 computed 缓存，滚动时不必每帧重算 */
 const rowHeights = computed(() =>
-  rows.value.map((row) => (row.kind === "patch" ? PATCH_ROW_H : LIST_ROW_H)),
+  rows.value.map((row) => {
+    const base = row.kind === "mod" ? LIST_ROW_H : PATCH_ROW_H;
+    // 紧贴着下一行的（框里的行）在 CSS 里用负外边距吃掉行间距，这里同步扣掉
+    return row.tight ? base - LIST_ROW_GAP : base;
+  }),
 );
 
 /** 只渲染视口附近那几行，其余用上下内边距撑住高度，见 useVirtualRows */
@@ -235,8 +353,25 @@ const { start, end, padTop, padBottom, remeasure } = useVirtualRows({
   gap: LIST_ROW_GAP,
 });
 
-// 展开 / 收起会改变本组乃至后面各组的高度：报一次布局变化（flush: post，等 DOM 更新完）
-watch(rows, () => remeasure(), { flush: "post" });
+/** 上一次渲染出来的行 key：用来找出"这次新出现的行" */
+let lastKeys = new Set<string>();
+
+// 展开 / 收起会改变本组乃至后面各组的高度：报一次布局变化（flush: post，等 DOM 更新完）。
+// 顺带给"点开那一行"带出来的行挂进场标记：滚动时才挂上来的行不播，不会闪。
+// **必须 immediate**：不先记一次首屏的 key，第一次展开时整屏都会被当成"新出现的行"闪一下
+watch(
+  rows,
+  (list) => {
+    const next = new Set(list.map((row) => row.key));
+    if (expandPending) {
+      expandPending = false;
+      markEntering(list.filter((row) => !lastKeys.has(row.key)).map((row) => row.key));
+    }
+    lastKeys = next;
+    remeasure();
+  },
+  { flush: "post", immediate: true },
+);
 
 /** 这一回真正渲染出来的那几行 */
 const visible = computed(() => rows.value.slice(start.value, end.value));
@@ -245,11 +380,13 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
   <div ref="root" class="mod-rows" :style="{ paddingTop: padTop + 'px', paddingBottom: padBottom + 'px' }">
     <template v-for="row in visible" :key="row.key">
       <ResourceRow v-if="row.kind === 'mod'" :icon="row.item.icon"
-        :name="row.item.name || row.item.file" :depth="row.depth" :class="{
+        :name="row.item.name || row.item.file" :depth="row.depth"
+        :class="[row.box ? 'box-' + row.box : '', {
           'row-selected': selectedKeys.has(modSelectKey(row.item)),
           'row-anchor': modSelectKey(row.item) === anchorKey,
           'row-selecting': selectedKeys.size > 0,
-        }" @contextmenu.prevent="row.depth === depth ? emit('item-menu', { event: $event, item: row.item }) : undefined"
+          'row-enter': entering.has(row.key),
+        }]" @contextmenu.prevent="row.depth === depth ? emit('item-menu', { event: $event, item: row.item }) : undefined"
         @click="row.depth === depth ? emit('row-click', { event: $event, item: row.item }) : undefined">
         <!--
           多选勾选框（最左边）。只在顶层给 —— 内置模组装在父 jar 里、没有独立文件，
@@ -337,16 +474,36 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
         </template>
       </ResourceRow>
 
+      <!-- 「改写目标」子项：默认收起。一个包可能有几百上千条 mixin，摊开会把整屏冲掉，
+           所以父行展开只多出这一条，点它才列具体的类 -->
+      <div v-else-if="row.kind === 'patches'"
+        :class="['mod-patch-row', 'mod-patch-list', row.box ? 'box-' + row.box : '', { 'row-enter': entering.has(row.key) }]"
+        :style="{ '--row-depth': row.depth }" @click="togglePatches(row.parent)">
+        <span class="row-select-gap" />
+        <button class="mod-tree-caret" :class="{ collapsed: !isPatchesOpen(row.parent) }"
+          @click.stop="togglePatches(row.parent)">
+          <GlyphIcon name="chevron-down" :size="12" :weight="2.4" />
+        </button>
+        <span class="mod-patch-list-label">{{ t("resource.modPatchList") }}</span>
+        <span class="mod-patch-list-count">{{ row.count }}</span>
+      </div>
+
       <!-- 展开出来的改写目标：一行一个目标类，不可点、不可选，只用来读 -->
-      <div v-else class="mod-patch-row" :style="{ '--row-depth': row.depth }" :title="row.title">
+      <div v-else :class="['mod-patch-row', row.box ? 'box-' + row.box : '', { 'row-enter': entering.has(row.key) }]"
+        :style="{ '--row-depth': row.depth }" :title="row.title">
         <!-- 与同级行落在同一列：勾选框列、箭头列都留空，标签才对齐上面的图标那一列 -->
         <span class="row-select-gap" />
         <span class="mod-tree-caret-placeholder" />
         <span class="mod-patch-tag" :class="{ 'is-asm': row.asm }">
           {{ row.asm ? t("resource.patchesAsm") : t("resource.patchesMixin") }}
         </span>
-        <span class="mod-patch-target">{{ row.name }}</span>
-        <span v-if="row.detail" class="mod-patch-detail">{{ row.detail }}</span>
+        <!-- 目标类与方法也走高亮：按 mixin 目标搜出来时，命中的是这里而不是行名 -->
+        <span class="mod-patch-target">
+          <HighlightText :text="row.name" :query="props.query" />
+        </span>
+        <span v-if="row.detail" class="mod-patch-detail">
+          <HighlightText :text="row.detail" :query="props.query" />
+        </span>
       </div>
     </template>
   </div>

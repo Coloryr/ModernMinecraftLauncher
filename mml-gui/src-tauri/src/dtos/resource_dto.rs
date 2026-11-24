@@ -173,6 +173,8 @@ pub struct ResourceViewDto {
     pub category: String,
     /// 模组的展示方式：list / table / tree，空串 = 没记过
     pub mod_view: String,
+    /// 模组搜索的匹配字段，取值见前端 ModSearchField；空串 = 没记过，按「全部」
+    pub mod_search_field: String,
     /// 表格视图的列宽，列 key → 像素宽；空对象 = 没改过，前端用默认宽度
     ///
     /// 用裸 `HashMap`：IPC 生成器只认裸名，`std::collections::HashMap` 会被原样写进 TS。

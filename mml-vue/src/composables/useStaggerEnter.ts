@@ -131,7 +131,15 @@ export function useStaggerEnter(
       done();
       return;
     }
-    const items = Array.from(el.querySelectorAll(selector)).slice(0, max);
+    // 只错峰**最外层**的匹配：子孙跟着父级一起入场。父子两层都挂透明度动画会互相叠加，
+    // 里面那一层看着比别的慢一截（模组的分组块与它里面的行就是这么嵌套的）。
+    // `:scope > *` 这类选择器本身就是"直接子元素"，closest 判断不可靠，不做这层过滤
+    const matched = Array.from(el.querySelectorAll(selector));
+    const items = (
+      selector.includes(":scope")
+        ? matched
+        : matched.filter((node) => !node.parentElement?.closest(selector))
+    ).slice(0, max);
     const fadeItems = fadeSelector ? Array.from(el.querySelectorAll(fadeSelector)) : [];
     const frosted = frostedMode();
     const running: Animation[] = [];
