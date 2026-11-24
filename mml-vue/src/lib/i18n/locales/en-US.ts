@@ -866,6 +866,7 @@ export default {
   "resource.depGraphVersion": " version {version}",
   "resource.depGraphCycle": "circular dependency",
   "resource.depGraphReset": "Reset view",
+  "resource.depGraphFit": "Show all",
   "resource.disableDepsTitle": "Other mods depend on it",
   "resource.disableDepsHint": "“{name}” is required by {list}; disabling them together keeps them consistent",
   "resource.disableDepsOnly": "Disable only it",

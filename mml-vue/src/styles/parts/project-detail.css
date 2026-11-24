@@ -11,9 +11,19 @@
   position: fixed;
   inset: var(--titlebar-h) 0 0 0;
   z-index: 100;
-  background: var(--bg);
+  /* 不透明那一档：背景图模式下 --bg 是半透明的（.62 / .66），详情页会像一层玻璃，
+     底下的项目列表直接透出来 */
+  background: var(--bg-solid);
   display: flex;
   flex-direction: column;
+}
+
+/* 背景图 + 高斯模糊开着时改成"半透明 + 背景模糊"：背景图还看得见，底下的列表被糊掉，
+   不会再透出一行行文字。没开模糊时保持上面的不透明底（糊不了就必须盖住） */
+html.has-bg.bg-frosted .detail-page {
+  background: color-mix(in srgb, var(--bg-solid) 82%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.06);
+  backdrop-filter: blur(18px) saturate(1.06);
 }
 
 /* 不再套一层卡片：详情铺满整个窗口，头部下沿一条分隔线就够了 */

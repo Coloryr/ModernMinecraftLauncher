@@ -54,7 +54,7 @@ async function saveList() {
 </script>
 
 <template>
-  <BaseModal :title="t('modExport.title')" :width="520" :closable="!busy" @close="emit('close')">
+  <BaseModal :title="t('modExport.title')" :width="520" :closable="false" @close="emit('close')">
     <fieldset class="export-options m-0 min-w-0 border-0 p-0" :disabled="busy">
       <!-- 格式：标签与下拉同一行，下拉定宽 —— 三个短选项撑满整行没有必要 -->
       <div class="export-format flex items-center gap-2.5">
@@ -79,6 +79,8 @@ async function saveList() {
     </fieldset>
 
     <div class="modal-actions">
+      <!-- 关闭走这颗「取消」，不再用右上角的 ✕ -->
+      <BaseButton :disabled="busy" @click="emit('close')">{{ t('actions.cancel') }}</BaseButton>
       <BaseButton variant="primary" :disabled="!fields.length || busy || (onlySelected && !selectedIds.length)"
         @click="saveList">{{ t('winExport.exportBtn') }}</BaseButton>
     </div>

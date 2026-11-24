@@ -579,7 +579,13 @@ html.has-bg.bg-frosted :is(
   .collect-empty-box, .collect-card,
   /* .mod-group-body 不在这里：它是个透明容器，模糊只会把分组头与 modid 小标题
      背后糊出一条横带，行卡片自己有底色，不需要它 */
-  .mod-table-panel, .mod-search, .mod-tr, .shot-cell, .detail-icon, .detail-shot,
+  /* 表格的行同理交给容器（.mod-table-panel），不逐行糊 */
+  .mod-table-panel, .shot-cell, .detail-icon, .detail-shot,
+  /* 模组页只糊**分组块**：工具条不糊（那一带本来就没有卡片，糊了只是多一条模糊带）；
+     也不逐行糊 —— 每行各自 backdrop-filter 时模糊只在行自己的盒子里取样，相邻两行
+     之间会露出没糊的缝。分组块的宽度就是卡片的宽度（右侧 26 + 9px 的留白不在块里），
+     所以也不会在右边多出一块。 */
+  .resource-layout .mod-group,
   /* 添加实例 / 整合包 / 资源 */
   .add-card, .probe-card, .modpack-top, .res-top, .save-row, .dep-row,
   .pack-item, .pack-icon, .group-drop, .dep-node, .multi-bar,

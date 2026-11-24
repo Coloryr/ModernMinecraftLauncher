@@ -849,6 +849,7 @@ export default {
   "resource.depGraphVersion": " 版本 {version}",
   "resource.depGraphCycle": "循环依赖",
   "resource.depGraphReset": "重置视图",
+  "resource.depGraphFit": "全部显示",
   "resource.depGraphReroot": "双击：换成以它为目标",
   // 模组行展开后的 mixin / ASM 改写目标：一行一个目标类
   "resource.modExpand": "展开",

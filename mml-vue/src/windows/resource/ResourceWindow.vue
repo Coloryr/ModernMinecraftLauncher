@@ -91,7 +91,7 @@ const deps = useModDeps(mods, instanceUuid);
 const depItem = ref<ModItemDto | null>(null);
 
 /** 依赖图子页面：重置视图的按钮在标题栏，方法从这里调 */
-const depPage = ref<{ resetView: () => void } | null>(null);
+const depPage = ref<{ resetView: () => void; showAll: () => void } | null>(null);
 
 /** 子页面标题：有名字用名字，没有用文件名 */
 const depTitle = computed(() =>
@@ -303,19 +303,21 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
 </script>
 
 <template>
-  <WindowFrame enter=":scope > *" :title="depTitle" :back="depItem ? t('actions.back') : ''" :body-flush="!!depItem"
+  <WindowFrame enter=":scope > *" :title="depTitle" :back="depItem ? t('actions.back') : ''"
     @back="depItem = null" @close="$emit('close')">
-    <!-- 依赖图子页面：整块内容换成画布，标题与返回键在窗口标题栏上 -->
-    <ModDepsPage v-if="depItem" ref="depPage" :item="depItem" :load-tree="deps.depTreeOf"
-      @target="rerootDep" @close="depItem = null" />
-
     <!-- 标题栏：当前实例（原先挤在左侧分类栏顶部）+ 下载资源入口；子页面不显示 -->
     <template #head-right>
-      <!-- 子页面：重置视图放标题栏，画布就能铺满整个内容区；标题栏按钮只留图标，文字进提示 -->
-      <BaseButton v-if="depItem" size="sm" variant="ghost" class="icon-btn-head"
-        v-tip="t('resource.depGraphReset')" :aria-label="t('resource.depGraphReset')" @click="depPage?.resetView()">
-        <GlyphIcon name="maximize" :size="15" :weight="1.8" />
-      </BaseButton>
+      <!-- 子页面：两个视图按钮放标题栏，画布就能铺满整个内容区；只留图标，文字进提示 -->
+      <template v-if="depItem">
+        <BaseButton size="sm" variant="ghost" class="icon-btn-head" v-tip="t('resource.depGraphReset')"
+          :aria-label="t('resource.depGraphReset')" @click="depPage?.resetView()">
+          <GlyphIcon name="refresh" :size="15" :weight="1.8" />
+        </BaseButton>
+        <BaseButton size="sm" variant="ghost" class="icon-btn-head" v-tip="t('resource.depGraphFit')"
+          :aria-label="t('resource.depGraphFit')" @click="depPage?.showAll()">
+          <GlyphIcon name="maximize" :size="15" :weight="1.8" />
+        </BaseButton>
+      </template>
       <template v-else>
         <InstanceChip :instance="instance" />
         <!-- 资源下载窗口也是一个实例一个，没有实例就无处可放，按钮跟着灰掉 -->
@@ -326,7 +328,7 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
       </template>
     </template>
 
-    <div v-if="!depItem" class="resource-layout flex h-full gap-[18px]">
+    <div class="resource-layout flex h-full gap-[18px]">
       <CategoryRail :data="data" :view="view" @select="selectCategory" />
 
       <section class="cat-content mr-[-26px] flex min-w-0 flex-1 flex-col gap-3">
@@ -381,6 +383,18 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
       <DropConflictModal v-if="dropPending" :conflicts="dropPending.conflicts" :busy="dropBusy"
         @close="dropPending = null" @pick="answerDrop" />
     </div>
+
+    <!--
+      依赖图：铺满窗口的覆盖层，Teleport 到 body、进出场动画与「项目详情」同一套
+      （见 ModDepsPage 里的 .dep-page / .detail-page-*）。
+      底下的列表**不卸载**，关掉后滚动位置与分组展开状态都还在。
+    -->
+    <Teleport to="body">
+      <transition name="detail-page">
+        <ModDepsPage v-if="depItem" ref="depPage" :item="depItem" :load-tree="deps.depTreeOf"
+          @target="rerootDep" @close="depItem = null" />
+      </transition>
+    </Teleport>
 
     <!-- 拖入文件时的遮罩：标题报出落到哪一类；目录 / 卡片不接，见 canAcceptDrop -->
     <DropOverlay v-if="fileDragOver" :title="t('resource.dropTitleTo', { name: dropLabel })" />

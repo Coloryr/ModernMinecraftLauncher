@@ -62,15 +62,62 @@ const expanded = ref<Set<string>>(new Set());
  */
 const patchesOpen = ref<Set<string>>(new Set());
 
+/** 收起动画时长，单位 ms */
+const COLLAPSE_ROW_MS = 170;
+
+/**
+ * 正在收起的那些行
+ *
+ * 行列表是虚拟拍的平结构，没有"容器"可以给高度过渡：收起时先把这些旧行留在列表里，
+ * 逐帧把高度与不透明度压到 0（虚拟窗口那本账同步跟着，见 `rowHeights`），
+ * 动画结束再从列表里拿掉。这样下面的行是滑上来的，不是一帧顶上来。
+ */
+const collapseAnim = ref<{ parent: string; rows: FlatRow[]; progress: number } | null>(null);
+
+/**
+ * 收起的行退场动画
+ *
+ * - `parentKey`: 收起的那一行（它的子项要退场）；「改写目标」子项传它自己的 key
+ */
+function startRowCollapse(parentKey: string) {
+  const list = rows.value;
+  const index = list.findIndex((row) => row.key === parentKey);
+  if (index < 0) return;
+  const depth = list[index].depth;
+  const kids: FlatRow[] = [];
+  for (let at = index + 1; at < list.length && list[at].depth > depth; at += 1) kids.push(list[at]);
+  if (!kids.length) return;
+
+  collapseAnim.value = { parent: parentKey, rows: kids, progress: 1 };
+  const from = performance.now();
+  const step = () => {
+    const left = performance.now() - from;
+    const progress = Math.max(0, 1 - left / COLLAPSE_ROW_MS);
+    if (progress > 0) {
+      collapseAnim.value = { parent: parentKey, rows: kids, progress };
+      // 逐帧报一次布局变化：下面的分组按新高度重算行窗口
+      remeasure();
+      requestAnimationFrame(step);
+    } else {
+      collapseAnim.value = null;
+    }
+  };
+  requestAnimationFrame(step);
+}
+
 /** 展开 / 收起这一行；收起时把目标列表一起收掉，下次展开仍是默认收起 */
 function toggleExpand(key: string) {
   const next = new Set(expanded.value);
   if (next.has(key)) {
+    // 先把要退场的子行记下来，再改状态（改完它们就从拍平结果里消失了）
+    startRowCollapse(key);
     next.delete(key);
     const patches = new Set(patchesOpen.value);
     patches.delete(key);
     patchesOpen.value = patches;
   } else {
+    // 上一次收起的退场动画还没跑完就又展开了：直接作废，免得多出几行幽灵行
+    collapseAnim.value = null;
     next.add(key);
     expandPending = true;
   }
@@ -91,8 +138,11 @@ function isPatchesOpen(key: string): boolean {
 function togglePatches(key: string) {
   const next = new Set(patchesOpen.value);
   if (next.has(key)) {
+    // 「改写目标」那一行自己的 key 带 |patches 后缀，退场的子行挂在它下面
+    startRowCollapse(key + "|patches");
     next.delete(key);
   } else {
+    collapseAnim.value = null;
     next.add(key);
     expandPending = true;
   }
@@ -138,6 +188,12 @@ interface ModFlatRow {
   box?: "start" | "end" | "mid" | "single";
   /** 下一行紧贴着它（吃掉行间距） */
   tight?: boolean;
+  /** 正在收起：这一行是"退场"的旧行，高度按 progress 缩到 0 */
+  collapse?: boolean;
+  /** 收起动画里的当前高度，单位 px */
+  height?: number;
+  /** 收起动画里的当前不透明度 */
+  alpha?: number;
 }
 
 /**
@@ -161,6 +217,12 @@ interface PatchListRow {
   box?: "start" | "end" | "mid" | "single";
   /** 下一行紧贴着它（吃掉行间距），虚拟窗口按这个扣高度 */
   tight?: boolean;
+  /** 正在收起：这一行是"退场"的旧行，高度按 progress 缩到 0 */
+  collapse?: boolean;
+  /** 收起动画里的当前高度，单位 px */
+  height?: number;
+  /** 收起动画里的当前不透明度 */
+  alpha?: number;
 }
 
 /** 改写目标行：一个目标类一行 */
@@ -183,6 +245,12 @@ interface PatchFlatRow {
   box?: "start" | "end" | "mid" | "single";
   /** 下一行紧贴着它（吃掉行间距） */
   tight?: boolean;
+  /** 正在收起：这一行是"退场"的旧行，高度按 progress 缩到 0 */
+  collapse?: boolean;
+  /** 收起动画里的当前高度，单位 px */
+  height?: number;
+  /** 收起动画里的当前不透明度 */
+  alpha?: number;
 }
 
 /**
@@ -317,10 +385,33 @@ function markBox(rows: FlatRow[], start: number, end: number) {
   rows[end].tight = false;
 }
 
-/** 本视图要渲染的全部行，已按展开状态拍平 */
+/** 本视图要渲染的全部行，已按展开状态拍平；收起中的旧行先留在原位 */
 const rows = computed(() => {
   const out: FlatRow[] = [];
   flatten(props.items, props.depth, out);
+
+  const anim = collapseAnim.value;
+  if (anim) {
+    const at = out.findIndex((row) => row.key === anim.parent);
+    // 父行可能已经被别的操作带走了：找不到就这场动画作废
+    if (at >= 0) {
+      // 父行继续当框头，退场的行接着把它那个框填满、最后一行收口
+      out[at] = { ...out[at], box: "start", tight: true, collapse: false };
+      const leaving = anim.rows.map((row, index) => {
+        const base = row.kind === "mod" ? LIST_ROW_H : PATCH_ROW_H;
+        const last = index === anim.rows.length - 1;
+        return {
+          ...row,
+          box: last ? ("end" as const) : ("mid" as const),
+          tight: !last,
+          collapse: true,
+          height: Math.round(base * anim.progress),
+          alpha: anim.progress,
+        };
+      });
+      out.splice(at + 1, 0, ...leaving);
+    }
+  }
   return out;
 });
 
@@ -339,7 +430,11 @@ const PATCH_ROW_H = 30;
 const rowHeights = computed(() =>
   rows.value.map((row) => {
     const base = row.kind === "mod" ? LIST_ROW_H : PATCH_ROW_H;
-    // 紧贴着下一行的（框里的行）在 CSS 里用负外边距吃掉行间距，这里同步扣掉
+    // 收起中的行按逐帧高度算；紧贴着下一行的在 CSS 里用负外边距吃掉行间距，这里同步扣掉
+    if (row.collapse) {
+      const height = Math.max(0, row.height ?? 0);
+      return row.tight ? Math.max(0, height - LIST_ROW_GAP) : height;
+    }
     return row.tight ? base - LIST_ROW_GAP : base;
   }),
 );
@@ -373,6 +468,15 @@ watch(
   { flush: "post", immediate: true },
 );
 
+/**
+ * 收起中的行的内联样式：高度与不透明度跟着动画走
+ *
+ * - `row`: 要样式的那一行
+ */
+function collapseStyle(row: FlatRow) {
+  return row.collapse ? { height: `${row.height ?? 0}px`, opacity: row.alpha ?? 1 } : {};
+}
+
 /** 这一回真正渲染出来的那几行 */
 const visible = computed(() => rows.value.slice(start.value, end.value));
 </script>
@@ -381,11 +485,13 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
     <template v-for="row in visible" :key="row.key">
       <ResourceRow v-if="row.kind === 'mod'" :icon="row.item.icon"
         :name="row.item.name || row.item.file" :depth="row.depth"
+        :style="collapseStyle(row)"
         :class="[row.box ? 'box-' + row.box : '', {
           'row-selected': selectedKeys.has(modSelectKey(row.item)),
           'row-anchor': modSelectKey(row.item) === anchorKey,
           'row-selecting': selectedKeys.size > 0,
           'row-enter': entering.has(row.key),
+          'row-collapsing': row.collapse,
         }]" @contextmenu.prevent="row.depth === depth ? emit('item-menu', { event: $event, item: row.item }) : undefined"
         @click="row.depth === depth ? emit('row-click', { event: $event, item: row.item }) : undefined">
         <!--
@@ -477,8 +583,9 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
       <!-- 「改写目标」子项：默认收起。一个包可能有几百上千条 mixin，摊开会把整屏冲掉，
            所以父行展开只多出这一条，点它才列具体的类 -->
       <div v-else-if="row.kind === 'patches'"
-        :class="['mod-patch-row', 'mod-patch-list', row.box ? 'box-' + row.box : '', { 'row-enter': entering.has(row.key) }]"
-        :style="{ '--row-depth': row.depth }" @click="togglePatches(row.parent)">
+        :class="['mod-patch-row', 'mod-patch-list', row.box ? 'box-' + row.box : '',
+          { 'row-enter': entering.has(row.key), 'row-collapsing': row.collapse }]"
+        :style="{ '--row-depth': row.depth, ...collapseStyle(row) }" @click="togglePatches(row.parent)">
         <span class="row-select-gap" />
         <button class="mod-tree-caret" :class="{ collapsed: !isPatchesOpen(row.parent) }"
           @click.stop="togglePatches(row.parent)">
@@ -489,8 +596,9 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
       </div>
 
       <!-- 展开出来的改写目标：一行一个目标类，不可点、不可选，只用来读 -->
-      <div v-else :class="['mod-patch-row', row.box ? 'box-' + row.box : '', { 'row-enter': entering.has(row.key) }]"
-        :style="{ '--row-depth': row.depth }" :title="row.title">
+      <div v-else :class="['mod-patch-row', row.box ? 'box-' + row.box : '',
+        { 'row-enter': entering.has(row.key), 'row-collapsing': row.collapse }]"
+        :style="{ '--row-depth': row.depth, ...collapseStyle(row) }" :title="row.title">
         <!-- 与同级行落在同一列：勾选框列、箭头列都留空，标签才对齐上面的图标那一列 -->
         <span class="row-select-gap" />
         <span class="mod-tree-caret-placeholder" />

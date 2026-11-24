@@ -25,7 +25,7 @@ const { loading, reloadCurrent } = props.data;
 </script>
 
 <template>
-  <div class="content-head flex items-center justify-between gap-2.5 pr-[calc(26px+9px)]">
+  <div class="content-head flex items-center justify-between gap-2.5 pr-[26px]">
     <div class="head-lead flex min-w-0 flex-1 items-center gap-2">
       <slot />
     </div>

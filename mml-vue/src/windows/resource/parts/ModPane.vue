@@ -8,7 +8,7 @@
 //
 // 数据：模组列表在 useResourceData，分组在 useModGroups（自己的 JSON），
 // 拖动分组头调整分组顺序在 useReorderDrag。
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
@@ -706,39 +706,6 @@ watch(
   { immediate: true },
 );
 
-/**
- * 从依赖图回到列表时要摆回去的滚动位置
- *
- * 依赖图是整页子页面，ResourceWindow 用 v-if 把内容区整块换掉，模组页连同滚动容器一起
- * 卸载，回来就停在列表开头。打开之前记下位置，重新挂载时先摆回去。
- * 放模块级是因为模组页自己会被卸载，组件内的变量活不到回来那一刻。
- */
-let restoreScroll: { uuid: string; top: number } | null = null;
-
-/** 记下列表当前滚到哪儿，交给 `restoreListScroll` 摆回去 */
-function rememberListScroll() {
-  const top = listScroll.container.value?.scrollTop ?? 0;
-  restoreScroll = top > 0 ? { uuid: instanceUuid.value, top } : null;
-}
-
-/**
- * 把列表滚回打开依赖图之前的位置
- *
- * 等一个 tick 再摆：容器是模板 ref，挂载钩子跑的时候不一定已经 attach 上。
- * 摆完把滚动状态一并改掉，行虚拟化按恢复后的位置算窗口，不会先按顶部渲染一帧。
- */
-function restoreListScroll() {
-  const saved = restoreScroll;
-  restoreScroll = null;
-  if (!saved || saved.uuid !== instanceUuid.value) return;
-  void nextTick(() => {
-    const el = listScroll.container.value;
-    if (!el) return;
-    el.scrollTop = saved.top;
-    listScroll.top.value = saved.top;
-    listScroll.attach(el);
-  });
-}
 
 const groups = useModGroups(props.data);
 
@@ -1439,7 +1406,6 @@ function onMenuPick(id: string) {
       openUpdateLog(item.projectId);
       break;
     case "dep-tree":
-      rememberListScroll();
       emit("open-deps", item);
       break;
 
@@ -1747,11 +1713,19 @@ const collapseTimers = new Map<string, number>();
  * 画行，项目多的分组展开时下面整块乱跳。
  *
  * - `ms`: 持续时长，单位 ms
+ * - `anchor`: 要在动画期间**钉在视口顶端**的分组块；不给就不动滚动
  */
-function bumpWhileAnimating(ms: number) {
+function bumpWhileAnimating(ms: number, anchor?: HTMLElement | null) {
+  const container = listScroll.container.value;
   const end = performance.now() + ms;
   const step = () => {
     listScroll.bump();
+    // 收起的那一组：它的头是被自己这一组顶到视口上方的，动画期间把滚动位置跟着往上收，
+    // 让它一直停在顶端 —— 于是下面的分组是"从它下面滑上来"，而不是把视口整个换掉
+    if (anchor && container) {
+      const delta = anchor.getBoundingClientRect().top - container.getBoundingClientRect().top;
+      if (delta < -1) container.scrollTop += delta;
+    }
     if (performance.now() < end) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
@@ -1818,15 +1792,18 @@ function toggleCollapse(id: string) {
     : 0;
   const vis = Math.max(0, Math.min(contentH, room));
 
+  // 收起时把这一块钉在视口顶端（见 bumpWhileAnimating 的 anchor）；展开不用
+  const anchor = wasOpen ? section : null;
+
   groups.toggleCollapsed(id);
   if (!panel || contentH <= 0 || vis >= contentH || vis <= 0) {
     // 矮分组、整块都在屏幕外、或量不到：普通的高度过渡就够（也可能是即时切换）
-    bumpWhileAnimating(COLLAPSE_ANIM_MS);
+    bumpWhileAnimating(COLLAPSE_ANIM_MS, anchor);
     return;
   }
 
   animateVisiblePart(panel, vis, !wasOpen);
-  bumpWhileAnimating(COLLAPSE_ANIM_MS);
+  bumpWhileAnimating(COLLAPSE_ANIM_MS, anchor);
   const timer = window.setTimeout(() => {
     collapseTimers.delete(id);
     releasePanel(panel);
@@ -1906,13 +1883,32 @@ const {
   dragKey: draggingSection,
   insertAt: insertSectionAt,
   ghost: sectionGhost,
-  onPointerDown: onSectionPointerDown,
+  onPointerDown: startSectionDrag,
   consumeSuppressClick: consumeSectionClick,
 } = useReorderDrag({
   keys: () => sectionIds.value,
   rectOf: (key) => sectionEls.get(key)?.getBoundingClientRect() ?? null,
   onDrop: (from, insertAt) => void moveSection(from, insertAt),
 });
+
+/** 这一块能不能拖动排序：两个虚拟块固定在最前，不参与拖拽 */
+function canDragSection(id: string): boolean {
+  return !FIXED_GROUP_IDS.has(id);
+}
+
+/**
+ * 分组头按下：能拖的才开始拖拽，否则什么都不做
+ *
+ * 固定块（「有更新」「modid 重复」）位置固定，按下时不该进入拖拽态 ——
+ * 否则会画出拖动副本与落点插入线，松手却什么都不动
+ *
+ * - `event`: 按下事件
+ * - `id`: 分组块键
+ */
+function onSectionPointerDown(event: PointerEvent, id: string) {
+  if (!canDragSection(id)) return;
+  startSectionDrag(event, id);
+}
 
 /** 拖动副本与落点占位上显示的组名：被拖那一块的显示名 */
 const sectionGhostLabel = computed(() => {
@@ -2116,7 +2112,6 @@ async function mountPackWatch() {
 }
 
 onMounted(() => {
-  restoreListScroll();
   void groups.load();
   void mountPackWatch();
 });
@@ -2306,7 +2301,8 @@ onBeforeUnmount(() => {
             <GlyphIcon class="mod-group-caret" :class="{ collapsed: !isOpen(sec.id) }" name="chevron-down" :size="13"
               :weight="2.4" />
           </button>
-          <span class="mod-group-handle" v-tip="t('resource.groupDragTip')"
+          <span class="mod-group-handle"
+            v-tip="canDragSection(sec.id) ? t('resource.groupDragTip') : ''"
             @pointerdown="onSectionPointerDown($event, sec.id)" @click="onSectionToggle(sec.id)">
             <span class="mod-group-name">{{ sec.label }}</span>
           </span>
@@ -2348,7 +2344,7 @@ onBeforeUnmount(() => {
   <!-- 新建 / 重命名分组 -->
   <BaseModal v-if="groupForm" :title="groupForm.id ? t('resource.groupRenameTitle') : t('resource.groupAddTitle')"
     :closable="false" @close="groupForm = null">
-    <label class="field-label">{{ t("resource.groupName") }}</label>
+    <!-- 弹窗标题已经写明是新建 / 重命名分组，输入框上不再重复一行"分组名" -->
     <input v-model="groupForm.name" class="field-input" :class="{ 'is-invalid': groupFormInvalid }"
       :placeholder="t('resource.groupPlaceholder')" spellcheck="false" @input="groupFormTouched = true"
       @keydown.enter="saveGroupForm" />

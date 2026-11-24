@@ -270,10 +270,10 @@ async function waitForNodes() {
 }
 
 /**
- * 打开或换目标后的默认视图
+ * 打开或换目标后的默认视图，也是「重置视图」回到的那个视图
  *
- * 100% 缩放、把根节点摆到视口中央：图大时 fitView 会把整张图缩到看不清，
- * 默认先看清当前模组，看全图交给「重置视图」。
+ * 100% 缩放、把根节点摆到视口中央：图大时一次性缩到全图会把节点缩到看不清，
+ * 默认先看清当前模组；看全图交给「全部显示」。
  */
 async function centerOnRoot() {
   await waitForNodes();
@@ -283,8 +283,14 @@ async function centerOnRoot() {
   void setCenter(root.x + NODE_W / 2, root.y + NODE_H / 2, { zoom: 1 });
 }
 
-/** 拖乱了 / 缩放过了：缩到全图可见 */
-async function resetView() {
+/** 重置视图：回到刚打开这张图时的缩放与位置（100% + 根节点居中） */
+function resetView() {
+  hidePopup();
+  void centerOnRoot();
+}
+
+/** 全部显示：把整张图缩到可见范围里 */
+async function showAll() {
   hidePopup();
   await waitForNodes();
   void fitView({ padding: 0.16 });
@@ -318,14 +324,18 @@ function onKeyDown(event: KeyboardEvent) {
 onMounted(() => window.addEventListener("keydown", onKeyDown));
 onUnmounted(() => window.removeEventListener("keydown", onKeyDown));
 
-// 重置视图的按钮在窗口标题栏上，由窗口层调这里
-defineExpose({ resetView });
+// 两个视图按钮在窗口标题栏上，由窗口层调这里：重置视图回到默认视图，全部显示缩到全图
+defineExpose({ resetView, showAll });
 </script>
 
 
 <template>
-  <!-- 窗口子页面：标题与返回键由外层的 WindowFrame 提供，这里只铺画布 -->
-  <div class="dep-page flex h-full flex-col">
+  <!--
+    铺满窗口的**覆盖层**：标题与返回键由外层的 WindowFrame 提供，这里只铺画布。
+    固定定位 + 由调用方 Teleport 到 body，与「项目详情」（ProjectDetailPage）同一套做法 ——
+    进出场用同一套 `detail-page` 过渡，底下的模组列表**不卸载**，关掉后滚动位置还在。
+  -->
+  <div class="dep-page flex flex-col">
     <div v-if="loading" class="empty-tip dep-page-body min-h-0 flex-1 p-6">{{ t("resource.loading") }}</div>
 
     <div v-else-if="error" class="empty-tip dep-page-body min-h-0 flex-1 p-6">
@@ -359,6 +369,34 @@ defineExpose({ resetView });
 
 <style scoped>
 /* 画布内部的 vue-flow 元素只能靠 :deep 指定；排版已移到模板上的工具类。 */
+
+/* 覆盖层：盖住自绘标题栏以下的整个窗口，与「项目详情」的 .detail-page 同一口径 */
+.dep-page {
+  position: fixed;
+  inset: var(--titlebar-h) 0 0 0;
+  z-index: 100;
+  /* 与项目详情同一口径：覆盖层要不透明，背景图模式下 --bg 是半透明的 */
+  background: var(--bg-solid);
+}
+
+/* 背景图 + 高斯模糊开着时：半透明 + 背景模糊，背景图还看得见、底下的列表被糊掉 */
+html.has-bg.bg-frosted .dep-page {
+  background: color-mix(in srgb, var(--bg-solid) 82%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.06);
+  backdrop-filter: blur(18px) saturate(1.06);
+}
+
+/* 与项目详情同一套进出场：淡入淡出 + 上移 14px */
+.detail-page-enter-active,
+.detail-page-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.detail-page-enter-from,
+.detail-page-leave-to {
+  opacity: 0;
+  transform: translateY(14px);
+}
 
 /* 点阵压淡：--border 跟画布底色几乎同亮度，直接用等于没有 */
 .dep-flow :deep(.vue-flow__background) {

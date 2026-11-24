@@ -43,6 +43,7 @@
   opacity: 0.45;
 }
 
+
 /* 分类切换动画：ResourceWindow 的 `<Transition name="pane-swap">`，
    淡入淡出 + 轻微上收，数值与主窗口的 `.view-swap` 一致，全应用观感统一。
    `mode="out-in"` 保证同一时刻只有一个子节点，避免两块 `flex:1` 叠在一起 */
@@ -64,10 +65,10 @@
    所以在窗口级补一份右边距，口径与 .content-head 的 padding-right 相同。
 
    **必须限定为直接子节点**：ListSkeleton 里的"读取模组"进度也是 .load-progress，
-   但它在 .item-list 里，已经吃到滚动容器的 padding-right 26px 与 scrollbar-gutter 9px；
-   用后代选择器会让它再叠一份 35px，右端比顶栏和下方骨架行多缩一倍（踩过）。 */
+   但它在 .item-list 里，已经吃到滚动容器的 padding-right 17px 与 scrollbar-gutter 9px；
+   用后代选择器会让它再叠一份 26px，右端比顶栏和下方骨架行多缩一倍（踩过）。 */
 .resource-layout .pane-swap>.load-progress {
-  padding-right: calc(26px + 9px);
+  padding-right: 26px;
 }
 
 /* 存档 / 数据包那条顶栏挂在窗口层，切分类进来时它不在 <Transition> 里，自己淡入一次；
@@ -110,12 +111,13 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  /* 右边让出卡片的留白（26px，与窗口其它三边一致）。
-     加在**滚动容器**上而不是 `.cat-content` 上，是为了让滚动条仍贴在容器最右
-     （= 窗口右边）：滚动条的 gutter 在 padding box 之外，内容盒才受 padding 影响。 */
-  padding-right: 26px;
-  /* 钉成常驻滚动槽：WebKit 只在溢出时占位，短列表下卡片会比 .content-head 少让 9px，
-     右缘对不齐。常驻后两个引擎都是 26 + 9，见 styles/scrollbar.css 的 WebKit 例外 */
+  /* 卡片右缘距窗口右边 **26px**，与游戏统计等窗口一致：
+     容器本身贴到窗口右边（见 .cat-content 的 -26px 外边距），这里让出 17px，
+     加上常驻滚动槽的 9px 正好 26。加在**滚动容器**上而不是 `.cat-content` 上，
+     是为了让滚动条仍贴在容器最右（滚动槽在 padding box 之外，内容盒才受 padding 影响）。
+     钉成常驻滚动槽：WebKit 只在溢出时占位，短列表下卡片会比 .content-head 多让 9px，
+     右缘对不齐 —— 常驻后两个引擎都是 17 + 9，见 styles/scrollbar.css 的 WebKit 例外 */
+  padding-right: 17px;
   scrollbar-gutter: stable;
   overflow-y: scroll;
 }
@@ -275,12 +277,12 @@
 /* ---------- 截图网格 ---------- */
 
 /* 同样不套外框：格子自己就是框。
-   滚动条占位与留白口径同 .item-list（常驻占位 + 26px 内容留白） */
+   滚动条占位与留白口径同 .item-list：17 + 常驻 9 = 距窗口右边 26px */
 .resource-layout .shot-list {
   flex: 1;
   /* 常驻滚动槽，口径同 .item-list，见 styles/scrollbar.css 的 WebKit 例外 */
   overflow-y: scroll;
-  padding-right: 26px;
+  padding-right: 17px;
   scrollbar-gutter: stable;
 }
 
@@ -518,8 +520,9 @@ html.has-bg .resource-layout .mod-group-head.is-stuck {
   flex-direction: column;
   gap: 6px;
   /* 上边那条就是分组头与第一条内容之间的间距，见 .mod-group 的说明。
-     给 8px 而不是行与行之间的 6px：分组头是一条通栏色块，紧贴第一张卡片看着像粘住了 */
-  padding: 8px 0 0 2px;
+     给 8px 而不是行与行之间的 6px：分组头是一条通栏色块，紧贴第一张卡片看着像粘住了。
+     **左右都不留**：行要与分组头、与窗口的同一条左右边线对齐（原来左边多 2px） */
+  padding: 8px 0 0;
 }
 
 /* 空分组：把「该分组没有模组」那行字放进一块虚线区里。
@@ -593,13 +596,14 @@ html.has-bg .resource-layout .mod-group-head.is-stuck {
 
 /* 搜索字段下拉：搜索时**占满输入框右边剩下的宽度**，这样它与「列表 / 表格」之间的间距
    就跟输入框与它之间的一样（都是同行的标准间距），不会一边 8px 一边几十像素 */
+/* 基准必须是 0：`auto` 会按"选中项那段文字有多宽"算基准，换个选项宽度就变 */
 .resource-layout .bar-slot.field-slot.open {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 96px;
 }
 
 .resource-layout .sel-search-field {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   width: 100%;
   min-width: 0;
 }
@@ -826,7 +830,14 @@ html.has-bg .resource-layout .mod-group-head.is-stuck {
   color: var(--text-dim);
 }
 
-/* 展开出来的一行：轻轻淡入并往下落一点。收起不做动画 —— 行是从虚拟列表里直接移除的 */
+/* 收起中的旧行：高度与不透明度由内联样式逐帧给（见 ModList 的 collapseAnim），
+   这里只负责裁切 —— 行内容跟着盒子一起收上去，不会溢到相邻行上 */
+.resource-layout .mod-rows .row-collapsing {
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* 展开出来的一行：轻轻淡入并往下落一点 */
 .resource-layout .mod-rows .row-enter {
   animation: mod-row-enter 0.24s var(--ease-out) both;
 }
