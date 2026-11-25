@@ -19,6 +19,13 @@ onMounted(() => {
 /** macOS 全屏时标题栏只剩 28px 内容区，副标题要收起来、主标题降一档 */
 const fullscreen = useWindowFullscreen();
 const compact = computed(() => detectOs() === "macos" && fullscreen.value);
+
+/** 徽章配色：预发布黄、前端调试绿、测试版强调色 */
+const badgeColor = computed(() => {
+  if (buildChannel.value === "prerelease") return "text-yellow";
+  if (buildChannel.value === "frontendDebug") return "text-green";
+  return "text-accent";
+});
 </script>
 
 <template>
@@ -29,7 +36,7 @@ const compact = computed(() => detectOs() === "macos" && fullscreen.value);
         <!-- 测试版 / 预发布版徽章：顶栏一直可见，切到实例列表时也知道自己在用什么版本 -->
         <span v-if="isTestBuild"
           class="ml-1.5 inline-block rounded-pill border border-current px-1.5 py-px align-[2px] text-caption font-semibold"
-          :class="buildChannel === 'prerelease' ? 'text-yellow' : 'text-accent'">{{ t(buildBadgeKey) }}</span>
+          :class="badgeColor">{{ t(buildBadgeKey) }}</span>
       </div>
       <div v-if="!compact" class="text-meta text-dim">{{ t("app.sub") }}</div>
     </div>

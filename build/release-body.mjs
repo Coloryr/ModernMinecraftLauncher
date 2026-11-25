@@ -153,6 +153,10 @@ if (kind === "release") {
     lines.push("- Linux：x64 / arm64（deb / rpm / AppImage；x64 另有 Flatpak / Arch）");
     lines.push("- macOS：x64 / arm64（解压得到 `.app`，首次打开需在「隐私与安全性」里放行）");
 }
+// 前端调试版是附加产物：同一版本里单独一份，文件名带 -frontend-debug 便于区分
+if (files.some((file) => path.basename(file).includes("-frontend-debug"))) {
+    lines.push("- 前端调试版：文件名带 `-frontend-debug`，前端未压缩并带 source map，按 F12 可打开 DevTools；Windows 为 exe，Linux / macOS 为 tar.gz。");
+}
 lines.push("");
 lines.push("## 校验和");
 lines.push("");

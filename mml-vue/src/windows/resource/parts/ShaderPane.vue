@@ -8,11 +8,14 @@ import { t } from "../../../lib/i18n";
 import { deleteShaderpack, setShader } from "../../../lib/api";
 import ContentHead from "./ContentHead.vue";
 import ListSkeleton from "./ListSkeleton.vue";
+import SearchBox from "../../../components/ui/SearchBox.vue";
+import { stripFormatting } from "../../../lib/formatting";
 import ResourceRow from "./ResourceRow.vue";
 import FormattedText from "../../../components/ui/FormattedText.vue";
 import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
 import VirtualList from "../../../components/ui/VirtualList.vue";
 import { RESOURCE_ROW_GAP } from "../../../composables/useVirtualRows";
+import { useListSearch } from "../composables/useListSearch";
 import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
@@ -40,6 +43,16 @@ function remove(item: ShaderItemDto) {
   askDelete(item.name || item.file, () => deleteShaderpack(instanceUuid.value, item.file));
 }
 
+// ---------- 搜索 ----------
+//
+// 只过滤列表：设为当前 / 删除仍按那一行自己的文件名走。
+// 显示名、注释与文件名都参与匹配，光影包这两段常带 `§` 格式码，先去掉再比。
+
+const { keyword, searching, filtered } = useListSearch(
+  () => shaders.value,
+  (item) => `${stripFormatting(item.name)}\n${stripFormatting(item.comment)}\n${stripFormatting(item.file)}`,
+);
+
 // ---------- 多选 ----------
 
 /** 选中键用**磁盘文件名**：设为当前与删除都按它定位，显示名可能为空或重复 */
@@ -53,7 +66,7 @@ const {
   clear,
 } = useRowSelect<ShaderItemDto>({
   keyOf: (item) => item.file,
-  order: () => shaders.value,
+  order: () => filtered.value,
 });
 
 /** 选中的光影包 */
@@ -163,6 +176,10 @@ function sub(item: ShaderItemDto): string {
 
 <template>
   <ContentHead :data="data" :busy="busy">
+    <div class="head-search-wrap">
+      <SearchBox v-model="keyword" :placeholder="t('resource.shaderSearch')" :clear-label="t('resource.searchClear')"
+        width="100%" />
+    </div>
     <!-- 有选中项时顶栏换成批量操作条，与其它分类同一口径 -->
     <template #actions>
       <template v-if="count">
@@ -180,9 +197,9 @@ function sub(item: ShaderItemDto): string {
   <div v-if="loading" class="item-list">
     <ListSkeleton />
   </div>
-  <VirtualList v-else class="item-list" :count="shaders.length" :row-gap="RESOURCE_ROW_GAP">
+  <VirtualList v-else class="item-list" :count="filtered.length" :row-gap="RESOURCE_ROW_GAP">
     <template #default="{ start, end }">
-      <ResourceRow v-for="item in shaders.slice(start, end)" :key="item.file" :name="item.name || item.file" :class="{
+      <ResourceRow v-for="item in filtered.slice(start, end)" :key="item.file" :name="item.name || item.file" :class="{
         'row-selected': isSelected(item),
         'row-anchor': anchorKey === item.file,
         'row-selecting': selected.size > 0,
@@ -202,7 +219,10 @@ function sub(item: ShaderItemDto): string {
           <FormattedText :text="sub(item)" />
         </template>
       </ResourceRow>
-      <div v-if="!shaders.length" class="empty-tip">{{ t("resource.empty") }}</div>
+      <!-- 搜不到与"确实没有光影包"分开说 -->
+      <div v-if="!filtered.length" class="empty-tip">
+        {{ searching ? t("resource.shaderSearchEmpty") : t("resource.empty") }}
+      </div>
     </template>
   </VirtualList>
 

@@ -22,11 +22,14 @@ import BaseButton from "../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../components/ui/BaseModal.vue";
 import ContentHead from "./ContentHead.vue";
 import FormattedText from "../../../components/ui/FormattedText.vue";
+import SearchBox from "../../../components/ui/SearchBox.vue";
+import { stripFormatting } from "../../../lib/formatting";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
 import VirtualList from "../../../components/ui/VirtualList.vue";
 import { RESOURCE_ROW_GAP } from "../../../composables/useVirtualRows";
+import { useListSearch } from "../composables/useListSearch";
 import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
@@ -46,6 +49,22 @@ function remove(item: SchematicItemDto) {
   askDelete(titleOf(item), () => deleteSchematic(instanceUuid.value, item.file));
 }
 
+// ---------- 搜索 ----------
+//
+// 只过滤列表：删除 / 打开目录仍按那一行自己的文件名走。
+// 标题、文件名、作者与描述都参与匹配（后三个常带 `§` 格式码，先去掉再比）。
+
+const { keyword, searching, filtered } = useListSearch(
+  () => schematics.value,
+  (item) =>
+    [
+      stripFormatting(item.name),
+      stripFormatting(item.file),
+      stripFormatting(item.author),
+      stripFormatting(item.description),
+    ].join("\n"),
+);
+
 // ---------- 多选 ----------
 
 /** 选中键用**磁盘文件名**：删除与打开目录都按它走，NBT 里的 `Name` 常与它不一致 */
@@ -59,7 +78,7 @@ const {
   clear,
 } = useRowSelect<SchematicItemDto>({
   keyOf: (item) => item.file,
-  order: () => schematics.value,
+  order: () => filtered.value,
 });
 
 /** 选中的结构文件 */
@@ -192,6 +211,10 @@ function metaLabel(item: SchematicItemDto): string {
 
 <template>
   <ContentHead :data="data" :busy="busy">
+    <div class="head-search-wrap">
+      <SearchBox v-model="keyword" :placeholder="t('resource.schematicSearch')" :clear-label="t('resource.searchClear')"
+        width="100%" />
+    </div>
     <!-- 有选中项时顶栏换成批量操作条，与其它分类同一口径 -->
     <template #actions>
       <template v-if="count">
@@ -209,9 +232,9 @@ function metaLabel(item: SchematicItemDto): string {
   <div v-if="loading" class="item-list">
     <ListSkeleton />
   </div>
-  <VirtualList v-else class="item-list" :count="schematics.length" :row-gap="RESOURCE_ROW_GAP">
+  <VirtualList v-else class="item-list" :count="filtered.length" :row-gap="RESOURCE_ROW_GAP">
     <template #default="{ start, end }">
-      <ResourceRow v-for="item in schematics.slice(start, end)" :key="item.file" :name="titleOf(item)" :class="{
+      <ResourceRow v-for="item in filtered.slice(start, end)" :key="item.file" :name="titleOf(item)" :class="{
         'row-selected': isSelected(item),
         'row-anchor': anchorKey === item.file,
         'row-selecting': selected.size > 0,
@@ -235,7 +258,10 @@ function metaLabel(item: SchematicItemDto): string {
           <FormattedText v-if="item.description" :text="item.description" />
         </template>
       </ResourceRow>
-      <div v-if="!schematics.length" class="empty-tip">{{ t("resource.empty") }}</div>
+      <!-- 搜不到与"确实没有结构文件"分开说 -->
+      <div v-if="!filtered.length" class="empty-tip">
+        {{ searching ? t("resource.schematicSearchEmpty") : t("resource.empty") }}
+      </div>
     </template>
   </VirtualList>
 

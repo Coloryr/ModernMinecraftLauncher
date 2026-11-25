@@ -14,6 +14,15 @@
  * 弹窗内容 Teleport 到 body，样式由各自组件自带。
  */
 
+/* 背景图模式：分类栏直接压在图上，小字与图案叠在一起看不清。
+   补一层侧栏底色（与主窗口侧栏同色）做成一条圆角列，分类项离边缘留点余量；
+   这条列的高斯模糊在 themes.css 的透明模糊表里跟着加 */
+html.has-bg .resource-layout .cat-nav {
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--bg-side);
+}
+
 .resource-layout .cat-nav.ready .cat-thumb {
   opacity: 1;
   transition:
@@ -87,6 +96,16 @@
   }
 }
 
+/* 顶栏操作区是 fieldset（可以整组禁用，见 ContentHead 的 actionsDisabled）：
+   它自带的边框 / 内边距 / 最小宽度都要清掉，排版仍由 .head-actions 的 flex 决定 */
+.resource-layout .head-actions {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  background: none;
+}
+
 /* 工具条里的按钮：高度与同行的视图切换（SegmentedTabs）一样是全 app 那一档 32px，
    .mini-btn 的默认就是 32，这里只管横向留白 */
 .resource-layout .head-actions .mini-btn {
@@ -120,6 +139,50 @@
   padding-right: 17px;
   scrollbar-gutter: stable;
   overflow-y: scroll;
+}
+
+/* 背景图模式：只有**直接压在图上、没有卡片兜底**的文字才垫一层底 ——
+   空状态，以及存档的「自动进入」行、数据包的「选择存档」行。
+   不整块铺列表：那样会把背景图压掉一大片；列表行自己是卡片，自带底色就够 */
+html.has-bg .resource-layout .pane-swap>.empty-tip,
+html.has-bg .resource-layout .item-list:not(.mod-groups) .empty-tip,
+html.has-bg .resource-layout .shot-list>.empty-tip {
+  width: fit-content;
+  margin: auto;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--bg-card);
+}
+
+/* 空状态在整块列表区**居中**，不顶着上沿。三种容器各居一次：
+   .pane-swap 的直接子节点（无匹配 / 未选实例）、VirtualList 的行容器、截图网格。
+   有行时这些提示不存在，规则不会影响正常列表 */
+.resource-layout .pane-swap>.empty-tip,
+.resource-layout .item-list .vlist-rows>.empty-tip,
+.resource-layout .shot-list>.empty-tip {
+  margin: auto;
+}
+
+/* 列表里没有行时行容器吃掉剩余高度，提示才在正中而不是顶在上沿。
+   flex-basis 取 auto、不收缩：有行时它本来就被内容撑满，总高度与滚动位置都不变 */
+.resource-layout .item-list>.vlist-rows {
+  flex: 1 0 auto;
+}
+
+/* 加载中那行「读取中 x / x」也压在图上，同样垫一层底；左右 12px 与列表行的文字对齐 */
+html.has-bg .resource-layout .item-list .load-progress {
+  width: 100%;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+/* 左右内边距与列表行一致（12px），标签才和下面各行的文字对齐 */
+html.has-bg .resource-layout .auto-enter-row,
+html.has-bg .resource-layout .dp-save-row {
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--bg-card);
 }
 
 .resource-layout .item-row {
@@ -265,6 +328,36 @@
   cursor: default;
 }
 
+/* 顶栏操作按钮的「图标 + 文本」：标签放在 .head-btn-text 里，放不下时由 ContentHead
+   量完宽度给操作区挂 .is-compact，只留图标 —— 两种形态是同一颗按钮，不做两套。
+   量法见那个组件的 fitActions：搜索框这类可伸缩的前置内容也一起算进去，
+   所以模组页窄窗口只出图标，窗口拉宽、放得下文字时自动带出文字 */
+.resource-layout .head-btn-text {
+  white-space: nowrap;
+}
+
+.resource-layout .head-actions.is-compact .head-btn-text {
+  display: none;
+}
+
+/* 收起文字后退回方形档，与操作区里其它纯图标按钮同宽；没有标签的按钮不受影响 */
+.resource-layout .head-actions.is-compact .head-btn {
+  width: var(--ctl-h);
+  padding: 0;
+  justify-content: center;
+}
+
+/* 禁用态不接受任何悬停反馈：组件自带的 :hover 未必排除 :disabled（截图分类就踩过，
+   大图预览浮层那份按钮样式漏到了顶栏上），这里统一压成无反馈的样子 */
+.resource-layout .mini-btn:disabled,
+.resource-layout .mini-btn:disabled:hover,
+.resource-layout .mini-btn.danger:disabled:hover,
+.resource-layout .mini-btn.icon-only:disabled:hover {
+  color: var(--text-dim);
+  border-color: var(--border);
+  background: var(--bg-raised);
+}
+
 /* 带图标的 .mini-btn（刷新 / 新建分组）：图标 + 文案摆成一行。
    .mini-btn 本身是块级按钮，不加这个的话图标与文字会各占一行。
    注意「下载资源」用的是 BaseButton，它本身就是 inline-flex + gap，不需要这个类。 */
@@ -280,6 +373,9 @@
    滚动条占位与留白口径同 .item-list：17 + 常驻 9 = 距窗口右边 26px */
 .resource-layout .shot-list {
   flex: 1;
+  /* 纵向 flex：只有空状态提示时，它靠 auto 外边距在整块区域里居中 */
+  display: flex;
+  flex-direction: column;
   /* 常驻滚动槽，口径同 .item-list，见 styles/scrollbar.css 的 WebKit 例外 */
   overflow-y: scroll;
   padding-right: 17px;
@@ -553,14 +649,35 @@ html.has-bg .resource-layout .mod-group-head.is-stuck {
   background: var(--accent-soft);
 }
 
-/* 模组搜索框的外壳：外观整块交给 SearchBox（.field-input + 放大镜 + 清空键），
-   与主窗口的实例搜索同一份；这里只管它在工具条里占多宽 ——
-   占满剩下的空间、最宽 320px，再宽就离右边的按钮太远 */
-.resource-layout .mod-search-wrap {
+/* 工具条 / 子页顶栏里搜索框的外壳（模组页、存档页共用）：外观整块交给 SearchBox
+   （.field-input + 放大镜 + 清空键），与主窗口的实例搜索同一份；
+   这里只管它在顶栏里占多宽 —— 占满剩下的空间、最宽 320px，再宽就离右边的按钮太远。
+   上限提成变量：ContentHead 量按钮宽度时要把它按这个上限摆开，见下面 is-measuring */
+.resource-layout .head-search-wrap {
+  --head-search-w: 320px;
   display: flex;
   flex: 1 1 auto;
   min-width: 140px;
-  max-width: 320px;
+  max-width: var(--head-search-w);
+}
+
+/* 量宽度期间把搜索框按上限固定住：否则"放得下文字"是靠把搜索框挤窄换来的，
+   界限会被悄悄让掉（模组页就是这样把搜索框挤到只剩一百多像素） */
+.resource-layout .content-head.is-measuring .head-search-wrap {
+  flex: none;
+  width: var(--head-search-w);
+}
+
+/* 量宽度期间不要过渡：按钮宽度带 transition 时，刚挂上去的布局要 150ms 才落定，
+   量到的是动画中途的宽度 —— 判定跟着摆动，窗口卡在临界值上就会来回闪 */
+.resource-layout .content-head.is-measuring .mini-btn {
+  transition: none;
+}
+
+/* 量宽度期间左区不参与伸缩：flex-1 会把它撑满"剩余宽度"，量出来的和永远刚好等于顶栏内宽，
+   回差永远差那么一点，收起来之后就再也展不开了 */
+.resource-layout .content-head.is-measuring .head-lead {
+  flex: none;
 }
 
 /* 工具条上"一进一出"的两块（搜索字段下拉 / 那组图标按钮）：宽度在 0fr ↔ 1fr 之间过渡，

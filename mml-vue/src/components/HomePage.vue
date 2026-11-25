@@ -3,7 +3,7 @@
 // empty 为 true 时在内容区顶部展示空实例引导块，含添加账户 / 添加游戏实例两个按钮
 import { computed } from "vue";
 import { t } from "../lib/i18n";
-import { buildChannel, buildNoticeKey, isSourceBuild, isTestBuild } from "../lib/buildInfo";
+import { buildChannelClass, buildNoticeKey, isSourceBuild, isTestBuild } from "../lib/buildInfo";
 import { showToast } from "../lib/toast";
 import { openWindow } from "../windows/windowManager";
 import type { InstanceInfoDto, NewsItem } from "../lib/bindings";
@@ -87,7 +87,7 @@ function onLobby() {
 <template>
   <div class="home-page">
     <!-- 测试版 / 预发布版提示：压在主页最上方，打开启动器第一眼就能看到 -->
-    <div v-if="isTestBuild" class="build-notice" :class="buildChannel">
+    <div v-if="isTestBuild" class="build-notice" :class="buildChannelClass">
       <svg class="build-notice-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
         stroke-width="2" stroke-linecap="round">
         <path d="M12 8v5M12 16.5h.01" />
@@ -207,6 +207,11 @@ function onLobby() {
 .build-notice.debug {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.build-notice.frontend-debug {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
 }
 
 .build-notice-icon {

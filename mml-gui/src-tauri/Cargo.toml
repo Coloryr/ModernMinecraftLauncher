@@ -134,3 +134,7 @@ custom-protocol = ["tauri/custom-protocol"]
 # 正式发布不带，前端据 app_build_info 的 channel 决定提示与否。
 # 同时打开 tauri 的 devtools：预发布版要能用 F12 打开控制台，正式版不把它编进去。
 prerelease = ["tauri/devtools"]
+
+# 前端调试版：前端不压缩并带 source map（见 mml-vue 的 build:frontend-debug），
+# 界面标「调试版」。同样要能按 F12 打开控制台，所以也带 devtools。
+frontend-debug = ["tauri/devtools"]

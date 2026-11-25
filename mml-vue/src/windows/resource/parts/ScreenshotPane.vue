@@ -16,6 +16,7 @@ import { showToast } from "../../../lib/toast";
 import { previewOriginOf, type PreviewOrigin } from "../../../lib/previewOrigin";
 import { clearScreenshots, deleteScreenshot } from "../../../lib/api";
 import ContentHead from "./ContentHead.vue";
+import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
 import { useRowSelect } from "../composables/useRowSelect";
 import { createListScroll, visibleWindow } from "../../../composables/useVirtualRows";
@@ -35,7 +36,7 @@ const props = defineProps<{
   ops: ReturnType<typeof useResourceOps>;
 }>();
 
-const { shots, instanceUuid, loading, shotUrl } = props.data;
+const { shots, instanceUuid, loading, listReady, switching, shotUrl } = props.data;
 const { busy, act, askConfirm, askDelete, openFolder } = props.ops;
 
 /** 滚动容器：截图列表这一个滚动区 */
@@ -305,7 +306,8 @@ function onMenuPick(id: string) {
 </script>
 
 <template>
-  <ContentHead :data="data" :busy="busy">
+  <!-- 列表还是上一份快照时整组操作一起禁掉，不必每颗各写一遍"等数据就绪" -->
+  <ContentHead :data="data" :busy="busy" :actions-disabled="!listReady || switching">
     <!-- 有选中项时顶栏换成批量操作条，与其它分类同一口径 -->
     <template #actions>
       <template v-if="count">
@@ -317,8 +319,14 @@ function onMenuPick(id: string) {
           {{ t("resource.clearSelection") }}
         </button>
       </template>
-      <button v-else-if="shots.length" class="mini-btn danger" :disabled="busy" @click="clearAll">
-        {{ t("resource.clear") }}
+      <!-- 删除全部截图：只留图标，说明放提示里；没有截图时禁掉而不是藏起来，
+           按钮位置固定，空白页上也找得到它 -->
+      <!-- 一条截图都没有时禁用；列表没就绪那一段由整组禁用兜住，见上面的 actionsDisabled -->
+      <button v-else class="mini-btn icon-btn head-btn danger" :disabled="busy || !shots.length"
+        v-tip="shots.length ? t('resource.clearAllShots') : ''" :aria-label="t('resource.clear')"
+        @click="clearAll">
+        <GlyphIcon name="trash" :size="14" />
+        <span class="head-btn-text">{{ t("resource.clear") }}</span>
       </button>
     </template>
   </ContentHead>
@@ -354,22 +362,24 @@ function onMenuPick(id: string) {
   -->
   <ImagePreview :src="previewSrc" :origin="previewOrigin" @close="preview = null">
     <template v-if="preview">
-      <button class="mini-btn" @click="copyShot(preview)">
+      <button class="mini-btn preview-btn" @click="copyShot(preview)">
         {{ t("resource.copyShot") }}
       </button>
-      <button class="mini-btn" @click="openFolder('screenshots', preview.name)">
+      <button class="mini-btn preview-btn" @click="openFolder('screenshots', preview.name)">
         {{ t("resource.openFolder") }}
       </button>
-      <button class="mini-btn danger" @click="remove(preview)">
+      <button class="mini-btn preview-btn danger" @click="remove(preview)">
         {{ t("resource.delete") }}
       </button>
     </template>
   </ImagePreview>
 </template>
 
-<!-- 浮层里的按钮是 Teleport 到 body 的，`.resource-layout` 前缀够不着，所以自带 scoped 样式 -->
+<!-- 浮层里的按钮是 Teleport 到 body 的，`.resource-layout` 前缀够不着，所以自带 scoped 样式。
+     只挂 `.preview-btn`：scoped 样式会作用到本组件模板里的所有节点，包括顶栏那几个
+     共用 `.mini-btn` 的按钮 —— 否则禁用态也会跟着有悬停变色 -->
 <style scoped>
-.mini-btn {
+.preview-btn {
   height: var(--ctl-h);
   padding: 0 12px;
   border-radius: 8px;
@@ -382,12 +392,12 @@ function onMenuPick(id: string) {
   transition: all 0.12s;
 }
 
-.mini-btn:hover {
+.preview-btn:hover {
   border-color: var(--on-accent);
   color: var(--on-accent);
 }
 
-.mini-btn.danger:hover {
+.preview-btn.danger:hover {
   border-color: var(--red);
   color: var(--red);
 }

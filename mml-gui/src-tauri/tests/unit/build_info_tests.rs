@@ -15,7 +15,11 @@ fn version_follows_channel() {
     let base = base_version(env!("CARGO_PKG_VERSION"));
     assert_eq!(version_of(BuildChannel::Release), base);
 
-    for channel in [BuildChannel::Debug, BuildChannel::Prerelease] {
+    for channel in [
+        BuildChannel::Debug,
+        BuildChannel::Prerelease,
+        BuildChannel::FrontendDebug,
+    ] {
         let version = version_of(channel);
         let date = version
             .strip_prefix(&format!("{base}."))

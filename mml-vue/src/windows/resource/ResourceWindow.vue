@@ -341,6 +341,8 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
         -->
         <ContentHead v-if="instance && category === 'saves'" :data="data">
           <SaveTabs :data="data" />
+          <!-- 子页的搜索框由 SavePane 传送进来：关键词归那一页，切子页时跟着卸载 -->
+          <div id="resource-saves-search" class="head-search-wrap"></div>
           <template #actions>
             <div id="resource-saves-actions" class="head-pane-actions flex items-center gap-1.5"></div>
           </template>
@@ -355,7 +357,8 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
           存档类的顶栏在上面那一层，不在这个 Transition 里：间距由 .cat-content 的 gap 给，
           子页之间切换只换下面的列表，顶栏与滑块原地不动。
         -->
-        <Transition :css="false" mode="out-in" @enter="enterPane" @leave="leavePane">
+        <Transition :css="false" mode="out-in" @enter="enterPane" @leave="leavePane"
+          @after-enter="data.settleSwitch">
           <!-- 没有选中实例：只给这一条引导，不再顺带铺一个空列表，原先两段会同时出现 -->
           <div v-if="!instance" key="__no-instance" class="empty-tip">
             {{ t("resource.notSelected") }}

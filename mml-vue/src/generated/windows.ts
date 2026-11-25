@@ -88,6 +88,7 @@ export { default as WinResourcePartsModModGroupMenu } from "../windows/resource/
 export { default as WinResourcePartsModModList } from "../windows/resource/parts/mod/ModList.vue";
 export { default as WinResourcePartsModModReplaceModal } from "../windows/resource/parts/mod/ModReplaceModal.vue";
 export { default as WinResourcePartsModModTable } from "../windows/resource/parts/mod/ModTable.vue";
+export { default as WinResourcePartsModModToolbar } from "../windows/resource/parts/mod/ModToolbar.vue";
 export { default as WinResourcePartsModModUpdateLogModal } from "../windows/resource/parts/mod/ModUpdateLogModal.vue";
 export { default as WinResourcePartsModModUpdateModal } from "../windows/resource/parts/mod/ModUpdateModal.vue";
 export { default as ServerInstanceWindow } from "../windows/server_instance/ServerInstanceWindow.vue";

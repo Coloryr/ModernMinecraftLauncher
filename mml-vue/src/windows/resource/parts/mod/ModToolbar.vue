@@ -62,7 +62,7 @@ const searchActive = computed(() => props.keyword.trim().length > 0);
   <ContentHead :data="data" :busy="busy" :show-refresh="!searchActive">
     <!-- 搜索框与搜索字段同一组：字段只服务于搜索，不放到右侧按钮旁边 -->
     <template v-if="!selectedCount">
-      <div class="mod-search-wrap">
+      <div class="head-search-wrap">
         <SearchBox :model-value="keyword" :placeholder="t('resource.searchPlaceholder')"
           :clear-label="t('resource.searchClear')" width="100%"
           @update:model-value="emit('update:keyword', $event)" />
@@ -116,13 +116,15 @@ const searchActive = computed(() => props.keyword.trim().length > 0);
         ]" @update:model-value="emit('update:modView', $event as ModView)" />
         <div class="bar-slot" :class="{ open: !searchActive }" :inert="searchActive">
           <div class="bar-slot-inner">
-            <button class="mini-btn icon-btn icon-only" :disabled="busy" v-tip="t('resource.groupAdd')"
+            <button class="mini-btn icon-btn head-btn" :disabled="busy" v-tip="t('resource.groupAdd')"
               :aria-label="t('resource.groupAdd')" @click="emit('addGroup')">
               <GlyphIcon name="folder-plus" :size="14" />
+              <span class="head-btn-text">{{ t("resource.groupAdd") }}</span>
             </button>
-            <button class="mini-btn icon-btn icon-only" v-tip="t('resource.moreActions')" aria-haspopup="menu"
+            <button class="mini-btn icon-btn head-btn" v-tip="t('resource.moreActions')" aria-haspopup="menu"
               :aria-expanded="moreOpen" :aria-label="t('resource.moreActions')" @click="emit('more', $event)">
               <GlyphIcon name="more" :size="14" />
+              <span class="head-btn-text">{{ t("resource.moreActions") }}</span>
             </button>
           </div>
         </div>

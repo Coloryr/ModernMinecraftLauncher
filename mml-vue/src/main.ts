@@ -72,8 +72,15 @@ function editableTarget(target: EventTarget | null): HTMLElement | null {
   return el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA" ? el : null;
 }
 
+/** 是否是开 DevTools 的组合键：F12 与 macOS 的 ⌘⌥I */
+function isInspectKey(e: KeyboardEvent): boolean {
+  return e.key === "F12" || (e.metaKey && e.altKey && e.key.toLowerCase() === "i");
+}
+
 /** 这个按键要不要拦：文本框内只放行输入 / 编辑与 C/V/X，文本框外只留 Tab 与修饰键 */
 function shouldBlockKey(e: KeyboardEvent): boolean {
+  // 测试版与预发布版要能开控制台；正式发布的 F12 仍然拦掉
+  if (isInspectKey(e) && devtoolsAllowed()) return false;
   const editable = editableTarget(e.target);
   const ctrl = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();

@@ -14,7 +14,7 @@ M²L（Modern Minecraft Launcher）是一个 Minecraft 启动器。它把“一�
 - 服务器实例怎么生成、发布、更新：见[服务器实例操作指导](server-instance.md)。
 - 每个版本改了什么：见[更新日志](changelog.md)。
 
-> 当前发布版本从 **v0.0.1** 开始。界面上的「测试版 / 预发布版」徽章只表示构建通道，不代表功能差异。
+> 当前发布版本从 **v0.0.1** 开始。界面上的「测试版 / 预发布版 / 调试版」徽章只表示构建通道，不代表功能差异。
 
 ## 目录
 
@@ -87,6 +87,9 @@ M²L（Modern Minecraft Launcher）是一个 Minecraft 启动器。它把“一�
 
 启动器不再注册任何键盘快捷键：`Esc`、`Enter`、`F5`、方向键、鼠标侧键等都不再触发页面动作。
 文本框内保留原生输入与编辑，以及复制 / 粘贴 / 剪切（`Ctrl+C` / `Ctrl+V` / `Ctrl+X`，macOS 对应 `Cmd`）；单行输入框的 `Enter` 也不再提交表单。
+
+测试版（源码 / `tauri dev` 启动）与预发布版保留 `F12`（macOS 为 `Cmd+Option+I`）打开 DevTools，正式发布不响应。
+发布页另带一份前端调试版（文件名含 `-frontend-debug`）：前端不压缩并带 source map，界面标「调试版」，同样按 `F12` 打开控制台。
 
 ### 2.4 拖放
 

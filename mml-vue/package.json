@@ -15,6 +15,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "build:frontend-debug": "vue-tsc --noEmit && vite build --mode frontend-debug",
     "lint": "eslint .",
     "test": "node --test \"tests/**/*.test.mjs\"",
     "preview": "vite preview",

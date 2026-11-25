@@ -10,24 +10,43 @@ export const buildChannel = ref<BuildChannel>("release");
 /** 版本号，如 0.1.0；还没拉到时是空串 */
 export const appVersion = ref("");
 
-/** 是否需要提示：测试版与预发布版都要，正式版不提示 */
+/** 是否需要提示：测试版、预发布版与前端调试版都要，正式版不提示 */
 export const isTestBuild = computed(() => buildChannel.value !== "release");
 /**
  * 是否源码启动，也就是 debug 构建（界面上的「测试版」）
  *
  * 还没上线的东西只用这一档：联机大厅、存档云同步、设置里的手柄栏。
- * 预发布版是给用户试的，不该露出这些半成品，所以判据比 isTestBuild 更严。
+ * 预发布版与前端调试版是给用户试的，不该露出这些半成品，所以判据比 isTestBuild 更严。
  */
 export const isSourceBuild = computed(() => buildChannel.value === "debug");
 
-/** 提示文案的键：测试版与预发布版说法不同 */
-export const buildNoticeKey = computed(() =>
-  buildChannel.value === "debug" ? "build.debugNotice" : "build.prereleaseNotice",
-);
+/** 提示文案的键：三种非正式通道说法不同 */
+export const buildNoticeKey = computed(() => {
+  switch (buildChannel.value) {
+    case "debug":
+      return "build.debugNotice";
+    case "frontendDebug":
+      return "build.frontendDebugNotice";
+    default:
+      return "build.prereleaseNotice";
+  }
+});
 
 /** 徽章文案的键；正式版没有徽章 */
-export const buildBadgeKey = computed(() =>
-  buildChannel.value === "debug" ? "build.debugBadge" : "build.prereleaseBadge",
+export const buildBadgeKey = computed(() => {
+  switch (buildChannel.value) {
+    case "debug":
+      return "build.debugBadge";
+    case "frontendDebug":
+      return "build.frontendDebugBadge";
+    default:
+      return "build.prereleaseBadge";
+  }
+});
+
+/** 构建通道的样式后缀：接口给的 frontendDebug 在 CSS 里写成 frontend-debug */
+export const buildChannelClass = computed(() =>
+  buildChannel.value === "frontendDebug" ? "frontend-debug" : buildChannel.value,
 );
 
 let loading: Promise<void> | null = null;

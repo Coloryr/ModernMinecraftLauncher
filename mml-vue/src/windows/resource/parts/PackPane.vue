@@ -12,11 +12,14 @@ import {
 } from "../../../lib/api";
 import ContentHead from "./ContentHead.vue";
 import FormattedText from "../../../components/ui/FormattedText.vue";
+import SearchBox from "../../../components/ui/SearchBox.vue";
+import { stripFormatting } from "../../../lib/formatting";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
 import VirtualList from "../../../components/ui/VirtualList.vue";
 import { RESOURCE_ROW_GAP } from "../../../composables/useVirtualRows";
+import { useListSearch } from "../composables/useListSearch";
 import { useRowSelect } from "../composables/useRowSelect";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceOps } from "../composables/useResourceOps";
@@ -55,6 +58,16 @@ async function toggle(item: PackItemDto) {
   });
 }
 
+// ---------- 搜索 ----------
+//
+// 只过滤列表：启用 / 删除仍按那一行自己的文件名走，批量条也只数看得见的这些。
+// 文件名与描述都参与匹配，材质包作者常在里面写 `§` 格式码，先去掉再比。
+
+const { keyword, searching, filtered } = useListSearch(
+  () => packs.value,
+  (item) => `${stripFormatting(item.file)}\n${stripFormatting(item.description)}`,
+);
+
 // ---------- 多选 ----------
 
 /** 选中键用**磁盘文件名**：启用 / 删除都按它定位 */
@@ -68,7 +81,7 @@ const {
   clear,
 } = useRowSelect<PackItemDto>({
   keyOf: (item) => item.file,
-  order: () => packs.value,
+  order: () => filtered.value,
 });
 
 /** 选中的材质包 */
@@ -212,6 +225,10 @@ function formatLabel(item: PackItemDto): string {
 
 <template>
   <ContentHead :data="data" :busy="busy">
+    <div class="head-search-wrap">
+      <SearchBox v-model="keyword" :placeholder="t('resource.packSearch')" :clear-label="t('resource.searchClear')"
+        width="100%" />
+    </div>
     <!-- 有选中项时顶栏换成批量操作条，与其它分类同一口径 -->
     <template #actions>
       <template v-if="count">
@@ -235,9 +252,9 @@ function formatLabel(item: PackItemDto): string {
   <div v-if="loading" class="item-list">
     <ListSkeleton />
   </div>
-  <VirtualList v-else class="item-list" :count="packs.length" :row-gap="RESOURCE_ROW_GAP">
+  <VirtualList v-else class="item-list" :count="filtered.length" :row-gap="RESOURCE_ROW_GAP">
     <template #default="{ start, end }">
-      <ResourceRow v-for="item in packs.slice(start, end)" :key="item.file" :icon="item.icon" :name="item.file" :class="{
+      <ResourceRow v-for="item in filtered.slice(start, end)" :key="item.file" :icon="item.icon" :name="item.file" :class="{
         'row-selected': isSelected(item),
         'row-anchor': anchorKey === item.file,
         'row-selecting': selected.size > 0,
@@ -262,7 +279,10 @@ function formatLabel(item: PackItemDto): string {
           <template v-if="item.description"> · </template>{{ formatLabel(item) }}
         </template>
       </ResourceRow>
-      <div v-if="!packs.length" class="empty-tip">{{ t("resource.empty") }}</div>
+      <!-- 搜不到与"确实没有材质包"分开说 -->
+      <div v-if="!filtered.length" class="empty-tip">
+        {{ searching ? t("resource.packSearchEmpty") : t("resource.empty") }}
+      </div>
     </template>
   </VirtualList>
 

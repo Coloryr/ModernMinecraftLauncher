@@ -131,6 +131,8 @@ jobs:
         run: pwsh -NoProfile -File build/init.ps1
       - name: 构建并打包（${{ matrix.arch }}）
         run: pwsh -NoProfile -File build/build-release.ps1 -Arch ${{ matrix.arch }}
+      - name: 构建前端调试版（${{ matrix.arch }}）
+        run: pwsh -NoProfile -File build/build-frontend-debug.ps1 -Arch ${{ matrix.arch }}
       - name: 上传 Windows 产物
         if: needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v6
@@ -206,6 +208,8 @@ jobs:
         run: bash build/init.sh
       - name: 构建并打包
         run: bash build/build-release.sh
+      - name: 构建前端调试版
+        run: bash build/build-frontend-debug.sh
       - name: 上传 Linux 产物
         if: needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v6
@@ -379,6 +383,11 @@ jobs:
             fi
           done
           bash build/build-release.sh
+      - name: 构建前端调试版
+        shell: bash
+        env:
+          MML_TARGETS: ${{ matrix.triple }}
+        run: bash build/build-frontend-debug.sh
       - name: 上传 macOS 产物
         if: needs.check-version.outputs.test != 'true'
         uses: actions/upload-artifact@v6

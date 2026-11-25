@@ -100,6 +100,23 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
   /** 有列表正在拉；模组那个分类要解析 jar 元数据，可能要几秒 */
   const loading = ref(false);
 
+  /**
+   * 当前的列表是不是**这一档**的、且已经就绪
+   *
+   * 与 `loading` 分开：切分类的那一瞬列表还是上一份快照，只看长度会先亮一下再变。
+   * 分类一变就同步置假（`flush: "sync"`），加载完 / 命中缓存才置真，
+   * 所以按列表内容决定可用性的按钮（截图的清空、服务器的导出）从第一帧就是禁用的。
+   */
+  const listReady = ref(false);
+
+  /**
+   * 分类切换的入场动画是否还没结束
+   *
+   * 动画期间顶栏操作整组禁用：禁用态从第一帧就在，不会出现"动画放完才变灰"的观感。
+   * 开始时由切分类的 sync watcher 置真，窗口在 `@after-enter` 里调 {@link settleSwitch} 收起。
+   */
+  const switching = ref(false);
+
   const mods = ref<ModItemDto[]>([]);
   const packs = ref<PackItemDto[]>([]);
   const saves = ref<SaveItemDto[]>([]);
@@ -175,6 +192,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     const target = category.value;
     const seq = ++loadSeq;
     loading.value = true;
+    listReady.value = false;
     let ok = false;
     try {
       switch (target) {
@@ -223,7 +241,10 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
       if (seq === loadSeq) showToast(tErr(e));
     } finally {
       // 慢的那一发回来时可能已经有更新的一发了：别把它的加载态关掉
-      if (seq === loadSeq) loading.value = false;
+      if (seq === loadSeq) {
+        loading.value = false;
+        listReady.value = ok;
+      }
     }
     // 拉成了才算这一档"已加载"；失败不记，下次切回来还能再试
     if (ok) loadedCats.add(target);
@@ -231,7 +252,11 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
 
   /** 这一档还没有列表时才拉：切分类走这里，操作后重拉 / 点刷新走 reloadCurrent */
   async function loadIfNeeded() {
-    if (loadedCats.has(category.value)) return;
+    if (loadedCats.has(category.value)) {
+      // 命中缓存：列表就是这一档的，按钮不必再等
+      listReady.value = true;
+      return;
+    }
     await load();
   }
 
@@ -371,6 +396,18 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     return `${imgBase.value}/screenshot/${instanceUuid.value}/${item.name}`;
   }
 
+  // 分类一变就**同步**作废列表的"就绪"标记：新面板第一帧拿到的就是假，
+  // 不会先用上一档的列表算一遍按钮可用性（等 pre-flush 的加载/命中缓存再置真）
+  watch(category, () => {
+    listReady.value = false;
+    switching.value = true;
+  }, { flush: "sync" });
+
+  /** 入场动画结束：放开顶栏操作（各按钮再按自己的条件判断） */
+  function settleSwitch() {
+    switching.value = false;
+  }
+
   watch(category, () => {
     // sync 期间只更新选择，不触发加载，否则同一份列表会被拉两遍；
     // 那一遍由 sync 结尾的 reloadCurrent 统一做，见上面 `syncing` 的说明
@@ -404,6 +441,9 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     instance,
     instanceUuid,
     loading,
+    listReady,
+    switching,
+    settleSwitch,
     modProgress,
     modDuplicates,
     mods,

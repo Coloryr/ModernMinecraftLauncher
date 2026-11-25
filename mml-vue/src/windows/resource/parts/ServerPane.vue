@@ -15,6 +15,7 @@ import { showToast } from "../../../lib/toast";
 import { addServer, deleteServer, exportServers, getMotd, importServers, updateServer } from "../../../lib/api";
 import { faviconOf } from "../../../lib/motd";
 import ContentHead from "./ContentHead.vue";
+import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
 import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
@@ -34,7 +35,7 @@ const props = defineProps<{
   ops: ReturnType<typeof useResourceOps>;
 }>();
 
-const { servers, instanceUuid, loading, reloadCurrent } = props.data;
+const { servers, instanceUuid, loading, listReady, switching, reloadCurrent } = props.data;
 // 行的操作只剩「编辑 / 删除」：服务器行没有"打开文件夹"这一项（用户点名去掉），
 // 且都搬进了右键菜单
 const { busy, act, actLocal, askConfirm, askDelete } = props.ops;
@@ -325,7 +326,8 @@ function onMenuPick(id: string) {
 </script>
 
 <template>
-  <ContentHead :data="data" :busy="busy">
+  <!-- 列表还是上一份快照时整组操作一起禁掉，不必每颗各写一遍"等数据就绪" -->
+  <ContentHead :data="data" :busy="busy" :actions-disabled="!listReady || switching">
     <!-- 有选中项时顶栏换成批量操作条，与其它分类同一口径 -->
     <template #actions>
       <template v-if="count">
@@ -337,16 +339,26 @@ function onMenuPick(id: string) {
           {{ t("resource.clearSelection") }}
         </button>
       </template>
+      <!-- 图标 + 文本：头够宽时文字跟出来，窄了只剩图标（见 resource.css 的 .head-btn-text），
+           所以每颗都带提示与无障碍名 -->
       <template v-else>
-        <button class="mini-btn" :disabled="busy" @click="openForm(null)">
-          {{ t("resource.serverAdd") }}
+        <button class="mini-btn icon-btn head-btn" :disabled="busy" v-tip="t('resource.serverAdd')"
+          :aria-label="t('resource.serverAdd')" @click="openForm(null)">
+          <GlyphIcon name="plus" :size="14" />
+          <span class="head-btn-text">{{ t("resource.serverAdd") }}</span>
         </button>
         <!-- 服务器列表就在 servers.dat 里：导出 / 导入都是整份换，与其它启动器互通 -->
-        <button class="mini-btn" :disabled="busy" @click="exportList">
-          {{ t("resource.serverExport") }}
+        <!-- 一条都没有就没什么可导出的：按钮禁掉，提示也不弹（与截图那颗清空同一口径） -->
+        <button class="mini-btn icon-btn head-btn" :disabled="busy || !servers.length"
+          v-tip="servers.length ? t('resource.serverExport') : ''" :aria-label="t('resource.serverExport')"
+          @click="exportList">
+          <GlyphIcon name="export" :size="14" />
+          <span class="head-btn-text">{{ t("resource.serverExport") }}</span>
         </button>
-        <button class="mini-btn" :disabled="busy" @click="importList">
-          {{ t("resource.serverImport") }}
+        <button class="mini-btn icon-btn head-btn" :disabled="busy" v-tip="t('resource.serverImport')"
+          :aria-label="t('resource.serverImport')" @click="importList">
+          <GlyphIcon name="download" :size="14" />
+          <span class="head-btn-text">{{ t("resource.serverImport") }}</span>
         </button>
       </template>
     </template>

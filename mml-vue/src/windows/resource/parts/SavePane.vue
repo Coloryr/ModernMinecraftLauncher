@@ -28,6 +28,8 @@ import CloudSavePane from "./CloudSavePane.vue";
 import FormattedText from "../../../components/ui/FormattedText.vue";
 import ListSkeleton from "./ListSkeleton.vue";
 import ResourceRow from "./ResourceRow.vue";
+import SearchBox from "../../../components/ui/SearchBox.vue";
+import { useListSearch } from "../composables/useListSearch";
 import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
 import VirtualList from "../../../components/ui/VirtualList.vue";
 import { RESOURCE_ROW_GAP } from "../../../composables/useVirtualRows";
@@ -91,15 +93,27 @@ function backup(item: SaveItemDto) {
   });
 }
 
+// ---------- 搜索 ----------
+//
+// 只过滤**看得见的列表**，不动数据本身（云同步、自动进入那些行仍按全量算）。
+// 搜索框画在窗口层的子页顶栏里，由本组件 Teleport 过去，关键词也就留在这里：
+// 切到「数据包」时本组件卸载，搜索框跟着消失，两个子页不会互相带着对方的关键词。
+
+/** 名字与目录都参与匹配，名字先去掉 `§` 格式码再比 */
+const { keyword, searching, filtered } = useListSearch(
+  () => saves.value,
+  (item) => `${stripFormatting(item.levelName)}\n${item.dir}`,
+);
+
 // ---------- 多选（顶栏批量操作） ----------
 //
 // 与模组列表同一套口径，选中逻辑见 useRowSelect。存档只有列表视图，没有分组也没有排序，
-// 所以整段选择的顺序就是后端给的顺序。
+// 所以整段选择的顺序就是搜索后看得见的那一段 —— 被搜掉的行不该跨进 Shift 的范围。
 
 /** 选中键用**目录名**：它就是后端认的存档身份，备份 / 删除前后都不变 */
 const { selected, anchorKey, count, isSelected, toggle, onRowClick, clear } = useRowSelect<SaveItemDto>({
   keyOf: (item) => item.dir,
-  order: () => saves.value,
+  order: () => filtered.value,
 });
 
 /** 选中的那些存档 */
@@ -478,6 +492,13 @@ function saveTip(item: SaveItemDto): string {
 </script>
 
 <template>
+  <!-- 搜索框挂到窗口层那条子页切换栏上，与「存档 / 数据包」并排；关键词归本页，
+       切到数据包时本组件卸载，框也跟着走 -->
+  <Teleport to="#resource-saves-search">
+    <SearchBox v-model="keyword" :placeholder="t('resource.saveSearch')" :clear-label="t('resource.searchClear')"
+      width="100%" />
+  </Teleport>
+
   <!-- 操作条挂到窗口层那条子页切换栏上，切换「存档 / 数据包」时这一条不重建，见 ResourceWindow。
        有选中项时顶栏换成批量操作条，与模组列表同一口径。
        这一条与右键的批量菜单**动作一致**，都只有「删除」：批量备份用户不要 -->
@@ -499,9 +520,10 @@ function saveTip(item: SaveItemDto): string {
   <div v-if="loading" class="item-list">
     <ListSkeleton />
   </div>
-  <VirtualList v-else class="item-list" :count="saves.length" :row-gap="RESOURCE_ROW_GAP">
-    <!-- 自动进入存档：整个实例只有一个目标，列表上方直接选；对应那行有「自动进入」徽标 -->
-    <template v-if="quickPlay && saves.length" #header>
+  <VirtualList v-else class="item-list" :count="filtered.length" :row-gap="RESOURCE_ROW_GAP">
+    <!-- 自动进入存档：整个实例只有一个目标，列表上方直接选；对应那行有「自动进入」徽标。
+         搜索时这条让位：它选的是全量里的一个目录，摆在过滤结果上方只会让人以为只对结果生效 -->
+    <template v-if="quickPlay && saves.length && !searching" #header>
       <div class="auto-enter-row mb-2 flex items-center gap-2">
         <span class="auto-enter-label shrink-0 whitespace-nowrap text-body text-dim">{{ t("resource.autoEnter") }}</span>
         <select class="field-select auto-enter-select" :value="autoEnterDir" :disabled="busy"
@@ -514,7 +536,7 @@ function saveTip(item: SaveItemDto): string {
       </div>
     </template>
     <template #default="{ start, end }">
-      <ResourceRow v-for="item in saves.slice(start, end)" :key="item.dir" :icon="item.icon"
+      <ResourceRow v-for="item in filtered.slice(start, end)" :key="item.dir" :icon="item.icon"
         :name="item.levelName || item.dir" v-tip="saveTip(item)" :class="{
           'row-selected': isSelected(item),
           'row-anchor': anchorKey === item.dir,
@@ -544,7 +566,10 @@ function saveTip(item: SaveItemDto): string {
           <FormattedText :text="item.dir" /> · {{ t("resource.lastPlayed", { time: formatTime(item.lastPlayed) }) }}
         </template>
       </ResourceRow>
-      <div v-if="!saves.length" class="empty-tip">{{ t("resource.empty") }}</div>
+      <!-- 搜不到与"确实没有存档"分开说，与模组列表同一口径 -->
+      <div v-if="!filtered.length" class="empty-tip">
+        {{ searching ? t("resource.saveSearchEmpty") : t("resource.empty") }}
+      </div>
     </template>
   </VirtualList>
 

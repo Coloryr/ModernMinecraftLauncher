@@ -896,8 +896,10 @@ function createViaJs(kind: WindowKind, params?: WindowOpenParams) {
   const label = prefix && params?.uuid ? `${prefix}${params.uuid}` : `mml-${kind}`;
   WebviewWindow.getByLabel(label).then(async (existing) => {
     if (existing) {
-      // 窗口已存在则聚焦；导出窗口的目标实例靠 export-focus 事件链路自行同步
-      existing.setFocus();
+      // 窗口已存在则还原并聚焦（最小化时只 setFocus 看不出变化）；
+      // 导出窗口的目标实例靠 export-focus 事件链路自行同步
+      await existing.unminimize().catch(() => undefined);
+      await existing.setFocus();
       return;
     }
     // 尺寸从后端注册表取（与 Rust 建窗同源）；后端不可用时给个兜底值

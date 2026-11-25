@@ -62,6 +62,10 @@ pub(crate) fn quiet_main_window_startup() {
 
 /// 显示窗口：启动时的第一扇主窗口只显示、不激活，其余照旧显示并拿焦点
 ///
+/// **已经可见的窗口不再显示、也不再拿焦点**：那是同一扇窗又挂载了一遍（开发时页面
+/// 重载 / 热更新就会重跑装饰激活），用户此刻很可能正在别的窗口里操作，
+/// 把前台拉过来就是打断他。新窗与重新打开的窗（隐藏状态）照旧拿到焦点。
+///
 /// - `window`: 要显示的窗口
 ///
 /// # 返回值
@@ -70,6 +74,9 @@ pub(crate) fn quiet_main_window_startup() {
 fn show_window(window: &WebviewWindow) -> Result<(), String> {
     if take_startup_quiet(window.label()) {
         return show_without_activate(window);
+    }
+    if window.is_visible().unwrap_or(false) {
+        return Ok(());
     }
     window.show().map_err(|err| err.to_string())?;
     // 显示不等于到前台：不抢一次焦点，新窗会压在发起它的那个窗口后面，看着像点了没反应
@@ -233,8 +240,8 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
 
 /// 打开开发者工具
 ///
-/// 测试版与预发布版可用；正式发布没有把 DevTools 编进去（见 Cargo.toml 的
-/// `prerelease = ["tauri/devtools"]`），这里返回错误。
+/// 测试版、预发布版与前端调试版可用；正式发布没有把 DevTools 编进去（见 Cargo.toml 的
+/// `prerelease` / `frontend-debug` 都开 `tauri/devtools`），这里返回错误。
 ///
 /// 三个平台都是**独立窗口**：Windows 是 WebView2 的 DevTools 窗口，macOS 是
 /// Web Inspector 窗口，Linux 是 WebKitGTK 的 inspector（默认不贴靠）。
@@ -247,15 +254,23 @@ pub async fn window_activate_decoration(window: WebviewWindow) -> Result<&'stati
 #[gui_macros::ipc_group("windows")]
 #[gui_macros::command]
 pub fn window_open_devtools(window: WebviewWindow) -> Result<(), String> {
-    #[cfg(any(debug_assertions, feature = "prerelease"))]
+    #[cfg(any(
+        debug_assertions,
+        feature = "prerelease",
+        feature = "frontend-debug"
+    ))]
     {
         window.open_devtools();
         Ok(())
     }
-    #[cfg(not(any(debug_assertions, feature = "prerelease")))]
+    #[cfg(not(any(
+        debug_assertions,
+        feature = "prerelease",
+        feature = "frontend-debug"
+    )))]
     {
         let _ = window;
-        Err("DevTools are only available in debug and prerelease builds".to_string())
+        Err("DevTools are only available in debug, prerelease and frontend-debug builds".to_string())
     }
 }
 

@@ -120,7 +120,7 @@ struct InstanceReport {
 struct LauncherSection {
     /// 版本号
     version: String,
-    /// 构建通道：`release` / `prerelease` / `debug`
+    /// 构建通道：`release` / `prerelease` / `frontend-debug` / `debug`
     channel: &'static str,
 }
 
@@ -662,12 +662,13 @@ fn encoding_id(encoding: LogEncoding) -> &'static str {
 ///
 /// # 返回值
 ///
-/// `release` / `prerelease` / `debug`
+/// `release` / `prerelease` / `frontend-debug` / `debug`
 fn channel_id(channel: crate::dtos::build_info_dto::BuildChannel) -> &'static str {
     use crate::dtos::build_info_dto::BuildChannel;
     match channel {
         BuildChannel::Release => "release",
         BuildChannel::Prerelease => "prerelease",
+        BuildChannel::FrontendDebug => "frontend-debug",
         BuildChannel::Debug => "debug",
     }
 }

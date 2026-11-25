@@ -14,7 +14,7 @@ import { ISSUES_URL, QQ_GROUP, REPO_URL } from "../../lib/links";
 import { commands } from "../../lib/bindings";
 import { copyText } from "../../lib/clipboard";
 import { showToast } from "../../lib/toast";
-import { appVersion, buildBadgeKey, buildChannel, isTestBuild, loadBuildInfo } from "../../lib/buildInfo";
+import { appVersion, buildBadgeKey, buildChannelClass, isTestBuild, loadBuildInfo } from "../../lib/buildInfo";
 // 与 src-tauri/icons 那套是同一个源（design/icon/f-blend.svg）；换图标时两处一起换
 import appIcon from "../../assets/app-icon.svg";
 import { faqs as zhFaqs } from "../../lib/i18n/locales/zh-CN";
@@ -188,7 +188,7 @@ async function copyQq() {
       <div class="about-body flex min-w-0 flex-1 flex-col gap-1">
         <div class="about-title flex items-center gap-1.5 text-heading font-bold">
           {{ t("app.name") }}
-          <span v-if="isTestBuild" class="about-badge rounded-pill border border-current px-1.5 py-0.5 text-caption font-semibold" :class="`is-${buildChannel}`">
+          <span v-if="isTestBuild" class="about-badge rounded-pill border border-current px-1.5 py-0.5 text-caption font-semibold" :class="`is-${buildChannelClass}`">
             {{ t(buildBadgeKey) }}
           </span>
         </div>
@@ -341,6 +341,10 @@ async function copyQq() {
 
 .about-badge.is-prerelease {
   color: var(--yellow);
+}
+
+.about-badge.is-frontend-debug {
+  color: var(--green);
 }
 
 .about-sha1.is-error {

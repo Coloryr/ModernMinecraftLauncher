@@ -10,6 +10,8 @@ pub enum BuildChannel {
     Release,
     /// 预发布版：走 `build/build-prerelease.*`，未经完整验证
     Prerelease,
+    /// 前端调试版：走 `build/build-frontend-debug.*`，前端不压缩并带 source map，可开 DevTools
+    FrontendDebug,
     /// 测试版：直接拉源码启动，`cargo run` / `tauri dev` 都是
     Debug,
 }

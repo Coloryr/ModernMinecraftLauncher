@@ -2,6 +2,7 @@
 //!
 //! 通道来自编译期，不是配置：
 //! - `debug_assertions` 打开 → 测试版，直接拉源码启动，`cargo run` / `tauri dev` 都是
+//! - 否则开了 `frontend-debug` feature → 前端调试版，见 `build/build-frontend-debug.*`
 //! - 否则开了 `prerelease` feature → 预发布版，见 `build/build-prerelease.*`
 //! - 都不是 → 正式发布
 //!
@@ -47,7 +48,9 @@ fn version_of(channel: BuildChannel) -> String {
     let base = base_version(env!("CARGO_PKG_VERSION"));
     match channel {
         BuildChannel::Release => base,
-        BuildChannel::Debug | BuildChannel::Prerelease => format!("{base}.{BUILD_DATE}"),
+        BuildChannel::Debug | BuildChannel::Prerelease | BuildChannel::FrontendDebug => {
+            format!("{base}.{BUILD_DATE}")
+        }
     }
 }
 
@@ -60,6 +63,8 @@ fn version_of(channel: BuildChannel) -> String {
 pub fn app_build_info() -> BuildInfoDto {
     let channel = if cfg!(debug_assertions) {
         BuildChannel::Debug
+    } else if cfg!(feature = "frontend-debug") {
+        BuildChannel::FrontendDebug
     } else if cfg!(feature = "prerelease") {
         BuildChannel::Prerelease
     } else {

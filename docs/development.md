@@ -85,6 +85,7 @@ mml-gui/src-tauri/src/            ipc-gen/                 mml-ipc/src/
 | `build/dev-frontend.ps1` | 只起 Vite，配合 debug 版 Rust 后端单独运行；`tauri dev` 已自带 Vite，不要重复起 |
 | `build/build-release.ps1` | 正式发布构建（fat LTO，含安装包，按版本收集到 `build_out/`；Windows 默认 x64 / arm64；Linux / macOS 的 x64 / arm64 由 CI 原生 runner 出） |
 | `build/build-prerelease.ps1` | 本地快速预发布构建（thin LTO，只出 exe，不打包；Windows 两种架构，`target/prerelease/mml-gui-<arch>.exe`） |
+| `build/build-frontend-debug.ps1` | 前端调试版（前端不压缩 + source map，F12 可开 DevTools；thin LTO，产物收进 `build_out/`，文件名带 `-frontend-debug`） |
 | `bash build/package-flatpak.sh` | 用已构建的二进制打 `.flatpak`，需要 `flatpak`，不重新编译 |
 | `bash build/package-arch.sh` | 用已构建的二进制打 `.pkg.tar.zst`，不依赖 `makepkg`，任一 Linux 可跑 |
 | `.\check.ps1 --all` | 根目录整仓检查，先还原 vendor 插件再 `cargo check`（bash 版 `bash check.sh --all`） |
@@ -131,6 +132,7 @@ CI 会校验标签的数字部分与文件一致，见[自动化构建](#自动�
 | --- | --- |
 | 正式发布 | `1.0.0`，不带日期 |
 | 预发布版（`prerelease` feature） | `1.0.0.20261028`；清单带后缀时是 `1.0.0-pre.20261028` |
+| 前端调试版（`frontend-debug` feature） | `1.0.0.20261028` |
 | 测试版（`cargo run` / `tauri dev`） | `1.0.0.20261028` |
 
 日期由 `src-tauri/build.rs` 在编译期取当天写进 `MML_BUILD_DATE`，所以查版本时看到的是
@@ -143,6 +145,7 @@ CI 会校验标签的数字部分与文件一致，见[自动化构建](#自动�
 构建 profile 与产物：正式发布是 `[profile.release]`（fat LTO + `codegen-units = 1`），
 预发布是 `[profile.prerelease]`（thin LTO + `codegen-units = 16`）；两者分别在
 `target/<三元组>/release/` 与 `target/<三元组>/prerelease/` 下，来回切不会互相刷缓存。
+前端调试版复用 `[profile.prerelease]`，只是换前端产物与 `frontend-debug` feature。
 
 Windows 的正式 / 预发布脚本默认构建 **x64 / arm64**：
 
@@ -169,6 +172,8 @@ Windows 的正式 / 预发布脚本默认构建 **x64 / arm64**：
 | Arch Linux | `mml-arch-x64-0.0.1.pkg.tar.zst` |
 | macOS x64 | `mml-macos-x64-0.0.1.dmg`、`mml-macos-x64-0.0.1.app.tar.gz` |
 | macOS arm64 | `mml-macos-arm64-0.0.1.dmg`、`mml-macos-arm64-0.0.1.app.tar.gz` |
+| Windows（前端调试版） | `mml-windows-x64-0.0.1-frontend-debug.exe` |
+| Linux / macOS（前端调试版） | `mml-linux-x64-0.0.1-frontend-debug.tar.gz` |
 
 预发布在 Windows 只出裸可执行文件、macOS 只出自签的 `.app` 压缩包，文件名保留 `-pre` 后缀，
 安装包内部版本仍是纯数字。
@@ -185,12 +190,20 @@ cargo tauri build --features prerelease
 `--features prerelease` 不能漏，否则主界面不会提示「预发布版」，出的包与正式版一样。
 vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
 
+前端调试版是第三种产物，不替代正式 / 预发布：`build/build-frontend-debug.*` 用
+`frontend-debug` feature（带 `tauri/devtools`）与 `[profile.prerelease]`，前端按
+`npm run build:frontend-debug` 生成不压缩、带 source map 的 dist。界面标「调试版」，
+按 F12 打开控制台；它不改变 `isSourceBuild`，联机大厅 / 云存档这些半成品仍不会露出。
+发版时 CI 在各平台正式构建之后顺手再跑一遍，产物随同一个 Release 上传，文件名带
+`-frontend-debug`。
+
 测试按改动范围只跑相关的那几个：`cargo test -p <crate>`（不要整仓全量测试）。
 
 ## 自动化构建（GitHub Actions）
 
 [`.github/workflows/build.yml`](../.github/workflows/build.yml) 把 `init` 与 `build-release`
-两个本地脚本串成三平台流水线，两个通道共用同一套构建：数字版本来自 `docs/version`，发版标签带
+两个本地脚本串成三平台流水线，正式 / 预发布两个通道共用同一套构建，前端调试版在每个平台
+构建完后再补一份：数字版本来自 `docs/version`，发版标签带
 `-pre` 后缀就出 Pre-release；标签只决定什么时候跑，数字部分必须与文件一致：
 
 | 触发 | 行为 |
@@ -213,6 +226,7 @@ vendor 插件的还原方式见 [AGENTS.md](../AGENTS.md) §3。
    Linux 跑 x64（`ubuntu-22.04`）与 arm64（`ubuntu-24.04-arm`）；macOS 两行都跑
    `macos-latest`，用 `MML_TARGETS` 指定 `aarch64-apple-darwin` / `x86_64-apple-darwin`
    （x64 交叉编译），都执行 `bash build/init.sh` 再跑 `bash build/build-release.sh`；
+   随后各平台再跑 `build/build-frontend-debug.*`，把前端调试版一起放进 `build_out/`；
 4. Linux x64 构建完先上传 deb / rpm / AppImage，再单独上传原始二进制；`package-linux-extra` job
    下载这份二进制后跑 `build/package-flatpak.sh` 与 `build/package-arch.sh`，把 `.flatpak` 与
    `.pkg.tar.zst` 也放进 `build_out/`。附加包失败不影响主产物，但发版 job 会等它，缺包时不发 Release；

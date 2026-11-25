@@ -185,6 +185,8 @@ pub(crate) fn create_window(
 ) -> Result<WebviewWindow, String> {
     // 已存在则聚焦，避免重复窗口
     if let Some(win) = app.get_webview_window(label) {
+        // 最小化的窗口只 set_focus 看不出变化：先还原，再提到前台
+        let _ = win.unminimize();
         win.set_focus().map_err(|err| err.to_string())?;
         // 句柄表可能因异常退出丢失，补记一份
         OPEN_WINDOWS.write().unwrap().insert(*uuid, win.clone());

@@ -4,7 +4,7 @@ import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 
 // https://vite.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, mode }) => ({
   // Tailwind 只用来出 utilities：重置、控件外观、主题变量仍在 styles/ 里，
   // 配置与 token 映射见 src/styles/tailwind.css
   plugins: [vue(), tailwindcss()],
@@ -38,5 +38,8 @@ export default defineConfig(({ command }) => ({
     // 这里抬高到刚好高于 Monaco 的量级，而不是直接关掉警告：将来若有**新的**
     // 大块超出这个量级，比如误把某个重依赖静态引进了主窗口，构建仍会提醒。
     chunkSizeWarningLimit: 3000,
+    // 前端调试版（--mode frontend-debug）保留可读代码与映射；正常发布仍走默认压缩
+    minify: mode === "frontend-debug" ? false : undefined,
+    sourcemap: mode === "frontend-debug",
   },
 }));

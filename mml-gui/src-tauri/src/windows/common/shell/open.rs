@@ -256,6 +256,8 @@ pub async fn window_reopen_window(
     };
 
     if let Some(win) = app.get_webview_window(&id.label) {
+        // 最小化的窗口只 set_focus 看不出变化：先还原，再重新加载并提到前台
+        let _ = win.unminimize();
         // 基准 URL 取窗口当前的：origin / devUrl 都一致，join 一个相对路径即可
         let base = win.url().map_err(|err| err.to_string())?;
         let url = base.join(&url_path).map_err(|err| err.to_string())?;
