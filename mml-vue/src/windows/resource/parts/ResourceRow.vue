@@ -27,10 +27,17 @@ withDefaults(
   }>(),
   { icon: "", name: "", depth: 0 },
 );
+
+/** Enter / Space 当成点击：单行动作都在右键菜单里，先把行变成可聚焦的入口 */
+function onKeyActivate(event: KeyboardEvent) {
+  (event.currentTarget as HTMLElement | null)?.click();
+}
 </script>
 
 <template>
-  <div class="item-row" :class="{ 'mod-nested': depth > 0 }" :style="{ '--row-depth': depth }">
+  <div class="item-row" role="button" tabindex="0" :aria-label="name || undefined"
+    :class="{ 'mod-nested': depth > 0 }" :style="{ '--row-depth': depth }"
+    @keydown.enter.prevent="onKeyActivate" @keydown.space.prevent="onKeyActivate">
     <!--
       多选勾选框：在**最左边**，箭头与图标之前。
       它是进入多选的唯一入口 —— 悬停该行出现，已在多选状态时全部常显；

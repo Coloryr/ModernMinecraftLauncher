@@ -19,6 +19,29 @@ export const result = ref<ResourceMapResultDto | null>(null);
 
 /** 进行中的事件订阅，任务结束或组件重挂时用 */
 let unlisten: UnlistenFn | null = null;
+/** 后台任务是否还在跑；设置窗口重开后靠它把 `mapping` 收回来 */
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+/** 停掉完成轮询 */
+function stopPoll() {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+/** 任务结束后轮询一次后端，避免重开窗口后按钮永久停在“正在处理…” */
+function startPoll() {
+  if (pollTimer !== null) return;
+  pollTimer = setInterval(() => {
+    void commands.settings.resourceMapRunning().then((running) => {
+      if (running) return;
+      stopPoll();
+      unsubscribe();
+      mapping.value = false;
+    }).catch(() => {});
+  }, 1000);
+}
 
 /** 挂上进度事件；重复调用只保留一份订阅 */
 async function subscribe() {
@@ -58,6 +81,7 @@ export async function startMapping(): Promise<void> {
   } catch (e) {
     showToast(tErr(e));
   } finally {
+    stopPoll();
     unsubscribe();
     mapping.value = false;
   }
@@ -74,4 +98,5 @@ export async function attachMapping(): Promise<void> {
   if (!running) return;
   mapping.value = true;
   await subscribe();
+  startPoll();
 }

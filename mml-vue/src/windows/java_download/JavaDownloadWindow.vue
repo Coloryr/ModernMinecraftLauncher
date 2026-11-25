@@ -155,7 +155,7 @@ let sourcesSeq = 0;
 /** 换搜索源：先清掉上一源的卡片，再拉新候选 */
 async function onSourceChange() {
   items.value = [];
-  await loadOptions();
+  await loadOptions(true);
 }
 
 /** 拉下载源并加载其选项：首次挂载与切回本窗口都走这里，保留用户已选的源 */
@@ -184,6 +184,8 @@ useWindowRefresh(loadSources);
 
 /** 候选请求代次：F5 / 连续切源只让最新一发写回下拉并继续拉列表 */
 let optionsSeq = 0;
+/** 四个筛选是否已经铺过默认值；刷新时保留用户选择 */
+let optionsReady = false;
 
 /**
  * 本次打开要预选的 Java 主版本
@@ -203,7 +205,7 @@ function wantedJavaMajor(): number | null {
 }
 
 /** 拉当前源的四个下拉候选，默认选本机对应的系统与架构，再按默认筛选拉一次列表 */
-async function loadOptions() {
+async function loadOptions(reset = false) {
   const mine = ++optionsSeq;
   if (!source.value) {
     optionsLoading.value = false;
@@ -214,24 +216,34 @@ async function loadOptions() {
     const data = await commands.javaDownload.getOptions(source.value);
     if (mine !== optionsSeq) return;
     options.value = data;
-    // 类型选第一项；主版本优先用启动缺 Java 时带过来的那一版，没有就选第一项
-    javaType.value = data.types[0] ?? "";
+    const keep = optionsReady && !reset;
+    // 类型：刷新时保留仍存在的选择，否则落第一项
+    javaType.value = keep && data.types.includes(javaType.value) ? javaType.value : data.types[0] ?? "";
     const wanted = wantedJavaMajor();
+    // 主版本：启动缺 Java 时带过来的优先；刷新时保留仍在候选里的值
     major.value =
-      wanted !== null && data.majors.includes(wanted) ? wanted : data.majors[0] ?? null;
+      wanted !== null && data.majors.includes(wanted)
+        ? wanted
+        : keep && major.value !== null && data.majors.includes(major.value)
+          ? major.value
+          : data.majors[0] ?? null;
     if (wanted !== null && !data.majors.includes(wanted)) {
       showToast(t("winJavaDownload.majorMissing", { java: wanted }));
     }
     const osCands = OS_CANDIDATES[detectOs()] ?? [];
-    system.value = pickMatch(data.systems, osCands) ?? data.systems[0] ?? "";
+    system.value = keep && data.systems.includes(system.value)
+      ? system.value
+      : pickMatch(data.systems, osCands) ?? data.systems[0] ?? "";
     const archDetected = await detectArch();
     if (mine !== optionsSeq) return;
-    arch.value =
-      pickMatch(data.archs, archDetected ? ARCH_CANDIDATES[archDetected] : []) ??
-      // 探不出本机架构时优先落到常见桌面架构，别默认选到 ARM
-      pickMatch(data.archs, ["x64", "x86_64", "amd64"]) ??
-      data.archs[0] ??
-      "";
+    arch.value = keep && data.archs.includes(arch.value)
+      ? arch.value
+      : pickMatch(data.archs, archDetected ? ARCH_CANDIDATES[archDetected] : []) ??
+        // 探不出本机架构时优先落到常见桌面架构，别默认选到 ARM
+        pickMatch(data.archs, ["x64", "x86_64", "amd64"]) ??
+        data.archs[0] ??
+        "";
+    optionsReady = true;
   } catch (e) {
     if (mine !== optionsSeq) return;
     showToast(tErr(e));

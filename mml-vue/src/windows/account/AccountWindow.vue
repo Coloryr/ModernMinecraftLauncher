@@ -541,10 +541,20 @@ async function switchAccount(acc: AccountStoreDto) {
   if (await setCurrentAccount(acc)) showToast(t("account.switched", { name: acc.userName }));
 }
 
-/** 刷新账户令牌；真实状态由后端的 account-change 广播刷回 */
-function refreshToken(acc: AccountStoreDto) {
-  void refreshAccountToken(acc.uuid);
-  showToast(t("account.refreshed"));
+/** 刷新账户令牌；成功才提示，失败把后端错误抛给用户，连点时只发一次 */
+const refreshingToken = ref("");
+
+async function refreshToken(acc: AccountStoreDto) {
+  if (refreshingToken.value) return;
+  refreshingToken.value = acc.uuid;
+  try {
+    await refreshAccountToken(acc.uuid);
+    showToast(t("account.refreshed"));
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    refreshingToken.value = "";
+  }
 }
 
 /** 刷新皮肤：后端清渲染缓存重取，前端 bump 版本号破 webview 旧图并清失败标记 */
@@ -577,7 +587,7 @@ const accountMenuItems = computed<RowMenuItem[]>(() => {
   items.push({
     id: "refresh",
     label: t("account.refreshAuth"),
-    disabled: !acc.canRefresh,
+    disabled: !acc.canRefresh || refreshingToken.value === acc.uuid,
   });
   if (acc.canRelogin) items.push({ id: "relogin", label: t("account.relogin") });
   if (acc.canEdit) items.push({ id: "edit", label: t("account.editOffline") });

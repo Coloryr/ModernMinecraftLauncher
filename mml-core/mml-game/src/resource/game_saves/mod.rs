@@ -23,6 +23,7 @@ pub(crate) use mml_nbt::{
     nbt_types::{NbtByte, NbtCompound, NbtInt, NbtList, NbtLong, NbtString},
 };
 pub(crate) use mml_net::chunkbase_api;
+pub(crate) use mml_nbt::NbtType;
 pub(crate) use mml_sys::path_helper;
 pub(crate) use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 pub(crate) use serde::{Deserialize, Serialize};

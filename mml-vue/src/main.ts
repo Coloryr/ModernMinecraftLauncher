@@ -62,6 +62,39 @@ document.addEventListener("contextmenu", (e) => {
   e.preventDefault();
 });
 
+// 只保留文本框的原生复制 / 粘贴 / 剪切；其余按键（含 Esc、Enter、方向键与鼠标侧键）
+// 一律拦截。文本框内仍允许正常输入与编辑，但不再触发任何启动器快捷键。
+const CLIPBOARD_KEYS = new Set(["c", "v", "x"]);
+const NON_SHORTCUT_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock", "Tab"]);
+function editableTarget(target: EventTarget | null): HTMLElement | null {
+  const el = target as HTMLElement | null;
+  if (!el) return null;
+  return el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA" ? el : null;
+}
+
+/** 这个按键要不要拦：文本框内只放行输入 / 编辑与 C/V/X，文本框外只留 Tab 与修饰键 */
+function shouldBlockKey(e: KeyboardEvent): boolean {
+  const editable = editableTarget(e.target);
+  const ctrl = e.ctrlKey || e.metaKey;
+  const key = e.key.toLowerCase();
+  if (editable) {
+    if (ctrl) return !CLIPBOARD_KEYS.has(key);
+    if (e.key === "Escape" || e.key === "F5") return true;
+    // 单行输入框的 Enter 是提交快捷键；textarea 的 Enter 是换行，保留
+    if (e.key === "Enter" && !editable.isContentEditable && editable.tagName !== "TEXTAREA") return true;
+    return false;
+  }
+  return !NON_SHORTCUT_KEYS.has(e.key);
+}
+
+for (const type of ["keydown", "keyup"] as const) {
+  window.addEventListener(type, (e) => {
+    if (!shouldBlockKey(e)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
+}
+
 // 构建通道：预发布版要按 channel 判断能不能开 DevTools，尽早拉一次
 void loadBuildInfo();
 

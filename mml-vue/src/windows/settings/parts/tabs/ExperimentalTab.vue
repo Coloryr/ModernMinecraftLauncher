@@ -3,6 +3,7 @@
 // 客户端设置被锁定时，开关同样隐藏，这一页只剩解锁入口。
 import { computed, onMounted } from "vue";
 import { t } from "../../../../lib/i18n";
+import { isSourceBuild } from "../../../../lib/buildInfo";
 import {
   attachMapping,
   mapping as mappingResources,
@@ -112,19 +113,21 @@ const mapState = computed(() =>
       <p class="field-desc">{{ t("winSettings.resourceLinkMapHint") }}</p>
     </template>
 
-    <!-- 还没实现的开关：只置灰，不写额外说明 -->
-    <div class="switch-row dim">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("winSettings.uriLaunch") }}</span>
+    <!-- 还没实现的开关：只在测试版露出，正式版不显示；保留配置字段等实现后直接接上 -->
+    <template v-if="isSourceBuild">
+      <div class="switch-row dim">
+        <div class="switch-text">
+          <span class="switch-label">{{ t("winSettings.uriLaunch") }}</span>
+        </div>
+        <BaseSwitch v-model="experimental.uriLaunch" disabled />
       </div>
-      <BaseSwitch v-model="experimental.uriLaunch" disabled />
-    </div>
-    <div class="switch-row dim">
-      <div class="switch-text">
-        <span class="switch-label">{{ t("winSettings.sandboxLaunch") }}</span>
+      <div class="switch-row dim">
+        <div class="switch-text">
+          <span class="switch-label">{{ t("winSettings.sandboxLaunch") }}</span>
+        </div>
+        <BaseSwitch v-model="experimental.sandboxLaunch" disabled />
       </div>
-      <BaseSwitch v-model="experimental.sandboxLaunch" disabled />
-    </div>
+    </template>
   </SettingsGroup>
 
   <!-- 锁定客户端设置：那一页在锁定时隐藏，解锁入口放这里 -->

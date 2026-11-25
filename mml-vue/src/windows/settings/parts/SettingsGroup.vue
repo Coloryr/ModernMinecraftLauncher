@@ -16,11 +16,23 @@ defineProps<{
 </script>
 
 <template>
-  <section :id="`set-${id}`" class="setting-group" :class="{
-    flash,
-    'rounded-panel px-3 py-2.5 -mx-3 -my-2.5': flash,
-  }">
+  <section :id="`set-${id}`" class="setting-group" :class="{ flash }">
     <h3 v-if="titleKey" class="group-title flex items-center gap-2 text-[13.5px] font-bold mt-6 mb-3 pb-[9px] border-b border-border">{{ t(titleKey) }}</h3>
     <slot />
   </section>
 </template>
+
+<style scoped>
+/* 高亮只画轮廓，不改盒模型：改 padding / margin 会让 scrollIntoView 后页面跳一下 */
+.setting-group.flash {
+  border-radius: 10px;
+  outline: 2px solid var(--accent-border);
+  outline-offset: 4px;
+  animation: setting-flash 0.8s var(--ease-out);
+}
+
+@keyframes setting-flash {
+  0% { outline-color: var(--accent); }
+  100% { outline-color: var(--accent-border); }
+}
+</style>

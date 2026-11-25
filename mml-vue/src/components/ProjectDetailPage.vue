@@ -166,6 +166,11 @@ async function open(item: ProjectItemDto) {
   }
 }
 
+/** 详情加载失败：重试当前项目 */
+async function retryDetail() {
+  if (current.value) await open(current.value);
+}
+
 async function fetchFiles(pid: string, page: number) {
   const mine = ++fileSeq;
   filesLoading.value = true;
@@ -398,7 +403,9 @@ function onStarClick(e: MouseEvent) {
               <button class="detail-jump" @click="scrollToVersions">
                 {{ t("modpack.versions") }}
               </button>
-              <button class="detail-download" :disabled="filesLoading || !latestFile" @click="downloadLatest">
+              <button class="detail-download"
+                :disabled="filesLoading || !latestFile || fileInstalled(latestFile) || fileRunning(latestFile)"
+                @click="downloadLatest">
                 {{ t("modpack.download") }}
               </button>
               <button class="detail-star" :class="{ on: current.isStar }"
@@ -441,7 +448,10 @@ function onStarClick(e: MouseEvent) {
                 <div class="sk detail-loading-shot"></div>
               </div>
             </div>
-            <div v-else-if="detailError" class="error-text detail-error" role="alert">{{ detailError }}</div>
+            <div v-else-if="detailError" class="error-text detail-error" role="alert">
+              <p>{{ detailError }}</p>
+              <BaseButton size="sm" @click="retryDetail">{{ t("modpack.retry") }}</BaseButton>
+            </div>
             <!-- 简介 / 截图 / 版本列表合并为一块大卡片，分区间距隔开，避免多框割裂 -->
             <div class="detail-card">
               <!-- 到货的简介与截图整块升起，见下面 .detail-intro 的动画 -->
@@ -524,7 +534,9 @@ function onStarClick(e: MouseEvent) {
                             }) }}
                           </span>
                         </div>
-                        <button class="install-btn" @click="emit('download', file)">
+                        <button class="install-btn"
+                          :disabled="filesLoading || fileInstalled(file) || fileRunning(file)"
+                          @click="emit('download', file)">
                           {{ props.actionLabel }}
                         </button>
                       </div>

@@ -6,7 +6,7 @@
 // 下载走全局下载器：命令立即返回，进度在下载窗口里看。
 //
 // 项目详情与下载整合包窗口共用 components/ProjectDetailPage.vue。
-import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onActivated, onMounted, ref, watch } from "vue";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import InstanceChip from "../../components/ui/InstanceChip.vue";
 import InstanceSelect from "../../components/InstanceSelect.vue";
@@ -19,6 +19,7 @@ import ProjectCard from "../../components/ProjectCard.vue";
 import ProjectDetailPage from "../../components/ProjectDetailPage.vue";
 import ResourceDownloadBar from "../../components/ResourceDownloadBar.vue";
 import { api, getAddResourceSource, setAddResourceSource } from "../../lib/api";
+import { loadGuiConfig } from "../../lib/guiConfig";
 import { pickSource, sourceOptions } from "../../lib/projectSources";
 import { useDownloadBadges } from "../../lib/downloadBadges";
 import { t, tErr } from "../../lib/i18n";
@@ -26,7 +27,7 @@ import { toggleStar } from "../../lib/projectCollect";
 import { useCollectStars } from "../../lib/useCollectStars";
 import { showToast } from "../../lib/toast";
 import { useResourceStatus } from "../../lib/resourceTasks";
-import { familyInstanceFromLabel, projectParamToItem, targetProject, targetUuid, type WindowProjectParam } from "../windowManager";
+import { familyInstanceFromLabel, multiWindow, projectParamToItem, targetProject, targetUuid, type WindowProjectParam } from "../windowManager";
 import { useInstanceChange } from "../../composables/useInstanceChange";
 import { useRefreshKey } from "../../composables/useRefreshKey";
 import { usePageKeys } from "../../composables/usePageKeys";
@@ -183,14 +184,6 @@ watch(
   { immediate: true },
 );
 
-// 离开本窗口时清掉搜索词：来源 / 类型 / 版本等**筛选**留着，那是浏览上下文，
-// 搜索词只是"找某样东西"的一次性输入。
-// 单窗口模式下这一页被 KeepAlive 缓存，切走不销毁，不清的话再打开时输入框里
-// 还压着上次搜的词，用户早忘了自己搜过什么，只会觉得界面不对劲。
-onDeactivated(() => {
-  filter.value = "";
-});
-
 const items = ref<ProjectItemDto[]>([]);
 const total = ref(0);
 const page = ref(0);
@@ -217,6 +210,21 @@ useCollectStars(() => (detailItem.value ? [...items.value, detailItem.value] : i
 const savePickFile = ref<FileListItemDto | null>(null);
 const saves = ref<ResourceSaveDto[]>([]);
 const savesLoading = ref(false);
+const savesError = ref("");
+
+/** 拉目标实例的存档列表；失败时保留错误，不伪装成“暂无存档” */
+async function loadSaves() {
+  savesLoading.value = true;
+  savesError.value = "";
+  saves.value = [];
+  try {
+    saves.value = await api.getResourceSaves(instanceUuid.value);
+  } catch (e) {
+    savesError.value = tErr(e);
+  } finally {
+    savesLoading.value = false;
+  }
+}
 const pickedSave = ref("");
 
 /** 前置勾选弹窗：正在下载的主文件 + 解析出的前置（已剔除实例里装了的） */
@@ -411,6 +419,12 @@ function submitSearch() {
   void search();
 }
 
+/** 清空搜索词并立即按空词重搜，别让列表停在旧结果上 */
+function clearSearch() {
+  filter.value = "";
+  submitSearch();
+}
+
 function turnPage(delta: number) {
   const next = page.value + delta;
   if (next < 0 || next > maxPage.value) return;
@@ -472,21 +486,15 @@ async function download(file: FileListItemDto) {
   if (type.value === "dataPacks") {
     savePickFile.value = file;
     pickedSave.value = "";
-    savesLoading.value = true;
-    saves.value = [];
-    try {
-      saves.value = await api.getResourceSaves(instanceUuid.value);
-    } catch (e) {
-      showToast(tErr(e));
-    } finally {
-      savesLoading.value = false;
-    }
+    await loadSaves();
     return;
-  }
+}
 
   // 前置只有模组才有：其余类型直接下载，不为一张空表白跑一次解析
   if (type.value !== "mod") {
-    await doDownload(pid, file);
+  const ok = await doDownload(pid, file);
+  // 主文件没排上队就不要继续下载前置，避免留下一堆无主前置
+  if (!ok) return;
     return;
   }
 
@@ -566,6 +574,8 @@ async function openDeps(pid: string, file: FileListItemDto) {
   } catch (e) {
     if (mine !== depsSeq) return;
     showToast(tErr(e));
+    // 解析失败不能当成“没有前置”：直接放弃这次下载，避免静默漏装必装前置
+    return;
   } finally {
     if (mine === depsSeq) depsLoading.value = false;
   }
@@ -627,7 +637,9 @@ async function startDownloads(picked: { pid: string; fid: string }[]) {
   }
   closeDeps();
 
-  await doDownload(pid, file);
+  const ok = await doDownload(pid, file);
+  // 主文件没排上队就不要继续下载前置，避免留下一堆无主前置
+  if (!ok) return;
 
   let queued = 0;
   for (const dep of picked) {
@@ -693,7 +705,11 @@ async function confirmSave() {
  * - `file`: 选中的文件
  * - `world`: 目标存档目录名，数据包才用；其余类型传 null
  */
-async function doDownload(pid: string, file: FileListItemDto, world: string | null = null) {
+async function doDownload(
+  pid: string,
+  file: FileListItemDto,
+  world: string | null = null,
+): Promise<boolean> {
   try {
     await api.downloadResource(
       instanceUuid.value,
@@ -705,8 +721,10 @@ async function doDownload(pid: string, file: FileListItemDto, world: string | nu
     );
     showToast(t("addResource.downloadOk", { name: file.name }));
     closeDetail();
+    return true;
   } catch (e) {
     showToast(tErr(e));
+    return false;
   }
 }
 
@@ -749,7 +767,11 @@ useInstanceChange(() => {
  * 等点下载时再让用户选。
  */
 async function refreshInstance() {
-  const locked = familyInstanceFromLabel("add_resource") ?? targetUuid() ?? "";
+  let locked = familyInstanceFromLabel("add_resource") ?? targetUuid() ?? "";
+  // 单窗口模式返回本页时 goTo 已清空跳转参数，回落到主窗口当前实例
+  if (!locked && !multiWindow.value) {
+    locked = (await loadGuiConfig())?.mainWindow.selectedInstance ?? "";
+  }
   // 只认"传进来的"实例：没传就是浏览模式，实例等点下载时再选
   instanceUuid.value = locked;
 
@@ -762,7 +784,14 @@ async function refreshInstance() {
   try {
     const list = await api.getInstances();
     const found = list.find((i) => i.uuid === instanceUuid.value);
-    instanceName.value = found?.name ?? "";
+    if (!found) {
+      instanceUuid.value = "";
+      instanceName.value = "";
+      instanceVersion.value = "";
+      instanceLoader.value = "normal";
+      return;
+    }
+    instanceName.value = found.name;
     instanceVersion.value = found?.version ?? "";
     instanceLoader.value = found?.loader || "normal";
   } catch {
@@ -904,11 +933,11 @@ onActivated(async () => {
               <input v-model="filter" class="field-input search-input" :placeholder="t('addResource.searchHint')"
                 spellcheck="false" :disabled="searching" @keydown.enter="submitSearch" />
               <button v-if="filter" class="input-clear search-clear" :aria-label="t('common.clearSearch')"
-                @mousedown.prevent @click="filter = ''">
+                @mousedown.prevent @click="clearSearch">
                 <GlyphIcon name="close" :size="12" :weight="2.4" />
               </button>
             </div>
-            <button class="search-btn" :disabled="searching" @click="submitSearch">
+            <button class="search-btn" :disabled="searching || !sorts.length" @click="submitSearch">
               <span v-if="searching" class="btn-spinner"></span>
               {{ t("modpack.search") }}
             </button>
@@ -967,6 +996,10 @@ onActivated(async () => {
         <p class="modal-text">{{ t("addResource.chooseSaveHint") }}</p>
         <div class="save-list">
           <div v-if="savesLoading" class="empty-tip">{{ t("resource.loading") }}</div>
+          <div v-else-if="savesError" class="empty-tip">
+            <p>{{ savesError }}</p>
+            <BaseButton size="sm" @click="loadSaves">{{ t("modpack.retry") }}</BaseButton>
+          </div>
           <div v-else-if="saves.length === 0" class="empty-tip">{{ t("resource.empty") }}</div>
           <label v-for="save in saves" :key="save.dir" class="save-row" :class="{ on: pickedSave === save.dir }">
             <input v-model="pickedSave" type="radio" name="save-pick" :value="save.dir" />

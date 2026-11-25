@@ -156,7 +156,8 @@ watch(lockServerError, async (msg) => {
     <!-- 服务器地址：自动进服与 MOTD 显示共用 -->
     <label class="field-label">{{ t("winSettings.serverAddress") }}</label>
     <input v-model="serverAddr" class="field-input" spellcheck="false" autocomplete="off"
-      placeholder="mc.example.com:25565" v-tip="t('winSettings.serverAddressHint')" />
+      placeholder="mc.example.com:25565" v-tip="t('winSettings.serverAddressHint')"
+        @change="applyClient" />
     <p class="field-desc">{{ t("winSettings.serverAddressHint") }}</p>
 
     <!-- 自动进服：启动时自动进入上面配置的服务器 -->
@@ -229,7 +230,7 @@ watch(lockServerError, async (msg) => {
           v-model="addLockServer" class="field-input lock-add-server" :class="{ 'lock-server-error': lockServerError }"
           spellcheck="false" autocomplete="off" :placeholder="lockServerPlaceholder" @input="lockServerError = ''"
           @blur="checkLockServerUuid" />
-        <BaseButton size="sm" variant="accent" class="lock-add-btn" :disabled="!addLockOptions.length" @click="addLock">
+        <BaseButton size="sm" variant="accent" class="lock-add-btn" @click="addLock">
           <GlyphIcon name="plus" :size="13" :weight="2.2" /> {{ t("winSettings.loginLockAdd") }}
         </BaseButton>
       </div>

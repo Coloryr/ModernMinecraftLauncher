@@ -283,13 +283,20 @@ export function useBlockList(hooks?: BlockListHooks) {
     if (!list.some((each) => each.uuid === cat.value)) cat.value = "";
   });
 
+  /** 分类显示名表：分类一变就整表重算，过滤时不再逐项 find + t() */
+  const catLabels = computed(() => {
+    const map = new Map<string, string>();
+    for (const found of cats.value) {
+      const key = `blocks.cat.${found.id}`;
+      const text = t(key);
+      map.set(found.uuid, text === key ? found.label : text);
+    }
+    return map;
+  });
+
   /** 分类显示名：先查 i18n（玩家皮肤这类启动器自己的分类），miss 时用后端翻译好的名字 */
   function catLabel(uuid: string): string {
-    const found = cats.value.find((each) => each.uuid === uuid);
-    if (!found) return uuid;
-    const key = `blocks.cat.${found.id}`;
-    const text = t(key);
-    return text === key ? found.label : text;
+    return catLabels.value.get(uuid) ?? uuid;
   }
 
   /** 是否处于筛选态（决定计数文案与空状态） */

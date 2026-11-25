@@ -172,7 +172,7 @@ function onMenuPick(id: string) {
       toggle(item);
       break;
     case "rename":
-      props.ops.askRename("datapacks", item.name, dpSave.value);
+      props.ops.askRename("datapacks", item.file, dpSave.value);
       break;
     case "open-folder":
       // 数据包目录是**整个存档**的数据包目录，与具体哪一条无关
@@ -245,26 +245,28 @@ function formatLabel(item: DataPackItemDto): string {
     <template #default="{ start, end }">
       <!-- 加载中用骨架行占位：与其它分类同一套；这里只换行，存档下拉要一直留着 -->
       <ListSkeleton v-if="loading" />
-      <ResourceRow v-for="item in datapacks.slice(start, end)" :key="item.name" :name="name(item)" :class="{
-        'row-selected': isSelected(item),
-        'row-anchor': anchorKey === item.name,
-        'row-selecting': selected.size > 0,
-      }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
-        <template #select>
-          <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
-            @change.stop="toggleSelect(item)" @click.stop />
-        </template>
-        <template #badges>
-          <span class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent" :class="item.enable === false ? 'badge-off' : 'badge-on'">
-            {{ state(item) }}
-          </span>
-        </template>
-        <template #sub>
-          <!-- 描述过格式码，数据包作者会用 `§a` 上色；包格式那句不过 -->
-          <FormattedText v-if="item.description" :text="item.description" />
-          <template v-if="item.description"> · </template>{{ formatLabel(item) }}
-        </template>
-      </ResourceRow>
+      <template v-if="!loading">
+        <ResourceRow v-for="item in datapacks.slice(start, end)" :key="item.name" :name="name(item)" :class="{
+          'row-selected': isSelected(item),
+          'row-anchor': anchorKey === item.name,
+          'row-selecting': selected.size > 0,
+        }" @click="onRowClick({ event: $event, item })" @contextmenu.prevent="openMenu({ event: $event, item })">
+          <template #select>
+            <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop
+              @change.stop="toggleSelect(item)" @click.stop />
+          </template>
+          <template #badges>
+            <span class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent" :class="item.enable === false ? 'badge-off' : 'badge-on'">
+              {{ state(item) }}
+            </span>
+          </template>
+          <template #sub>
+            <!-- 描述过格式码，数据包作者会用 `§a` 上色；包格式那句不过 -->
+            <FormattedText v-if="item.description" :text="item.description" />
+            <template v-if="item.description"> · </template>{{ formatLabel(item) }}
+          </template>
+        </ResourceRow>
+      </template>
       <div v-if="!datapacks.length && !loading" class="empty-tip">{{ t("resource.empty") }}</div>
     </template>
   </VirtualList>

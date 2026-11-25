@@ -50,6 +50,8 @@ export function createCommands(invoke: Invoke) {
     account: {
       addAccount: (name: string, accountType: string, server: string | null, password: string | null) => invoke<AccountStoreDto>("account_add_account", { name, accountType, server, password }),
       cancelOAuth: () => invoke<void>("account_cancel_oauth"),
+      clearCape: (accountType: string, uuid: string) => invoke<void>("account_clear_cape", { accountType, uuid }),
+      clearSkin: (accountType: string, uuid: string) => invoke<void>("account_clear_skin", { accountType, uuid }),
       editOffline: (uuid: string, newName: string, newUuid: string) => invoke<void>("account_edit_offline", { uuid, newName, newUuid }),
       getAccounts: () => invoke<AccountStoreViewDto>("account_get_accounts"),
       getTextures: (accountType: string, uuid: string) => invoke<TexturesDto>("account_get_textures", { accountType, uuid }),

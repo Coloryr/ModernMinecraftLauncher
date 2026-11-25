@@ -8,7 +8,7 @@
 //
 // 组件侧只负责画：勾选框走 ResourceRow 的 `select` 插槽（截图那个自绘网格浮在格子角上），
 // 选中 / 锚点行挂类名，样式在窗口级 resource.css 里（非 scoped，各分类共用）。
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 
 /**
  * 给一组行挂上多选
@@ -79,6 +79,17 @@ export function useRowSelect<T>(options: {
     }
     selected.value = next;
   }
+
+  // 列表刷新 / 导入后旧键可能已不存在：按当前顺序裁掉，别让批量条的计数虚高
+  watch(
+    () => options.order(),
+    (list) => {
+      const valid = new Set(list.map(options.keyOf).filter((key) => !!key));
+      const next = new Set([...selected.value].filter((key) => valid.has(key)));
+      if (next.size !== selected.value.size) selected.value = next;
+      if (anchorKey.value && !valid.has(anchorKey.value)) anchorKey.value = null;
+    },
+  );
 
   /** 清空选择与锚点 */
   function clear() {

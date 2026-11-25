@@ -151,10 +151,10 @@ export function useSettingsClient() {
 
   const serverAddr = computed({
     get: () => client.value.motdServer,
+    // 只回写内存；落盘由输入框的 change 触发，别每敲一个字符写一次配置
     set: (v: string) => {
       client.value.motdServer = v;
       client.value.autoJoinServer = v;
-      void applyClient();
     },
   });
 

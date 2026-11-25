@@ -351,3 +351,81 @@ pub fn account_open_skin_site(account_type: String, uuid: String) -> Result<(), 
     open_helper::open_url(&url);
     Ok(())
 }
+
+
+/// 取消账户当前皮肤 / 披风，仅正版
+///
+/// - `app`: 应用句柄，成功后广播账户变更
+/// - `account_type`: 前端账户类型串，非正版类型返回 `err.notOauth`
+/// - `uuid`: 账户 UUID
+/// - `kind`: 纹理种类，`skin` 取消皮肤、`cape` 隐藏披风
+///
+/// # 返回值
+///
+/// 账户不存在 / 非正版时返回对应错误键
+pub(super) async fn clear_texture(
+    app: &AppHandle,
+    account_type: &str,
+    uuid: &str,
+    kind: &str,
+) -> Result<(), String> {
+    let auth_type = auth_type_from_str(account_type);
+    if !auth_type.is_oauth() {
+        return Err(String::from(err_keys::NOT_OAUTH));
+    }
+    let Some(auth) = auths::get(uuid, auth_type) else {
+        return Err(String::from(err_keys::ACCOUNT_MISSING));
+    };
+
+    if kind == "skin" {
+        mojang_api::reset_minecraft_skin(&auth.access_token)
+            .await
+            .map_err(|err| err.to_string())?;
+    } else {
+        mojang_api::hide_minecraft_cape(&auth.access_token)
+            .await
+            .map_err(|err| err.to_string())?;
+    }
+
+    crate::image_manager::clear_texture_images();
+    emit_account_change(app);
+    Ok(())
+}
+
+/// 取消账户当前皮肤，仅正版
+///
+/// - `app`: 应用句柄，成功后广播账户变更
+/// - `account_type`: 前端账户类型串，非正版类型返回 `err.notOauth`
+/// - `uuid`: 账户 UUID
+///
+/// # 返回值
+///
+/// 账户不存在 / 非正版时返回对应错误键
+#[gui_macros::ipc_group("account")]
+#[gui_macros::command]
+pub async fn account_clear_skin(
+    app: AppHandle,
+    account_type: String,
+    uuid: String,
+) -> Result<(), String> {
+    clear_texture(&app, &account_type, &uuid, "skin").await
+}
+
+/// 隐藏账户当前披风，仅正版
+///
+/// - `app`: 应用句柄，成功后广播账户变更
+/// - `account_type`: 前端账户类型串，非正版类型返回 `err.notOauth`
+/// - `uuid`: 账户 UUID
+///
+/// # 返回值
+///
+/// 账户不存在 / 非正版时返回对应错误键
+#[gui_macros::ipc_group("account")]
+#[gui_macros::command]
+pub async fn account_clear_cape(
+    app: AppHandle,
+    account_type: String,
+    uuid: String,
+) -> Result<(), String> {
+    clear_texture(&app, &account_type, &uuid, "cape").await
+}

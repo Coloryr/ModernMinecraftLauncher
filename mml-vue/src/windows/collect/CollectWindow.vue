@@ -515,16 +515,21 @@ const addToGroupTarget = ref("");
 
 async function confirmAddGroup() {
   const name = newGroupName.value.trim();
-  showAddGroup.value = false;
-  if (!name) {
-    return;
-  }
+  if (!name) return;
   try {
     await api.collectAddGroup(name);
     newGroupName.value = "";
+    showAddGroup.value = false;
   } catch (e) {
+    // 失败时保留输入与弹窗，用户不用重新打一遍
     showToast(tErr(e));
   }
+}
+
+/** 取消新建分组：清掉草稿，别让下次打开还留着上一次的字 */
+function cancelAddGroup() {
+  newGroupName.value = "";
+  showAddGroup.value = false;
 }
 
 async function confirmDeleteGroup() {
@@ -687,7 +692,7 @@ let anchorUuid: string | null = null;
  * - `item`: 被点的收藏项
  * - `ev`: 点击事件，用来读 Ctrl / Shift
  */
-function toggleCard(item: CollectItemDto, ev?: MouseEvent) {
+function toggleCard(item: CollectItemDto, ev?: MouseEvent | KeyboardEvent) {
   if (!multiSelect.value) {
     startDownload(item);
     return;
@@ -727,7 +732,7 @@ const { draggingUuids, dropGroup, ghost: collectGhost, onCardPointerDown, consum
 });
 
 /** 卡片点击：刚拖完的那一下不算点击，否则一松手就顺手打开了下载窗口 */
-function onCardClick(item: CollectItemDto, ev?: MouseEvent) {
+function onCardClick(item: CollectItemDto, ev?: MouseEvent | KeyboardEvent) {
   // 右键菜单原本靠 .collect-body 那一下收；这里挡住了冒泡，得自己收
   closeMenu();
   // 别让这次点击冒到 .collect-body：那里负责"点外面收起菜单"
@@ -752,16 +757,21 @@ const collectDragItem = computed(() => {
  *
  * - `item`: 要下载的收藏项
  */
+/** 收藏项 → 下载窗口的项目参数；save / dataPacks 也走这一份 */
+function projectOf(item: CollectItemDto) {
+  return {
+    source: item.source,
+    pid: item.pid,
+    fileType: item.fileType,
+    name: item.name,
+    icon: item.icon ?? null,
+    url: item.url,
+  };
+}
+
 function openDownloadWindow(item: CollectItemDto) {
   openWindow(item.fileType === "modpack" ? "add_modpack" : "add_resource", {
-    project: {
-      source: item.source,
-      pid: item.pid,
-      fileType: item.fileType,
-      name: item.name,
-      icon: item.icon ?? null,
-      url: item.url,
-    },
+    project: projectOf(item),
   });
 }
 
@@ -777,6 +787,7 @@ function openDownloadWindow(item: CollectItemDto) {
  * - `item`: 要装的收藏项
  */
 function startDownload(item: CollectItemDto) {
+  // 整合包要新建实例，直接进下载窗口；其余资源先选目标实例，再决定用安装弹窗还是资源窗口
   if (item.fileType === "modpack") {
     openDownloadWindow(item);
     return;
@@ -788,18 +799,18 @@ function startDownload(item: CollectItemDto) {
 const installTargets = ref<CollectItemDto[]>([]);
 
 /**
- * 能走安装弹窗的类型：整合包要新建实例，存档 / 数据包要先有目标，都不从这里装
+ * 能走安装弹窗的类型：除整合包外的资源都要先选目标实例
  *
  * - `item`: 收藏项
  */
 function canInstall(item: CollectItemDto): boolean {
-  return item.fileType !== "modpack" && item.fileType !== "dataPacks" && item.fileType !== "save";
+  return item.fileType !== "modpack";
 }
 
 /**
  * 打开安装弹窗
  *
- * 整合包不走这里（它要新建实例，见 startDownload）；数据包 / 存档要先选目标，剔掉并说一声。
+ * 整合包不走这里（它要新建实例，见 startDownload）；存档 / 数据包选完实例后转到资源窗口。
  *
  * - `list`: 要装的收藏项
  */
@@ -815,12 +826,6 @@ function openInstall(list: CollectItemDto[]) {
   const installable = list.filter(canInstall);
   if (list.some((item) => item.fileType === "modpack")) {
     showToast(t("collect.installModpack"));
-  }
-  if (list.some((item) => item.fileType === "dataPacks")) {
-    showToast(t("collect.installDatapack"));
-  }
-  if (list.some((item) => item.fileType === "save")) {
-    showToast(t("collect.installSave"));
   }
   if (!installable.length) return;
   installTargets.value = installable;
@@ -842,6 +847,11 @@ async function doInstall(uuid: string) {
   let done = 0;
   let skipped = 0;
   for (const item of targets) {
+    if (item.fileType === "save" || item.fileType === "dataPacks") {
+      // 存档 / 数据包要先在资源窗口里选存档，不能直接丢给下载器
+      openWindow("add_resource", { uuid, project: projectOf(item) });
+      continue;
+    }
     try {
       const page = await api.getResourceFiles(
         uuid,
@@ -1193,7 +1203,7 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
       <input v-model="newGroupName" class="field-input" :placeholder="t('collect.groupPlaceholder')" spellcheck="false"
         @keydown.enter="confirmAddGroup" />
       <div class="modal-actions">
-        <BaseButton @click="showAddGroup = false">{{ t("add.cancel") }}</BaseButton>
+        <BaseButton @click="cancelAddGroup">{{ t("add.cancel") }}</BaseButton>
         <BaseButton variant="primary" @click="confirmAddGroup">{{ t("actions.confirm") }}</BaseButton>
       </div>
     </BaseModal>

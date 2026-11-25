@@ -119,7 +119,7 @@ async function removeGroup() {
           <span v-if="scanningDir" class="loading-spin sm" />
           {{ scanningDir ? t("winSettings.javaScanning") : t("winSettings.javaScanDir") }}
         </BaseButton>
-        <BaseButton size="sm" :disabled="scanning || scanningDir" @click="importJavaArchive">
+        <BaseButton size="sm" :disabled="scanning || scanningDir || importingJava" @click="importJavaArchive">
           {{ t("winSettings.javaImport") }}
         </BaseButton>
         <!-- 下载是这条动作行的主操作，单独推到最右，免得挨着扫描 / 导入被误点 -->

@@ -14,7 +14,8 @@ import {
   downloadOverallPercent,
   downloadTaskPercent,
 } from "../../lib/progress";
-import { t } from "../../lib/i18n";
+import { t, tErr } from "../../lib/i18n";
+import { showToast } from "../../lib/toast";
 import { usePageActive } from "../../lib/pageActive";
 import { isTauri, multiWindow } from "../windowManager";
 import type { DownloadStatusDto, DownloadTaskDto } from "../../lib/bindings";
@@ -25,8 +26,10 @@ const emit = defineEmits<{ (e: "close"): void }>();
 /** 本页面是否在前台：单窗口模式下切走只是被 KeepAlive 停用，见 lib/pageActive.ts */
 const pageActive = usePageActive();
 
-/** 轮询间隔，单位毫秒 */
+/** 有任务时的轮询间隔，单位毫秒 */
 const REFRESH_MS = 100;
+/** 空闲时的轮询间隔，单位毫秒；没有任务就不必每秒拉 10 次 */
+const IDLE_MS = 600;
 
 /**
  * 外壳两用：多窗口模式下是独立窗口 `WindowFrame`；单窗口模式下是**悬浮弹窗** `BaseModal`，
@@ -197,8 +200,9 @@ async function refresh() {
   }
 
   if (status.value.tasks.length > 0) {
+    // 只有新一批任务开始时才清掉“停止后保留窗口”的意图；刷新本身不能把它抹掉
+    if (!hadTasks) keepOpen = false;
     hadTasks = true;
-    keepOpen = false;
     lastFailed = status.value.tasks.some((x) => x.failed > 0);
     return;
   }
@@ -206,8 +210,9 @@ async function refresh() {
   // 有失败或用户主动停止时保留窗口。
   // 页面已切走时不发这条关闭，见 lib/pageActive.ts：此刻"关窗"会被当成关掉当前页面，
   // 而在主页面就是退出启动器 —— 轮询虽已停，收尾那一发仍可能落到这里
-  if (hadTasks && !keepOpen && !lastFailed) {
-    hadTasks = false;
+  const had = hadTasks;
+  hadTasks = false;
+  if (had && !keepOpen && !lastFailed) {
     if (pageActive.value) emit("close");
   }
 }
@@ -217,23 +222,37 @@ const allPaused = computed(() => status.value.paused);
 /** 是否有任务可操作（决定全局按钮是否可用） */
 const hasTasks = computed(() => tasks.value.length > 0);
 
+/** 全局下载操作是否在跑：防止连点发两遍 */
+const actionBusy = ref(false);
+
+/** 跑一次全局操作：串行化 + 失败提示 */
+async function runAction(run: () => Promise<void>) {
+  if (actionBusy.value) return;
+  actionBusy.value = true;
+  try {
+    await run();
+    await refresh();
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    actionBusy.value = false;
+  }
+}
+
 /** 暂停全部下载线程，随后立刻刷一次状态 */
-async function pauseAll() {
-  await api.pauseAllDownloads();
-  await refresh();
+function pauseAll() {
+  return runAction(async () => { await api.pauseAllDownloads(); });
 }
 
 /** 继续全部下载线程，随后立刻刷一次状态 */
-async function resumeAll() {
-  await api.resumeAllDownloads();
-  await refresh();
+function resumeAll() {
+  return runAction(async () => { await api.resumeAllDownloads(); });
 }
 
 /** 停止全部下载，并抑制这次的自动关窗 */
-async function stopAll() {
+function stopAll() {
   keepOpen = true;
-  await api.stopAllDownloads();
-  await refresh();
+  return runAction(async () => { await api.stopAllDownloads(); });
 }
 
 /** 点停止：先二次确认 */
@@ -273,26 +292,36 @@ function scheduleRefresh() {
   }, EVENT_REFRESH_MS);
 }
 
-/** 轮询开关：单窗口模式下窗口会被 KeepAlive 缓存，切走必须停掉，否则 100ms 一直空转 */
+/** 轮询开关：单窗口模式下窗口会被 KeepAlive 缓存，切走必须停掉，否则一直空转 */
 function startTimer() {
-  if (timer === null) {
-    timer = window.setInterval(refresh, REFRESH_MS);
-  }
+  if (timer !== null) return;
+  timer = window.setTimeout(async () => {
+    timer = null;
+    await refresh();
+    if (!gone && pageActive.value) startTimer();
+  }, hasTasks.value ? REFRESH_MS : IDLE_MS);
 }
 
 /** 停掉轮询；窗口切走或卸载时调用，别在后台空转 IPC */
 function stopTimer() {
   if (timer !== null) {
-    window.clearInterval(timer);
+    window.clearTimeout(timer);
     timer = null;
   }
 }
 
+let gone = false;
+
 onMounted(async () => {
   await refresh();
+  if (gone) return;
 
-  unsubs.push(await onDownloadTask(scheduleRefresh));
-  unsubs.push(await onDownloadItem(scheduleRefresh));
+  const taskUn = await onDownloadTask(scheduleRefresh);
+  if (gone) { taskUn(); return; }
+  unsubs.push(taskUn);
+  const itemUn = await onDownloadItem(scheduleRefresh);
+  if (gone) { itemUn(); return; }
+  unsubs.push(itemUn);
   // 关闭被 Rust 拦下（close-blocked）不在这里处理：关下载窗口 / 退出应用
   // 共用根组件那一个确认框（App.vue）
 
@@ -305,6 +334,7 @@ onActivated(startTimer);
 onDeactivated(stopTimer);
 
 onUnmounted(() => {
+  gone = true;
   stopTimer();
   if (eventTimer !== null) {
     window.clearTimeout(eventTimer);
@@ -320,7 +350,7 @@ onUnmounted(() => {
   <component :is="shell" v-bind="shellProps" @close="requestClose">
     <!-- 暂停 / 继续 / 停止：独立窗口时收进标题栏，改用图标按钮 -->
     <template v-if="multiWindow" #head-right>
-      <BaseButton size="sm" :variant="allPaused ? 'accent' : 'ghost'" class="icon-btn-head" :disabled="!hasTasks"
+      <BaseButton size="sm" :variant="allPaused ? 'accent' : 'ghost'" class="icon-btn-head" :disabled="!hasTasks || actionBusy"
         v-tip="allPaused ? t('winDownload.resume') : t('winDownload.pause')"
         :aria-label="allPaused ? t('winDownload.resume') : t('winDownload.pause')"
         @click="allPaused ? resumeAll() : pauseAll()">
@@ -331,7 +361,7 @@ onUnmounted(() => {
           <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
         </svg>
       </BaseButton>
-      <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="!hasTasks" v-tip="t('winDownload.stop')"
+      <BaseButton size="sm" variant="ghost" class="icon-btn-head" :disabled="!hasTasks || actionBusy" v-tip="t('winDownload.stop')"
         :aria-label="t('winDownload.stop')" @click="requestStop">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none">
           <rect x="5" y="5" width="14" height="14" rx="2" />
@@ -360,13 +390,13 @@ onUnmounted(() => {
           </span>
           <!-- 全局控制：独立窗口时在标题栏上；单窗口的弹窗没有标题栏槽，留在这里 -->
           <span v-if="!multiWindow" class="ov-actions flex gap-1.5">
-            <BaseButton v-if="!allPaused" size="sm" :disabled="!hasTasks" @click="pauseAll">
+            <BaseButton v-if="!allPaused" size="sm" :disabled="!hasTasks || actionBusy" @click="pauseAll">
               {{ t("winDownload.pause") }}
             </BaseButton>
-            <BaseButton v-else size="sm" variant="accent" :disabled="!hasTasks" @click="resumeAll">
+            <BaseButton v-else size="sm" variant="accent" :disabled="!hasTasks || actionBusy" @click="resumeAll">
               {{ t("winDownload.resume") }}
             </BaseButton>
-            <BaseButton size="sm" variant="danger" :disabled="!hasTasks" @click="requestStop">
+            <BaseButton size="sm" variant="danger" :disabled="!hasTasks || actionBusy" @click="requestStop">
               {{ t("winDownload.stop") }}
             </BaseButton>
           </span>

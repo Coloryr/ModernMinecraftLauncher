@@ -127,6 +127,15 @@ const LOCKED_GROUPS = [
   "theme", "bgImage", "jvm", "launchCmd", "experimental",
 ];
 
+/**
+ * 搜索跳转时额外按锁定处理的组
+ *
+ * `window` 组里只有材质 / 不透明度被 `v-if="!locked"` 藏掉，`launchCheck` 组里只有
+ * 自动进入存档那两条；整组不在 LOCKED_GROUPS 里，搜索命中时必须先解锁，
+ * 否则会跳到一个控件已被藏掉的分组。
+ */
+const SEARCH_LOCKED_GROUPS = [...LOCKED_GROUPS, "window", "launchCheck"];
+
 /** 本次是否处于锁定状态；解锁后本次设置窗口全部放开 */
 const locked = computed(() => clientLocked.value && !clientUnlocked.value);
 
@@ -249,7 +258,7 @@ async function onResetPage() {
 /** 命中搜索项：切到它的标签页，滚到分组锚点，短暂高亮 */
 async function onSearchSelect(hit: SettingsHit) {
   // 目标分组或整个客户端设置页锁着：先要密码，解锁后再跳转
-  if (locked.value && (hit.tab === "client" || LOCKED_GROUPS.includes(hit.group))) {
+  if (locked.value && (hit.tab === "client" || SEARCH_LOCKED_GROUPS.includes(hit.group))) {
     openUnlock(hit);
     return;
   }
@@ -326,16 +335,32 @@ watch(tab, (v) => {
 
 // ================= Esc 关窗 =================
 
+/** 关闭前还有没保存的代理草稿时先确认，别让用户白填 */
+const proxyLeaveAsk = ref(false);
+
+function requestClose() {
+  if (network.proxyDirty.value) {
+    proxyLeaveAsk.value = true;
+    return;
+  }
+  emit("close");
+}
+
+function discardProxyAndClose() {
+  proxyLeaveAsk.value = false;
+  emit("close");
+}
+
 function onKeyDown(e: KeyboardEvent) {
   if (e.key !== "Escape") return;
   // 有弹窗时先让弹窗处理：Java 页的确认框自己听 Esc，别把整扇窗关掉
   if (document.querySelector(".modal-mask")) return;
-  emit("close");
+  requestClose();
 }
 </script>
 
 <template>
-  <WindowFrame enter=":scope > *" :title="t('features.settings')" body-fill body-flush @close="emit('close')">
+  <WindowFrame enter=":scope > *" :title="t('features.settings')" body-fill body-flush @close="requestClose">
     <!-- 设置项搜索放在标题栏：全局可用，切哪个标签都在，且不随内容区滚动 -->
     <template #head-right>
       <SaveStateText v-if="headerSave" class="head-save-state" :state="headerSave.state"
@@ -402,6 +427,13 @@ function onKeyDown(e: KeyboardEvent) {
       <div class="modal-actions">
         <BaseButton @click="confirmResetPage = false">{{ t("actions.cancel") }}</BaseButton>
         <BaseButton variant="danger" @click="onResetPage">{{ t("winSettings.resetPage") }}</BaseButton>
+      </div>
+    </BaseModal>
+    <BaseModal v-if="proxyLeaveAsk" :title="t('winSettings.proxyUnsavedTitle')" @close="proxyLeaveAsk = false">
+      <p class="modal-text">{{ t("winSettings.proxyUnsavedText") }}</p>
+      <div class="modal-actions">
+        <BaseButton @click="proxyLeaveAsk = false">{{ t("winSettings.proxyKeepEditing") }}</BaseButton>
+        <BaseButton variant="danger" @click="discardProxyAndClose">{{ t("winSettings.proxyDiscard") }}</BaseButton>
       </div>
     </BaseModal>
   </WindowFrame>

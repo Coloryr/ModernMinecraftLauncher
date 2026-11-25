@@ -393,3 +393,26 @@ pub async fn get_minecraft_news(page: u32) -> CoreResult<MinecraftNewsObj> {
         .get_json::<MinecraftNewsObj>(&url)
         .await
 }
+
+
+/// 取消当前皮肤，恢复默认皮肤
+///
+/// - `token`: Minecraft 访问令牌
+///
+/// # 返回值
+///
+/// 成功返回 `Ok(())`；令牌无效等返回对应错误
+pub async fn reset_minecraft_skin(token: &str) -> CoreResult<()> {
+    send_profile_json(Method::DELETE, "/skins", token, &serde_json::json!({})).await
+}
+
+/// 隐藏当前披风
+///
+/// - `token`: Minecraft 访问令牌
+///
+/// # 返回值
+///
+/// 成功返回 `Ok(())`；令牌无效等返回对应错误
+pub async fn hide_minecraft_cape(token: &str) -> CoreResult<()> {
+    send_profile_json(Method::DELETE, "/capes/active", token, &serde_json::json!({})).await
+}

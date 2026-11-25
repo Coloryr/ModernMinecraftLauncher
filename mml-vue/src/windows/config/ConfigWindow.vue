@@ -436,6 +436,7 @@ function startResize(event: PointerEvent) {
   const startWidth = visibleTreeWidth.value;
   const preferredWidth = treeWidth.value;
 
+
   function onMove(e: PointerEvent) {
     if (e.pointerId !== event.pointerId) return;
     treeWidth.value = clampTreeWidth(startWidth + e.clientX - startX);
@@ -559,17 +560,6 @@ function onSourceChange(event: Event) {
   void pickSource(value);
 }
 
-/** 用 Ctrl+S 或 Cmd+S 保存，并阻止浏览器默认的保存网页操作 */
-function onSaveHotkey(event: KeyboardEvent) {
-  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "s") {
-    return;
-  }
-  event.preventDefault();
-  if (!canSave.value || !unsaved.value || busy.value) {
-    return;
-  }
-  void save();
-}
 
 onMounted(() => {
   void load();
@@ -582,7 +572,6 @@ onMounted(() => {
     if (entry && entry.contentRect.width > 0) bodyWidth.value = entry.contentRect.width;
   });
   if (configBody.value) resizeObserver.observe(configBody.value);
-  window.addEventListener("keydown", onSaveHotkey);
 });
 
 onBeforeUnmount(() => {
@@ -590,7 +579,6 @@ onBeforeUnmount(() => {
   answerDiscard(false);
   stopResize?.();
   resizeObserver?.disconnect();
-  window.removeEventListener("keydown", onSaveHotkey);
   // 卸载时关闭 NBT 会话；单窗口模式的 KeepAlive 切页不会触发卸载
   closeSessions();
 });

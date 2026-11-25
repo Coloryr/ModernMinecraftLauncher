@@ -6,7 +6,6 @@
 //
 // **只对当前活动的页面生效**：单窗口模式下多个窗口同时挂载，不能一次点击翻所有页。
 import { onMounted, onUnmounted } from "vue";
-import { usePageActive } from "../lib/pageActive";
 
 /** 鼠标后退键的 button 值 */
 const BUTTON_BACK = 3;
@@ -27,18 +26,10 @@ type PageKeyOptions = {
  *
  * - `options`: 见 [`PageKeyOptions`]
  */
-export function usePageKeys(options: PageKeyOptions) {
-  const active = usePageActive();
-
-  /** 侧键松开：后退翻上一页、前进翻下一页 */
+export function usePageKeys(_options: PageKeyOptions) {
+  /** 侧键只拦掉 WebView 的历史回退，不再翻页 */
   function onMouseUp(e: MouseEvent) {
-    if (e.button !== BUTTON_BACK && e.button !== BUTTON_FORWARD) return;
-    // 先拦掉历史回退 / 前进，否则界面会跟着 WebView 跳走
-    e.preventDefault();
-    if (!active.value) return;
-    if (options.enabled && !options.enabled()) return;
-    if (e.button === BUTTON_BACK) options.prev?.();
-    else options.next?.();
+    if (e.button === BUTTON_BACK || e.button === BUTTON_FORWARD) e.preventDefault();
   }
 
   onMounted(() => window.addEventListener("mouseup", onMouseUp));

@@ -11,14 +11,11 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
-import SegmentedTabs from "../../../components/ui/SegmentedTabs.vue";
 import BaseButton from "../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../components/ui/BaseModal.vue";
 import BaseSwitch from "../../../components/ui/BaseSwitch.vue";
 import DragGhost from "../../../components/ui/DragGhost.vue";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
-import ContentHead from "./ContentHead.vue";
-import SearchBox from "../../../components/ui/SearchBox.vue";
 import CollapsePanel from "../../../components/ui/CollapsePanel.vue";
 import LoaderQueryProgress from "../../../components/LoaderQueryProgress.vue";
 import ListSkeleton from "./ListSkeleton.vue";
@@ -29,6 +26,7 @@ import ModReplaceModal from "./mod/ModReplaceModal.vue";
 import ModUpdateLogModal from "./mod/ModUpdateLogModal.vue";
 import ModUpdateModal from "./mod/ModUpdateModal.vue";
 import ModGroupMenu, { type GroupMenuAction } from "./mod/ModGroupMenu.vue";
+import ModToolbar from "./mod/ModToolbar.vue";
 import RowMenu, { type RowMenuItem } from "../../../components/ui/RowMenu.vue";
 import {
   api,
@@ -75,11 +73,10 @@ import type {
   ModUpdateDto,
 } from "../../../lib/bindings";
 import {
-  SEARCH_FIELDS,
+
   modHit,
   modSelectKey,
   sortedMods,
-  type ModSearchField,
   type ModStateGroup,
 } from "../types";
 import { orderedMods } from "../modColumns";
@@ -1421,7 +1418,6 @@ function onMenuPick(id: string) {
 const keyword = ref("");
 const query = computed(() => keyword.value.trim().toLowerCase());
 /** 搜索框里有没有内容：工具条据此在"图标按钮"与"搜索字段下拉"之间切换 */
-const searchActive = computed(() => query.value.length > 0);
 
 /**
  * 命中判定：按展示方式选字段（见 `modHit`），表格模式**再往里看一层**
@@ -2125,94 +2121,13 @@ onBeforeUnmount(() => {
 <template>
   <ModExportModal v-if="exportOpen" :uuid="instanceUuid" :selected-ids="selectedItems.map(item => item.uuid)"
     @close="exportOpen = false" />
-  <ContentHead :data="data" :busy="depBusy || updateBusy" :show-refresh="!searchActive">
-    <!--
-      搜索框放在左侧弹性区：默认占满工具条剩下的宽度，超过上限停在 .mod-search-wrap 的 max-width。
-      搜索字段下拉紧挨着它（同一组，间距走 .head-lead 的 8px）：它只服务于搜索框，
-      隔到右侧那排按钮旁边会离输入框一大截。选中项出现时整条让位。
-    -->
-    <template v-if="!selectedCount">
-      <!-- 与主窗口的实例搜索同一个组件、同一套外观（放大镜 + 清空键 + .field-input） -->
-      <div class="mod-search-wrap">
-        <SearchBox v-model="keyword" :placeholder="t('resource.searchPlaceholder')"
-          :clear-label="t('resource.searchClear')" width="100%" />
-      </div>
-      <!-- 搜索字段：宽度用 0fr ↔ 1fr 过渡，收起时被裁掉并 inert，见 resource.css 的 .bar-slot -->
-      <div class="bar-slot field-slot" :class="{ open: searchActive }" :inert="!searchActive">
-        <div class="bar-slot-inner">
-          <select class="field-select sel-search-field" :value="modSearchField" :disabled="loading"
-            :aria-label="t('resource.searchField')"
-            @change="setModSearchField(($event.target as HTMLSelectElement).value as ModSearchField)">
-            <option v-for="field in SEARCH_FIELDS" :key="field.value" :value="field.value">
-              {{ t(field.labelKey) }}
-            </option>
-          </select>
-        </div>
-      </div>
-    </template>
-    <template #actions>
-      <!--
-        有选中项时顶栏换成批量操作条，用户选的口径是"顶栏出现批量按钮"。
-        整条替换而不是并列：选中之后的重点是"对这些项做什么"，
-        搜索框 / 视图切换 / 新建分组这时都不该再占着位置。
-      -->
-      <template v-if="selectedCount">
-        <span class="row-selected-count">{{ t("resource.selectedCount", { n: selectedCount }) }}</span>
-        <!-- 按钮统一纯图标：名称走悬浮提示与 aria-label，占位由 .icon-only 收成方形 -->
-        <button class="mini-btn icon-btn icon-only" :disabled="busy" v-tip="t('resource.enable')"
-          :aria-label="t('resource.enable')" @click="batchSetState(false)">
-          <GlyphIcon name="check" :size="14" />
-        </button>
-        <button class="mini-btn icon-btn icon-only" :disabled="busy" v-tip="t('resource.disable')"
-          :aria-label="t('resource.disable')" @click="batchSetState(true)">
-          <GlyphIcon name="ban" :size="14" />
-        </button>
-        <!-- 归组：开弹窗选目标，不用下拉 —— 下拉一次只看得见一项，
-             而且"移到分组"会以占位项的形式混在选项里，看着像能选的东西。
-             提示与弹窗标题共用同一条文案（不带省略号）。
-             选中项都在同一个分组里、又没别的分组可去时置灰，见 canMoveSelection -->
-        <button class="mini-btn icon-btn icon-only" :disabled="busy || !canMoveSelection"
-          v-tip="t('resource.batchMoveTo')" :aria-label="t('resource.batchMoveTo')" @click="groupPickOpen = true">
-          <GlyphIcon name="folder" :size="14" />
-        </button>
-        <button class="mini-btn icon-btn icon-only danger" :disabled="busy" v-tip="t('resource.delete')"
-          :aria-label="t('resource.delete')" @click="batchRemove">
-          <GlyphIcon name="trash" :size="14" />
-        </button>
-        <!-- 导出选中的这批：普通模式里这一项在「更多」菜单里 -->
-        <button class="mini-btn icon-btn icon-only" :disabled="busy || loading" v-tip="t('modExport.title')"
-          :aria-label="t('modExport.title')" @click="exportOpen = true">
-          <GlyphIcon name="export-list" :size="14" />
-        </button>
-        <button class="mini-btn icon-btn icon-only" :disabled="busy" v-tip="t('resource.clearSelection')"
-          :aria-label="t('resource.clearSelection')" @click="clearSelection">
-          <GlyphIcon name="close" :size="14" />
-        </button>
-      </template>
-
-      <template v-else>
-        <SegmentedTabs :model-value="modView" :options="[
-          { value: 'list', label: t('resource.viewList') },
-          { value: 'table', label: t('resource.viewTable') },
-        ]" @update:model-value="setModView($event as ModView)" />
-        <!-- 正在搜索时整组图标按钮让位：此刻要找的是那一条结果，不是批量操作 -->
-        <div class="bar-slot" :class="{ open: !searchActive }" :inert="searchActive">
-          <div class="bar-slot-inner">
-            <!-- 新建分组：原来在列表底部那行文字按钮，挪成图标 -->
-            <button class="mini-btn icon-btn icon-only" :disabled="busy" v-tip="t('resource.groupAdd')"
-              :aria-label="t('resource.groupAdd')" @click="openGroupForm()">
-              <GlyphIcon name="folder-plus" :size="14" />
-            </button>
-            <!-- 其余操作收进一个按钮：点开是下拉菜单，见 toolbarMoreItems -->
-            <button class="mini-btn icon-btn icon-only" v-tip="t('resource.moreActions')" aria-haspopup="menu"
-              :aria-expanded="!!moreMenu" :aria-label="t('resource.moreActions')" @click="openMoreMenu">
-              <GlyphIcon name="more" :size="14" />
-            </button>
-          </div>
-        </div>
-      </template>
-    </template>
-  </ContentHead>
+  <ModToolbar :data="data" :busy="depBusy || updateBusy" :loading="loading" :keyword="keyword"
+    @update:keyword="keyword = $event" :search-field="modSearchField"
+    @update:search-field="setModSearchField" :selected-count="selectedCount"
+    :can-move="canMoveSelection" :mod-view="modView" @update:mod-view="setModView"
+    @batch-state="batchSetState" @move="groupPickOpen = true" @remove="batchRemove"
+    @export="exportOpen = true" @clear="clearSelection" @add-group="openGroupForm()"
+    @more="openMoreMenu" :more-open="!!moreMenu" />
 
   <!--
     更新进度：**整行显示在工具条下方**，不再挤在按钮右边；检查与下载共用这一条。

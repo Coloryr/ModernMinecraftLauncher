@@ -317,10 +317,33 @@ async function saveSkinFile() {
   }
 }
 
+/** 取消当前皮肤 / 披风，只对正版账户给按钮 */
+const unequipBusy = ref(false);
+
+async function unequip(kind: "skin" | "cape") {
+  const acc = target.value;
+  if (!acc || unequipBusy.value || equipBusy.value) return;
+  unequipBusy.value = true;
+  try {
+    if (kind === "skin") {
+      await commands.account.clearSkin(acc.authType, acc.uuid);
+    } else {
+      await commands.account.clearCape(acc.authType, acc.uuid);
+    }
+    const data = await commands.account.getTextures(acc.authType, acc.uuid);
+    if (target.value?.uuid === acc.uuid) textures.value = data;
+    showToast(t("account.unequipOk"));
+  } catch (e) {
+    showToast(tErr(e));
+  } finally {
+    unequipBusy.value = false;
+  }
+}
+
 /** 装备选中的皮肤 / 披风，仅正版账户可用 */
 async function equip(kind: "skin" | "cape", item: TextureItemDto) {
   const acc = target.value;
-  if (!acc || equipBusy.value) return;
+  if (!acc || equipBusy.value || unequipBusy.value) return;
   equipBusy.value = item.sha1;
   try {
     if (kind === "skin") {
@@ -686,10 +709,15 @@ onBeforeUnmount(() => {
               <span class="tex-name overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-fg" v-tip="item.name">{{ item.name }}</span>
               <span class="tex-model text-[11px] text-dim">{{ modelLabel(item.model) }}</span>
             </div>
-            <BaseButton v-if="isOauth" size="sm" :disabled="item.active || equipBusy === item.sha1"
-              @click.stop="equip('skin', item)">
-              {{ item.active ? t("account.equipped") : t("account.equip") }}
-            </BaseButton>
+            <template v-if="isOauth">
+              <BaseButton v-if="item.active" size="sm" variant="ghost" :disabled="unequipBusy"
+                @click.stop="unequip('skin')">
+                {{ t("account.unequip") }}
+              </BaseButton>
+              <BaseButton v-else size="sm" :disabled="equipBusy === item.sha1 || unequipBusy" @click.stop="equip('skin', item)">
+                {{ t("account.equip") }}
+              </BaseButton>
+            </template>
           </div>
           <p v-if="listLoading" class="tex-empty px-0.5 py-1 text-[12px] text-dim">{{ t("account.loadingTextures") }}</p>
           <p v-else-if="!(textures?.skins ?? []).length" class="tex-empty px-0.5 py-1 text-[12px] text-dim">{{ t("winSkin.noSkin") }}</p>
@@ -703,10 +731,15 @@ onBeforeUnmount(() => {
             <div class="tex-meta flex min-w-0 flex-1 flex-col gap-0.5">
               <span class="tex-name overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-fg" v-tip="item.name">{{ item.name }}</span>
             </div>
-            <BaseButton v-if="isOauth" size="sm" :disabled="item.active || equipBusy === item.sha1"
-              @click.stop="equip('cape', item)">
-              {{ item.active ? t("account.equipped") : t("account.equip") }}
-            </BaseButton>
+            <template v-if="isOauth">
+              <BaseButton v-if="item.active" size="sm" variant="ghost" :disabled="unequipBusy"
+                @click.stop="unequip('cape')">
+                {{ t("account.unequip") }}
+              </BaseButton>
+              <BaseButton v-else size="sm" :disabled="equipBusy === item.sha1 || unequipBusy" @click.stop="equip('cape', item)">
+                {{ t("account.equip") }}
+              </BaseButton>
+            </template>
           </div>
           <p v-if="listLoading" class="tex-empty px-0.5 py-1 text-[12px] text-dim">{{ t("account.loadingTextures") }}</p>
           <p v-else-if="!(textures?.capes ?? []).length" class="tex-empty px-0.5 py-1 text-[12px] text-dim">{{ t("account.noCape") }}</p>

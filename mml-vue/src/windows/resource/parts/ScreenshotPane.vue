@@ -305,7 +305,7 @@ function onMenuPick(id: string) {
 </script>
 
 <template>
-  <ContentHead :data="data">
+  <ContentHead :data="data" :busy="busy">
     <!-- 有选中项时顶栏换成批量操作条，与其它分类同一口径 -->
     <template #actions>
       <template v-if="count">

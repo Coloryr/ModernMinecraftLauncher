@@ -37,7 +37,7 @@ const props = defineProps<{
 const { servers, instanceUuid, loading, reloadCurrent } = props.data;
 // 行的操作只剩「编辑 / 删除」：服务器行没有"打开文件夹"这一项（用户点名去掉），
 // 且都搬进了右键菜单
-const { busy, act, askConfirm, askDelete } = props.ops;
+const { busy, act, actLocal, askConfirm, askDelete } = props.ops;
 
 /** 表单草稿，`null` 表示没开弹窗 */
 const form = ref<ServerFormDraft | null>(null);
@@ -58,9 +58,12 @@ const motds = ref(new Map<string, MotdDto | null>());
 
 /** 正在查的键集合（用于"查询中…"） */
 const pending = ref(new Set<string>());
+/** 查询代次：连点刷新时只让最后一发写回结果与 pending */
+let querySeq = 0;
 
 /** 并发查全部服务器，进分类 / 刷新列表时跑一遍 */
 async function queryAll() {
+  const seq = ++querySeq;
   const list = servers.value;
   motds.value = new Map();
   if (!list.length) {
@@ -73,38 +76,24 @@ async function queryAll() {
     list.map(async (item) => {
       const key = keyOf(item);
       try {
-        motds.value.set(key, await getMotd(item.ip));
+        const result = await getMotd(item.ip);
+        if (seq === querySeq) motds.value.set(key, result);
       } catch {
         // 失败也要落一条 null：否则这一行会永远停在"查询中…"
-        motds.value.set(key, null);
+        if (seq === querySeq) motds.value.set(key, null);
       } finally {
-        const next = new Set(pending.value);
-        next.delete(key);
-        pending.value = next;
+        if (seq === querySeq) {
+          const next = new Set(pending.value);
+          next.delete(key);
+          pending.value = next;
+        }
       }
     }),
   );
 }
 
-/**
- * 列表上方那张 MOTD 卡显示哪一台：存 `keyOf`，`null` = 还没选
- *
- * 默认选中第一台，列表一加载上方就有内容，不用先点一下；选中的那台被删掉或改名
- * 之后键会落空，也在下面退回第一台。
- */
-const selectedKey = ref<string | null>(null);
-
-// 列表一换就重查一遍，即首次加载、点刷新、增删改之后重拉；并把选中项落到仍然有效的那台
-watch(
-  servers,
-  () => {
-    void queryAll();
-    if (!servers.value.some((item) => keyOf(item) === selectedKey.value)) {
-      selectedKey.value = servers.value.length ? keyOf(servers.value[0]) : null;
-    }
-  },
-  { immediate: true },
-);
+/** 列表一换就重查一遍 MOTD：首次加载、点刷新、增删改之后重拉 */
+watch(servers, () => void queryAll(), { immediate: true });
 
 /** 这一行的 MOTD；没查到 / 还在查时返回 null */
 function motdOf(item: ServerItemDto): MotdDto | null {
@@ -187,9 +176,9 @@ function remove(item: ServerItemDto) {
 //
 // 与其它分类同一套口径（见 useRowSelect / RowMenu），身份键就是 keyOf。
 // 唯一的差别在行点击：这里点行原来是"切换上方 MOTD 卡显示哪一台"，
-// 所以只有多选状态下点行才是加选，见 onServerClick。
+// 所以只有多选状态下点行才是加选。
 
-// `selected` 这个名字已经被上方 MOTD 卡占用了，所以这里把多选的集合改名
+// 多选的集合改名，避免和 server 自己的 selected 混淆
 const {
   selected: selection,
   anchorKey,
@@ -206,22 +195,6 @@ const {
 /** 选中的服务器 */
 const selectedItems = computed(() => servers.value.filter(isSelected));
 
-/**
- * 行点击
- *
- * 多选状态下点行 = 加选，与其它分类一致；否则维持原行为：
- * 把上方那张 MOTD 卡切到这一台
- *
- * - `payload.event`: 原始点击事件，取 `shiftKey` 判整段选择
- * - `payload.item`: 点到的这一行
- */
-function onServerClick(payload: { event: MouseEvent; item: ServerItemDto }) {
-  if (payload.event.shiftKey || count.value) {
-    onRowClick(payload);
-    return;
-  }
-  selectedKey.value = keyOf(payload.item);
-}
 
 /** 批量删除；删完选中项已不在列表里，直接清空选择 */
 function batchRemove() {
@@ -296,7 +269,7 @@ async function exportList() {
       filters: [{ name: "servers.dat", extensions: ["dat"] }],
     });
     if (!path) return;
-    await act(async () => {
+    await actLocal(async () => {
       await exportServers(instanceUuid.value, path);
       showToast(t("resource.serverExported"));
     });
@@ -352,7 +325,7 @@ function onMenuPick(id: string) {
 </script>
 
 <template>
-  <ContentHead :data="data">
+  <ContentHead :data="data" :busy="busy">
     <!-- 有选中项时顶栏换成批量操作条，与其它分类同一口径 -->
     <template #actions>
       <template v-if="count">
@@ -385,11 +358,10 @@ function onMenuPick(id: string) {
   <VirtualList v-else class="item-list" :count="servers.length" :row-gap="RESOURCE_ROW_GAP">
     <template #default="{ start, end }">
       <ResourceRow v-for="item in servers.slice(start, end)" :key="keyOf(item)" class="sv-row" :class="{
-        'sv-selected': keyOf(item) === selectedKey,
         'row-selected': isSelected(item),
         'row-anchor': anchorKey === keyOf(item),
         'row-selecting': selection.size > 0,
-      }" :icon="iconOf(item)" :name="item.name" @click="onServerClick({ event: $event, item })"
+      }" :icon="iconOf(item)" :name="item.name" @click="onRowClick({ event: $event, item })"
         @contextmenu.prevent="openMenu({ event: $event, item })">
         <template #select>
           <input type="checkbox" class="row-select" :checked="isSelected(item)" @pointerdown.stop

@@ -39,6 +39,7 @@ export const GROUP_TITLES: Record<string, string> = {
   gameTitle: "winSettings.secGameTitle",
   localFiles: "winSettings.secLocalFiles",
   experimental: "winSettings.secExperimental",
+  programIcon: "winSettings.secProgramIcon",
 };
 
 /** 索引里的一条设置项 */
@@ -95,39 +96,14 @@ const SETTINGS_INDEX: IndexEntry[] = [
 
   // ---- 皮肤与头像 ----
   { tab: "skin", group: "skin", labelKey: "winSettings.headDisplay", extra: ["head", "头像"] },
-  { tab: "skin", group: "skin", labelKey: "winSettings.rotX", extra: ["rotate", "旋转"] },
-  { tab: "skin", group: "skin", labelKey: "winSettings.rotY", extra: ["rotate", "旋转"] },
+  { tab: "skin", group: "skin", labelKey: "winSettings.headRotX", extra: ["rotate", "头像", "旋转"] },
+  { tab: "skin", group: "skin", labelKey: "winSettings.headRotY", extra: ["rotate", "头像", "旋转"] },
   { tab: "skin", group: "skin", labelKey: "winSettings.skinDisplay", extra: ["skin", "皮肤"] },
-  {
-    tab: "skin",
-    group: "skin",
-    labelKey: "winSettings.rotX",
-    extra: ["skin", "rotate", "皮肤", "旋转"],
-  },
-  {
-    tab: "skin",
-    group: "skin",
-    labelKey: "winSettings.rotY",
-    extra: ["skin", "rotate", "皮肤", "旋转"],
-  },
-  {
-    tab: "skin",
-    group: "skin",
-    labelKey: "winSettings.capeDisplay",
-    extra: ["cape", "elytra", "披风", "鞘翅"],
-  },
-  {
-    tab: "skin",
-    group: "skin",
-    labelKey: "winSettings.rotX",
-    extra: ["cape", "rotate", "披风", "旋转"],
-  },
-  {
-    tab: "skin",
-    group: "skin",
-    labelKey: "winSettings.rotY",
-    extra: ["cape", "rotate", "披风", "旋转"],
-  },
+  { tab: "skin", group: "skin", labelKey: "winSettings.skinRotX", extra: ["skin", "rotate", "皮肤", "旋转"] },
+  { tab: "skin", group: "skin", labelKey: "winSettings.skinRotY", extra: ["skin", "rotate", "皮肤", "旋转"] },
+  { tab: "skin", group: "skin", labelKey: "winSettings.capeDisplay", extra: ["cape", "elytra", "披风", "鞘翅"] },
+  { tab: "skin", group: "skin", labelKey: "winSettings.capeRotX", extra: ["cape", "rotate", "披风", "旋转"] },
+  { tab: "skin", group: "skin", labelKey: "winSettings.capeRotY", extra: ["cape", "rotate", "披风", "旋转"] },
 
   // ---- 网络与下载 ----
   { tab: "network", group: "download", labelKey: "winSettings.downloadSource", extra: ["source", "bmclapi", "下载源"] },
@@ -217,6 +193,8 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "client", group: "customHome", labelKey: "winSettings.customHomeRemove", extra: ["remove", "删除"] },
   { tab: "client", group: "music", labelKey: "winSettings.musicOn", extra: ["music", "bgm", "自定义音乐"] },
   { tab: "client", group: "music", labelKey: "winSettings.musicSource", extra: ["music", "url", "音乐地址"] },
+  { tab: "client", group: "programIcon", labelKey: "winSettings.programIconPick", extra: ["icon", "图标", "程序图标", "任务栏"] },
+  { tab: "client", group: "programIcon", labelKey: "winSettings.programIconClear", extra: ["icon", "图标", "清除"] },
   { tab: "client", group: "gameTitle", labelKey: "winSettings.editTitle", extra: ["title", "标题"] },
   { tab: "client", group: "gameTitle", labelKey: "winSettings.randomTitle", extra: ["title", "随机标题"] },
   { tab: "client", group: "gameTitle", labelKey: "winSettings.cycleTitle", extra: ["title", "循环标题"] },
@@ -228,6 +206,8 @@ const SETTINGS_INDEX: IndexEntry[] = [
   { tab: "gamepad", group: "gamepad", labelKey: "winGamepad.ingame", extra: ["gamepad", "in-game", "enable", "游戏内", "启用", "手柄"] },
 
   // ---- 实验性功能 ----
+  { tab: "experimental", group: "experimental", labelKey: "winSettings.launcherAdmin", extra: ["admin", "管理员", "启动器"] },
+  { tab: "experimental", group: "experimental", labelKey: "winSettings.instanceAdmin", extra: ["admin", "管理员", "实例"] },
   { tab: "experimental", group: "experimental", labelKey: "winSettings.resourceLink", extra: ["resource mapping", "hard link", "资源映射", "硬链接", "公共目录"] },
 
   // ---- 本地文件 ----

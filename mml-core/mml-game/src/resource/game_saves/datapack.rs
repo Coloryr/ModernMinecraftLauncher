@@ -270,6 +270,43 @@ impl SaveObj {
         Ok(())
     }
 
+    /// 同步 level.dat 里数据包的登记名
+    ///
+    /// - `old_name`: 旧登记名，形如 `file/xxx.zip`
+    /// - `new_name`: 新登记名
+    ///
+    /// # 返回值
+    ///
+    /// NBT 写入失败时返回对应错误；没有 DataPacks 节点时当作无需同步
+    pub fn rename_datapack(&mut self, old_name: &str, new_name: &str) -> CoreResult<()> {
+        let Some(data) = self
+            .nbt
+            .nbt
+            .as_compound_mut()
+            .and_then(|map| map.get_compound_mut("Data"))
+        else {
+            return Ok(());
+        };
+        let Some(data_packs) = data.get_compound_mut("DataPacks") else {
+            return Ok(());
+        };
+
+        for key in ["Enabled", "Disabled"] {
+            let Some(list) = data_packs.get_list_mut(key) else {
+                continue;
+            };
+            for index in 0..list.len() {
+                if let Some(NbtType::String(item)) = list.get_item_mut(index)
+                    && item.data.eq_ignore_ascii_case(old_name)
+                {
+                    item.data = new_name.to_string();
+                }
+            }
+        }
+
+        self.save_nbt()
+    }
+
     /// 打开种子信息网站
     ///
     /// - `version`: 游戏版本

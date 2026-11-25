@@ -657,17 +657,23 @@ function onWindowFocus() {
   void syncLaunchState();
 }
 
+let gone = false;
+
 onMounted(async () => {
   window.addEventListener("focus", onWindowFocus);
   // 先挂启动状态：后面的实例 / 日志加载期间也可能推进阶段
   try {
-    unlistenLaunchState = await onLaunchState(applyLaunchState);
+    const un = await onLaunchState(applyLaunchState);
+    if (gone) { un(); return; }
+    unlistenLaunchState = un;
   } catch (e) {
     console.error("[LogWindow] 启动状态事件订阅失败", e);
   }
+  if (gone) return;
   await syncInstance(true);
+  if (gone) return;
 
-  unlistenGameLog = await onGameLog((e) => {
+  const gameLog = await onGameLog((e) => {
     // 锁定了实例：只收它自己的日志行；看历史文件时不追加实时行
     if (e.uuid !== lockedUuid.value || !liveSource.value) return;
     if (e.clear) {
@@ -678,14 +684,19 @@ onMounted(async () => {
     }
     for (const line of e.lines) enqueueLine(line);
   });
+  if (gone) { gameLog(); return; }
+  unlistenGameLog = gameLog;
 
   // 本实例的启停：切换「测试启动 / 停止」按钮
-  unlistenLaunchError = await onLaunchError((e) => {
+  const launchError = await onLaunchError((e) => {
     if (e.uuid && e.uuid !== lockedUuid.value) return;
     launching.value = false;
     running.value = false;
   });
-  unlistenGameExit = await onGameExit((e) => {
+  if (gone) { launchError(); return; }
+  unlistenLaunchError = launchError;
+
+  const gameExit = await onGameExit((e) => {
     if (e.uuid !== lockedUuid.value) return;
     // 退出后连阶段一起清掉：留着的话下次窗口获得焦点会被 syncLaunchState 当成"启动中"顶出来
     launching.value = false;
@@ -712,9 +723,12 @@ onMounted(async () => {
       });
     }
   });
+  if (gone) { gameExit(); return; }
+  unlistenGameExit = gameExit;
 });
 
 onBeforeUnmount(() => {
+  gone = true;
   dropPending();
   window.removeEventListener("keydown", onFindKey, true);
   window.removeEventListener("focus", onWindowFocus);

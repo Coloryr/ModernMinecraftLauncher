@@ -51,7 +51,8 @@ function onStar(e: MouseEvent) {
         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
       </svg>
     </button>
-    <div class="pack-main" @click="emit('open', item)">
+    <div class="pack-main" role="button" tabindex="0" @click="emit('open', item)"
+      @keydown.enter.prevent="emit('open', item)" @keydown.space.prevent="emit('open', item)">
       <AsyncImage v-if="item.image" class="pack-icon" :src="item.image" alt="" />
       <div v-else class="pack-icon pack-icon-fallback">{{ item.name.slice(0, 1).toUpperCase() }}</div>
       <div class="pack-info">

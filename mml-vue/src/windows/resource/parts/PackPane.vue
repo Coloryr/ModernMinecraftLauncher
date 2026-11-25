@@ -138,7 +138,8 @@ function itemMenuItems(item: PackItemDto): RowMenuItem[] {
       id: "toggle",
       label: item.enable ? t("resource.disable") : t("resource.enable"),
     },
-    { id: "rename", label: t("resource.rename"), separated: true },
+    // 改名不改 options.txt 里的启用名单：启用中的包改了名会掉回未启用，先禁止
+    { id: "rename", label: t("resource.rename"), separated: true, disabled: item.enable },
     { id: "open-folder", label: t("resource.openFolder"), separated: true },
     { id: "remove", label: t("resource.delete"), danger: true, separated: true },
   ];
@@ -210,7 +211,7 @@ function formatLabel(item: PackItemDto): string {
 </script>
 
 <template>
-  <ContentHead :data="data">
+  <ContentHead :data="data" :busy="busy">
     <!-- 有选中项时顶栏换成批量操作条，与其它分类同一口径 -->
     <template #actions>
       <template v-if="count">

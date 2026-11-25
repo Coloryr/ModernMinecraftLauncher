@@ -118,11 +118,24 @@ export function useResourceOps(data: ReturnType<typeof useResourceData>) {
    */
   async function doRename(newName: string) {
     const ask = renameAsk.value;
-    renameAsk.value = null;
     if (!ask) return;
     const name = newName.trim();
-    if (!name || name === ask.name) return;
-    await act(() => renameResource(instanceUuid.value, ask.kind, ask.parent, ask.name, name));
+    if (!name || name === ask.name) {
+      renameAsk.value = null;
+      return;
+    }
+    if (busy.value) return;
+    busy.value = true;
+    try {
+      await renameResource(instanceUuid.value, ask.kind, ask.parent, ask.name, name);
+      // 成功后才关弹窗；失败保留输入，用户不用重新打开菜单再打一遍
+      renameAsk.value = null;
+      await reloadCurrent();
+    } catch (e) {
+      showToast(tErr(e));
+    } finally {
+      busy.value = false;
+    }
   }
 
   /**

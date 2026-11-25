@@ -150,6 +150,9 @@ const pickedMods = ref(new Map<string, ExportEntryDto>());
 const pickedFiles = ref(new Map<string, ExportEntryDto>());
 /** 取消勾选的路径：父目录勾着时单独去掉某一条 */
 const unpickedFiles = ref(new Set<string>());
+
+/** 每种导出格式各自记住手选的勾选 / 排除，切回来时还原 */
+const filePickCache = new Map<PackId, { picked: Map<string, ExportEntryDto>; unpicked: Set<string> }>();
 /** 因为模组已勾选而自动取消的文件：取消勾选模组时按这份表还原 */
 const autoExcluded = ref(new Set<string>());
 /** 路径 → 下载地址；空串表示没填，按 overrides 打包 */
@@ -364,6 +367,7 @@ async function loadInfo() {
   const uuid = currentUuid.value;
   info.value = null;
   pickedMods.value = new Map();
+  filePickCache.clear();
   pickedFiles.value = new Map();
   unpickedFiles.value = new Set();
   autoExcluded.value = new Set();
@@ -478,12 +482,20 @@ watch(showModsTab, (value) => {
   if (!value && tab.value === "mods") tab.value = "meta";
 });
 
-// 两种格式的文件根不同（实例目录 / 游戏目录），切过去时旧的路径不能带过去，重新铺默认
-watch(pack, () => {
-  pickedFiles.value = new Map();
+// 两种格式的文件根不同（实例目录 / 游戏目录），切过去时旧的路径不能带过去；
+// 但用户手选的勾选要按格式各自保留，切回来原样还原，别每次切格式都白选一遍。
+watch(pack, (next, prev) => {
+  if (prev) {
+    filePickCache.set(prev, { picked: pickedFiles.value, unpicked: unpickedFiles.value });
+  }
+  const cached = filePickCache.get(next);
+  pickedFiles.value = cached?.picked ?? new Map();
+  unpickedFiles.value = cached?.unpicked ?? new Set();
   // 模组勾选跟着格式重算：整包格式没有清单，全部按文件打包
   pickedMods.value = seedModPicks();
-  if (currentUuid.value) void reseedFilePicks(currentUuid.value);
+  if (!currentUuid.value) return;
+  if (cached) syncModExclusions();
+  else void reseedFilePicks(currentUuid.value);
 });
 
 /**

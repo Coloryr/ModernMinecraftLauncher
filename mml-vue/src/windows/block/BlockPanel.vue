@@ -554,6 +554,10 @@ async function onDetailRemove() {
           <BaseButton v-if="inSkinCat" size="sm" variant="accent" @click="skinOpen = true">
             {{ t("blocks.addSkin") }}
           </BaseButton>
+          <!-- 首轮渲染成功后仍要能重来：缓存坏了 / 换了贴图时需要强制重扫 -->
+          <BaseButton v-if="rendered" size="sm" :disabled="running" @click="startRender(true)">
+            {{ t("blocks.rerender") }}
+          </BaseButton>
         </div>
 
         <BlockGrid :key="cat" :enter="gridAnim" :items="filtered" :keyword="keyword" :size="size"

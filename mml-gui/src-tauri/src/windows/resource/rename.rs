@@ -4,7 +4,7 @@
 //! `folder.rs` 那套辅助函数（[`resource_file`] / [`datapack_dir`] / [`check_parent`]），
 //! 不在这里另写一份 —— 那些校验是 IPC 入参的唯一防线。
 
-use super::{KIND_DATAPACKS, check_parent, datapack_dir, parse_instance, resource_file};
+use super::{KIND_DATAPACKS, check_parent, datapack_dir, find_save, parse_instance, resource_file};
 use crate::err_keys;
 
 /// 重命名一个资源文件或目录
@@ -21,7 +21,7 @@ use crate::err_keys;
 /// 只表示成功 / 失败：类别未知、名字非法、原目标不存在或新名字已被占用时返回对应错误串
 #[gui_macros::ipc_group("resource")]
 #[gui_macros::command]
-pub fn resource_rename(
+pub async fn resource_rename(
     uuid: String,
     kind: String,
     parent: String,
@@ -39,7 +39,9 @@ pub fn resource_rename(
         return Ok(());
     }
 
-    let (old, new) = if kind == KIND_DATAPACKS {
+    let is_datapacks = kind == KIND_DATAPACKS;
+    let save_instance = if is_datapacks { Some(instance.clone()) } else { None };
+    let (old, new) = if is_datapacks {
         let dir = datapack_dir(&instance.read().unwrap(), &parent)?;
         check_parent(&name)?;
         (dir.join(&name), dir.join(&new_name))
@@ -58,5 +60,20 @@ pub fn resource_rename(
         return Err(err_keys::NAME_TAKEN.to_string());
     }
     std::fs::rename(&old, &new).map_err(|err| err.to_string())?;
+
+    // 数据包的启用状态按 `file/<文件名>` 记在 level.dat 的 Enabled / Disabled 里；
+    // 只改磁盘名会让改完的包掉回“未启用”，这里把旧登记名一起换掉。
+    if let Some(instance) = save_instance {
+        let save = find_save(instance, &parent).await?;
+        let old_key = format!("file/{name}");
+        let new_key = format!("file/{new_name}");
+        tauri::async_runtime::spawn_blocking(move || {
+            let mut save = save;
+            save.rename_datapack(&old_key, &new_key)
+                .map_err(|err| err.to_string())
+        })
+        .await
+        .map_err(|err| err.to_string())??;
+    }
     Ok(())
 }

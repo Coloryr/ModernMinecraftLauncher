@@ -9,6 +9,7 @@ import BaseButton from "../../../components/ui/BaseButton.vue";
 import BaseModal from "../../../components/ui/BaseModal.vue";
 import GamepadDiagram from "./GamepadDiagram.vue";
 import { t, tErr } from "../../../lib/i18n";
+import { showToast } from "../../../lib/toast";
 import { isTauri } from "../../windowManager";
 import { ALL_BUTTONS, buttonLabel } from "../gamepadLabels";
 import { commands, type GamepadButtonDto, type GamepadLayoutDto, type GamepadStateDto } from "../../../lib/bindings";
@@ -41,6 +42,8 @@ const order = ref<GamepadButtonDto[]>([]);
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let disposed = false;
+/** 本轮已提示过采样错误，避免每帧重复弹 */
+let errorShown = false;
 let previous = new Set<GamepadButtonDto>();
 
 /** 主键记号；没选时显示提示 */
@@ -92,6 +95,7 @@ function show() {
   previous = new Set();
   open.value = true;
   disposed = false;
+  errorShown = false;
   void poll(true);
 }
 
@@ -115,6 +119,7 @@ async function poll(first = false) {
     const snapshot = id === null ? null : await commands.gamepad.state(id);
     if (disposed) return;
     state.value = snapshot;
+    errorShown = false;
 
     const now = pressedNow(snapshot);
     for (const button of now) {
@@ -122,7 +127,11 @@ async function poll(first = false) {
     }
     previous = new Set(now);
   } catch (error) {
-    if (first) tErr(error);
+    // 采样失败只提示一次，别每 100ms 重复刷屏
+    if (first || !errorShown) {
+      errorShown = true;
+      showToast(tErr(error));
+    }
   }
   if (!disposed) timer = setTimeout(() => void poll(), TICK);
 }

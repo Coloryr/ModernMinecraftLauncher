@@ -23,6 +23,7 @@ const {
   dnsLines,
   dnsKeys,
   proxy,
+  proxyDirty,
   proxyDetailVisible,
   sourceOptions,
   proxyModeOptions,
@@ -111,7 +112,7 @@ const {
 
       <!-- 代理字段较多，保留显式保存按钮（其余网络设置即改即存） -->
       <div class="set-save-row right">
-        <BaseButton variant="accent" size="sm" @click="saveProxy">{{ t("winSettings.save") }}</BaseButton>
+        <BaseButton variant="accent" size="sm" :disabled="!proxyDirty" @click="saveProxy">{{ t("winSettings.save") }}</BaseButton>
       </div>
     </SettingsGroup>
 

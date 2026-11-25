@@ -1330,6 +1330,9 @@ function onAction(id: ActionId) {
       // 配置文件窗口也是**一个实例一个**的窗口族，实例必须带上
       openWindow("config", { uuid: selected.value.uuid });
       break;
+    case "export":
+      openExportWindow();
+      break;
     default:
       showToast(t("actions.wip", { name: t(ACTION_LABELS[id]) }));
   }

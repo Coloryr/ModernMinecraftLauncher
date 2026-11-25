@@ -647,7 +647,7 @@ defineExpose({ scrollToInstance });
         <GlyphIcon :name="maximized ? 'restore' : 'maximize'" :size="16" />
       </button>
 
-      <button class="icon-btn" v-tip="t('sidebar.collapse')" @click="emit('collapse')">
+      <button class="icon-btn" v-tip="t('sidebar.collapse')" :aria-label="t('sidebar.collapse')" @click="emit('collapse')">
         <GlyphIcon name="chevron-left" :size="16" />
       </button>
     </div>
@@ -747,12 +747,12 @@ defineExpose({ scrollToInstance });
 
             <!-- 实例行 -->
             <div v-else class="vrow vrow-inst" :data-group="row.group.id" :style="rowStyle(row)">
-              <div class="inst-row" :data-uuid="row.inst.uuid" :data-idx="row.idx" :data-group="row.group.id" :class="{
+              <div class="inst-row" role="button" tabindex="0" :data-uuid="row.inst.uuid" :data-idx="row.idx" :data-group="row.group.id" :class="{
                 active: selected?.uuid === row.inst.uuid,
                 'multi-checked': multiSelect && selectedIds.has(row.inst.uuid),
                 running: row.inst.running,
               }" @pointerdown="onDragPointerDown($event, { kind: 'instance', instance: row.inst })"
-                @click="onInstClick(row.inst, $event)" @contextmenu.prevent="onInstContext($event, row.inst)">
+                @click="onInstClick(row.inst, $event)" @keydown.enter.prevent="onInstClick(row.inst)" @keydown.space.prevent="onInstClick(row.inst)" @contextmenu.prevent="onInstContext($event, row.inst)">
                 <span v-if="multiSelect" class="row-check" :class="{ on: selectedIds.has(row.inst.uuid) }">
                   <GlyphIcon name="check" :size="12" :weight="2.6" />
                 </span>

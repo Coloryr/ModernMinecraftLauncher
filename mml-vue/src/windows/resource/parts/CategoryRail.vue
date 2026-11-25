@@ -48,7 +48,7 @@ const { thumbStyle, thumbReady, refresh: refreshThumb } = useSlidingThumb(
 watch(items, refreshThumb, { deep: true });
 
 /** 开始拖拽的位移阈值（与实例 / 收藏拖拽一致） */
-const DRAG_THRESHOLD = 5;
+const DRAG_THRESHOLD = 8;
 
 /** 按下但还没超过阈值（可能只是点击） */
 let candidate: CategoryId | null = null;
