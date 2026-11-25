@@ -276,6 +276,20 @@ onUnmounted(() => {
   padding-bottom: 0;
 }
 
+/* 背景图模式：整条栏补一层侧栏底色，做成一条圆角列（与资源管理的分类栏同一观感）——
+   分类文字直接压在图上时小字看不清。这条底色只在有背景图时出现，普通主题下仍是透明栏；
+   毛玻璃在 themes.css 的透明模糊表里跟着加 */
+html.has-bg .cat-rail {
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--bg-side);
+  /* 有了底色，左右留白就看得出是不是一样宽：原来那条 9px 的常驻滚动条会全吃掉在右边，
+     于是分类项右边比左边宽一截。这里改成"真溢出才出滚动条"，装得下时两边都是 6px；
+     真滚动时右边多出滚动条本身的位置，与其它列表的观感一致 */
+  overflow-y: auto;
+  scrollbar-gutter: auto;
+}
+
 /* 选中色块：分类切换时在栏内上下滑动 */
 .cat-thumb {
   position: absolute;

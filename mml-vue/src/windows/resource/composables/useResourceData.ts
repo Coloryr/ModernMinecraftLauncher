@@ -70,7 +70,7 @@ export interface ResourceInstance {
  *
  * - `category` / `saveTab`: 当前分类与存档子页，外壳与各面板共用这一份
  * - `instance` / `instanceUuid`: 当前实例的名字版本与 uuid
- * - `loading`: 有列表正在拉
+ * - `loading`: 当前分类有列表正在拉（其余分类在拉不影响本页）
  * - `modProgress`: 模组扫描进度
  * - `modDuplicates`: 重复安装的模组，非空时模组面板自动弹窗
  * - `mods` / `packs` / `saves` / `shots` / `servers` / `shaders` / `schematics` / `datapacks`: 各分类的列表
@@ -97,8 +97,28 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
    */
   const lockedUuid = computed(() => familyInstanceFromLabel("resource") ?? targetUuid() ?? "");
 
-  /** 有列表正在拉；模组那个分类要解析 jar 元数据，可能要几秒 */
-  const loading = ref(false);
+  /**
+   * 正在拉的分类
+   *
+   * 按分类分开记，不是一个"有人在拉"的总开关：模组那一档要解析几百个 jar、好几秒，
+   * 这期间切到别的分类时，别的分类不该跟着显示骨架（那样看着像卡死）。
+   * 切走之后上一档还在拉也不影响当前这一页。
+   */
+  const loadingCats = ref<Set<CategoryId>>(new Set());
+
+  /** 当前分类有没有在拉列表 */
+  const loading = computed(() => loadingCats.value.has(category.value));
+
+  /** 每一档各自自增的请求序号：同一档连拉两次时只让最后一次收尾 */
+  const catSeq = new Map<CategoryId, number>();
+
+  /** 把某一档的"正在拉"标记改掉 */
+  function setLoading(cat: CategoryId, on: boolean) {
+    const next = new Set(loadingCats.value);
+    if (on) next.add(cat);
+    else next.delete(cat);
+    loadingCats.value = next;
+  }
 
   /**
    * 当前的列表是不是**这一档**的、且已经就绪
@@ -191,7 +211,9 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     // 拉的过程中用户可能又切了分类：这一发算在**发起时**那一档上
     const target = category.value;
     const seq = ++loadSeq;
-    loading.value = true;
+    const mine = (catSeq.get(target) ?? 0) + 1;
+    catSeq.set(target, mine);
+    setLoading(target, true);
     listReady.value = false;
     let ok = false;
     try {
@@ -240,11 +262,10 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     } catch (e) {
       if (seq === loadSeq) showToast(tErr(e));
     } finally {
-      // 慢的那一发回来时可能已经有更新的一发了：别把它的加载态关掉
-      if (seq === loadSeq) {
-        loading.value = false;
-        listReady.value = ok;
-      }
+      // 同一档慢的那一发回来时可能已经有更新的一发了：别把它的加载态关掉
+      if (catSeq.get(target) === mine) setLoading(target, false);
+      // 慢的那一发回来时可能已经有更新的一发了，或者用户已经切走：都别写就绪态
+      if (seq === loadSeq && target === category.value) listReady.value = ok;
     }
     // 拉成了才算这一档"已加载"；失败不记，下次切回来还能再试
     if (ok) loadedCats.add(target);
@@ -266,7 +287,11 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
     // 与 load 同一道理：这一发算在**发起时**那个存档上，中途换存档不能记到新的头上
     const save = dpSave.value;
     const seq = ++loadSeq;
-    loading.value = true;
+    // 数据包子页挂在「存档」这一档下面，加载态也记在它头上
+    const target = category.value;
+    const mine = (catSeq.get(target) ?? 0) + 1;
+    catSeq.set(target, mine);
+    setLoading(target, true);
     try {
       datapacks.value = await listDatapacks(instanceUuid.value, save);
       loadedDpSave = save;
@@ -276,7 +301,7 @@ export function useResourceData(initialCategory: CategoryId = "saves") {
         showToast(tErr(e));
       }
     } finally {
-      if (seq === loadSeq) loading.value = false;
+      if (catSeq.get(target) === mine) setLoading(target, false);
     }
   }
 

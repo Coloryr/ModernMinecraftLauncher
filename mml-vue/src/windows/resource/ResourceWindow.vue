@@ -328,7 +328,7 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
       </template>
     </template>
 
-    <div class="resource-layout flex h-full gap-[18px]">
+    <div class="resource-layout flex h-full gap-4">
       <CategoryRail :data="data" :view="view" @select="selectCategory" />
 
       <section class="cat-content mr-[-26px] flex min-w-0 flex-1 flex-col gap-3">

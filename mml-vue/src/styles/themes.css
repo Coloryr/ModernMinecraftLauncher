@@ -548,10 +548,10 @@ html.has-bg .tab-content {
    数量不必太担心：列表都由虚拟列表撑着，同时参与合成的只有视口里那几行。 */
 html.has-bg.bg-frosted :is(
   /* 外壳：标题栏、左侧栏、各类导航栏。这几条里只有本身**有底色**的才收 ——
-     .cat-rail 是透明栏，整条加模糊会在分类按钮背后糊出一整列方斑；它只让选中色块
-     .cat-thumb 与悬停态参与模糊，见下面第二张表 */
+     资源管理的 .cat-nav 与方块 / 收藏的 .cat-rail 只在背景图模式下补底色（见各自的
+     CSS），所以跟着收；平时透明、悬停才出底的按钮见下面第二张表 */
   .frame-head, .topbar, .sidebar, .boot-head, .tab-rail, .si-rail,
-  .cat-thumb,
+  .cat-rail, .cat-thumb,
   /* 资源管理的分类栏只在背景图模式下有底色（见 resource.css），整条跟着糊 */
   .resource-layout .cat-nav,
   /* 通用控件：卡片、折叠头、分段、分页、整行添加、开关、步进器 */

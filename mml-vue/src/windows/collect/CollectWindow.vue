@@ -1111,7 +1111,7 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
           <SearchBox v-model="keyword" :placeholder="t('collect.search')" :clear-label="t('collect.searchClear')"
             width="100%" />
 
-          <div class="collect-scroll -mr-[26px] mt-[-2px] min-h-0 flex-1 overflow-y-scroll pb-0.5 pr-[17px] pt-0.5 [scrollbar-gutter:stable]">
+          <div class="collect-scroll -mr-[26px] mt-[-2px] min-h-0 flex-1 overflow-y-scroll pr-[17px] pt-0.5 [scrollbar-gutter:stable]">
             <Transition :css="false" mode="out-in" @enter="enterCards" @leave="leaveCards">
               <div :key="activeGroup" class="collect-pane">
             <!-- 当前分组是空的：搜索没命中与"这一组确实没收藏"分开说 -->

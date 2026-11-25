@@ -508,7 +508,7 @@ async function onDetailRemove() {
 </script>
 
 <template>
-  <div class="block-panel relative -mb-[22px] -mr-[26px] flex min-h-0 flex-1 flex-col gap-3">
+  <div class="block-panel relative -mr-[26px] flex min-h-0 flex-1 flex-col gap-3">
     <!-- 渲染中：顶部一行进度；不挤掉下方内容，取消后立即消失 -->
     <div v-if="running"
       class="block-progress mr-[26px] flex shrink-0 items-center gap-2.5 rounded-panel border border-border bg-card px-3 py-2 text-body">
@@ -570,7 +570,7 @@ async function onDetailRemove() {
 
     <!-- 尺寸滑杆：右下角，小 → 大连续调图标大小 -->
     <div v-if="rendered"
-      class="size-dock absolute bottom-[30px] right-[34px] z-20 flex items-center gap-2 rounded-pill border border-border bg-card px-3 py-1.5 shadow-[var(--shadow-md)]">
+      class="size-dock absolute bottom-[8px] right-[34px] z-20 flex items-center gap-2 rounded-pill border border-border bg-card px-3 py-1.5 shadow-[var(--shadow-md)]">
       <span class="size-edge text-meta text-dim">{{ t("blocks.size.sm") }}</span>
       <input class="size-range" type="range" min="0" max="2" step="1" :value="sizeIndex"
         :aria-label="t('blocks.size.title')" :title="t('blocks.size.title')" @input="onSizeSlider" />
@@ -579,7 +579,7 @@ async function onDetailRemove() {
 
     <!-- 未渲染：提示卡；渲染中显示进度说明，不再给按钮 -->
     <div v-if="!rendered"
-      class="block-prompt mb-[22px] mr-[26px] flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-panel border border-dashed border-accent-border bg-card px-5 pt-8 pb-6">
+      class="block-prompt mr-[26px] flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-panel border border-dashed border-accent-border bg-card px-5 pt-8 pb-6">
       <div class="block-prompt-icon mb-2 flex h-[84px] w-[84px] items-center justify-center rounded-panel bg-accent-soft text-accent">
         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6"
           stroke-linecap="round" stroke-linejoin="round">

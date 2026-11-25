@@ -377,7 +377,7 @@ function onCellKey(e: KeyboardEvent, i: number) {
   /* 右侧缩进与 .block-main 的 16px 间距一致：原来取 26px 与窗口左内边距对齐，
      但滚动条本身还占约 9px，看着右边比左边空得多；滚动条仍在窗口最右边。
      列数按这个更窄的宽度算，见 script 里的 gridW */
-  right: 16px;
+  right: 17px;
   display: grid;
 }
 
