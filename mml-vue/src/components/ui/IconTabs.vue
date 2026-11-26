@@ -97,7 +97,9 @@ function glyphOf(icon: string): GlyphName {
   font-variant-numeric: tabular-nums;
 }
 
-.tab-btn:hover:not(:disabled) {
+/* 悬停只提亮未选中项：选中项是强调色渐变底，跟着提亮会变成正文色压在蓝底上，
+   深色主题下几乎看不见。排除 .active 后也不必再单独取消它的上浮 */
+.tab-btn:hover:not(:disabled):not(.active) {
   border-color: var(--accent-border);
   color: var(--text);
   transform: translateY(-1px);
@@ -119,10 +121,5 @@ function glyphOf(icon: string): GlyphName {
   color: var(--on-accent);
   font-weight: 600;
   box-shadow: 0 6px 16px var(--accent-soft);
-}
-
-/* 激活态不再上浮：避免与背景渐变一起「跳」一下 */
-.tab-btn.active:hover {
-  transform: none;
 }
 </style>

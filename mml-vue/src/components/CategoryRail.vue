@@ -9,7 +9,6 @@
 // 投放高亮（`dropKey`）：别的窗口把条目拖到分组上时，给对应那一项描一道虚线框。
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
-import BaseButton from "./ui/BaseButton.vue";
 import { useSlidingThumb } from "../composables/useSlidingThumb";
 
 /** 左栏的一项 */
@@ -44,12 +43,10 @@ const props = withDefaults(
     dropKey?: string | null;
     /** 栏底「新建分组」的文案；空串则不显示这一行 */
     newLabel?: string;
-    /** 栏底入口的外观：`row` 是整行虚线添加条（默认），`button` 是工具条同档的强调色按钮 */
-    newStyle?: "row" | "button";
     /** 去掉上下留白：由父级自己安排（父级内容区不滚动时用） */
     flush?: boolean;
   }>(),
-  { sortable: false, dropKey: null, newLabel: "", newStyle: "row", flush: false },
+  { sortable: false, dropKey: null, newLabel: "", flush: false },
 );
 
 const emit = defineEmits<{
@@ -205,43 +202,44 @@ onUnmounted(() => {
 <template>
   <aside ref="navEl" class="cat-rail" :class="{ flush, ready: thumbReady }" role="tablist"
     aria-orientation="vertical">
-    <span class="cat-thumb" :style="thumbStyle" aria-hidden="true"></span>
-    <!-- 全部：不参与排序，也不给右键 -->
-    <button type="button" role="tab" class="cat-item" :class="{ on: active === '' }" :aria-selected="active === ''"
-      @click="onClick('')">
-      <span class="cat-name">{{ allLabel }}</span>
-      <span class="cat-num">{{ allCount }}</span>
-    </button>
+    <!-- 分类列表：整栏里唯一滚动的一段（栏底那颗添加键不跟着滚，见 .cat-new-slot） -->
+    <div class="cat-scroll">
+      <span class="cat-thumb" :style="thumbStyle" aria-hidden="true"></span>
+      <!-- 全部：不参与排序，也不给右键 -->
+      <button type="button" role="tab" class="cat-item" :class="{ on: active === '' }" :aria-selected="active === ''"
+        @click="onClick('')">
+        <span class="cat-name">{{ allLabel }}</span>
+        <span class="cat-num">{{ allCount }}</span>
+      </button>
 
-    <template v-for="(c, idx) in items" :key="c.id">
-      <!-- 插入线：松手后这一项会落到这里 -->
-      <div v-if="showLine(idx)" class="cat-insert">
+      <template v-for="(c, idx) in items" :key="c.id">
+        <!-- 插入线：松手后这一项会落到这里 -->
+        <div v-if="showLine(idx)" class="cat-insert">
+          <span class="cat-name">{{ dragged?.label }}</span>
+          <span class="cat-num">{{ dragged?.count }}</span>
+        </div>
+        <button type="button" role="tab" class="cat-item"
+          :class="{ on: active === c.id, dragging: dragging === c.id, 'drop-target': dropKey === c.id }" :data-cat="c.id"
+          :data-group="c.dropDisabled ? undefined : c.id" :aria-selected="active === c.id"
+          @pointerdown="onPointerDown($event, c)" @click="onClick(c.id)" @contextmenu="onContextMenu($event, c)">
+          <span class="cat-name">{{ c.label }}</span>
+          <span class="cat-num">{{ c.count }}</span>
+        </button>
+      </template>
+      <div v-if="showLine(items.length)" class="cat-insert">
         <span class="cat-name">{{ dragged?.label }}</span>
         <span class="cat-num">{{ dragged?.count }}</span>
       </div>
-      <button type="button" role="tab" class="cat-item"
-        :class="{ on: active === c.id, dragging: dragging === c.id, 'drop-target': dropKey === c.id }" :data-cat="c.id"
-        :data-group="c.dropDisabled ? undefined : c.id" :aria-selected="active === c.id"
-        @pointerdown="onPointerDown($event, c)" @click="onClick(c.id)" @contextmenu="onContextMenu($event, c)">
-        <span class="cat-name">{{ c.label }}</span>
-        <span class="cat-num">{{ c.count }}</span>
-      </button>
-    </template>
-    <div v-if="showLine(items.length)" class="cat-insert">
-      <span class="cat-name">{{ dragged?.label }}</span>
-      <span class="cat-num">{{ dragged?.count }}</span>
     </div>
 
-    <!-- 新建分组：默认与其它窗口同一套整行添加外观；`button` 档换成工具条同档的强调色按钮 -->
-    <BaseButton v-if="newLabel && newStyle === 'button'" size="sm" variant="accent" block class="cat-new-btn"
-      @click="emit('new-group')">
-      <GlyphIcon name="plus" :size="14" :weight="2.2" />
-      {{ newLabel }}
-    </BaseButton>
-    <button v-else-if="newLabel" type="button" class="add-row-btn cat-new" @click="emit('new-group')">
-      <GlyphIcon name="plus" :size="14" />
-      <span class="cat-name">{{ newLabel }}</span>
-    </button>
+    <!-- 添加分组：不属于滚动内容，始终贴在这一栏的底部（与资源管理栏底那颗「添加资源」
+         同一处、同一套外观） -->
+    <div v-if="newLabel" class="cat-new-slot">
+      <button type="button" class="add-row-btn" @click="emit('new-group')">
+        <GlyphIcon name="plus" :size="14" :weight="2.2" />
+        <span class="cat-name">{{ newLabel }}</span>
+      </button>
+    </div>
 
     <!-- 拖动时的浮起副本：跟着指针走，位置见 ghost；列表里那一项留在原位淡出 -->
     <Teleport to="body">
@@ -260,18 +258,28 @@ onUnmounted(() => {
   min-width: var(--rail-w);
   display: flex;
   flex-direction: column;
+  /* 栏自己不滚：只有上面的分类列表滚，栏底的添加键固定不动 */
+  overflow: hidden;
+}
+
+/* 分类列表：整栏里唯一滚动的那一段。
+   上下留白跟着窗口内容区的原内边距（22px）走，且放进滚动内容里：
+   空档只在滚到两端时出现，滚动条轨道保持整条（见 styles/scrollbar.css） */
+.cat-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   gap: 2px;
-  overflow-y: scroll;
+  overflow-y: auto;
   scrollbar-gutter: stable;
-  /* 见 styles/scrollbar.css */
-  /* 上下留白跟着窗口内容区的原内边距（22px）走，且放进滚动内容里：
-     空档只在滚到两端时出现，分类栏的滚动条轨道保持整条 */
   padding: 22px 2px 22px 0;
 }
 
 /* 父级自己安排了上下留白（内容区不整页滚动的窗口）：这里只留右侧那 2px，
    免得与父级的间距叠成两份 */
-.cat-rail.flush {
+.cat-rail.flush .cat-scroll {
   padding-top: 0;
   padding-bottom: 0;
 }
@@ -283,10 +291,13 @@ html.has-bg .cat-rail {
   padding: 6px;
   border-radius: 12px;
   background: var(--bg-side);
-  /* 有了底色，左右留白就看得出是不是一样宽：原来那条 9px 的常驻滚动条会全吃掉在右边，
-     于是分类项右边比左边宽一截。这里改成"真溢出才出滚动条"，装得下时两边都是 6px；
-     真滚动时右边多出滚动条本身的位置，与其它列表的观感一致 */
-  overflow-y: auto;
+}
+
+/* 有底色之后左右留白就看得出是不是一样宽：那条 9px 的常驻滚动条会全吃掉在右边，
+   所以列表改成"真溢出才出滚动条"，内边距交给栏自己的 6px —— 装得下时两边都是 6px，
+   真滚动时右边多出滚动条本身的位置，与其它列表的观感一致 */
+html.has-bg .cat-scroll {
+  padding: 0;
   scrollbar-gutter: auto;
 }
 
@@ -363,9 +374,15 @@ html.has-bg .cat-rail {
   background: var(--accent-soft);
 }
 
-/* 新建分组：外观走全局 .add-row-btn（虚线强调色整行键），这里只留与分类项的间距 */
-.cat-new {
-  margin-top: 2px;
+/* 栏底的添加键：不参与滚动，永远贴在这一栏底部，与上面的分类留 6px。
+   右边那道 2px 与分类列表的右内边距对齐；背景图模式下由栏自己的 6px 内边距负责 */
+.cat-new-slot {
+  flex-shrink: 0;
+  padding: 6px 2px 0 0;
+}
+
+html.has-bg .cat-new-slot {
+  padding-right: 0;
 }
 
 /* 拖拽落点占位：虚线框 + 被拖分类的名字与数量 */
@@ -398,12 +415,6 @@ html.has-bg .cat-rail {
 
 .cat-item.on .cat-num {
   color: var(--accent);
-}
-
-/* 栏底「新建分组」的按钮档：与上一行分组拉开一点，别贴在一起 */
-.cat-new-btn {
-  flex-shrink: 0;
-  margin-top: 6px;
 }
 
 /* 跟手浮起的那一份：底色 + 强调色描边 + 大阴影做出"被拿起来"的观感。

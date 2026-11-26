@@ -71,7 +71,7 @@ pub(super) fn read_slice(path: &Path, offset: u64, length: u32) -> Result<BytesS
 /// 文件条目列表；uuid 非法、实例不存在或存档目录不存在时返回错误串
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
-pub fn config_get_files(game: String, source: String) -> Result<Vec<FileItemDto>, String> {
+pub async fn config_get_files(game: String, source: String) -> Result<Vec<FileItemDto>, String> {
     let game = instance_snapshot(&game)?;
     let mut items = Vec::new();
 
@@ -119,7 +119,7 @@ pub fn config_get_files(game: String, source: String) -> Result<Vec<FileItemDto>
 /// 体积超过 [`super::source::MAX_FILE_SIZE`] 返回 `err.fileTooLarge`，读取失败返回内核错误串
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
-pub fn config_get_file(
+pub async fn config_get_file(
     game: String,
     source: String,
     file: String,
@@ -154,7 +154,7 @@ pub fn config_get_file(
 /// `err.fileBinary`，磁盘上那一份已经变了返回 `err.fileChanged`，写盘失败返回内核错误串
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
-pub fn config_save_file(
+pub async fn config_save_file(
     game: String,
     source: String,
     file: String,
@@ -216,7 +216,7 @@ pub(super) fn text_sha1(text: &str) -> String {
 /// 路径非法返回 `err.fileName`
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
-pub fn config_open_file_dir(game: String, source: String, file: String) -> Result<(), String> {
+pub async fn config_open_file_dir(game: String, source: String, file: String) -> Result<(), String> {
     let game = instance_snapshot(&game)?;
     let path = resolve_source(&game, &source, &file)?;
     mml_sys::open_helper::open_file_with_explorer(&path);
@@ -236,7 +236,7 @@ pub fn config_open_file_dir(game: String, source: String, file: String) -> Resul
 /// 路径非法返回 `err.fileName`；删除失败返回内核错误串
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
-pub fn config_delete_file(game: String, source: String, file: String) -> Result<(), String> {
+pub async fn config_delete_file(game: String, source: String, file: String) -> Result<(), String> {
     let game = instance_snapshot(&game)?;
     let path = resolve_source(&game, &source, &file)?;
     // 普通文件的会话；区块会话跟着区域文件走，这里不去猜下标
@@ -260,7 +260,7 @@ pub fn config_delete_file(game: String, source: String, file: String) -> Result<
 /// 见 [`BytesSliceDto`]；路径非法返回 `err.fileName`，读取失败返回内核错误串
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
-pub fn config_get_bytes_slice(
+pub async fn config_get_bytes_slice(
     game: String,
     source: String,
     file: String,
@@ -310,7 +310,7 @@ pub(super) fn image_mime(path: &Path) -> &'static str {
 /// `err.notImageFile`，体积超过上限返回 `err.fileTooLarge`
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
-pub fn config_get_image(game: String, source: String, file: String) -> Result<String, String> {
+pub async fn config_get_image(game: String, source: String, file: String) -> Result<String, String> {
     let game = instance_snapshot(&game)?;
     let path = resolve_source(&game, &source, &file)?;
     if get_file_type(&path) != FileItemType::Image {

@@ -479,6 +479,21 @@
   color: var(--text-dim);
 }
 
+/* 时间与次数单独成块，间距与整行一致 */
+.meta-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 背景图模式下这行小字直接压在图上看不清，给它垫一层胶囊底（同资源窗口的空提示）。
+   左缘就落在内容区那条线上：靠负外边距把文字顶回对齐线的话，底色会探出卡片左边 */
+html.has-bg .detail-meta .meta-stats {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-card);
+}
+
 .sep {
   opacity: 0.5;
 }

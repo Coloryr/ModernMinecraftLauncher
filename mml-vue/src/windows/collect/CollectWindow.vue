@@ -1102,7 +1102,7 @@ function openGroupMenu(payload: { event: MouseEvent; id: string; label: string }
       <!-- 左栏：全部 + 默认分组 + 自建分组，与方块窗口同一个分类栏 -->
       <div class="collect-main flex min-h-0 flex-1 gap-4">
         <CategoryRail flush :all-label="t('collect.all')" :all-count="shownCount" :items="railItems"
-          :active="activeGroup" :drop-key="dropGroup" :new-label="t('collect.addGroup')" new-style="button" sortable
+          :active="activeGroup" :drop-key="dropGroup" :new-label="t('collect.addGroup')" sortable
           @pick="activeGroup = $event" @reorder="onGroupReorder" @group-menu="openGroupMenu"
           @new-group="showAddGroup = true" />
 

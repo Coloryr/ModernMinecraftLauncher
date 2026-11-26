@@ -449,16 +449,6 @@ watch(
   },
 );
 
-/**
- * 主页卡片的启动：**留在主页**直接启动
- *
- * 以前这里先调 select()，那会把主页收掉、跳到实例详情；主页只是"顺手点一下启动"，
- * 不该把人从新闻页拽走。按钮的启动中 / 运行中状态由 HomePage 按实例状态自己按住。
- */
-function quickLaunch() {
-  if (selected.value) void launch();
-}
-
 const news = ref<NewsItem[]>([]);
 const newsPage = ref(1);
 const newsHasMore = ref(true);
@@ -2105,6 +2095,20 @@ const preparingText = computed(() =>
     : t("launch.checkingFiles"),
 );
 
+/** 主页卡片那颗启动按钮里的阶段文案：启动中 / 补全中各一套 */
+const homeLaunchText = computed(() => {
+  if (isLaunching.value) return launchStageText.value;
+  if (isPreparing.value) return preparingText.value;
+  return "";
+});
+
+/** 主页卡片那颗启动按钮的进度；两段都没有确定值时给 null（进度条走滚动） */
+const homeLaunchPct = computed(() => {
+  if (isLaunching.value) return launchPct.value;
+  if (isPreparing.value) return preparingPct.value;
+  return null;
+});
+
 /**
  * 取消正在进行的文件补全
  *
@@ -2667,8 +2671,10 @@ onMounted(async () => {
             <section v-else-if="newsActive" key="home" class="news-page">
               <HomePage :items="news" :loading="newsLoading" @refresh="fetchNews(newsPage)" :page="newsPage"
                 :has-more="newsHasMore" @prev="prevNewsPage" @next="nextNewsPage" @open="openNews"
-                :current-instance="selected" :launching="isLaunching" @select="(inst: InstanceInfoDto) => select(inst)"
-                @quick-launch="quickLaunch" back-label-key="home.backToList" @back="newsActive = false" />
+                :current-instance="selected" :launching="isLaunching" :launch-stage-text="homeLaunchText"
+                :launch-percent="homeLaunchPct" :can-launch-menu="canLaunchMenu" :launch-menu-open="launchMenuOpen"
+                :offline-blocked="offlineLaunchBlocked" @quick-launch="onLaunchAction"
+                @launch-menu="openLaunchMenu" back-label-key="home.backToList" @back="newsActive = false" />
             </section>
 
             <section v-else key="list" class="list-mode">
@@ -2731,8 +2737,6 @@ onMounted(async () => {
                     :aria-expanded="launchMenuOpen" @click="openLaunchMenu">
                     <GlyphIcon name="chevron-down" :size="14" :weight="2.2" />
                   </button>
-                  <RowMenu v-if="launchMenuOpen" :x="launchMenuPos.x" :y="launchMenuPos.y"
-                    :items="launchMenuItems" @pick="onLaunchMenuPick" @close="launchMenuOpen = false" />
                 </div>
                 <!-- 两组按钮各自贴紧：左边两个文字按钮一组、右边三个图标键一组，
                      两组之间的间距保持原样（见 main-window.css .launch-sub-actions） -->
@@ -2816,8 +2820,10 @@ onMounted(async () => {
               <HomePage v-else-if="newsActive" key="home" :items="news" :loading="newsLoading"
                 @refresh="fetchNews(newsPage)" :page="newsPage" :has-more="newsHasMore" @prev="prevNewsPage"
                 @next="nextNewsPage" @open="openNews" :current-instance="selected" :launching="isLaunching"
-                @select="(inst: InstanceInfoDto) => select(inst)" @quick-launch="quickLaunch"
-                back-label-key="home.backToDetail" @back="newsActive = false" />
+                :launch-stage-text="homeLaunchText" :launch-percent="homeLaunchPct"
+                :can-launch-menu="canLaunchMenu" :launch-menu-open="launchMenuOpen"
+                :offline-blocked="offlineLaunchBlocked" @quick-launch="onLaunchAction"
+                @launch-menu="openLaunchMenu" back-label-key="home.backToDetail" @back="newsActive = false" />
 
               <div v-else key="detail" class="detail-content flex flex-1 flex-col gap-4">
                 <!-- 按实例 uuid 做 key：切换实例时整块详情走进出动画 -->
@@ -2875,8 +2881,6 @@ onMounted(async () => {
                             @click="openLaunchMenu">
                             <GlyphIcon name="chevron-down" :size="14" :weight="2.2" />
                           </button>
-                          <RowMenu v-if="launchMenuOpen" :x="launchMenuPos.x" :y="launchMenuPos.y"
-                            :items="launchMenuItems" @pick="onLaunchMenuPick" @close="launchMenuOpen = false" />
                         </div>
                         <div class="side-row">
                           <BaseButton size="sm" variant="accent" @click="onAction('addResource')">{{
@@ -2888,9 +2892,12 @@ onMounted(async () => {
                     </div>
 
                     <div class="detail-meta">
-                      <span>{{ t("detail.playTime", { hours: playHoursOf(selected.uuid) }) }}</span>
-                      <span class="sep">·</span>
-                      <span>{{ t("detail.launchCount", { count: statsOf(selected.uuid)?.count ?? 0 }) }}</span>
+                      <!-- 时间与次数单独一块：背景图模式下只有文字要垫底，图标按钮自带底色 -->
+                      <span class="meta-stats">
+                        <span>{{ t("detail.playTime", { hours: playHoursOf(selected.uuid) }) }}</span>
+                        <span class="sep">·</span>
+                        <span>{{ t("detail.launchCount", { count: statsOf(selected.uuid)?.count ?? 0 }) }}</span>
+                      </span>
                       <!-- 小图标快捷操作（单色 SVG） -->
                       <div class="meta-actions">
                         <button class="icon-btn" v-tip="t('actions.openFolder')" @click="onAction('openFolder')">
@@ -3234,6 +3241,10 @@ onMounted(async () => {
     <!-- ===== 拖拽整合包文件遮罩层 ===== -->
     <!-- 拖拽文件 / 登录卡片时的遮罩；标题按拖入类型变，见 DROP_TITLE_KEYS -->
     <DropOverlay v-if="fileDragOver" :title="t(dropTitleKey)" />
+
+    <!-- 启动方式菜单：列表 / 详情 / 主页三处启动按钮共用一份，落点由点击处给 -->
+    <RowMenu v-if="launchMenuOpen" :x="launchMenuPos.x" :y="launchMenuPos.y" :items="launchMenuItems"
+      @pick="onLaunchMenuPick" @close="launchMenuOpen = false" />
   </div>
 </template>
 

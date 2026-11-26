@@ -4,7 +4,7 @@
 // 文本提交行级差异，NBT 会话记录编辑操作；保存前均用基线 SHA1 检查磁盘冲突。
 // 实例名、来源下拉、刷新、保存状态与保存键都放进标题栏；
 // 文件树上方只留搜索与区域文件的查找入口。
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { t, tErr } from "../../lib/i18n";
 import { showToast } from "../../lib/toast";
 import { useWindowRefresh } from "../../composables/useWindowRefresh";
@@ -21,7 +21,7 @@ import {
   writeConfigFile,
 } from "../../lib/api";
 import { loadGuiConfig } from "../../lib/guiConfig";
-import { buildConfigTree, visibleConfigRows } from "./configTree";
+import { buildConfigTree, visibleConfigRows, type ConfigTreeRow } from "./configTree";
 import { applyHunks, diffLines, joinLines, splitLines } from "../../lib/textDiff";
 import { familyInstanceFromLabel, multiWindow, targetSaveDir, targetUuid, windowParams } from "../windowManager";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
@@ -149,6 +149,68 @@ const fileByPath = computed(() => new Map(files.value.map((f) => [f.name, f])));
 const tree = computed(() => buildConfigTree(files.value.map((file) => file.name)));
 const rows = computed(() => visibleConfigRows(tree.value, expanded.value, query.value));
 
+// ---------- 左栏吸顶目录 ----------
+
+/** 左侧文件树的滚动容器 */
+const treeScrollEl = ref<HTMLElement | null>(null);
+/** 当前的滚动距离 */
+const treeScrollTop = ref(0);
+
+function onTreeScroll() {
+  treeScrollTop.value = treeScrollEl.value?.scrollTop ?? 0;
+}
+
+/**
+ * 视口顶部那一行的下标
+ *
+ * 行高与行间距都按实际布局量（读 offsetTop 二分），不按常量换算：行高由 --row-h 给、
+ * 间距来自容器的 gap，写死数字迟早和样式对不上。
+ *
+ * - `el`: 滚动容器，子元素顺序与 rows 一致
+ * - `top`: 当前的滚动距离
+ *
+ * # 返回值
+ *
+ * 顶部那一行的下标；容器里没有行时为 0
+ */
+function topRowIndex(el: HTMLElement, top: number): number {
+  let lo = 0;
+  let hi = el.children.length - 1;
+  let found = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const child = el.children[mid] as HTMLElement;
+    if (child.offsetTop + child.offsetHeight > top) {
+      found = mid;
+      hi = mid - 1;
+    } else {
+      lo = mid + 1;
+    }
+  }
+  return found;
+}
+
+/** 吸顶的目录：视口顶部那一行所属的那一层目录；没滚动或它就在根上时为 null */
+const pinnedDir = computed<ConfigTreeRow | null>(() => {
+  const el = treeScrollEl.value;
+  const list = rows.value;
+  if (!el || treeScrollTop.value <= 0 || !list.length) return null;
+  const start = Math.min(topRowIndex(el, treeScrollTop.value), list.length - 1);
+  const row = list[start];
+  // 顶部这行本身就是展开着的目录：它自己就是当前所在的那一层
+  if (row.isDir && row.expanded) return row;
+  // 否则往上找最近的上一层目录：DFS 展平后它就是这行的父目录
+  for (let i = start - 1; i >= 0; i--) {
+    if (list[i].depth < row.depth && list[i].isDir) return list[i];
+  }
+  return null;
+});
+
+// 展开 / 收起、搜索、换来源都会改行，浏览器可能顺手挪动滚动位置：跟着重读一次
+watch(rows, () => {
+  treeScrollTop.value = treeScrollEl.value?.scrollTop ?? 0;
+}, { flush: "post" });
+
 /** 展开或收起目录，保留其他目录的展开状态 */
 function toggleExpand(key: string) {
   const next = new Set(expanded.value);
@@ -171,7 +233,6 @@ function openFile(key: string) {
 
 /** 左栏占位文案：加载中 / 没选实例 / 搜不到 / 这个位置没有文件 */
 const emptyTip = computed(() => {
-  if (loading.value) return t("config.loading");
   if (!instanceUuid.value) return t("config.noInstance");
   if (query.value.trim()) return t("config.searchEmpty");
   return t("config.noFiles");
@@ -236,6 +297,9 @@ async function loadFiles(confirmed = false) {
   // 树与搜索都跟着这批文件走：换了来源 / 实例，旧的目录 key 与关键字都没意义了
   expanded.value = new Set();
   query.value = "";
+  // 新的一批文件从顶部看起，吸顶目录跟着复位
+  if (treeScrollEl.value) treeScrollEl.value.scrollTop = 0;
+  treeScrollTop.value = 0;
   // 关闭干净的 NBT 会话以便重读磁盘，保留会话中尚未保存的编辑。
   await clearCleanSessions();
   if (!current()) return;
@@ -638,35 +702,61 @@ useWindowRefresh(() => {
           </BaseButton>
         </div>
 
-        <div class="cfg-tree flex flex-col gap-1 flex-1 min-h-0 overflow-y-scroll [scrollbar-gutter:stable] px-2.5 pt-0.5 pb-3.5"
-          :aria-busy="loading">
-          <template v-for="row in rows" :key="row.key">
-            <!-- 目录：按侧栏的分组标题写，缩进由层级给 -->
-            <button v-if="row.isDir"
+        <div class="cfg-tree relative flex flex-1 min-h-0" :aria-busy="loading">
+          <!-- 吸顶目录：与导出实例的文件列表同一套做法 —— 单独画在滚动区外面，
+               滚动时换成当前所在的那一层目录 -->
+          <div v-if="pinnedDir" class="cfg-pin">
+            <button type="button"
               class="cfg-dir flex items-center gap-2 w-full shrink-0 px-3 border-0 rounded-ctl bg-transparent text-fg text-body text-left cursor-pointer transition-[background-color] duration-[120ms] [font-family:inherit]"
-              :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
-              :aria-expanded="row.expanded" @click="toggleExpand(row.key)"
-              @contextmenu.prevent="openRowMenu($event, row.key)">
-              <GlyphIcon class="cfg-chevron" :class="{ 'is-expanded': row.expanded }" name="chevron-down" :size="14"
-                :weight="2.4" />
-              <span class="cfg-dir-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" :title="row.key">
-                <HighlightText :text="row.name" :query="query" />
+              :style="{ paddingLeft: `${8 + pinnedDir.depth * 14}px` }" :aria-expanded="pinnedDir.expanded"
+              @click="toggleExpand(pinnedDir.key)">
+              <GlyphIcon class="cfg-chevron" :class="{ 'is-expanded': pinnedDir.expanded }" name="chevron-down"
+                :size="14" :weight="2.4" />
+              <span class="cfg-dir-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                :title="pinnedDir.key">
+                <HighlightText :text="pinnedDir.name" :query="query" />
               </span>
             </button>
-            <!-- 文件：按侧栏的实例行写 -->
-            <button v-else
-              class="cfg-row flex items-center gap-2 w-full shrink-0 px-3 border-0 rounded-ctl bg-transparent text-fg text-body text-left cursor-pointer transition-[background-color] duration-[120ms] [font-family:inherit]"
-              :class="{ 'is-active': selected?.name === row.key }"
-              :aria-current="selected?.name === row.key ? 'true' : undefined"
-              :style="{ paddingLeft: `${8 + row.depth * 14}px` }" :title="row.key" @click="openFile(row.key)"
-              @contextmenu.prevent="openRowMenu($event, row.key)">
-              <span class="cfg-chevron-spacer shrink-0 w-3.5"></span>
-              <span class="cfg-file-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                <HighlightText :text="row.name" :query="query" />
-              </span>
-            </button>
-          </template>
-          <p v-if="!rows.length" class="empty-tip">{{ emptyTip }}</p>
+          </div>
+          <div ref="treeScrollEl"
+            class="cfg-tree-scroll flex flex-col gap-1 flex-1 min-h-0 overflow-y-scroll [scrollbar-gutter:stable] px-2.5 pt-0.5 pb-3.5"
+            @scroll="onTreeScroll">
+            <template v-for="row in rows" :key="row.key">
+              <!-- 目录：按侧栏的分组标题写，缩进由层级给 -->
+              <button v-if="row.isDir"
+                class="cfg-dir flex items-center gap-2 w-full shrink-0 px-3 border-0 rounded-ctl bg-transparent text-fg text-body text-left cursor-pointer transition-[background-color] duration-[120ms] [font-family:inherit]"
+                :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
+                :aria-expanded="row.expanded" @click="toggleExpand(row.key)"
+                @contextmenu.prevent="openRowMenu($event, row.key)">
+                <GlyphIcon class="cfg-chevron" :class="{ 'is-expanded': row.expanded }" name="chevron-down" :size="14"
+                  :weight="2.4" />
+                <span class="cfg-dir-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" :title="row.key">
+                  <HighlightText :text="row.name" :query="query" />
+                </span>
+              </button>
+              <!-- 文件：按侧栏的实例行写 -->
+              <button v-else
+                class="cfg-row flex items-center gap-2 w-full shrink-0 px-3 border-0 rounded-ctl bg-transparent text-fg text-body text-left cursor-pointer transition-[background-color] duration-[120ms] [font-family:inherit]"
+                :class="{ 'is-active': selected?.name === row.key }"
+                :aria-current="selected?.name === row.key ? 'true' : undefined"
+                :style="{ paddingLeft: `${8 + row.depth * 14}px` }" :title="row.key" @click="openFile(row.key)"
+                @contextmenu.prevent="openRowMenu($event, row.key)">
+                <span class="cfg-chevron-spacer shrink-0 w-3.5"></span>
+                <span class="cfg-file-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                  <HighlightText :text="row.name" :query="query" />
+                </span>
+              </button>
+            </template>
+            <!-- 首次加载（还没有任何行）：骨架行占位，自带呼吸动画；
+                 已经有行时不动列表，避免刷新时内容闪一下 -->
+            <div v-if="loading && !rows.length" class="cfg-sk" aria-hidden="true">
+              <div v-for="n in 10" :key="n" class="cfg-sk-row">
+                <span class="sk cfg-sk-mark" />
+                <span class="sk cfg-sk-line" />
+              </div>
+          </div>
+            <p v-else-if="!rows.length" class="empty-tip">{{ emptyTip }}</p>
+          </div>
         </div>
       </aside>
 
@@ -689,6 +779,10 @@ useWindowRefresh(() => {
         <ImageView v-else-if="selected.fileType === 'image'" :uuid="instanceUuid" :source="source"
           :file="selected.name" />
         <HexView v-else :uuid="instanceUuid" :source="source" :file="selected.name" />
+        <!-- 读文本文件期间：空占位编辑器上盖一层代码骨架，读盘不再是一片空白 -->
+        <div v-if="loading && selected && isText" class="cfg-sk-editor" aria-hidden="true">
+          <span v-for="n in 14" :key="n" class="sk cfg-sk-code" />
+        </div>
       </section>
     </div>
 
@@ -768,6 +862,8 @@ useWindowRefresh(() => {
    写成无层规则而不是只靠模板上的 bg-bg-solid：工具类赢不过无层声明，这里必须稳 */
 .cfg-view {
   background: var(--bg-solid, var(--bg-card));
+  /* 读文件时的骨架盖在这块上面 */
+  position: relative;
 }
 
 /* 视图占满容器，滚动交给各视图内部 */
@@ -786,5 +882,98 @@ useWindowRefresh(() => {
 .cfg-split:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: -2px;
+}
+
+/* 加载态用骨架占位（.sk 自带呼吸动画），与其它列表窗口同一套口径，不另做转圈。
+   行高跟着 --row-h 走，骨架换真实内容时不会跳一下 */
+.cfg-sk {
+  display: flex;
+  flex-direction: column;
+}
+
+.cfg-sk-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--row-h);
+  padding: 0 8px;
+}
+
+/* 每三行往里缩一档，看着像真的文件树 */
+.cfg-sk-row:nth-child(3n) {
+  padding-left: 22px;
+}
+
+.cfg-sk-mark {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.cfg-sk-line {
+  width: 72%;
+  height: 10px;
+}
+
+.cfg-sk-row:nth-child(2n) .cfg-sk-line {
+  width: 54%;
+}
+
+.cfg-sk-row:nth-child(3n) .cfg-sk-line {
+  width: 84%;
+}
+
+/* 读文件期间盖住空占位编辑器：不透明底，免得透出下面那份空 Monaco */
+.cfg-sk-editor {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  background: var(--bg-solid, var(--bg-card));
+  overflow: hidden;
+}
+
+.cfg-sk-code {
+  flex-shrink: 0;
+  width: 78%;
+  height: 11px;
+}
+
+.cfg-sk-editor .cfg-sk-code:nth-child(3n) {
+  width: 52%;
+}
+
+.cfg-sk-editor .cfg-sk-code:nth-child(4n) {
+  width: 90%;
+}
+
+/* 滚动区自己当定位参照：行的 offsetTop 与 scrollTop 同一原点，二分才准 */
+.cfg-tree-scroll {
+  position: relative;
+}
+
+/* 吸顶目录：贴在滚动区顶部（左缩进对齐列表内容 10px，右缘让出 9px 的常驻滚动条槽）。
+   底色取侧栏色并加模糊：它压着下面滑上来的行，不能透出来 */
+.cfg-pin {
+  position: absolute;
+  top: 2px;
+  left: 10px;
+  right: 19px;
+  z-index: 2;
+}
+
+.cfg-pin .cfg-dir {
+  background-color: var(--bg-side);
+  -webkit-backdrop-filter: blur(14px) saturate(1.06);
+  backdrop-filter: blur(14px) saturate(1.06);
+}
+
+/* 悬停色叠在这层底上：直接换 --bg-hover 是半透明的，下面的行会透出来 */
+.cfg-pin .cfg-dir:hover {
+  background-color: var(--bg-side);
+  background-image: linear-gradient(var(--bg-hover), var(--bg-hover));
 }
 </style>

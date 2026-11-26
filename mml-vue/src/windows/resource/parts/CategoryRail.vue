@@ -23,9 +23,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** 点了某个分类，外壳据此切换面板 */
   (e: "select", id: CategoryId): void;
+  /** 点了栏底的「添加资源」，外壳据此开下载窗口 */
+  (e: "add"): void;
 }>();
 
-const { category } = props.data;
+const { category, instanceUuid } = props.data;
+
+/** 有实例才放行添加资源：下载窗口一个实例一个，没实例无处可放 */
+const canAdd = computed(() => !!instanceUuid.value);
 const { order, setOrder } = props.view;
 
 /** 按偏好顺序排好的分类，含文案键 */
@@ -181,6 +186,13 @@ onUnmounted(() => {
       <GlyphIcon :name="dragged.icon" :size="15" />
       <span class="cat-name">{{ t(dragged.labelKey) }}</span>
     </div>
+
+    <!-- 添加资源：原先在标题栏那颗加号，挪到分类栏**底部**（mt-auto 把它推到栏底），
+         与另两个分类栏的「添加分组」同一档外观 -->
+    <button type="button" class="add-row-btn cat-add mt-auto" :disabled="!canAdd" @click="emit('add')">
+      <GlyphIcon name="plus" :size="14" :weight="2.2" />
+      <span>{{ t("winTitle.addResource") }}</span>
+    </button>
 
     <!-- 拖动时的浮起副本：跟着指针走，位置见 ghost；列表里那一项留在原位淡出 -->
     <Teleport to="body">

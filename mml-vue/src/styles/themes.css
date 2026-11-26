@@ -570,6 +570,8 @@ html.has-bg.bg-frosted :is(
   /* 主窗口 */
   .last-card, .entry-card, .empty-block, .page-back, .motd-card, .motd-refresh,
   .meta-panel, .args-panel, .server-config, .exec-panel, .json-panel, .proxy-panel,
+  /* 主页详情里压在背景图上的「累计游戏时间 · 启动次数」，背景图模式下才垫底 */
+  .meta-stats,
   .news-item, .build-notice, .sidebar-expand,
   /* 设置 */
   .settings-layout .row-card, .sample-box, .java-grid, .program-icon-preview,

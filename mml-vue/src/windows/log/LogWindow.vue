@@ -740,7 +740,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <WindowFrame enter=":scope > *" :title="title" body-fill hide-download-indicator @close="$emit('close')">
+  <WindowFrame enter=":scope > *" :title="title" body-fill hide-download-indicator class="log-frame"
+    @close="$emit('close')">
     <!-- 日志来源与操作都放标题栏：不占内容区高度；除「测试启动」外只留图标，文字进提示 -->
     <template #head-right>
       <div class="head-log flex min-w-0 shrink items-center gap-2">
@@ -902,6 +903,12 @@ onBeforeUnmount(() => {
 /* 外壳排版（.log-window / .bar / .head-log / .sw / .lbl / .pick / .launch-busy）
    已改到模板上的工具类，类名保留给主题与毛玻璃表。
    这里只剩工具类表达不了的部分：悬停切换与 keyframes。 */
+
+/* 背景图模式下子窗口默认整窗透明：这一页全是开关、下拉与日志正文，
+   直接压在图上读不了；补回单层 --bg，与设置、导出窗口同一口径 */
+html.has-bg .window-frame.log-frame {
+  background: var(--bg);
+}
 
 /* 启动中悬停换成「取消启动」：进度与动作叠在同一位置，只切透明度，按钮宽度不变 */
 .launch-busy .launch-in {

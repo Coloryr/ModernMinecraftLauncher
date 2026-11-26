@@ -154,8 +154,6 @@ export default {
   "winExport.generateInfo": "Export instance info",
   "winExport.generatingInfo": "Generating…",
   "winExport.directZip": "Direct zip",
-  "winExport.nativeHint": "Zips the instance folder as-is; drop the package into the launcher to import it. Pick what to pack below — logs and crash reports are unchecked by default.",
-  "winExport.dirHintZip": "Checking a folder packs all of it; unchecking leaves it out. Files outside .minecraft in the instance root are always included",
   "err.exportDestination": "Save the archive outside the instance directory",
   "err.exportLink": "The instance contains symbolic links; remove them before exporting",
 
@@ -554,7 +552,7 @@ export default {
   "blocks.search": "Search blocks…",
   "blocks.catAll": "All",
   // Custom groups and favorites (local user data)
-  "blocks.groupAdd": "New group",
+  "blocks.groupAdd": "Add Group",
   "blocks.groupRename": "Rename group",
   "blocks.groupRemove": "Delete group",
   "blocks.groupRemoveConfirm": "Delete “{name}”? The blocks stay; they just leave this group.",
@@ -774,8 +772,8 @@ export default {
   "resource.groupOn": "Enabled",
   "resource.groupOff": "Disabled",
   "resource.groupFail": "Unreadable",
-  "resource.groupAdd": "New group",
-  "resource.groupAddTitle": "New Mod Group",
+  "resource.groupAdd": "Add Group",
+  "resource.groupAddTitle": "Add Mod Group",
   "resource.groupRenameTitle": "Rename Group",
   "resource.groupRename": "Rename",
   "resource.groupDelete": "Delete group",

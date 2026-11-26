@@ -32,7 +32,7 @@ use super::source::{get_file_type, resolve_source, resolve_under};
 /// 扩展名不是 `.mca` 返回 `err.notMcaFile`，文件短于 8 KiB 返回 `err.mcaFileEmpty`
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
-pub fn config_get_mca(
+pub async fn config_get_mca(
     game: String,
     source: String,
     file: String,
@@ -85,7 +85,7 @@ pub fn config_get_mca(
 /// 路径非法返回 `err.fileName`，这一类取错返回 `err.mcaChunkEmpty`
 #[gui_macros::ipc_group("config")]
 #[gui_macros::command]
-pub fn config_find_chunk(
+pub async fn config_find_chunk(
     game: String,
     source: String,
     kind: String,

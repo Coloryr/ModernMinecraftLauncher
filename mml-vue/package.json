@@ -20,6 +20,7 @@
     "test": "node --test \"tests/**/*.test.mjs\"",
     "preview": "vite preview",
     "gen": "node scripts/gen-ui.ts",
+    "gen:nls": "node scripts/gen-monaco-nls.ts",
     "shots": "node scripts/screenshot/run.mjs",
     "shots:docs": "node scripts/screenshot/docs.mjs"
   },

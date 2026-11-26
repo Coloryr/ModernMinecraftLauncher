@@ -10,6 +10,7 @@ import type { InstanceInfoDto, NewsItem } from "../lib/bindings";
 import NewsPanel from "./NewsPanel.vue";
 import InstanceIcon from "./InstanceIcon.vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
+import LaunchProgress from "./LaunchProgress.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -17,8 +18,18 @@ const props = withDefaults(
     items: NewsItem[];
     /** 上次启动的实例；`null` 表示没有，那张卡片不显示 */
     currentInstance: InstanceInfoDto | null;
-    /** 这个实例正在启动流程里（进程还没起来）；按钮据此禁用并显示「正在启动」 */
+    /** 这个实例正在启动流程里（进程还没起来）；按钮里换成进度，点它是取消启动 */
     launching?: boolean;
+    /** 启动 / 补全阶段文案，由调用方按阶段算好 */
+    launchStageText?: string;
+    /** 启动进度；null 表示这一阶段没有确定值，进度条走滚动 */
+    launchPercent?: number | null;
+    /** 启动方式下拉能不能点 */
+    canLaunchMenu?: boolean;
+    /** 启动方式下拉是否展开（只用于 aria-expanded） */
+    launchMenuOpen?: boolean;
+    /** 实例离线且设置了禁止离线启动 */
+    offlineBlocked?: boolean;
     /** 是否一个实例都没有：为 true 时顶部换成空实例引导块 */
     empty?: boolean;
     /** 新闻是否加载中 */
@@ -35,32 +46,45 @@ const props = withDefaults(
      */
     backLabelKey?: string;
   }>(),
-  { loading: false, page: 1, hasMore: true, backLabelKey: "home.backToList", launching: false },
+  {
+    loading: false,
+    page: 1,
+    hasMore: true,
+    backLabelKey: "home.backToList",
+    launching: false,
+    launchStageText: "",
+    launchPercent: null,
+    canLaunchMenu: false,
+    launchMenuOpen: false,
+    offlineBlocked: false,
+  },
 );
 
-/** 快捷启动按钮能不能点：启动中 / 补全中 / 运行中都按住，别在主页重复点出两次启动 */
-const playDisabled = computed(
-  () =>
-    !props.currentInstance ||
-    props.launching ||
-    !!props.currentInstance.preparing ||
-    props.currentInstance.running,
-);
+/** 补全文件阶段（建实例后的自动下载） */
+const preparing = computed(() => !!props.currentInstance?.preparing);
+/** 进程已经起来了 */
+const running = computed(() => !!props.currentInstance?.running);
+/** 启动流程里：启动中 / 补全中 / 运行中，这几种点按钮都是"取消 / 关闭" */
+const busy = computed(() => props.launching || preparing.value || running.value);
 
-/** 快捷启动按钮的文案：跟着实例状态走 */
-const playLabel = computed(() => {
-  if (props.launching) return t("launch.launching");
-  if (props.currentInstance?.preparing === "download") return t("launch.downloadingFiles");
-  if (props.currentInstance?.preparing) return t("launch.checkingFiles");
-  if (props.currentInstance?.running) return t("launch.running");
-  return t("home.lastPlay");
+/** 能不能点：没有实例、或离线又禁止离线启动时按住；忙的时候要能点来取消 */
+const playDisabled = computed(() => !props.currentInstance || (!busy.value && props.offlineBlocked));
+
+/** 悬停时替换显示的动作：取消启动 / 取消补全 / 关闭游戏 */
+const actionText = computed(() => {
+  if (props.launching) return t("launch.cancel");
+  if (preparing.value) return t("launch.cancelPrepare");
+  return t("launch.stop");
 });
 
+/** 动作图标：取消类是叉，关闭游戏是电源 */
+const actionIcon = computed(() => (props.launching || preparing.value ? "close" : "power"));
+
 const emit = defineEmits<{
-  /** 选中该实例 */
-  (e: "select", inst: InstanceInfoDto): void;
-  /** 快捷启动上次启动的实例 */
+  /** 启动按钮：闲时启动，启动中 / 补全中取消、运行中弹关闭确认（都由外壳判） */
   (e: "quick-launch"): void;
+  /** 点右侧下拉：出启动方式菜单（调试启动 / 导出启动参数） */
+  (e: "launch-menu", event: MouseEvent): void;
   /** 点击页头返回按钮：返回目标由调用方决定，见 backLabelKey */
   (e: "back"): void;
   /** 空实例引导块里的"添加实例" */
@@ -130,17 +154,37 @@ function onLobby() {
       </div>
     </div>
 
-    <!-- 当前选中实例：仅在选中时显示（未选中时该槽位留空），点一下即可快捷启动 -->
+    <!-- 当前选中实例：仅在选中时显示（未选中时该槽位留空）。
+         启动按钮与实例设置里那颗同一套：跑起来时按钮里是进度、点它是取消 / 关闭，
+         右端贴一个下拉箭头出启动方式菜单 -->
     <div v-if="currentInstance" class="last-card">
       <InstanceIcon :name="currentInstance.name" :uuid="currentInstance.uuid" :loader="currentInstance.loader"
         :size="52" />
       <span class="last-name">{{ currentInstance.name }}</span>
-      <button class="last-play" :disabled="playDisabled" @click="emit('quick-launch')">
-        <GlyphIcon name="play" :size="12" /> {{ playLabel }}
-      </button>
-      <button class="last-open" @click="emit('select', currentInstance)">
-        <GlyphIcon name="chevron-right" :size="18" />
-      </button>
+      <div class="last-launch">
+        <button class="last-play" :class="{ running: busy }" :disabled="playDisabled"
+          @click="emit('quick-launch')">
+          <!-- 启动 / 补全中：阶段 + 进度；悬停换成取消动作 -->
+          <span v-if="busy" class="last-busy">
+            <span v-if="launching || preparing" class="last-progress">
+              <LaunchProgress :text="launchStageText" :percent="launchPercent" />
+            </span>
+            <span v-else class="last-running">{{ t("launch.running") }}</span>
+            <span class="last-hover">
+              <GlyphIcon :name="actionIcon" :size="12" />
+              {{ actionText }}
+            </span>
+          </span>
+          <template v-else>
+            <GlyphIcon name="play" :size="12" /> {{ t("home.lastPlay") }}
+          </template>
+        </button>
+        <button type="button" class="last-drop" :disabled="!canLaunchMenu" v-tip="t('launchMenu.more')"
+          :aria-label="t('launchMenu.more')" :aria-expanded="launchMenuOpen"
+          @click="emit('launch-menu', $event)">
+          <GlyphIcon name="chevron-down" :size="14" :weight="2.2" />
+        </button>
+      </div>
     </div>
 
     <div class="entry-cards">
@@ -383,9 +427,24 @@ function onLobby() {
   text-overflow: ellipsis;
 }
 
+/* 启动按钮 + 右端下拉：整体仍是一颗按钮，箭头压在内侧右端（与实例设置里那颗同一做法） */
+.last-launch {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+
 .last-play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   height: var(--ctl-h);
-  padding: 0 18px;
+  /* 定一个下限：进度那两行（阶段 + 进度条）要放得开，标签长短也不让卡片左右跳 */
+  min-width: 140px;
+  /* 右边留出下拉箭头的热区 */
+  padding: 0 34px 0 16px;
   border-radius: 8px;
   border: none;
   background: var(--accent);
@@ -394,36 +453,97 @@ function onLobby() {
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  transition: filter 0.15s;
+  transition: filter 0.15s, background 0.15s, color 0.15s;
   white-space: nowrap;
+  overflow: hidden;
+  /* 进度条比主界面那颗窄一档：按钮本身窄，110px 会把阶段文字挤没 */
+  --launch-bar-w: 88px;
 }
 
 .last-play:hover:not(:disabled) {
   filter: brightness(1.12);
 }
 
-/* 启动中 / 运行中：按住不放，跟着实例状态变灰 */
+/* 启动中悬停是取消启动、运行中悬停是关闭游戏，都是危险动作：整颗转红底红字 */
+.last-play.running:hover:not(:disabled) {
+  filter: none;
+  background: color-mix(in srgb, var(--red) 20%, var(--bg-card));
+  color: var(--red);
+}
+
 .last-play:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.last-open {
-  width: var(--ctl-h);
-  height: var(--ctl-h);
-  border-radius: 8px;
-  border: 1px solid var(--accent-border);
-  background: var(--bg-raised);
-  color: var(--accent);
-  font-size: 18px;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s;
+/* 按钮里平时是进度、「运行中」，悬停换成动作：两层叠在同一位置，只切透明度 */
+.last-busy {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
 }
 
-.last-open:hover {
-  background: var(--accent);
+.last-progress,
+.last-running {
+  transition: opacity 0.12s;
+}
+
+.last-running {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.last-hover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  /* 点击交给按钮本身 */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  white-space: nowrap;
+}
+
+.last-play:hover .last-progress,
+.last-play:hover .last-running {
+  opacity: 0;
+}
+
+.last-play:hover .last-hover {
+  opacity: 1;
+}
+
+/* 启动方式下拉：只做一小块悬停底，不画竖线，视觉上还是同一颗按钮 */
+.last-drop {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 0 8px 8px 0;
+  background: transparent;
   color: var(--on-accent);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.last-drop:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--on-accent) 14%, transparent);
+}
+
+.last-drop:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .entry-cards {

@@ -2,13 +2,15 @@
 // 导出用的文件树：一层一层向 Rust 要目录内容，勾选状态留在父组件
 //
 // 勾选沿目录继承：勾了目录，里面的东西都算勾上；取消勾选记成排除项，父目录勾着也能去掉某一条。
-// 展平成一维行来渲染：递归组件在只有"目录 + 文件"两层结构时反而更绕。
+// 展平成一维行渲染（目录 + 文件的先后即显示顺序），吸顶靠行高换算：
+// 滚动位置 / 行高 = 顶部那一行，往回找到最近的目录行，把它单独画在滚动区外面——
+// 不用 position: sticky，那一套在嵌套分组里对祖先的高度很敏感，容易错位。
 import { computed, ref, watch } from "vue";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
 import { api } from "../../../lib/api";
 import type { ExportEntryDto } from "../../../lib/bindings";
-import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
+import FileTreeRow from "./FileTreeRow.vue";
 import { isPickedPath } from "../picked";
 
 const props = defineProps<{
@@ -38,7 +40,7 @@ const opened = ref(new Set<string>());
 /** 正在拉的目录，防重复请求 */
 const loading = ref(new Set<string>());
 
-/** 展平后的可见行：只含已展开目录的后代 */
+/** 展平后的可见行：只含已展开目录的后代，顺序就是显示顺序 */
 interface TreeRow {
   /** 这一行的条目 */
   entry: ExportEntryDto;
@@ -46,19 +48,60 @@ interface TreeRow {
   depth: number;
 }
 
+/** 行高，单位 px：与 .tree-row 的 height 一致，吸顶行按它换算 */
+const ROW_H = 27;
+
 const rows = computed<TreeRow[]>(() => {
   const list: TreeRow[] = [];
   const walk = (dir: string, depth: number) => {
     for (const entry of children.value.get(dir) ?? []) {
       list.push({ entry, depth });
-      if (entry.dir && opened.value.has(entry.path)) {
-        walk(entry.path, depth + 1);
-      }
+      if (entry.dir && opened.value.has(entry.path)) walk(entry.path, depth + 1);
     }
   };
   walk("", 0);
   return list;
 });
+
+/** 滚动容器 */
+const scrollEl = ref<HTMLElement | null>(null);
+/** 当前的滚动距离，吸顶行按它算 */
+const scrollTop = ref(0);
+
+/** 滚动时重算吸顶行 */
+function onScroll() {
+  scrollTop.value = scrollEl.value?.scrollTop ?? 0;
+}
+
+/** 吸顶行：视口顶部那一行**所属**的那一层目录；没滚动或已经在根上时不显示 */
+const pinned = computed<TreeRow | null>(() => {
+  const top = scrollTop.value;
+  const list = rows.value;
+  if (top <= 0 || !list.length) return null;
+  const start = Math.min(Math.floor(top / ROW_H), list.length - 1);
+  const row = list[start];
+  // 顶部这行本身就是展开着的目录：它自己就是当前所在的那一层
+  if (row.entry.dir && opened.value.has(row.entry.path)) return row;
+  // 否则往上找最近的上一层目录：DFS 里它就是这行的父目录。
+  // 不能简单取「最近的目录行」—— 那会挑中已经划过去的、同层的兄弟目录
+  for (let i = start - 1; i >= 0; i--) {
+    if (list[i].depth < row.depth && list[i].entry.dir) return list[i];
+  }
+  return null;
+});
+
+/** 没有排除项时共用的空表，免得每渲染一行就新建一个 */
+const NO_UNPICKED: ReadonlySet<string> = new Set();
+
+/** 勾选状态：勾了目录，里面每一条都跟着算勾上 */
+function isChecked(path: string): boolean {
+  return isPickedPath(path, props.picked, props.unpicked ?? NO_UNPICKED);
+}
+
+/** 必选条目：勾选框固定勾上并禁用，点了也不改勾选 */
+function isLocked(path: string): boolean {
+  return props.locked?.(path) === true;
+}
 
 /** 按根目录选接口：实例目录给「直接压缩」用 */
 function listDir(dir: string) {
@@ -94,30 +137,16 @@ async function toggleDir(dir: string) {
   await load(dir);
 }
 
-/** 没有排除项时共用的空表，免得每渲染一行就新建一个 */
-const NO_UNPICKED: ReadonlySet<string> = new Set();
-
-/** 勾选状态：勾了目录，里面每一条都跟着算勾上 */
-function checked(path: string): boolean {
-  return isPickedPath(path, props.picked, props.unpicked ?? NO_UNPICKED);
+/** 回到顶部，并把吸顶行一起清掉 */
+function resetScroll() {
+  if (scrollEl.value) scrollEl.value.scrollTop = 0;
+  scrollTop.value = 0;
 }
 
-/** 必选条目：勾选框固定勾上并禁用，点了也不改勾选 */
-function isLocked(path: string): boolean {
-  return props.locked?.(path) === true;
-}
-
-/** 勾选 / 取消一行；必选条目不动 */
-function toggleRow(entry: ExportEntryDto) {
-  if (!isLocked(entry.path)) emit("toggle", entry);
-}
-
-/** 文件大小，按档显示 */
-function sizeText(size: number): string {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
-}
+// 展开 / 收起会改变内容高度，浏览器可能顺手挪动滚动位置：重新读一次
+watch(rows, () => {
+  scrollTop.value = scrollEl.value?.scrollTop ?? 0;
+}, { flush: "post" });
 
 // 换实例或换根目录就把整棵树清掉重来，再把指定的目录展开
 watch(
@@ -125,6 +154,7 @@ watch(
   async () => {
     children.value = new Map();
     opened.value = new Set();
+    resetScroll();
     if (!props.uuid) return;
     await load("");
     for (const dir of props.expand ?? []) {
@@ -139,105 +169,49 @@ watch(
 
 <template>
   <div class="tree">
-    <p v-if="!rows.length" class="empty-tip">{{ t("winExport.noFiles") }}</p>
-    <div v-for="row in rows" :key="row.entry.path" class="tree-row" :style="{ paddingLeft: `${8 + row.depth * 16}px` }">
-      <span class="tree-caret" :class="{ open: opened.has(row.entry.path) }" @click="toggleDir(row.entry.path)">
-        <GlyphIcon v-if="row.entry.dir" name="chevron-down" :size="12" :weight="2.4" />
-      </span>
-      <input type="checkbox" class="tree-box" :checked="isLocked(row.entry.path) || checked(row.entry.path)"
-        :disabled="isLocked(row.entry.path)" :title="isLocked(row.entry.path) ? t('winExport.mandatory') : undefined"
-        @change="toggleRow(row.entry)" />
-      <span class="tree-name" :class="{ dir: row.entry.dir, locked: isLocked(row.entry.path) }" :title="row.entry.path"
-        @click="row.entry.dir ? toggleDir(row.entry.path) : toggleRow(row.entry)">{{
-          row.entry.path.split("/").pop()
-        }}</span>
-      <span class="tree-size">{{ row.entry.dir ? "—" : sizeText(row.entry.size) }}</span>
+    <!-- 吸顶行画在滚动区之外，滚动时由前面的脚本换成当前那一层目录 -->
+    <div v-if="pinned" class="tree-pin">
+      <FileTreeRow :entry="pinned.entry" :depth="pinned.depth" :open="opened.has(pinned.entry.path)"
+        :checked="isChecked(pinned.entry.path)" :locked="isLocked(pinned.entry.path)" pinned
+        @toggle="emit('toggle', $event)" @open="toggleDir" />
+    </div>
+    <div ref="scrollEl" class="tree-scroll" @scroll="onScroll">
+      <p v-if="!rows.length" class="empty-tip">{{ t("winExport.noFiles") }}</p>
+      <FileTreeRow v-for="row in rows" :key="row.entry.path" :entry="row.entry" :depth="row.depth"
+        :open="opened.has(row.entry.path)" :checked="isChecked(row.entry.path)" :locked="isLocked(row.entry.path)"
+        @toggle="emit('toggle', $event)" @open="toggleDir" />
     </div>
   </div>
 </template>
 
 <style scoped>
+/* 外框只管边框与圆角，滚动交给里面那层；圆角裁掉滚动条与吸顶行 */
 .tree {
+  position: relative;
   flex: 1;
   min-height: 0;
-  overflow: auto;
-  overflow-y: scroll;
-  padding: 4px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg-solid, var(--bg-card));
+  overflow: hidden;
+}
+
+.tree-scroll {
+  position: absolute;
+  inset: 4px;
+  overflow: auto;
+  overflow-y: scroll;
   /* 只留滚动条那一侧的槽：条目左右内边距本来就一样，两侧都留反而把内容推向右 */
   scrollbar-gutter: stable;
 }
 
-.tree-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 27px;
-  padding: 0 8px;
-  border-radius: 8px;
-  font-size: 12.5px;
-  /* 点一下就是一整行的操作，别让它顺手选中文字 */
-  user-select: none;
-}
-
-.tree-row:hover {
-  background: var(--bg-hover);
-}
-
-/* 箭头占位：文件行也要占同样的宽度，名字才对得齐。收起朝右、展开朝下 */
-.tree-caret {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  flex-shrink: 0;
-  color: var(--text-dim);
-  cursor: pointer;
-  transform: rotate(-90deg);
-  transition: transform 0.12s;
-}
-
-.tree-caret.open {
-  transform: rotate(0);
-}
-
-/* 勾选框放大一档，原生控件只调尺寸，配色仍跟主题走 */
-.tree-box {
-  flex-shrink: 0;
-  width: 15px;
-  height: 15px;
-  margin: 0;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-/* 必选项：勾着但点不动 */
-.tree-box:disabled {
-  cursor: default;
-}
-
-.tree-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.tree-name.dir {
-  font-weight: 600;
-}
-
-.tree-name.locked {
-  cursor: default;
-}
-
-.tree-size {
-  flex-shrink: 0;
-  color: var(--text-dim);
-  font-size: 11.5px;
+/* 吸顶行：贴在同一条内缩线上，右缘让出 9px 的滚动条槽，
+   宽度才和滚动区里的行一致 */
+.tree-pin {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 13px;
+  z-index: 2;
 }
 </style>

@@ -318,18 +318,11 @@ const { fileDragOver } = useFileDrop(onFilesDropped, { accept: canAcceptDrop });
           <GlyphIcon name="maximize" :size="15" :weight="1.8" />
         </BaseButton>
       </template>
-      <template v-else>
-        <InstanceChip :instance="instance" />
-        <!-- 资源下载窗口也是一个实例一个，没有实例就无处可放，按钮跟着灰掉 -->
-        <BaseButton size="sm" variant="accent" class="icon-btn-head" :disabled="!instanceUuid"
-          v-tip="t('winTitle.addResource')" :aria-label="t('winTitle.addResource')" @click="openDownload">
-          <GlyphIcon name="plus" :size="16" />
-        </BaseButton>
-      </template>
+      <InstanceChip v-else :instance="instance" />
     </template>
 
     <div class="resource-layout flex h-full gap-4">
-      <CategoryRail :data="data" :view="view" @select="selectCategory" />
+      <CategoryRail :data="data" :view="view" @select="selectCategory" @add="openDownload" />
 
       <section class="cat-content mr-[-26px] flex min-w-0 flex-1 flex-col gap-3">
         <!--

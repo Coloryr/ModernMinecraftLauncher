@@ -13,7 +13,6 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
 import IconTabs from "../../components/ui/IconTabs.vue";
-import SegmentedTabs from "../../components/ui/SegmentedTabs.vue";
 import BaseButton from "../../components/ui/BaseButton.vue";
 import GlyphIcon from "../../components/ui/GlyphIcon.vue";
 import BaseModal from "../../components/ui/BaseModal.vue";
@@ -328,11 +327,10 @@ const urlRows = computed(() =>
 /** 文件树的勾选表按路径判在不在，交给子组件只看键 */
 const pickedFilePaths = computed(() => new Map([...pickedFiles.value].map(([path]) => [path, true])));
 
-/** 文件页的说明：三种去向（实例目录 / overrides / 整包实例）各一句 */
+/** 文件页的说明：两种去向（overrides / 整包实例）各一句；「直接压缩」不写，免得与下面的勾选行为重复 */
 const fileHint = computed(() => {
-  if (pack.value === "mml") return t("winExport.dirHintZip");
-  if (showModsTab.value) return t("winExport.dirHint");
-  return t("winExport.dirHintPack");
+  if (pack.value === "mml") return "";
+  return showModsTab.value ? t("winExport.dirHint") : t("winExport.dirHintPack");
 });
 
 /** 选项卡标签：整合包信息在最前，两个勾选区把已选数量挂在标签尾巴上 */
@@ -913,7 +911,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <WindowFrame enter=":scope > *" body-fill :title="t(serverPack ? 'winTitle.serverPack' : 'winExport.title')" @close="askClose">
+  <WindowFrame enter=":scope > *" body-fill class="export-frame" :title="t(serverPack ? 'winTitle.serverPack' : 'winExport.title')"
+    @close="askClose">
     <!-- 实例选择放进标题栏：不占内容区高度，也不随选项卡滚动 -->
     <template #head-right>
       <!-- 实例多时靠搜索 / 分组找，见 components/InstanceSelect：标题栏里位置窄，
@@ -923,7 +922,7 @@ onBeforeUnmount(() => {
         @update:model-value="currentUuid = $event" />
     </template>
 
-    <div class="export-window flex min-h-0 flex-1 flex-col gap-3 overflow-y-scroll [scrollbar-gutter:stable_both-edges]">
+    <div class="export-window flex min-h-0 flex-1 flex-col gap-3 overflow-y-scroll [scrollbar-gutter:stable]">
       <template v-if="info">
         <!-- 服务器包：启动器 → 配置 → 自定义内容 → 实例 → 内置 Java -->
         <template v-if="serverPack">
@@ -1029,31 +1028,43 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <div class="row">
-            <label class="field-label" v-tip="t('winExport.zipLevelTip')">{{ t("winExport.zipLevel") }}</label>
-            <SegmentedTabs :options="zipOptions" :model-value="zipLevel" :disabled="busy"
-              @update:model-value="onZipLevelChange" />
+          <div class="export-config">
+            <div class="cfg-field">
+              <label class="field-label" for="export-zip" v-tip="t('winExport.zipLevelTip')">{{
+                t("winExport.zipLevel") }}</label>
+              <select id="export-zip" class="field-select zip-select" :value="zipLevel" :disabled="busy"
+                @change="onZipLevelChange(($event.target as HTMLSelectElement).value)">
+                <option v-for="o in zipOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+              </select>
+            </div>
           </div>
         </template>
 
         <template v-else>
-          <!-- 导出格式与压缩等级同一行：两者一起决定输出文件 -->
-          <div class="row">
-            <label class="field-label">{{ t("winExport.format") }}</label>
-            <SegmentedTabs :options="packOptions" :model-value="pack" :disabled="busy"
-              @update:model-value="onPackChange" />
-            <label class="field-label zip-label" v-tip="t('winExport.zipLevelTip')">{{ t("winExport.zipLevel")
-              }}</label>
-            <SegmentedTabs :options="zipOptions" :model-value="zipLevel" :disabled="busy"
-              @update:model-value="onZipLevelChange" />
+          <!-- 导出格式与压缩等级：两个下拉并排，一起决定输出文件 -->
+          <div class="export-config">
+            <div class="cfg-field">
+              <label class="field-label" for="export-format">{{ t("winExport.format") }}</label>
+              <select id="export-format" class="field-select fmt-select" :value="pack" :disabled="busy"
+                @change="onPackChange(($event.target as HTMLSelectElement).value)">
+                <option v-for="o in packOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+              </select>
+            </div>
+            <div class="cfg-field">
+              <label class="field-label" for="export-zip" v-tip="t('winExport.zipLevelTip')">{{
+                t("winExport.zipLevel") }}</label>
+              <select id="export-zip" class="field-select zip-select" :value="zipLevel" :disabled="busy"
+                @change="onZipLevelChange(($event.target as HTMLSelectElement).value)">
+                <option v-for="o in zipOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+              </select>
+            </div>
           </div>
 
           <!-- 这层限制在选择格式时就说清楚，别让用户以为包里带了自定义加载器 -->
           <p v-if="customLoaderLost" class="warn-hint">{{ t("winExport.customLoaderWarn") }}</p>
 
-          <!-- 选项卡：与「添加实例」窗口同一套图标页签 -->
-          <p v-if="pack === 'mml'" class="sec-hint">{{ t("winExport.nativeHint") }}</p>
-          <IconTabs v-else v-model="tab" :tabs="tabOptions" />
+          <!-- 选项卡：与「添加实例」窗口同一套图标页签；「直接压缩」只有文件一页，不画页签 -->
+          <IconTabs v-if="pack !== 'mml'" v-model="tab" :tabs="tabOptions" />
 
           <div class="tab-body">
             <!-- 整合包信息：写进清单的元数据，配着上面的格式一起看 -->
@@ -1142,7 +1153,7 @@ onBeforeUnmount(() => {
             <!-- 文件：只有一棵树，勾选即打包，取消勾选就排除 -->
             <template v-else>
               <div class="files-pane">
-                <p class="sec-hint">{{ fileHint }}</p>
+                <p v-if="fileHint" class="sec-hint">{{ fileHint }}</p>
                 <FilePicker :uuid="currentUuid" :picked="pickedFilePaths" :unpicked="unpickedFiles" :base="fileBase"
                   :expand="fileExpand" :locked="isLockedFile" @toggle="toggleFile" />
               </div>
@@ -1218,6 +1229,21 @@ onBeforeUnmount(() => {
    的毛玻璃表里，主题包也按类名覆盖）。这里只留工具类压不住的部分：:deep 穿透、
    覆盖全局 .field-label 的边距、状态色与标题栏下拉的宽度例外。 */
 
+/* 背景图模式下子窗口默认整窗透明，这一页全是表单与裸文字（说明、字段标签、文件树），
+   直接压在图上读不了；给它补回单层 --bg，与设置窗口的 .tab-content 同一口径 */
+html.has-bg .window-frame.export-frame {
+  background: var(--bg);
+}
+
+/* 内容左右缘与底部按钮落在同一条 26px 线上。
+   容器向右探进 .frame-body 的 26px 内边距，滚动条与内边距合起来正好补回这 26：
+   9px 滚动条 + 17px 内边距（不探出去的话，常驻滚动条会把内容再往里挤 9px）。
+   这里不用 scrollbar-gutter: stable both-edges —— 它还会在左侧再留 9px，右缘对了左缘又错开 */
+.export-window {
+  margin-right: -26px;
+  padding-right: 17px;
+}
+
 /* 页签自带的下外边距是给「添加实例」窗口的表单留的，这一页用的是 flex gap，
    不取消就会变成 12 + 14 = 26px */
 .export-window :deep(.tabs) {
@@ -1246,22 +1272,35 @@ onBeforeUnmount(() => {
   max-width: 340px;
 }
 
-/* 导出格式：标签与选择器同一行。选择器是 inline-flex，只包住自己的选项内容，
-   不会被拉着撑满整行 */
-.row {
+/* 导出格式与压缩等级并排：标签与下拉同一行，标签不换行、不被压缩。
+   窗口窄到放不下时整组换行，而不是把「导出格式」挤成竖排的四个字 */
+.export-config {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+
+.cfg-field {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
-/* .field-label 默认是块级、上下都带外边距（12 / 6），并排时会把这一行顶歪 */
-.row .field-label {
+/* .field-label 默认块级、上下带 12 / 6 外边距，并排时会把整行顶歪 */
+.cfg-field .field-label {
   margin: 0;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
-/* 压缩等级紧跟在格式后面，同一个行里隔开一档 */
-.row .zip-label {
-  margin-left: 12px;
+/* 宽度按最长的那个选项定：「Modrinth (.mrpack)」不被截断；压缩档位三个词都是两字 */
+.fmt-select {
+  width: 200px;
+}
+
+.zip-select {
+  width: 110px;
 }
 
 
