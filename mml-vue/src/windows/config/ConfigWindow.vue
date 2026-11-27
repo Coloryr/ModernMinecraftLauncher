@@ -190,20 +190,34 @@ function topRowIndex(el: HTMLElement, top: number): number {
   return found;
 }
 
-/** 吸顶的目录：视口顶部那一行所属的那一层目录；没滚动或它就在根上时为 null */
-const pinnedDir = computed<ConfigTreeRow | null>(() => {
+/**
+ * 吸顶的那一层目录，以及它该贴的位置
+ *
+ * 位置贴着这一行自己的轨迹走：这一行还没滚出视野时，吸顶行与它重合（看不出多了一条）；
+ * 它往上滚多少，吸顶行就跟着往上挪多少，到顶后停住。不写死 top，才不会出现
+ * 「目录行还在半截、上面又压了一条」的错位。
+ */
+const pin = computed<{ row: ConfigTreeRow; top: number } | null>(() => {
   const el = treeScrollEl.value;
   const list = rows.value;
   if (!el || treeScrollTop.value <= 0 || !list.length) return null;
   const start = Math.min(topRowIndex(el, treeScrollTop.value), list.length - 1);
   const row = list[start];
   // 顶部这行本身就是展开着的目录：它自己就是当前所在的那一层
-  if (row.isDir && row.expanded) return row;
+  let index = row.isDir && row.expanded ? start : -1;
   // 否则往上找最近的上一层目录：DFS 展平后它就是这行的父目录
-  for (let i = start - 1; i >= 0; i--) {
-    if (list[i].depth < row.depth && list[i].isDir) return list[i];
+  if (index < 0) {
+    for (let i = start - 1; i >= 0; i--) {
+      if (list[i].depth < row.depth && list[i].isDir) {
+        index = i;
+        break;
+      }
+    }
   }
-  return null;
+  if (index < 0) return null;
+  const element = el.children[index] as HTMLElement | undefined;
+  if (!element) return null;
+  return { row: list[index], top: Math.max(0, element.offsetTop - treeScrollTop.value) };
 });
 
 // 展开 / 收起、搜索、换来源都会改行，浏览器可能顺手挪动滚动位置：跟着重读一次
@@ -705,16 +719,16 @@ useWindowRefresh(() => {
         <div class="cfg-tree relative flex flex-1 min-h-0" :aria-busy="loading">
           <!-- 吸顶目录：与导出实例的文件列表同一套做法 —— 单独画在滚动区外面，
                滚动时换成当前所在的那一层目录 -->
-          <div v-if="pinnedDir" class="cfg-pin">
+          <div v-if="pin" class="cfg-pin" :style="{ top: pin.top + 'px' }">
             <button type="button"
               class="cfg-dir flex items-center gap-2 w-full shrink-0 px-3 border-0 rounded-ctl bg-transparent text-fg text-body text-left cursor-pointer transition-[background-color] duration-[120ms] [font-family:inherit]"
-              :style="{ paddingLeft: `${8 + pinnedDir.depth * 14}px` }" :aria-expanded="pinnedDir.expanded"
-              @click="toggleExpand(pinnedDir.key)">
-              <GlyphIcon class="cfg-chevron" :class="{ 'is-expanded': pinnedDir.expanded }" name="chevron-down"
+              :style="{ paddingLeft: `${8 + pin.row.depth * 14}px` }" :aria-expanded="pin.row.expanded"
+              @click="toggleExpand(pin.row.key)">
+              <GlyphIcon class="cfg-chevron" :class="{ 'is-expanded': pin.row.expanded }" name="chevron-down"
                 :size="14" :weight="2.4" />
               <span class="cfg-dir-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-                :title="pinnedDir.key">
-                <HighlightText :text="pinnedDir.name" :query="query" />
+                :title="pin.row.key">
+                <HighlightText :text="pin.row.name" :query="query" />
               </span>
             </button>
           </div>
@@ -955,11 +969,11 @@ useWindowRefresh(() => {
   position: relative;
 }
 
-/* 吸顶目录：贴在滚动区顶部（左缩进对齐列表内容 10px，右缘让出 9px 的常驻滚动条槽）。
+/* 吸顶目录：横向与列表内容对齐（左 10px，右缘让出 9px 的常驻滚动条槽），
+   纵向位置由脚本按该行自己的位置给（见 pin），这里不写 top。
    底色取侧栏色并加模糊：它压着下面滑上来的行，不能透出来 */
 .cfg-pin {
   position: absolute;
-  top: 2px;
   left: 10px;
   right: 19px;
   z-index: 2;
