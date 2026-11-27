@@ -22,6 +22,7 @@ import {
 } from "../../lib/api";
 import { loadGuiConfig } from "../../lib/guiConfig";
 import { buildConfigTree, visibleConfigRows, type ConfigTreeRow } from "./configTree";
+import { configClosePrompt, registerConfigEditor } from "./closeGuard";
 import { applyHunks, diffLines, joinLines, splitLines } from "../../lib/textDiff";
 import { familyInstanceFromLabel, multiWindow, targetSaveDir, targetUuid, windowParams } from "../windowManager";
 import WindowFrame from "../../components/ui/WindowFrame.vue";
@@ -36,7 +37,7 @@ import HexView from "./parts/HexView.vue";
 import ImageView from "./parts/ImageView.vue";
 import McaTable from "./parts/McaTable.vue";
 import NbtTree from "./parts/NbtTree.vue";
-import { clearCleanSessions, closeSessions } from "./parts/nbtSession";
+import { clearCleanSessions, closeSessions, dirtySessions, hasSavingSessions, saveSession } from "./parts/nbtSession";
 import RowMenu, { type RowMenuItem } from "../../components/ui/RowMenu.vue";
 import McaFindModal from "./parts/McaFindModal.vue";
 import type { FileItemDto, SaveItemDto } from "../../lib/bindings";
@@ -113,7 +114,7 @@ const pendingDiscard = ref<((discard: boolean) => void) | null>(null);
  * 可以继续切换为 `true`；被拒绝为 `false`
  */
 async function allowTextLoss(): Promise<boolean> {
-  if (busy.value || pendingDiscard.value) return false;
+  if (busy.value || pendingDiscard.value || configClosePrompt.value) return false;
   if (!isText.value || !dirty.value) return true;
   return new Promise((resolve) => { pendingDiscard.value = resolve; });
 }
@@ -375,7 +376,8 @@ async function open(file: FileItemDto) {
 
 /** 将保存操作分发给文本编辑器或 NBT 视图 */
 async function save() {
-  if (busy.value) return;
+  if (loading.value || busy.value) return;
+  if (configClosePrompt.value) return;
   if (isNbt.value) {
     const tree = nbtRef.value;
     if (!tree || nbtSaving.value || !nbtDirty.value) return;
@@ -391,9 +393,9 @@ async function save() {
 }
 
 /** 保存提交瞬间的文本快照，保留等待响应期间的新编辑 */
-async function saveText() {
+async function saveText(): Promise<boolean> {
   const file = selected.value;
-  if (!file || !isText.value || busy.value || !dirty.value) return;
+  if (!file || !isText.value || busy.value || !dirty.value) return false;
 
   const submitted = text.value;
   const uuid = instanceUuid.value;
@@ -416,17 +418,39 @@ async function saveText() {
       editedLines.length,
       hunks,
     );
-    if (selected.value === file && instanceUuid.value === uuid && source.value === from) {
+    const current = selected.value === file && instanceUuid.value === uuid && source.value === from;
+    if (current) {
       origin.value = submitted;
       originSha1.value = sha1;
     }
     showToast(t("config.saved"));
+    return current && text.value === submitted;
   } catch (e) {
     showToast(tErr(e));
+    return false;
   } finally {
     saving.value = false;
   }
 }
+
+async function saveBeforeClose(): Promise<boolean> {
+  if (dirty.value && !(await saveText())) return false;
+  try {
+    for (const session of dirtySessions()) {
+      if (!(await saveSession(session))) return false;
+    }
+    return true;
+  } catch (error) {
+    showToast(tErr(error));
+    return false;
+  }
+}
+
+const unregisterCloseGuard = registerConfigEditor({
+  busy: () => busy.value || hasSavingSessions(),
+  hasChanges: () => dirty.value || dirtySessions().length > 0,
+  save: saveBeforeClose,
+});
 
 /** 「查找实体 / 方块」弹窗开着没 */
 const findOpen = ref(false);
@@ -653,6 +677,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  unregisterCloseGuard();
   requestGeneration += 1;
   answerDiscard(false);
   stopResize?.();
@@ -781,7 +806,7 @@ useWindowRefresh(() => {
         @pointerdown="startResize" @keydown="onResizeKeydown" />
 
       <section class="cfg-view flex flex-col flex-1 min-w-0 min-h-0 bg-bg-solid overflow-hidden"
-        :aria-busy="loading || deleting">
+        :aria-busy="loading || deleting" @keydown.ctrl.s.exact.prevent="save" @keydown.meta.s.exact.prevent="save">
         <!-- 占位编辑器与文件编辑器使用独立实例，隔离只读状态 -->
         <MonacoText v-if="!selected || (isText && (loading || deleting))" key="empty"
           :model-value="deleting ? text : ''" readonly />

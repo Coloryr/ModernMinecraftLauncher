@@ -1084,6 +1084,8 @@ export default {
   "config.discardChanges": "当前文件有未保存的修改。是否放弃修改并继续？",
   "config.keepEditing": "继续编辑",
   "config.discard": "放弃修改",
+  "config.closeChanges": "配置编辑器中有未保存的修改。关闭前要保存这些修改吗？",
+  "config.saveAndClose": "保存并关闭",
   "config.hexPrev": "上一页",
   "config.hexNext": "下一页",
   "config.hexRange": "字节 {from}–{to} / 共 {total}",

@@ -1083,6 +1083,8 @@ export default {
   "config.discardChanges": "This file has unsaved changes. Discard them and continue?",
   "config.keepEditing": "Keep editing",
   "config.discard": "Discard changes",
+  "config.closeChanges": "The configuration editor has unsaved changes. Save them before closing?",
+  "config.saveAndClose": "Save and close",
   "config.hexPrev": "Previous",
   "config.hexNext": "Next",
   "config.hexRange": "Bytes {from}–{to} of {total}",

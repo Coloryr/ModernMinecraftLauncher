@@ -62,22 +62,13 @@ document.addEventListener("contextmenu", (e) => {
   e.preventDefault();
 });
 
-// 文本框与编辑器里保留完整的编辑快捷键，其余按键（含 Esc、Enter、方向键与鼠标侧键）
-// 一律拦截。文本框内仍允许正常输入与编辑，但不再触发任何启动器快捷键。
-//
-// Monaco 的输入区也是一个隐藏 textarea，所以这一份白名单同时管着所有文本编辑器：
-// 少一个就会出现"编辑器里按 Ctrl+A 没反应"。
+// 原生文本框的编辑快捷键；Monaco 自行处理编辑器内的按键。
 const EDIT_KEYS = new Set(["a", "c", "v", "x", "z", "y"]);
 const NON_SHORTCUT_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock", "Tab"]);
 function editableTarget(target: EventTarget | null): HTMLElement | null {
   const el = target as HTMLElement | null;
   if (!el) return null;
   return el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA" ? el : null;
-}
-
-/** 焦点是不是在编辑器里：Monaco 的输入区是它内部那个隐藏 textarea */
-function inEditor(el: HTMLElement): boolean {
-  return !!el.closest(".monaco-editor");
 }
 
 /** 是否是开 DevTools 的组合键：F12 与 macOS 的 ⌘⌥I */
@@ -88,21 +79,22 @@ function isInspectKey(e: KeyboardEvent): boolean {
 /**
  * 这个按键要不要拦
  *
- * 文本框与编辑器里放行输入、编辑快捷键（全选 / 复制 / 粘贴 / 剪切 / 撤销 / 重做）
- * 以及编辑器内的 Ctrl+F（Monaco 自己开查找框）；文本框外只留 Tab 与修饰键。
+ * Monaco 的输入节点可能是原生 EditContext 的 div，也可能是 textarea。
+ * 整个编辑器接收自己的快捷键，普通文本框保留常用编辑键，其余位置只留 Tab 与修饰键。
  */
 function shouldBlockKey(e: KeyboardEvent): boolean {
   // 测试版与预发布版要能开控制台；正式发布的 F12 仍然拦掉
-  if (isInspectKey(e) && devtoolsAllowed()) return false;
+  if (isInspectKey(e)) return !devtoolsAllowed();
+  if (e.target instanceof Element) {
+    if (e.target.closest(".monaco-editor")) return false;
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      const shortcuts = e.target.closest("[aria-keyshortcuts]")?.getAttribute("aria-keyshortcuts");
+      if (shortcuts?.split(" ").includes(e.key === " " ? "Space" : e.key)) return false;
+    }
+  }
   const editable = editableTarget(e.target);
-  const ctrl = e.ctrlKey || e.metaKey;
-  const key = e.key.toLowerCase();
   if (editable) {
-    // 页内查找只给编辑器：别处按 Ctrl+F 不该冒出浏览器的查找条
-    if (ctrl && key === "f") return !inEditor(editable);
-    if (ctrl) return !EDIT_KEYS.has(key);
-    // 编辑器里的 Esc 要留给它自己：关查找框、收补全框
-    if (e.key === "Escape" && inEditor(editable)) return false;
+    if (e.ctrlKey || e.metaKey) return !EDIT_KEYS.has(e.key.toLowerCase());
     if (e.key === "Escape" || e.key === "F5") return true;
     // 单行输入框的 Enter 是提交快捷键；textarea 的 Enter 是换行，保留
     if (e.key === "Enter" && !editable.isContentEditable && editable.tagName !== "TEXTAREA") return true;

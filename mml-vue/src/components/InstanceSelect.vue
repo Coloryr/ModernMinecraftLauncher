@@ -346,20 +346,21 @@ function addNew() {
 
 /** 浮层内的键盘：上下选、回车确认、Esc 收起 */
 function onMenuKeydown(e: KeyboardEvent) {
+  if (e.isComposing || e.keyCode === 229 || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
   // 浮层盖在弹窗上：这里吞掉的键不能再落到底下的弹窗（否则 Esc 会把弹窗一起关掉）
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     e.preventDefault();
     e.stopPropagation();
     moveActive(e.key === "ArrowDown" ? 1 : -1);
+    searchRef.value?.focus();
     return;
   }
   if (e.key === "Enter") {
+    e.stopPropagation();
+    if (e.target instanceof HTMLButtonElement) return;
+    e.preventDefault();
     const row = rows.value[activeIndex.value];
-    if (row?.kind === "item") {
-      e.preventDefault();
-      e.stopPropagation();
-      pick(row.inst);
-    }
+    if (row?.kind === "item") pick(row.inst);
     return;
   }
   if (e.key === "Escape") {
@@ -430,7 +431,7 @@ watch(
   <div ref="rootEl" class="instance-select" :class="`is-${variant}`">
     <!-- 卡片档：主窗口列表模式，名字 + 版本 / 加载器两行 -->
     <button v-if="variant === 'card'" ref="btnEl" type="button" class="select-btn card-btn" :class="{ open }"
-      :disabled="disabled" :aria-label="label" aria-haspopup="listbox" :aria-expanded="open" @click="toggle">
+      :disabled="disabled" :aria-label="label" aria-haspopup="listbox" :aria-expanded="open" aria-keyshortcuts="Enter Space" @click="toggle">
       <span class="sel-text">
         <span v-if="selected" class="sel-name">{{ selected.name }}</span>
         <span v-else class="sel-placeholder">{{ placeholder || t("launch.selectInstance") }}</span>
@@ -449,7 +450,7 @@ watch(
 
     <!-- 字段档：单行下拉，外观全走 .field-select（底色 / 边框 / 高度 / 箭头） -->
     <button v-else ref="btnEl" type="button" class="select-btn field-select field-btn" :class="{ open }"
-      :disabled="disabled" :title="label" :aria-label="label" aria-haspopup="listbox" :aria-expanded="open"
+      :disabled="disabled" :title="label" :aria-label="label" aria-haspopup="listbox" :aria-expanded="open" aria-keyshortcuts="Enter Space"
       @click="toggle">
       <span class="field-text" :class="{ 'is-empty': !selected && !emptyPicked }">{{ label }}</span>
     </button>
@@ -457,7 +458,8 @@ watch(
     <!-- 浮层挂到 body：各窗口的父级多是滚动容器，absolute 会被 overflow 裁掉 -->
     <Teleport to="body">
       <Transition name="drop">
-        <div v-if="open" ref="menuEl" class="select-menu" :style="menuStyle" @keydown="onMenuKeydown">
+        <div v-if="open" ref="menuEl" class="select-menu" :style="menuStyle"
+          aria-keyshortcuts="ArrowUp ArrowDown Enter Escape Space" @keydown="onMenuKeydown">
           <div class="menu-search">
             <SearchBox ref="searchRef" v-model="query" width="100%" :placeholder="t('search.placeholder')" />
           </div>

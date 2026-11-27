@@ -9,8 +9,9 @@
 //
 // 清的理由只有两种：盘上那一份可能已经变了（刷新 / 换来源 / 换实例），或者会话留太多。
 // 两种情况都**不扔有未保存改动的那些** —— 那是用户还没落盘的东西。
+import { reactive } from "vue";
 import type { NbtEditDto } from "../../../lib/bindings";
-import { closeConfigNbt } from "../../../lib/api";
+import { closeConfigNbt, openConfigNbt, writeConfigNbt } from "../../../lib/api";
 import type { NbtTreeNode } from "./nbtEdit";
 
 /** 一个打开着的 NBT 文件 */
@@ -31,6 +32,7 @@ export interface NbtSession {
   ops: NbtEditDto[];
   /** 有没有未保存的改动 */
   dirty: boolean;
+  saving: boolean;
   /** 已经从盘上读到过内容 */
   loaded: boolean;
   /** 手动定过的展开状态，键见 nbtEdit 的 `pathKey`；没记过的按默认档（前两层展开） */
@@ -82,6 +84,7 @@ function blankSession(
     sha1: "",
     ops: [],
     dirty: false,
+    saving: false,
     loaded: false,
     expanded: new Map(),
   };
@@ -107,10 +110,41 @@ export function openSession(
   const found = sessions.get(key);
   if (found) return found;
 
-  const session = blankSession(uuid, source, file, chunk ?? null);
-  sessions.set(key, session);
   trimSessions();
+  const session = reactive(blankSession(uuid, source, file, chunk ?? null));
+  sessions.set(key, session);
   return session;
+}
+
+export function dirtySessions(): NbtSession[] {
+  return [...sessions.values()].filter((session) => session.dirty);
+}
+
+export function hasSavingSessions(): boolean {
+  return [...sessions.values()].some((session) => session.saving);
+}
+
+export async function saveSession(session: NbtSession): Promise<boolean> {
+  if (session.saving || !session.ops.length) return false;
+  const { uuid, source, file } = session;
+  const chunk = session.chunk ?? undefined;
+  const ops = session.ops.map((op) => ({ ...op, path: [...op.path] }));
+  session.saving = true;
+  try {
+    session.sha1 = await writeConfigNbt(uuid, source, file, chunk, session.sha1, ops);
+    session.ops.splice(0, ops.length);
+    session.dirty = session.ops.length > 0;
+    if (!session.dirty) {
+      const data = await openConfigNbt(uuid, source, file, chunk);
+      if (!session.dirty) {
+        session.tree = data.node;
+        session.sha1 = data.sha1;
+      }
+    }
+    return true;
+  } finally {
+    session.saving = false;
+  }
 }
 
 /** 扔掉一份会话，并把后端那份打开着的会话一并关掉 */
@@ -123,9 +157,9 @@ function dropSession(key: string, session: NbtSession): Promise<void> {
 
 /** 超出上限时扔掉最早打开、且没有未保存改动的那一份；全都有改动就让它先超着 */
 function trimSessions() {
-  if (sessions.size <= MAX_SESSIONS) return;
+  if (sessions.size < MAX_SESSIONS) return;
   for (const [key, session] of sessions) {
-    if (!session.dirty) {
+    if (!session.dirty && !session.saving) {
       void dropSession(key, session);
       return;
     }
@@ -144,7 +178,7 @@ function trimSessions() {
  * 全部关完（或关失败）后 resolve
  */
 export async function clearCleanSessions() {
-  const clean = [...sessions].filter(([, session]) => !session.dirty);
+  const clean = [...sessions].filter(([, session]) => !session.dirty && !session.saving);
   await Promise.all(clean.map(([key, session]) => dropSession(key, session)));
 }
 

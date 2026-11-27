@@ -24,6 +24,7 @@ import {
   watchWindowMode,
 } from "./windows/windowManager";
 import type { WindowKind } from "./windows/registry";
+import { configClosePrompt, savingOnClose } from "./windows/config/closeGuard";
 import { setModpackFallbackToast, useModpackStatus } from "./lib/modpackTasks";
 import { initMusic } from "./lib/music";
 import { useResourceStatus } from "./lib/resourceTasks";
@@ -285,6 +286,18 @@ const closeAskButton = computed(() =>
 
   <!-- 启动数据升级：盖住整个界面，升级结束后自己消失 -->
   <UpgradeOverlay />
+
+  <BaseModal v-if="configClosePrompt" :title="t('config.unsaved')"
+    :close-disabled="savingOnClose" @close="configClosePrompt?.('cancel')">
+    <p class="modal-text">{{ t("config.closeChanges") }}</p>
+    <div class="modal-actions">
+      <BaseButton :disabled="savingOnClose" @click="configClosePrompt?.('cancel')">{{ t("actions.cancel") }}</BaseButton>
+      <BaseButton variant="danger" :disabled="savingOnClose" @click="configClosePrompt?.('discard')">{{ t("config.discard") }}</BaseButton>
+      <BaseButton variant="accent" :disabled="savingOnClose" @click="configClosePrompt?.('save')">
+        {{ t(savingOnClose ? "config.saving" : "config.saveAndClose") }}
+      </BaseButton>
+    </div>
+  </BaseModal>
 
   <!-- 账户占用确认：任何窗口里点启动都可能弹，所以挂在根上 -->
   <AccountLockModal />

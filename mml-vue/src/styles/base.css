@@ -127,6 +127,10 @@ html.no-anim *::after {
 
    注意选择器写法：win-page-* 这几个类是加在**窗口根元素自身**上的（.window-frame /
    .main-window），所以要用"根元素.类 > 内容容器"，不是"祖先.类 后代内容容器"。 */
+html.bg-frosted {
+  --page-transition-opacity: 1;
+}
+
 .window-frame.win-page-enter-active>.frame-body,
 .window-frame.win-page-leave-active>.frame-body,
 .main-window.win-page-enter-active>.main,
@@ -138,7 +142,7 @@ html.no-anim *::after {
 .window-frame.win-page-leave-to>.frame-body,
 .main-window.win-page-enter-from>.main,
 .main-window.win-page-leave-to>.main {
-  opacity: 0;
+  opacity: var(--page-transition-opacity, 0);
   transform: scale(0.99);
 }
 
