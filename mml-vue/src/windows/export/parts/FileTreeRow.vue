@@ -13,8 +13,10 @@ const props = defineProps<{
   depth: number;
   /** 目录是否展开；文件行忽略 */
   open: boolean;
+  loading?: boolean;
   /** 是否勾选 */
   checked: boolean;
+  indeterminate?: boolean;
   /** 必选项：勾着但点不动 */
   locked: boolean;
   /** 是不是吸顶的那一份：要自己垫一层不透明底，压住下面滑上来的行 */
@@ -38,11 +40,13 @@ function sizeText(size: number): string {
 
 <template>
   <div class="tree-row" :class="{ 'is-dir': entry.dir, 'is-pin': props.pinned }"
-    :style="{ paddingLeft: `${8 + depth * 16}px` }">
-    <span class="tree-caret" :class="{ open }" @click="emit('open', entry.path)">
-      <GlyphIcon v-if="entry.dir" name="chevron-down" :size="12" :weight="2.4" />
+    :style="{ paddingLeft: `${8 + depth * 16}px` }" :aria-busy="open && loading">
+    <span class="tree-caret" :class="{ open }" :title="open && loading ? t('winExport.loadingFiles') : undefined"
+      @click="entry.dir && emit('open', entry.path)">
+      <GlyphIcon v-if="open && loading" name="refresh" :size="12" :weight="2.4" class="animate-spin" />
+      <GlyphIcon v-else-if="entry.dir" name="chevron-down" :size="12" :weight="2.4" />
     </span>
-    <input type="checkbox" class="tree-box" :checked="locked || checked" :disabled="locked"
+    <input type="checkbox" class="tree-box" :checked="locked || checked" :indeterminate="!locked && indeterminate" :disabled="locked"
       :title="locked ? t('winExport.mandatory') : undefined" @change="emit('toggle', entry)" />
     <span class="tree-name" :class="{ dir: entry.dir, locked }" :title="entry.path"
       @click="entry.dir ? emit('open', entry.path) : emit('toggle', entry)">{{

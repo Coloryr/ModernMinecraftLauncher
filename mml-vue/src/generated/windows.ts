@@ -43,6 +43,7 @@ export { default as DownloadWindow } from "../windows/download/DownloadWindow.vu
 export { default as DownloadedResourcesWindow } from "../windows/downloaded_resources/DownloadedResourcesWindow.vue";
 export { default as ExportWindow } from "../windows/export/ExportWindow.vue";
 export { default as WinExportPartsFilePicker } from "../windows/export/parts/FilePicker.vue";
+export { default as WinExportPartsFileTreeRow } from "../windows/export/parts/FileTreeRow.vue";
 export { default as WinExportPartsInfoExportButton } from "../windows/export/parts/InfoExportButton.vue";
 export { default as HelpWindow } from "../windows/help/HelpWindow.vue";
 export { default as JavaDownloadWindow } from "../windows/java_download/JavaDownloadWindow.vue";
