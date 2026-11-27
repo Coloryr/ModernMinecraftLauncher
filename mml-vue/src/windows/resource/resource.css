@@ -492,10 +492,14 @@ html.has-bg .resource-layout .dp-save-row {
   /* 分组头吸顶：往下翻的时候一直看得到"现在在哪一组"。
      --bg-raised 是不透明底（浮层用它压住下层文字），行从底下滚过去看不出来；
      吸顶只在**自己这一组**的范围内生效，滚到下一组时它跟着本组一起走 */
+  transition: border-radius 0.12s, background-color 0.12s;
+}
+
+.resource-layout .mod-group-head,
+.resource-layout .mod-group-row {
   position: sticky;
   top: 0;
   z-index: 2;
-  transition: border-radius 0.12s, background-color 0.12s;
 }
 
 /* 背景图模式下 --bg-raised 是半透明的（.62 / .8），吸顶头会让下面的行透出来：
@@ -508,7 +512,8 @@ html.has-bg .resource-layout .mod-group-head {
    压在它下面的行透出来但被糊掉，滚动时一眼能看出"这一条是浮在上面的"。
    第二条选择器是为了压过上面那条 has-bg 的不透明底 */
 .resource-layout .mod-group-head.is-stuck,
-html.has-bg .resource-layout .mod-group-head.is-stuck {
+html.has-bg .resource-layout .mod-group-head.is-stuck,
+.resource-layout .mod-group-table.is-stuck .mod-group-row {
   border-radius: 0;
   /* 一条下边线：内容从底下穿过去时，直角横条与行之间还有个明确的分界 */
   box-shadow: 0 1px 0 0 var(--border);
@@ -809,6 +814,18 @@ html.has-bg .resource-layout .mod-group-head.is-stuck {
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: stretch;
+}
+
+.resource-layout .row-select-cell > .row-select {
+  display: block;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.resource-layout .row-select:focus-visible {
+  opacity: 1;
 }
 
 .resource-layout .mod-th-select {
@@ -1004,8 +1021,10 @@ html.has-bg .resource-layout .mod-group-head.is-stuck {
   color: var(--text-dim);
 }
 
-.resource-layout .mod-table .mod-virtual-row {
+.resource-layout .mod-table .mod-virtual-row,
+.resource-layout .mod-table .mod-group-row {
   height: 32px;
+  padding-block: 0;
 }
 
 /* ---------- 模组：表格视图 ---------- */
@@ -1196,8 +1215,18 @@ html.has-bg .resource-layout .mod-group-head.is-stuck {
   font-size: 11px;
 }
 
-/* 右边缘的拖宽把手：平时就画一条**看得见的竖线**（用户要求：竖线要显示出来，
-   不然不知道哪里能拖），悬停时变强调色、加粗到 2px */
+/* 分隔线也标出固定宽度列的边界，拖宽热区只给可调整的列。 */
+.resource-layout .mod-th-cell:not(.mod-th-select)::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  right: -1px;
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+
 .resource-layout .mod-th-resize {
   position: absolute;
   top: 3px;
@@ -1207,18 +1236,7 @@ html.has-bg .resource-layout .mod-group-head.is-stuck {
   cursor: col-resize;
 }
 
-.resource-layout .mod-th-resize::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 4px;
-  width: 1px;
-  background: var(--border);
-}
-
-.resource-layout .mod-th-resize:hover::before {
-  left: 3px;
+.resource-layout .mod-th-cell:has(> .mod-th-resize:hover)::after {
   width: 2px;
   background: var(--accent);
 }

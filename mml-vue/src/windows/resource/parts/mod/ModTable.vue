@@ -3,7 +3,7 @@
 //
 // 两棵树叠在一起：
 //   - **一级节点 = 分组行**（折叠箭头 + 组名 + 数量）：收起时整组的模组行都不渲染；
-//   - **二级 = 模组行**；模组自带的内置模组（jar-in-jar）再往下缩进一级。
+//   - **二级 = 模组行**；内置模组和 Mixin / ASM 目标沿用列表视图的展开层级。
 //
 // 左起三列就是"树"：**缩进 / 折叠箭头**（都在最左，用户要求）｜启用勾选框｜名字。
 // 箭头一律放在最左边那一列，层级靠 16px 一级的缩进表达：
@@ -40,6 +40,7 @@ import {
   type ModSort,
 } from "../../modColumns";
 import { TABLE_ROW_H, useVirtualRows } from "../../../../composables/useVirtualRows";
+import { modTreeRows, type ModTreeRow } from "../../modTree";
 import { modHit, modRowKey, modSelectKey, type ModViewEmits, type ModViewProps } from "../../types";
 
 const props = withDefaults(
@@ -180,27 +181,9 @@ function sortMark(key: string): string {
   return cur.dir === "asc" ? "↑" : "↓";
 }
 
-// ---------- 行的拍平（父行 + 已展开的内置模组行） ----------
+type TableModRow = Extract<ModTreeRow, { kind: "mod" }>;
 
-/**
- * 表格里展开的行：父行 + 缩进的内部模组行拍平成一串
- *
- * 内置模组装在父 jar 里、没有独立文件：它们**没有**启用 / 备注 / 下载源这些东西，
- * 所以只在"名字"那一列缩进显示，其余列留空 —— 与它们在内核里的实际情况一致。
- */
-interface TableRow {
-  /** 这一行的模组条目 */
-  item: ModItemDto;
-  /** 层级：1 是模组行，大于 1 是内置模组行 */
-  depth: number;
-}
-
-/**
- * **展开**的父条目 key；默认**收起**，与列表视图同一口径
- *
- * 内置模组（jar-in-jar）默认不铺开：一个包常带好几个内置库，全展开会把表撑得很长，
- * 想看的模组被挤到屏幕外。点名字前的箭头才展开。
- */
+/** 模组及其改写目标分组各自保存展开状态。 */
 const expanded = ref<Set<string>>(new Set());
 
 /** 展开 / 收起这一行 */
@@ -208,6 +191,7 @@ function toggleExpand(key: string) {
   const next = new Set(expanded.value);
   if (next.has(key)) {
     next.delete(key);
+    next.delete(key + "|patches");
   } else {
     next.add(key);
   }
@@ -220,9 +204,9 @@ function toggleExpand(key: string) {
  * 搜索时，内置模组（含更深一层）里命中的行**自动展开** —— 否则父行虽然因为内置命中
  * 被保留下来，命中的那一行却还收着，用户看不出搜到的是什么。
  */
-function isOpen(item: ModItemDto): boolean {
+function isOpen(key: string, item: ModItemDto): boolean {
   if (props.query && hasHitChild(item, props.query)) return true;
-  return expanded.value.has(modRowKey(item));
+  return expanded.value.has(key);
 }
 
 /** 这一行的内置模组里（含更深一层）有没有命中搜索词的 */
@@ -230,20 +214,19 @@ function hasHitChild(item: ModItemDto, q: string): boolean {
   return item.jarInJar.some((child) => modHit(child, q, "table") || hasHitChild(child, q));
 }
 
-/** 拍平：父行 + **已展开**的内置模组行（每一层各自排序） */
-function flatten(items: ModItemDto[], depth: number, out: TableRow[]) {
-  for (const item of orderedMods(items, props.sort)) {
-    out.push({ item, depth });
-    if (item.jarInJar.length && isOpen(item)) flatten(item.jarInJar, depth + 1, out);
-  }
-}
-
 /** 本表要显示的行；分组收起时为空，一级节点自己那一行由模板单独画 */
-const rows = computed(() => {
-  const out: TableRow[] = [];
-  if (props.groupOpen) flatten(props.items, 1, out);
-  return out;
-});
+const rows = computed(() => props.groupOpen ? modTreeRows(props.items, 1, {
+  query: props.query,
+  order: (items) => orderedMods(items, props.sort),
+  isOpen,
+  isPatchesOpen: (key) => expanded.value.has(key + "|patches"),
+}) : []);
+
+/** 改写目标分组整行可展开，只有顶层模组参与多选。 */
+function onRowClick(row: ModTreeRow, event: MouseEvent) {
+  if (row.kind === "patches") toggleExpand(row.key);
+  else if (row.kind === "mod" && row.depth === 1) emit("row-click", { event, item: row.item });
+}
 
 /**
  * 正在编辑的备注（同时只能有一个）
@@ -281,7 +264,7 @@ const editingOnline = ref<{ key: string; field: "source" | "projectId" | "fileId
 );
 
 /** 这一格是不是正在就地编辑 */
-function isEditingOnline(row: TableRow, field: "source" | "projectId" | "fileId"): boolean {
+function isEditingOnline(row: TableModRow, field: "source" | "projectId" | "fileId"): boolean {
   return row.depth === 1 && editingOnline.value?.key === modRowKey(row.item) && editingOnline.value.field === field;
 }
 
@@ -336,7 +319,7 @@ function commitOnline(field: "source" | "projectId" | "fileId", value: string, i
 }
 
 /** 这一行是不是正在编辑备注 */
-function isEditing(row: TableRow): boolean {
+function isEditing(row: TableModRow): boolean {
   return editing.value?.key === modRowKey(row.item);
 }
 
@@ -422,16 +405,18 @@ function onNoteEnter(event: KeyboardEvent) {
       其余列留空占位 —— 栅格必须占满，否则这一行会整体左移、列全错位。
     -->
     <div class="mod-tr mod-group-row" :style="{ gridTemplateColumns: gridTemplate }"
-      :class="{ 'mod-group-dragging': draggingGroup === groupKey }" @contextmenu.prevent="emit('group-menu', {
+      :class="{ 'mod-group-dragging': draggingGroup === groupKey, 'row-selecting': selectedKeys.size > 0 }" @contextmenu.prevent="emit('group-menu', {
         event: $event, id: groupKey, label: groupLabel, custom, count: items.length,
       })">
       <span class="mod-cell row-select-cell">
         <!-- 整组全选 / 取消全选，与行勾选框同一个开关；空组不画 -->
         <input v-if="items.length" type="checkbox" class="row-select group-select" :checked="allSelected"
-          :indeterminate="someSelected" @pointerdown.stop @change.stop="emit('select-group')" @click.stop />
+          :indeterminate="someSelected" :aria-label="t(allSelected ? 'resource.deselectAll' : 'resource.selectAll')"
+          @pointerdown.stop @change.stop="emit('select-group')" @click.stop />
       </span>
       <span class="mod-cell mod-group-cell">
-        <button class="mod-tree-caret" :class="{ collapsed: !groupOpen }" @click.stop="emit('toggle-group')">
+        <button class="mod-tree-caret" :class="{ collapsed: !groupOpen }" :aria-expanded="groupOpen"
+          :aria-label="groupLabel" @click.stop="emit('toggle-group')">
           <GlyphIcon name="chevron-down" :size="13" :weight="2.4" />
         </button>
         <span class="mod-group-label" :title="groupLabel" @pointerdown.stop="emit('drag-group', $event)"
@@ -445,19 +430,20 @@ function onNoteEnter(event: KeyboardEvent) {
          包一层 CollapsePanel：分组收起 / 展开走高度过渡，收起的动画期间行仍挂在 DOM 里，虚拟窗口不受影响 -->
     <CollapsePanel :open="groupOpen">
       <div ref="rowsEl" class="mod-rows" :style="{ paddingTop: padTop + 'px', paddingBottom: padBottom + 'px' }">
-        <div v-for="row in visibleRows" :key="modRowKey(row.item)" class="mod-tr mod-virtual-row" :style="{
-          gridTemplateColumns: gridTemplate,
-          '--row-depth': row.depth - 1,
-        }" :class="{
-        'row-selected': selectedKeys.has(modSelectKey(row.item)),
-        'row-anchor': modSelectKey(row.item) === anchorKey,
-        'row-selecting': selectedKeys.size > 0,
-        'mod-nested': row.depth > 1,
-      }" @contextmenu.prevent="row.depth === 1 ? emit('item-menu', { event: $event, item: row.item }) : undefined"
-          @click="row.depth === 1 ? emit('row-click', { event: $event, item: row.item }) : undefined">
+        <div v-for="row in visibleRows" :key="row.key" class="mod-tr mod-virtual-row"
+          :style="{ gridTemplateColumns: gridTemplate, '--row-depth': row.depth - 1 }"
+          :class="{
+            'row-selected': row.kind === 'mod' && selectedKeys.has(modSelectKey(row.item)),
+            'row-anchor': row.kind === 'mod' && modSelectKey(row.item) === anchorKey,
+            'row-selecting': selectedKeys.size > 0,
+            'mod-nested': row.depth > 1,
+            'mod-patch-list': row.kind === 'patches',
+          }" :title="row.kind === 'patch' ? row.title : undefined"
+          @contextmenu.prevent="row.kind === 'mod' && row.depth === 1 ? emit('item-menu', { event: $event, item: row.item }) : undefined"
+          @click="onRowClick(row, $event)">
           <!-- 多选勾选框（与列表视图同一套）：内置行在父 jar 里、没有独立文件，留等宽占位保持各列对齐 -->
           <span class="mod-cell row-select-cell">
-            <input v-if="row.depth === 1" type="checkbox" class="row-select"
+            <input v-if="row.kind === 'mod' && row.depth === 1" type="checkbox" class="row-select"
               :checked="selectedKeys.has(modSelectKey(row.item))" @pointerdown.stop
               @change.stop="emit('select', row.item)" @click.stop />
             <span v-else class="row-select-gap" />
@@ -465,25 +451,40 @@ function onNoteEnter(event: KeyboardEvent) {
 
           <!--
           树列在最左：**缩进 + 展开箭头都放这里**，用户要求"把展开放在左边"。
-          层级靠 16px 一级的缩进；箭头只给带内置模组的行，其余留等宽占位。
+          层级靠 16px 一级的缩进；有子项的位置给箭头，其余留等宽占位。
           组名只在分组行那一行出现，模组行这一格是空的。
         -->
           <span class="mod-cell mod-group-cell">
             <span class="mod-tree-indent" :style="{ width: `${(row.depth - 1) * 16}px` }" />
-            <button v-if="row.item.jarInJar.length" class="mod-tree-caret" :class="{ collapsed: !isOpen(row.item) }"
-              v-tip="isOpen(row.item)
-                ? t('resource.modBuiltinCollapse')
-                : t('resource.modBuiltinExpand')
-                " @click.stop="toggleExpand(modRowKey(row.item))" @pointerdown.stop>
+            <button v-if="row.kind === 'patches' || (row.kind === 'mod' && row.expandable)"
+              class="mod-tree-caret" :class="{ collapsed: !row.open }" :aria-expanded="row.open"
+              :aria-label="row.kind === 'patches' ? t('resource.modPatchList') : row.item.name || row.item.file"
+              v-tip="row.open ? t('resource.modCollapse') : t('resource.modExpand')"
+              @click.stop="toggleExpand(row.key)" @pointerdown.stop>
               <GlyphIcon name="chevron-down" :size="13" :weight="2.4" />
             </button>
             <span v-else class="mod-tree-caret-placeholder" />
           </span>
 
+          <span v-if="row.kind !== 'mod'" class="mod-cell mod-name-cell col-start-4 -col-end-1">
+            <template v-if="row.kind === 'patches'">
+              <span class="mod-patch-list-label">{{ t('resource.modPatchList') }}</span>
+              <span class="mod-patch-list-count">{{ row.count }}</span>
+            </template>
+            <template v-else>
+              <span class="mod-patch-tag" :class="{ 'is-asm': row.asm }">
+                {{ t(row.asm ? 'resource.patchesAsm' : 'resource.patchesMixin') }}
+              </span>
+              <span class="mod-patch-target"><HighlightText :text="row.name" :query="query" /></span>
+              <span class="mod-patch-detail"><HighlightText :text="row.detail" :query="query" /></span>
+            </template>
+          </span>
+
+          <template v-else>
           <!-- 启用：复选框，勾 = 启用、取消 = 禁用；内置模组没有独立文件，不给 -->
           <span class="mod-cell mod-enable-cell" @pointerdown.stop>
             <input v-if="row.depth === 1" type="checkbox" class="mod-check" :checked="!row.item.disable"
-              :disabled="busy || row.item.fail" @change="emit('toggle', row.item)" />
+              :disabled="busy || row.item.fail" @click.stop @change="emit('toggle', row.item)" />
           </span>
 
           <span class="mod-cell mod-name-cell">
@@ -508,7 +509,7 @@ function onNoteEnter(event: KeyboardEvent) {
             <!-- 「CoreMod」：会改写别的类的字节码 —— 老式 coremod 或声明了 ASM 变压器 -->
             <span v-if="row.item.coremod" class="badge shrink-0 rounded-[6px] bg-accent-soft px-[7px] py-px text-caption text-accent"
               v-tip="t('resource.modCoreModTip')">{{ t("resource.modCore") }}</span>
-            <!-- 「Mixin N」：注入了多少处目标；列表视图里展开这一行就能看到具体类与方法 -->
+            <!-- 「Mixin N」统计注入条数，展开后按目标类汇总。 -->
             <span v-if="row.item.mixins.length" class="badge badge-mixin shrink-0 rounded-[6px] px-[7px] py-px text-caption"
               v-tip="t('resource.modMixinTip')">{{ t("resource.modMixin", { n: row.item.mixins.length }) }}</span>
           </span>
@@ -566,6 +567,7 @@ function onNoteEnter(event: KeyboardEvent) {
             <HighlightText :text="row.item.author" :query="props.query" />
           </span>
           <span class="mod-cell" :title="row.item.url">{{ row.item.url }}</span>
+          </template>
         </div>
       </div>
     </CollapsePanel>

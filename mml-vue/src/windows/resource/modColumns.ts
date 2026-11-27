@@ -29,7 +29,7 @@ export interface ModCol {
 
 export const MOD_COLS: ModCol[] = [
   { key: "group", label: "resource.groupName", width: 150, resizable: true },
-  // 启用列**不给拖宽**（勾选框列固定）：没有把手，也就没有那条竖线
+  // 启用列固定宽度，保留分隔线。
   { key: "enable", label: "resource.colEnable", width: 44, center: true },
   { key: "name", label: "resource.modName", width: 200, sortable: true, resizable: true },
   { key: "note", label: "resource.modNote", width: 160, sortable: true, resizable: true },

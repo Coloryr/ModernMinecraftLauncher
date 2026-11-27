@@ -849,6 +849,7 @@ export default {
   "resource.modExpand": "Expand",
   "resource.modCollapse": "Collapse",
   "resource.patchesMixin": "Mixin",
+  "resource.modPatchSources": "From {sources}",
   "resource.patchesAsm": "ASM",
   "resource.patchKindInject": "inject",
   "resource.patchKindRedirect": "redirect",

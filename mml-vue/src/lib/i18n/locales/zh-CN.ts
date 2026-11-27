@@ -863,6 +863,7 @@ export default {
   "resource.modExpand": "展开",
   "resource.modCollapse": "收起",
   "resource.patchesMixin": "Mixin",
+  "resource.modPatchSources": "来自 {sources}",
   "resource.patchesAsm": "ASM",
   "resource.patchKindInject": "注入",
   "resource.patchKindRedirect": "重定向",
