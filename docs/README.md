@@ -701,6 +701,8 @@ Windows 会把它下到启动器目录的 `tools/python`（整个启动器一份
 - 示例：组件路线见 `custom/custom-main-demo`，HTML 路线见 `custom/custom-main-html-demo`。
 - 启用后主窗口的启动器主页换成该页面；没导入或关闭开关时回落到内置主页。
 - 页面里可以用 `window.mml` 调用命令、订阅白名单事件；包内静态资源随包读取。
+- 页面自己的持久存储：`window.mml.read_custom_config()` / `write_custom_config(text)`
+  （`read_cutsom_config()` 是兼容拼写），内容原样存进运行目录的 `.custom_config`。
 
 ### 13.3 样式包（自定义 CSS）
 

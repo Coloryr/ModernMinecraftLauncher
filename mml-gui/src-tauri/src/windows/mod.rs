@@ -15,6 +15,7 @@ pub mod block;
 pub mod collect;
 pub mod colormc;
 pub mod config;
+pub(crate) mod custom_config;
 pub mod custom_home;
 pub mod custom_ui;
 pub mod download;

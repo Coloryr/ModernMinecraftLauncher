@@ -305,6 +305,9 @@ interface HostMml {
   openWindow: NonNullable<MmlApi["openWindow"]>;
   on(event: string, cb: (payload: unknown) => void): () => void;
   onTheme(cb: (theme: "Dark" | "Light") => void): () => void;
+  read_custom_config(): Promise<string>;
+  read_cutsom_config(): Promise<string>;
+  write_custom_config(data: string): Promise<void>;
   readonly theme: "Dark" | "Light";
   ready: Promise<void>;
 }
@@ -333,6 +336,14 @@ export function ensureHostMml(): void {
     },
     onTheme: (cb) =>
       watch(theme, () => cb(resolvedTheme() === "Light" ? "Light" : "Dark")),
+    read_custom_config: () => invoke<string>("read_custom_config"),
+    read_cutsom_config: () => invoke<string>("read_cutsom_config"),
+    write_custom_config(data) {
+      if (typeof data !== "string") {
+        return Promise.reject(new TypeError("window.mml.write_custom_config(data): data 必须是字符串"));
+      }
+      return invoke("write_custom_config", { data });
+    },
     get theme() {
       return resolvedTheme() === "Light" ? "Light" : "Dark";
     },

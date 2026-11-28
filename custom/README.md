@@ -142,6 +142,20 @@ token 映射到启动器主题变量、不含 preflight）；两个 HTML 示例�
 - `mml-vue/tailwind.css`：Tailwind 入口（不含 preflight），工具类直接映射启动器的
   主题变量，用法见下一节。
 
+### 自定义存储
+
+自定义主页面可以把要记住的内容存进启动器运行目录的 `.custom_config`：
+
+```js
+const text = await window.mml.read_custom_config(); // 没有文件时是空串
+await window.mml.write_custom_config(JSON.stringify(state));
+```
+
+- 读写都是字符串，启动器不解析 JSON；需要结构化数据就自己 `JSON.stringify` / `JSON.parse`。
+- `read_cutsom_config()` 是最初接口名的兼容拼写，与 `read_custom_config()` 等价。
+- 文件不存在时读取返回空串，写一次就会创建；所有自定义主页面共用这一份，需要区分页面就在内容里加字段。
+- 组件路线（`custom.js`）与 iframe 路线（`index.html`）都能用。
+
 ### 用 Tailwind 写主题
 
 组件型主题（`custom.js`）跑在启动器页面里，可以直接用 Tailwind：颜色与档位取自启动器

@@ -64,6 +64,9 @@ const mml: MmlApi | undefined = window.mml;
 const off = mml?.on(LaunchState, (e: StateEvent) => console.log(e.uuid, e.state));
 ```
 
+自定义主页面要记住一点东西时，用 `mml.read_custom_config()` / `mml.write_custom_config(text)`
+读写运行目录的 `.custom_config`；读写都是字符串，启动器不解析内容。
+
 事件除了名字，还生成了带 payload 类型的订阅函数，接上自己的 `on` 即可：
 
 ```ts

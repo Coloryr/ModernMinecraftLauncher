@@ -160,6 +160,11 @@ export function createCommands(invoke: Invoke) {
       setTreeWidth: (width: number) => invoke<void>("config_set_tree_width", { width }),
       treeWidth: () => invoke<number>("config_tree_width"),
     },
+    customConfig: {
+      readCustomConfig: () => invoke<string>("read_custom_config"),
+      readCutsomConfig: () => invoke<string>("read_cutsom_config"),
+      writeCustomConfig: (data: string) => invoke<void>("write_custom_config", { data }),
+    },
     customHome: {
       import: (path: string) => invoke<CustomHomeInfoDto>("custom_home_import", { path }),
       openDir: () => invoke<void>("custom_home_open_dir"),

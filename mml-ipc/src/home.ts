@@ -90,6 +90,23 @@ export interface MmlApi {
    */
   openWindow?(kind: string, instance?: string | null): Promise<void>;
 
+  /**
+   * 读取自定义存储
+   *
+   * 内容来自运行目录的 `.custom_config`，原样返回；文件不存在时是空串。
+   */
+  read_custom_config(): Promise<string>;
+
+  /** `read_custom_config` 的兼容拼写 */
+  read_cutsom_config(): Promise<string>;
+
+  /**
+   * 写入自定义存储
+   *
+   * - `data`: 要保存的字符串，原样覆盖 `.custom_config`，启动器不校验内容格式
+   */
+  write_custom_config(data: string): Promise<void>;
+
   /** 当前主题（启动器下发，实时更新） */
   theme: MmlTheme;
 

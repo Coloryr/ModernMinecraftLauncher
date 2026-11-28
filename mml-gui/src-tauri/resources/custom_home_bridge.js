@@ -7,6 +7,9 @@
 //     invoke(cmd, args) -> Promise<any>,   // 调任意已注册的启动器命令
 //     on(event, cb) -> () => void,         // 订阅白名单事件，返回取消订阅函数
 //     onTheme(cb) -> () => void,           // 主题变化回调，返回取消订阅函数
+//     read_custom_config() -> Promise<string>,  // 读运行目录的 .custom_config
+//     read_cutsom_config() -> Promise<string>,  // 兼容最初接口名里的拼写
+//     write_custom_config(text) -> Promise<void>, // 原样覆盖 .custom_config
 //     theme: "Dark" | "Light",             // 当前主题（启动器下发的，实时更新）
 //     ready: Promise,                      // 父窗口握手完成
 //   }
@@ -307,10 +310,42 @@
     };
   }
 
+  /**
+   * 读取自定义存储
+   *
+   * 内容来自运行目录的 `.custom_config`，文件不存在时是空串。
+   *
+   * @returns {Promise<string>}
+   */
+  function readCustomConfig() {
+    return invoke("read_custom_config");
+  }
+
+  /** `read_custom_config` 的兼容拼写 */
+  function readCutsomConfig() {
+    return invoke("read_cutsom_config");
+  }
+
+  /**
+   * 写入自定义存储
+   *
+   * @param {string} data 要保存的字符串，原样覆盖 `.custom_config`
+   * @returns {Promise<void>}
+   */
+  function writeCustomConfig(data) {
+    if (typeof data !== "string") {
+      return Promise.reject(new TypeError("mml.write_custom_config(data): data 必须是字符串"));
+    }
+    return invoke("write_custom_config", { data: data });
+  }
+
   window.mml = {
     invoke: invoke,
     on: on,
     onTheme: onTheme,
+    read_custom_config: readCustomConfig,
+    read_cutsom_config: readCutsomConfig,
+    write_custom_config: writeCustomConfig,
     theme: themeValue,
     ready: ready,
   };
