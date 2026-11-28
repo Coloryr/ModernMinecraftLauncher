@@ -363,6 +363,8 @@ function onCellKey(e: KeyboardEvent, i: number) {
      这 2px 是给滚动容器的溢出余量，不留第一排格子悬停上浮时顶边那条线会被切掉 */
   padding-top: 2px;
   /* 右侧不留内边距：滚动条要贴窗口右边缘，父级已抵消 frame-body 的右内边距 */
+  /* 底部留白只在滚到底时出现，见 BlockPanel 的 .block-content */
+  padding-bottom: 22px;
 }
 
 /* 等高占位：撑出滚动条长度；真正的格子绝对定位在里面并按行偏移 */

@@ -689,6 +689,12 @@ async function onDetailRemove() {
 }
 
 /* 渲染进度条：两端文字按内容宽度，条子占满中段 */
+/* 内容区贴到窗口下沿：底部那 22px 不再常驻，留白放在 .grid-scroll 的滚动内容里
+   （与资源管理 / 资源收藏同一套口径）。分类栏自己已经吃掉了上下内边距，这里只处理右半边 */
+.block-content {
+  margin-bottom: -22px;
+}
+
 /* 渲染进度条：分类栏占满左侧时会向内边距里探出去，这条要压在它上面 */
 .block-progress {
   position: relative;

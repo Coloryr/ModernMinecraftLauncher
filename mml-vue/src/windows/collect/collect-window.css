@@ -80,6 +80,16 @@
   color: var(--accent);
 }
 
+/* 内容区贴到窗口下沿：底部那 22px 不再常驻 —— 没滚到底时列表一直铺到窗口下沿，
+   只有滚到底才空出来（留白放在 .collect-scroll 的滚动内容里）。与资源管理同一套口径 */
+.collect-content {
+  margin-bottom: -22px;
+}
+
+.collect-scroll {
+  padding-bottom: 22px;
+}
+
 /* 空分组提示：覆盖全局 .empty-tip 的内边距，无层规则优先，工具类压不住 */
 .collect-empty {
   padding: 24px 16px;

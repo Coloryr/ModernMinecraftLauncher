@@ -111,6 +111,13 @@
   justify-content: center;
 }
 
+/* 内容区贴到窗口下沿：底部那 22px 不再常驻 —— 没滚到底时列表一直铺到窗口下沿，
+   只有滚到底才空出来（留白在 .item-list / .shot-list 的滚动内容里）。
+   与 .cat-content 的 -26px 右边距同一套做法：把 .frame-body 的内边距吃回来 */
+.resource-layout .cat-content {
+  margin-bottom: -22px;
+}
+
 /* ---------- 列表与行 ---------- */
 
 /* 列表容器：只负责滚动与间距，**自己不画框** ——
@@ -128,9 +135,9 @@
      钉成常驻滚动槽：WebKit 只在溢出时占位，短列表下卡片会比 .content-head 多让 9px，
      右缘对不齐 —— 常驻后两个引擎都是 17 + 9，见 styles/scrollbar.css 的 WebKit 例外 */
   padding-right: 17px;
-  /* 底部留一段呼吸区：滚到最底时最后一张卡片不贴着容器下沿（窗口本身的 22px 内边距照旧，
-     这里加的是**滚动内容里**的空白，所以滚动条也能画到这一段 */
-  padding-bottom: 12px;
+  /* 底部留白放进**滚动内容里**：没滚到底时列表一直铺到窗口下沿（不留常驻的空白带），
+     滚到底才空出 22px —— 与 .cat-content 的 -22px 下边距成对，两边一起改 */
+  padding-bottom: 22px;
   scrollbar-gutter: stable;
   overflow-y: scroll;
 }
@@ -373,8 +380,8 @@ html.has-bg .resource-layout .dp-save-row {
   /* 常驻滚动槽，口径同 .item-list，见 styles/scrollbar.css 的 WebKit 例外 */
   overflow-y: scroll;
   padding-right: 17px;
-  /* 底部呼吸区，理由同 .item-list */
-  padding-bottom: 12px;
+  /* 底部留白同 .item-list */
+  padding-bottom: 22px;
   scrollbar-gutter: stable;
 }
 
@@ -446,6 +453,8 @@ html.has-bg .resource-layout .dp-save-row {
   padding: 0;
   scrollbar-gutter: auto;
   margin-right: 26px;
+  /* 外层 .cat-content 已经贴到窗口下沿，白底在这里把 22px 让回来 */
+  margin-bottom: 22px;
 }
 
 /* 真正的滚动容器：铺满卡片，滚动条落在**白色底里面**、且贴住右边框与下边框。
