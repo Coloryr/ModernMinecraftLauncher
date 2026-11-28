@@ -149,6 +149,38 @@ const filteredGroups = computed(() => {
     .filter((g) => g.items.length > 0);
 });
 
+/** 换实例时整页滑动的方向：目标在列表里更靠上就是往回翻，方向反过来 */
+const swapBackward = ref(false);
+
+/**
+ * 这次换实例是不是往回翻
+ *
+ * - from: 原来选中的实例 uuid
+ * - to: 新的实例 uuid
+ *
+ * # 返回值
+ *
+ * 目标在实例列表里更靠上时为 true
+ */
+function movedBackward(from: string | undefined, to: string): boolean {
+  if (!from || from === to) return false;
+  // 用侧栏上真正的显示顺序：分组模式按分组排，列表模式按实例排
+  const order = filteredGroups.value.length
+    ? filteredGroups.value.flatMap((group) => group.items.map((item) => item.uuid))
+    : instances.value.map((item) => item.uuid);
+  const before = order.indexOf(from);
+  const after = order.indexOf(to);
+  return before >= 0 && after >= 0 && after < before;
+}
+
+// 选中项变了就记下方向：切换动画在下一帧按它选进出方向
+watch(
+  () => selected.value?.uuid,
+  (next, prev) => {
+    if (next && prev && next !== prev) swapBackward.value = movedBackward(prev, next);
+  },
+);
+
 function select(inst: InstanceInfoDto) {
   // 实例锁定：只能使用锁定的那个实例；对玩家静默拦截，不暴露"被锁定"这件事
   if (lockActive.value && inst.uuid !== lockUuid.value) return;
@@ -2825,9 +2857,9 @@ onMounted(async () => {
                 :offline-blocked="offlineLaunchBlocked" @quick-launch="onLaunchAction"
                 @launch-menu="openLaunchMenu" back-label-key="home.backToDetail" @back="newsActive = false" />
 
-              <div v-else key="detail" class="detail-content flex flex-1 flex-col gap-4">
+              <div v-else key="detail" class="detail-content flex flex-1 flex-col gap-4" :class="{ 'is-swap-back': swapBackward }">
                 <!-- 按实例 uuid 做 key：切换实例时整块详情走进出动画 -->
-                <Transition name="view-swap" mode="out-in">
+                <Transition name="view-swap">
                   <div v-if="selected" :key="selected.uuid" class="detail-instance flex flex-col gap-2.5">
                     <div class="detail-top flex items-start gap-[18px]">
                       <!-- 实例图标：悬停压暗并露出改图标入口，与列表模式同一套 -->

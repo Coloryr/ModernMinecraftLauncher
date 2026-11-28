@@ -21,16 +21,12 @@ export interface ModCol {
   min?: number;
   /** 表头可点，在「正序 → 倒序 → 不排序」之间切；勾选框列不给 */
   sortable?: boolean;
-  /** 可拖右边缘改宽度（启用列固定，不给） */
+  /** 可拖右边缘改宽度；不给就是固定宽 */
   resizable?: boolean;
-  /** 表头与内容居中（勾选框那列） */
-  center?: boolean;
 }
 
 export const MOD_COLS: ModCol[] = [
   { key: "group", label: "resource.groupName", width: 150, resizable: true },
-  // 启用列固定宽度，保留分隔线。
-  { key: "enable", label: "resource.colEnable", width: 44, center: true },
   { key: "name", label: "resource.modName", width: 200, sortable: true, resizable: true },
   { key: "note", label: "resource.modNote", width: 160, sortable: true, resizable: true },
   { key: "modId", label: "resource.colModId", width: 150, sortable: true, resizable: true },

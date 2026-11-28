@@ -84,3 +84,13 @@
 .collect-empty {
   padding: 24px 16px;
 }
+
+/* 背景图模式下这一句直接压在图上，垫一层胶囊底（与资源窗口的空状态同一口径）；
+   平时的 24px 上下留白在有底色后显得空，收成一档 */
+html.has-bg .collect-empty {
+  width: fit-content;
+  margin: 0 auto;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--bg-card);
+}

@@ -9,7 +9,9 @@
 // 投放高亮（`dropKey`）：别的窗口把条目拖到分组上时，给对应那一项描一道虚线框。
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import GlyphIcon from "./ui/GlyphIcon.vue";
+import { t } from "../lib/i18n";
 import { useSlidingThumb } from "../composables/useSlidingThumb";
+import { useRailWidth } from "../composables/useRailWidth";
 
 /** 左栏的一项 */
 export interface CatItem {
@@ -43,11 +45,12 @@ const props = withDefaults(
     dropKey?: string | null;
     /** 栏底「新建分组」的文案；空串则不显示这一行 */
     newLabel?: string;
-    /** 去掉上下留白：由父级自己安排（父级内容区不滚动时用） */
-    flush?: boolean;
   }>(),
-  { sortable: false, dropKey: null, newLabel: "", flush: false },
+  { sortable: false, dropKey: null, newLabel: "" },
 );
+
+/** 栏宽度：拖右边缘改，拖过的值记在本地，三个窗口共用一份 */
+const { width, railStyle, onResizeStart } = useRailWidth();
 
 const emit = defineEmits<{
   /** 选中一个分类，空串表示「全部」 */
@@ -200,7 +203,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <aside ref="navEl" class="cat-rail" :class="{ flush, ready: thumbReady }" role="tablist"
+  <aside ref="navEl" class="cat-rail" :class="{ ready: thumbReady }" :style="railStyle" role="tablist"
     aria-orientation="vertical">
     <!-- 分类列表：整栏里唯一滚动的一段（栏底那颗添加键不跟着滚，见 .cat-new-slot） -->
     <div class="cat-scroll">
@@ -241,9 +244,14 @@ onUnmounted(() => {
       </button>
     </div>
 
+    <!-- 右边缘：拖动改宽度。热区比视觉上宽一点，贴着栏边不挡内容 -->
+    <span class="rail-split" v-tip="t('common.railResize')" :aria-label="t('common.railResize')"
+      role="separator" aria-orientation="vertical" @pointerdown="onResizeStart" />
+
     <!-- 拖动时的浮起副本：跟着指针走，位置见 ghost；列表里那一项留在原位淡出 -->
     <Teleport to="body">
-      <div v-if="dragged" class="cat-ghost" :style="{ left: `${ghost.x}px`, top: `${ghost.y}px` }">
+      <div v-if="dragged" class="cat-ghost"
+        :style="{ left: `${ghost.x}px`, top: `${ghost.y}px`, width: `${width - 2}px` }">
         <span class="cat-name">{{ dragged.label }}</span>
         <span class="cat-num">{{ dragged.count }}</span>
       </div>
@@ -260,11 +268,15 @@ onUnmounted(() => {
   flex-direction: column;
   /* 栏自己不滚：只有上面的分类列表滚，栏底的添加键固定不动 */
   overflow: hidden;
+  /* 占满窗口左侧：向外吃掉内容区的内边距（上下 22、左 26），贴到窗口三面；
+     底色与右侧描边跟主窗口侧栏同一套 */
+  margin: -22px 0 -22px -26px;
+  padding: 22px 8px 22px 12px;
+  background: var(--bg-side);
+  border-right: 1px solid var(--border);
 }
 
-/* 分类列表：整栏里唯一滚动的那一段。
-   上下留白跟着窗口内容区的原内边距（22px）走，且放进滚动内容里：
-   空档只在滚到两端时出现，滚动条轨道保持整条（见 styles/scrollbar.css） */
+/* 分类列表：整栏里唯一滚动的那一段；上下留白由栏自己的 padding 给 */
 .cat-scroll {
   position: relative;
   flex: 1;
@@ -274,31 +286,7 @@ onUnmounted(() => {
   gap: 2px;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding: 22px 2px 22px 0;
-}
-
-/* 父级自己安排了上下留白（内容区不整页滚动的窗口）：这里只留右侧那 2px，
-   免得与父级的间距叠成两份 */
-.cat-rail.flush .cat-scroll {
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-/* 背景图模式：整条栏补一层侧栏底色，做成一条圆角列（与资源管理的分类栏同一观感）——
-   分类文字直接压在图上时小字看不清。这条底色只在有背景图时出现，普通主题下仍是透明栏；
-   毛玻璃在 themes.css 的透明模糊表里跟着加 */
-html.has-bg .cat-rail {
-  padding: 6px;
-  border-radius: 12px;
-  background: var(--bg-side);
-}
-
-/* 有底色之后左右留白就看得出是不是一样宽：那条 9px 的常驻滚动条会全吃掉在右边，
-   所以列表改成"真溢出才出滚动条"，内边距交给栏自己的 6px —— 装得下时两边都是 6px，
-   真滚动时右边多出滚动条本身的位置，与其它列表的观感一致 */
-html.has-bg .cat-scroll {
   padding: 0;
-  scrollbar-gutter: auto;
 }
 
 /* 选中色块：分类切换时在栏内上下滑动 */
@@ -374,15 +362,11 @@ html.has-bg .cat-scroll {
   background: var(--accent-soft);
 }
 
-/* 栏底的添加键：不参与滚动，永远贴在这一栏底部，与上面的分类留 6px。
-   右边那道 2px 与分类列表的右内边距对齐；背景图模式下由栏自己的 6px 内边距负责 */
+
+/* 栏底的添加键：不参与滚动，永远贴在这一栏底部，与上面的分类留 6px */
 .cat-new-slot {
   flex-shrink: 0;
-  padding: 6px 2px 0 0;
-}
-
-html.has-bg .cat-new-slot {
-  padding-right: 0;
+  padding: 6px 0 0;
 }
 
 /* 拖拽落点占位：虚线框 + 被拖分类的名字与数量 */

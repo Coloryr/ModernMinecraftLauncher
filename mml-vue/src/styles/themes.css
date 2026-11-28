@@ -583,6 +583,8 @@ html.has-bg.bg-frosted :is(
   .block-prompt, .block-progress, .block-cell, .size-dock,
   /* 资源收藏 / 资源管理 */
   .collect-empty-box, .collect-card,
+  /* 空分组那句「这个分组里没有收藏」在背景图模式下垫了胶囊底，跟着一起糊 */
+  .collect-empty,
   /* .mod-group-body 不在这里：它是个透明容器，模糊只会把分组头与 modid 小标题
      背后糊出一条横带，行卡片自己有底色，不需要它 */
   /* 表格的行同理交给容器（.mod-table-panel），不逐行糊 */

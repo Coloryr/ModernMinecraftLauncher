@@ -698,3 +698,22 @@ select.field-select {
     transform: translateX(300%);
   }
 }
+
+/* 左侧边栏 / 分类栏右边缘的拖宽把手：透明热区，悬停才亮。
+   贴在栏的右边框内侧（栏自己 overflow: hidden，放到外面会被裁掉），不挡内容 */
+.rail-split {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 6px;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+  transition: background 0.12s var(--ease-out);
+}
+
+.rail-split:hover {
+  background: var(--accent-soft);
+}

@@ -197,6 +197,7 @@ export default {
   // Shared UI text used across windows
   "common.imagePreviewHint": "Scroll to zoom · drag to pan when zoomed",
   "common.clearSearch": "Clear search",
+  "common.railResize": "Drag to resize",
   "common.listSep": ", ",
   "common.detailSep": ": ",
   "group.default": "Default",
@@ -737,7 +738,6 @@ export default {
   "resource.modBuiltinExpand": "Show bundled mods",
   "resource.modBuiltinCollapse": "Hide bundled mods",
   // Table columns (order matches ModTable's COLUMNS)
-  "resource.colEnable": "On",
   "resource.colModId": "modid",
   "resource.colLoader": "Loader",
   "resource.colSide": "Side",

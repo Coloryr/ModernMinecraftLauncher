@@ -4,12 +4,15 @@
 // **这里不再写分类名**：左侧导航已经把当前分类高亮出来了，顶栏再写一遍是同一份信息
 // 出现两次（用户点名）。所以顶栏只承担"操作"与"分类内的子页切换"。
 //
-// 刷新按钮在这里统一渲染：每个分类都要有，且逻辑完全一样，
-// 各分类自己的按钮（清空截图 / 添加服务器）走 actions 插槽塞在它前面。
-import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import { t } from "../../../lib/i18n";
+// 刷新与「打开文件夹」都在这里统一渲染：每个分类都要有，且逻辑完全一样，
+// 各分类自己的按钮（清空截图 / 添加服务器）走 actions 插槽塞在它们前面。
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { t, tErr } from "../../../lib/i18n";
+import { showToast } from "../../../lib/toast";
+import { openResourceFolder } from "../../../lib/api";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import type { useResourceData } from "../composables/useResourceData";
+import { dropKindOf } from "../types";
 
 const props = withDefaults(
   defineProps<{
@@ -29,7 +32,27 @@ const props = withDefaults(
   }>(),
   { busy: false, showRefresh: true, actionsDisabled: false },
 );
-const { loading, reloadCurrent } = props.data;
+const { loading, reloadCurrent, category, saveTab, dpSave, instanceUuid } = props.data;
+
+/** 当前这一档在磁盘上的目录名：光影是 shaderpacks，存档的数据包子页是 datapacks */
+const folderKind = computed(() => dropKindOf(category.value, saveTab.value));
+
+/** 数据包要带存档目录名，其它分类为 null */
+const folderParent = computed(() => (folderKind.value === "datapacks" ? dpSave.value : null));
+
+/** 能不能点：得有实例；数据包还得先选存档 */
+const canOpenFolder = computed(
+  () => !!instanceUuid.value && (folderKind.value !== "datapacks" || !!folderParent.value),
+);
+
+/** 在文件管理器里打开当前分类的目录；目录不存在时后端会先建出来 */
+async function openCurrentFolder() {
+  try {
+    await openResourceFolder(instanceUuid.value, folderKind.value, null, folderParent.value);
+  } catch (e) {
+    showToast(tErr(e));
+  }
+}
 
 const headEl = ref<HTMLDivElement | null>(null);
 const leadEl = ref<HTMLDivElement | null>(null);
@@ -104,6 +127,11 @@ onBeforeUnmount(() => {
     <fieldset ref="actionsEl" :disabled="props.actionsDisabled"
       class="head-actions ml-auto flex shrink-0 items-center gap-1.5">
       <slot name="actions" />
+      <button class="mini-btn icon-btn head-btn" :disabled="busy || loading || !canOpenFolder"
+        v-tip="t('resource.openFolder')" :aria-label="t('resource.openFolder')" @click="openCurrentFolder">
+        <GlyphIcon name="folder" :size="14" />
+        <span class="head-btn-text">{{ t("resource.openFolder") }}</span>
+      </button>
       <button v-if="props.showRefresh" class="mini-btn icon-btn head-btn" :disabled="busy || loading"
         v-tip="t('resource.refresh')" :aria-label="t('resource.refresh')" @click="reloadCurrent">
         <GlyphIcon name="refresh" :size="14" />

@@ -9,6 +9,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { t } from "../../../lib/i18n";
 import GlyphIcon from "../../../components/ui/GlyphIcon.vue";
 import { useSlidingThumb } from "../../../composables/useSlidingThumb";
+import { useRailWidth } from "../../../composables/useRailWidth";
 import { RESOURCE_CATEGORIES, type CategoryId } from "../types";
 import type { useResourceData } from "../composables/useResourceData";
 import type { useResourceView } from "../composables/useResourceView";
@@ -32,6 +33,9 @@ const { category, instanceUuid } = props.data;
 /** 有实例才放行添加资源：下载窗口一个实例一个，没实例无处可放 */
 const canAdd = computed(() => !!instanceUuid.value);
 const { order, setOrder } = props.view;
+
+/** 栏宽度：拖右边缘改，拖过的值记在本地，与资源收藏 / 方块列表共用一份 */
+const { width, railStyle, onResizeStart } = useRailWidth();
 
 /** 按偏好顺序排好的分类，含文案键 */
 const items = computed(() =>
@@ -168,7 +172,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <aside ref="navEl" class="cat-nav relative flex w-[var(--rail-w)] min-w-[var(--rail-w)] flex-col gap-1" :class="{ ready: thumbReady }">
+  <aside ref="navEl" class="cat-nav relative flex w-[var(--rail-w)] min-w-[var(--rail-w)] flex-col gap-1"
+    :class="{ ready: thumbReady }" :style="railStyle">
     <span class="cat-thumb pointer-events-none absolute left-0 top-0 z-0 rounded-[9px] bg-accent-soft opacity-0 transition-none" :style="thumbStyle" aria-hidden="true"></span>
     <template v-for="(c, idx) in items" :key="c.id">
       <!-- 插入线：松手后这一项会落到这里 -->
@@ -187,6 +192,10 @@ onUnmounted(() => {
       <span class="cat-name">{{ t(dragged.labelKey) }}</span>
     </div>
 
+    <!-- 右边缘：拖动改宽度 -->
+    <span class="rail-split" v-tip="t('common.railResize')" :aria-label="t('common.railResize')"
+      role="separator" aria-orientation="vertical" @pointerdown="onResizeStart" />
+
     <!-- 添加资源：原先在标题栏那颗加号，挪到分类栏**底部**（mt-auto 把它推到栏底），
          与另两个分类栏的「添加分组」同一档外观 -->
     <button type="button" class="add-row-btn cat-add mt-auto" :disabled="!canAdd" @click="emit('add')">
@@ -196,11 +205,24 @@ onUnmounted(() => {
 
     <!-- 拖动时的浮起副本：跟着指针走，位置见 ghost；列表里那一项留在原位淡出 -->
     <Teleport to="body">
-      <div v-if="dragged" class="cat-ghost pointer-events-none fixed z-[200] flex w-[calc(var(--rail-w)-2px)] items-center gap-[9px] rounded-card border border-accent-border bg-modal p-[10px_12px] text-title font-semibold text-accent shadow-[var(--shadow-lg)] [transform:translate(-40%,-50%)_scale(1.04)]" :style="{ left: `${ghost.x}px`, top: `${ghost.y}px` }">
+      <div v-if="dragged" class="cat-ghost pointer-events-none fixed z-[200] flex items-center gap-[9px] rounded-card border border-accent-border bg-modal p-[10px_12px] text-title font-semibold text-accent shadow-[var(--shadow-lg)] [transform:translate(-40%,-50%)_scale(1.04)]" :style="{ left: `${ghost.x}px`, top: `${ghost.y}px`, width: `${width - 2}px` }">
         <GlyphIcon :name="dragged.icon" :size="15" />
         {{ t(dragged.labelKey) }}
       </div>
     </Teleport>
   </aside>
 </template>
+
+<style scoped>
+/* 占满窗口左侧：向外吃掉内容区的内边距（上下 22、左 26），贴到窗口三面；
+   底色与右侧描边跟主窗口侧栏、资源收藏 / 方块列表的分类栏同一套 */
+.cat-nav {
+  margin: -22px 0 -22px -26px;
+  padding: 22px 8px 22px 12px;
+  background: var(--bg-side);
+  border-right: 1px solid var(--border);
+}
+
+</style>
+
 

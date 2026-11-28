@@ -544,7 +544,7 @@ async function onDetailRemove() {
          它和网格一起放在分类栏右边，分类栏的「全部」才与搜索框同一条顶线 -->
     <div v-if="rendered" class="block-main flex min-h-0 flex-1 gap-4">
       <CategoryRail :all-label="t('blocks.catAll')" :all-count="blocks.length" :items="catItems" :active="cat"
-        :sortable="true" :new-label="t('blocks.groupAdd')" flush @pick="cat = $event" @reorder="setOrder"
+        :sortable="true" :new-label="t('blocks.groupAdd')" @pick="cat = $event" @reorder="setOrder"
         @group-menu="openGroupMenu" @new-group="openNewGroup()" />
 
       <div class="block-content flex min-h-0 min-w-0 flex-1 flex-col gap-3">
@@ -689,6 +689,12 @@ async function onDetailRemove() {
 }
 
 /* 渲染进度条：两端文字按内容宽度，条子占满中段 */
+/* 渲染进度条：分类栏占满左侧时会向内边距里探出去，这条要压在它上面 */
+.block-progress {
+  position: relative;
+  z-index: 1;
+}
+
 .block-progress-bar {
   flex: 1;
   min-width: 60px;

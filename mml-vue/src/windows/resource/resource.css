@@ -14,15 +14,6 @@
  * 弹窗内容 Teleport 到 body，样式由各自组件自带。
  */
 
-/* 背景图模式：分类栏直接压在图上，小字与图案叠在一起看不清。
-   补一层侧栏底色（与主窗口侧栏同色）做成一条圆角列，分类项离边缘留点余量；
-   这条列的高斯模糊在 themes.css 的透明模糊表里跟着加 */
-html.has-bg .resource-layout .cat-nav {
-  padding: 6px;
-  border-radius: 12px;
-  background: var(--bg-side);
-}
-
 .resource-layout .cat-nav.ready .cat-thumb {
   opacity: 1;
   transition:
@@ -137,6 +128,9 @@ html.has-bg .resource-layout .cat-nav {
      钉成常驻滚动槽：WebKit 只在溢出时占位，短列表下卡片会比 .content-head 多让 9px，
      右缘对不齐 —— 常驻后两个引擎都是 17 + 9，见 styles/scrollbar.css 的 WebKit 例外 */
   padding-right: 17px;
+  /* 底部留一段呼吸区：滚到最底时最后一张卡片不贴着容器下沿（窗口本身的 22px 内边距照旧，
+     这里加的是**滚动内容里**的空白，所以滚动条也能画到这一段 */
+  padding-bottom: 12px;
   scrollbar-gutter: stable;
   overflow-y: scroll;
 }
@@ -379,6 +373,8 @@ html.has-bg .resource-layout .dp-save-row {
   /* 常驻滚动槽，口径同 .item-list，见 styles/scrollbar.css 的 WebKit 例外 */
   overflow-y: scroll;
   padding-right: 17px;
+  /* 底部呼吸区，理由同 .item-list */
+  padding-bottom: 12px;
   scrollbar-gutter: stable;
 }
 
@@ -794,6 +790,12 @@ html.has-bg .resource-layout .mod-group-head.is-stuck,
   opacity: 1;
 }
 
+/* 表格里这一列是常驻的：勾选框一直可见，平时压暗一档，悬停 / 选中才提亮。
+   不做「从无到有」的淡入 —— 那一瞬间容易被看成勾选框本身在往右挪 */
+.resource-layout .mod-tr .row-select {
+  opacity: 0.4;
+}
+
 /* 内置行没有勾选框，但要占同样的宽度，父子行的名字才会对齐 */
 .resource-layout .row-select-gap {
   display: inline-block;
@@ -1089,26 +1091,6 @@ html.has-bg .resource-layout .mod-group-head.is-stuck,
   cursor: pointer;
 }
 
-/* 启用列的复选框 */
-.resource-layout .mod-enable-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.resource-layout .mod-check {
-  width: 15px;
-  height: 15px;
-  margin: 0;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.resource-layout .mod-check:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
 /* 路径列等宽字符更整齐（反斜杠与字母等宽，扫起来成列） */
 .resource-layout .mod-path {
   font-size: 11px;
@@ -1239,14 +1221,6 @@ html.has-bg .resource-layout .mod-group-head.is-stuck,
 .resource-layout .mod-th-cell:has(> .mod-th-resize:hover)::after {
   width: 2px;
   background: var(--accent);
-}
-
-/* 居中的表头（勾选框那列）：`gap: 0` 一并去掉 —— 表头是 flex，`gap` 会把
-   文字往左挤一点，看着就是"离左右两条线不一样远" */
-.resource-layout .mod-th-center {
-  justify-content: center;
-  gap: 0;
-  text-align: center;
 }
 
 .resource-layout .mod-th-cell:hover {

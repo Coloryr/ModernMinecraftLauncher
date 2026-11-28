@@ -5,7 +5,7 @@
 //   - **一级节点 = 分组行**（折叠箭头 + 组名 + 数量）：收起时整组的模组行都不渲染；
 //   - **二级 = 模组行**；内置模组和 Mixin / ASM 目标沿用列表视图的展开层级。
 //
-// 左起三列就是"树"：**缩进 / 折叠箭头**（都在最左，用户要求）｜启用勾选框｜名字。
+// 左起两列就是"树"：**缩进 / 折叠箭头**（都在最左，用户要求）｜名字。
 // 箭头一律放在最左边那一列，层级靠 16px 一级的缩进表达：
 //
 //     > 分组名
@@ -16,13 +16,14 @@
 // 列宽与排序：
 //   - 列宽**由 JS 给**，`MOD_COLS` 一处定义 + 用户拖出来的宽度，所以整表是**固定宽**：
 //     总宽超出容器时由外层 `.item-list` 横向滚动，不再把列挤成省略号；
-//   - **启用右边的每一列**都能拖右边缘改宽度、点表头在「正序 → 倒序 → 不排序」之间切换，
+//   - **名字右边的每一列**都能拖右边缘改宽度、点表头在「正序 → 倒序 → 不排序」之间切换，
 //     这是用户要求；不排序时回到与列表视图一致的 modid 正序。
 //
 // 列序（14 列 + 多选）：
-//   分组名 | 启用 | 名字 | 备注 | modid | 版本 | 加载器类型 | 加载侧
+//   分组名 | 名字 | 备注 | modid | 版本 | 加载器类型 | 加载侧
 //          | 下载源 | 项目编号 | 文件编号 | 路径 | 作者 | 网页链接
 //   - 备注紧挨名字右边；没有操作列，删除 / 打开文件夹在列表视图里，备注双击就地编辑。
+//   - 启用不占列：切换走行的右键菜单（启用 / 禁用）与工具栏的批量按钮。
 import { computed, nextTick, ref, watch } from "vue";
 import { t } from "../../../../lib/i18n";
 import GlyphIcon from "../../../../components/ui/GlyphIcon.vue";
@@ -228,6 +229,7 @@ function onRowClick(row: ModTreeRow, event: MouseEvent) {
   else if (row.kind === "mod" && row.depth === 1) emit("row-click", { event, item: row.item });
 }
 
+
 /**
  * 正在编辑的备注（同时只能有一个）
  *
@@ -388,7 +390,7 @@ function onNoteEnter(event: KeyboardEvent) {
     <div class="mod-tr mod-th" :class="{ 'mod-th-hidden': hideHeader }" :style="{ gridTemplateColumns: gridTemplate }">
       <span class="mod-th-cell mod-th-select"></span>
       <span v-for="col in MOD_COLS" :key="col.key" class="mod-th-cell"
-        :class="{ 'mod-th-center': col.center, 'mod-th-sortable': col.sortable }">
+        :class="{ 'mod-th-sortable': col.sortable }">
         <button v-if="col.sortable" class="mod-th-sort" :title="t('resource.colSortTip')" @click="cycleSort(col.key)">
           {{ t(col.label) }}<span v-if="sortMark(col.key)" class="mod-th-mark">{{ sortMark(col.key) }}</span>
         </button>
@@ -466,7 +468,7 @@ function onNoteEnter(event: KeyboardEvent) {
             <span v-else class="mod-tree-caret-placeholder" />
           </span>
 
-          <span v-if="row.kind !== 'mod'" class="mod-cell mod-name-cell col-start-4 -col-end-1">
+          <span v-if="row.kind !== 'mod'" class="mod-cell mod-name-cell col-start-3 -col-end-1">
             <template v-if="row.kind === 'patches'">
               <span class="mod-patch-list-label">{{ t('resource.modPatchList') }}</span>
               <span class="mod-patch-list-count">{{ row.count }}</span>
@@ -481,12 +483,6 @@ function onNoteEnter(event: KeyboardEvent) {
           </span>
 
           <template v-else>
-          <!-- 启用：复选框，勾 = 启用、取消 = 禁用；内置模组没有独立文件，不给 -->
-          <span class="mod-cell mod-enable-cell" @pointerdown.stop>
-            <input v-if="row.depth === 1" type="checkbox" class="mod-check" :checked="!row.item.disable"
-              :disabled="busy || row.item.fail" @click.stop @change="emit('toggle', row.item)" />
-          </span>
-
           <span class="mod-cell mod-name-cell">
             <span class="mod-name" :title="row.item.name || row.item.file">
               <HighlightText :text="row.item.name || row.item.file" :query="props.query" />

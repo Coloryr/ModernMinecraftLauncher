@@ -71,6 +71,8 @@ export const KEYS = {
   settingsTab: "mml.settingsTab",
   /** 图标裁剪上次选的边长 */
   iconPickSize: "mml.iconPickSize",
+  /** 左侧分类栏宽度，单位 px（资源管理 / 资源收藏 / 方块列表共用一份） */
+  railWidth: "mml.railWidth",
 
   // ---- 账户显示 ----
   /** 皮肤显示模式 Skin2DA / Skin2DB / Skin3D / Skin3DD / Skin3DRotate */

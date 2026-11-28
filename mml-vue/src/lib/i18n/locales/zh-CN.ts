@@ -197,6 +197,7 @@ export default {
   // 跨窗口共用的界面文案
   "common.imagePreviewHint": "滚轮缩放 · 放大后可拖动",
   "common.clearSearch": "清空搜索",
+  "common.railResize": "拖动调整宽度",
   "common.listSep": "、",
   "common.detailSep": "：",
   "group.default": "默认分组",
@@ -737,7 +738,6 @@ export default {
   "resource.modBuiltinExpand": "展开内置模组",
   "resource.modBuiltinCollapse": "收起内置模组",
   // 表格的列，顺序与 ModTable 的 COLUMNS 一致
-  "resource.colEnable": "启用",
   "resource.colModId": "modid",
   "resource.colLoader": "加载器类型",
   "resource.colSide": "加载侧",

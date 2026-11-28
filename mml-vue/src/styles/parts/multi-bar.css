@@ -10,6 +10,10 @@
 .multi-bar {
   /* 竖直方向不被压缩：内容区再窄，条子也按自己的高度占一行 */
   flex: none;
+  /* 分类栏占满左侧时会向内容区的内边距里探出去（见 CategoryRail），
+     这条工具条要压在它上面，自己开一层 */
+  position: relative;
+  z-index: 1;
   align-self: center;
   display: flex;
   align-items: center;
