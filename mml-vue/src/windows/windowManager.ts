@@ -20,6 +20,7 @@ import { KEYS, readString, writeString } from "../lib/storage";
 import { isTauri } from "../lib/util";
 import { WindowModeChange } from "../lib/listens";
 import { isWindowKind, type WindowKind, WINDOW_REGISTRY } from "./registry";
+import { allowConfigClose } from "./config/closeGuard";
 
 const WIN_PARAM = "window";
 const UUID_PARAM = "uuid";
@@ -947,15 +948,10 @@ function closeInstanceArg(kind: WindowKind): string | null {
  * "回上一层"是另一回事，走 closeWindow —— 标题栏的 ‹ 箭头与各窗口的"取消"都走它。
  */
 export async function quitWindow() {
-  if (!isTauri()) {
-    // 浏览器预览：非脚本打开的标签页关不掉，失败就作罢
-    window.close();
-    return;
-  }
   // 单窗口模式下 ✕ 就是退出应用，但资源映射在跑时后端拒绝关主窗口。
   // 这时如果当前不在主页面，就把 ✕ 当成"关掉这一页" —— 否则用户会被困在设置页里，
   // 点 ✕ 只弹一句"正在处理资源映射"。主页面照旧交给后端的关闭保护拦
-  if (!multiWindow.value && currentKind.value !== "main") {
+  if (isTauri() && !multiWindow.value && currentKind.value !== "main") {
     const busy = await commands.settings.resourceMapRunning().catch(() => false);
     if (busy) {
       closeWindow();
@@ -963,9 +959,16 @@ export async function quitWindow() {
     }
   }
   // 单窗口模式只有主窗口是真的：那里 kind 是"当前页"而不是窗口标签，拿它去找窗口会 not found
-  const target = multiWindow.value ? currentKind.value : "main";
-  const instance = multiWindow.value ? closeInstanceArg(target) : null;
-  commands.windows.closeWindow(target, instance).catch((e) => {
+  await closeActualWindow(multiWindow.value ? currentKind.value : "main");
+}
+
+async function closeActualWindow(target: WindowKind) {
+  if (!(await allowConfigClose())) return;
+  if (!isTauri()) {
+    window.close();
+    return;
+  }
+  await commands.windows.closeWindow(target, closeInstanceArg(target)).catch((e) => {
     console.error("[windowManager] 关闭窗口失败，回退 JS API", target, e);
     getCurrentWindow().close();
   });
@@ -1016,30 +1019,8 @@ export function closeWindow() {
     }
     // 已经在主页面：主页面就是应用本身，关它 = 退出应用。
     // 不能走上面"切回主页面"的分支——那样标题栏的 ✕ 会变成空操作（启动画面为此单独绕过过）
-    if (isTauri()) {
-      commands.windows.closeWindow("main", null).catch((e) => {
-        console.error("[windowManager] 关闭主窗口失败，回退 JS API", e);
-        getCurrentWindow().close();
-      });
-      return;
-    }
-    // 浏览器预览：非脚本打开的标签页关不掉，失败就作罢
-    window.close();
-    return;
   }
-
-  if (isTauri()) {
-    // 多窗口：走 Rust 窗口管理器关闭当前真实窗口，kind → 标签的映射在 windows/registry。
-    // 日志窗口族的标签带实例 uuid，所以要把实例一起报上去。
-    // 命令失败时回退到官方 JS API 关闭当前窗口。
-    commands.windows.closeWindow(kind, closeInstanceArg(kind)).catch((e) => {
-      console.error("[windowManager] Rust 关闭窗口失败，回退 JS API", kind, e);
-      getCurrentWindow().close();
-    });
-  } else {
-    // 浏览器多窗口：由脚本打开的标签页允许 window.close()
-    window.close();
-  }
+  void closeActualWindow(kind);
 }
 
 /**

@@ -8,7 +8,7 @@
 //
 // **行是拍平了渲染的**（父行 + 已展开的内置行 + 已展开的目标行），外面再包一层 `.mod-rows`
 // 交给 composables/useVirtualRows 做**行虚拟化**：几百个模组时只渲染视口附近那几行。
-// 目标行与模组行同为 56px 高，虚拟窗口按同一行高算，不会错位。
+// 模组行与目标行各有固定高度，虚拟窗口按实际行高计算。
 //
 // 排序：**按 modid 正序**，见 types.ts 的 sortedMods —— 与表格视图共用同一份比较器，
 // 两个视图的顺序必须一致，否则切换视图会看着"顺序变了"。
@@ -19,15 +19,13 @@ import HighlightText from "../../../../components/ui/HighlightText.vue";
 import ResourceRow from "../ResourceRow.vue";
 import { LIST_ROW_GAP, LIST_ROW_H, useVirtualRows } from "../../../../composables/useVirtualRows";
 import {
-  modRowKey,
   modSelectKey,
   modSub,
-  patchKindLabel,
   sortedMods,
   type ModViewEmits,
   type ModViewProps,
 } from "../../types";
-import type { ModItemDto, ModMixinTargetDto } from "../../../../lib/bindings";
+import { modTreeRows, type ModTreeRow } from "../../modTree";
 
 const props = withDefaults(
   defineProps<
@@ -171,20 +169,9 @@ function markEntering(keys: string[]) {
   }, 420);
 }
 
-/** 展开后的一行：模组行，「改写目标」子项行，或这个模组改写的一个目标类 */
-type FlatRow = ModFlatRow | PatchListRow | PatchFlatRow;
-
-/** 模组行 */
-interface ModFlatRow {
-  /** 行类别 */
-  kind: "mod";
-  /** v-for 的 key */
-  key: string;
-  /** 这一行的模组条目 */
-  item: ModItemDto;
-  /** 层级：与最外层同层是 0，每往下嵌一层 +1（缩进与"给不给操作入口"都看它） */
-  depth: number;
-  /** 在"框"里的位置，见 {@link PatchListRow.box}；展开出子项时才填 */
+/** 列表卡片的拼框与退场动画状态。 */
+type FlatRow = ModTreeRow & {
+  /** 这一行在展开卡片里的位置 */
   box?: "start" | "end" | "mid" | "single";
   /** 下一行紧贴着它（吃掉行间距） */
   tight?: boolean;
@@ -194,201 +181,19 @@ interface ModFlatRow {
   height?: number;
   /** 收起动画里的当前不透明度 */
   alpha?: number;
-}
-
-/**
- * 「改写目标」子项行：一个模组一条，展开后才列出具体的类
- *
- * 单独拆一层是因为数量：重度 mixin 的包有几百上千条目标，跟着父行一起摊开会把整屏冲掉，
- * 虚拟列表的高度也会一跳几千像素。默认收起，想看再点。
- */
-interface PatchListRow {
-  /** 行类别 */
-  kind: "patches";
-  /** v-for 的 key */
-  key: string;
-  /** 层级，与内置模组行同层 */
-  depth: number;
-  /** 属于哪个模组行：展开 / 收起用它自己的 key */
-  parent: string;
-  /** 目标条数 */
-  count: number;
-  /** 在"框"里的位置：start = 框头，end = 框尾，mid = 中间；拼框时才填 */
-  box?: "start" | "end" | "mid" | "single";
-  /** 下一行紧贴着它（吃掉行间距），虚拟窗口按这个扣高度 */
-  tight?: boolean;
-  /** 正在收起：这一行是"退场"的旧行，高度按 progress 缩到 0 */
-  collapse?: boolean;
-  /** 收起动画里的当前高度，单位 px */
-  height?: number;
-  /** 收起动画里的当前不透明度 */
-  alpha?: number;
-}
-
-/** 改写目标行：一个目标类一行 */
-interface PatchFlatRow {
-  /** 行类别 */
-  kind: "patch";
-  /** v-for 的 key，带父条目前缀，避免不同模组的目标类重名 */
-  key: string;
-  /** 层级，规则同模组行 */
-  depth: number;
-  /** 是 ASM 变压器，而不是 mixin 注入 */
-  asm: boolean;
-  /** 目标类名；ASM 没声明目标时是变压器名 */
-  name: string;
-  /** 方法 / 注入方式摘要，一行放不下就省略 */
-  detail: string;
-  /** 悬停提示：完整的目标与方法 */
-  title: string;
-  /** 在"框"里的位置，见 {@link PatchListRow.box}；拼框时才填 */
-  box?: "start" | "end" | "mid" | "single";
-  /** 下一行紧贴着它（吃掉行间距） */
-  tight?: boolean;
-  /** 正在收起：这一行是"退场"的旧行，高度按 progress 缩到 0 */
-  collapse?: boolean;
-  /** 收起动画里的当前高度，单位 px */
-  height?: number;
-  /** 收起动画里的当前不透明度 */
-  alpha?: number;
-}
-
-/**
- * 把一个模组的改写目标整理成行
- *
- * 同一目标类的多条注入合成一行：重度包有几百条，按类摊开还能读，方法写在右侧；
- * 搜索命中方法名时同样保留这一行，所以搜 "renderItem" 也能找到那个类。
- *
- * - `item`: 模组条目
- * - `q`: 已转小写的搜索词，空串表示没在搜
- *
- * # 返回值
- *
- * 目标行；没命中搜索词的那些已经滤掉
- */
-function patchRowsOf(item: ModItemDto, q: string): PatchFlatRow[] {
-  const groups = new Map<string, ModMixinTargetDto[]>();
-  for (const target of item.mixins) {
-    const bucket = groups.get(target.target);
-    if (bucket) bucket.push(target);
-    else groups.set(target.target, [target]);
-  }
-
-  const rows: PatchFlatRow[] = [];
-  for (const [name, list] of groups) {
-    const detail = list
-      .map((target) => target.method + " · " + patchKindLabel(target.kind))
-      .join("，");
-    // 悬停才给"谁改的"：列表里一行放不下 mixin 类名，但排查冲突时要看得到
-    const sources = [...new Set(list.map((target) => target.mixin))].join("、");
-    const hit = (
-      name + " " + list.map((target) => target.method + " " + target.mixin).join(" ")
-    ).toLowerCase();
-    if (q && !hit.includes(q)) continue;
-    rows.push({
-      kind: "patch",
-      key: "mixin|" + name,
-      depth: 0,
-      asm: false,
-      name,
-      detail,
-      title: name + "：" + detail + (sources ? "；来自 " + sources : ""),
-    });
-  }
-
-  for (const target of item.asm) {
-    const name = target.target || target.transformer;
-    const detail = [target.method, target.source].filter(Boolean).join(" · ");
-    const hit = (
-      target.source +
-      " " +
-      target.transformer +
-      " " +
-      target.target +
-      " " +
-      target.method
-    ).toLowerCase();
-    if (q && !hit.includes(q)) continue;
-    rows.push({
-      kind: "patch",
-      key: "asm|" + target.source + "|" + target.transformer + "|" + name,
-      depth: 0,
-      asm: true,
-      name,
-      detail,
-      title: target.transformer + " · " + detail,
-    });
-  }
-
-  return rows;
-}
-
-/**
- * 拍平：父行 + **已展开**的内置行，以及「改写目标」子项（它自己再展开才列目标类）
- *
- * 内置的行跟着父行走，所以展开只会让后面那些行的下标往后挪，不会打乱父行的顺序。
- * **搜索时也照状态来**：不强制摊开 —— 搜到的行本来就会留在列表里（命中改写目标的模组
- * 也会出现），点箭头展开才看得到具体命中的类；强制摊开会让搜索中点箭头收不起来。
- *
- * - `items`: 这一层要显示的模组
- * - `depth`: 这一层的层级
- * - `out`: 结果累加到这里
- */
-function flatten(items: ModItemDto[], depth: number, out: FlatRow[]) {
-  for (const item of sortedMods(items)) {
-    const key = modRowKey(item);
-    const start = out.length;
-    out.push({ kind: "mod", key, item, depth });
-
-    // 收起时不用算改写目标，省掉几百个模组的目标分组
-    if (!isOpen(key)) continue;
-
-    const patches = patchRowsOf(item, props.query);
-    if (item.jarInJar.length) {
-      flatten(item.jarInJar, depth + 1, out);
-    }
-    if (patches.length) {
-      // 目标列表只算**一条**子项：几百上千条目标摊在这里会把整屏冲掉
-      out.push({ kind: "patches", key: key + "|patches", depth: depth + 1, parent: key, count: patches.length });
-      if (isPatchesOpen(key)) {
-        for (const patch of patches) {
-          out.push({ ...patch, key: key + "|" + patch.key, depth: depth + 2 });
-        }
-      }
-    }
-
-    // 这一行下面有内容：父行与它的子项拼成**一个框**，父行是框头
-    if (out.length > start + 1) markBox(out, start, out.length - 1);
-  }
-}
-
-/**
- * 把 [start, end] 这些行拼成一个框
- *
- * 框头（父行）去掉下边框与下圆角，中间只留左右两条边，框尾收口 ——
- * 于是父行的卡片把子项整个包住，与「本地文件」的缓存分组一个观感。
- * 行间距由 CSS 的负外边距吃掉，虚拟窗口那边按 `tight` 扣高度，见 `rowHeights`。
- *
- * - `rows`: 全部行
- * - `start`: 框头的下标
- * - `end`: 框尾的下标
- */
-function markBox(rows: FlatRow[], start: number, end: number) {
-  const head = rows[start];
-  head.box = "start";
-  head.tight = true;
-  for (let index = start + 1; index < end; index += 1) {
-    rows[index].box = "mid";
-    rows[index].tight = true;
-  }
-  rows[end].box = "end";
-  rows[end].tight = false;
-}
+};
 
 /** 本视图要渲染的全部行，已按展开状态拍平；收起中的旧行先留在原位 */
 const rows = computed(() => {
-  const out: FlatRow[] = [];
-  flatten(props.items, props.depth, out);
+  const out: FlatRow[] = modTreeRows(props.items, props.depth, {
+    query: props.query, order: sortedMods, isOpen, isPatchesOpen,
+  });
+  for (const [index, row] of out.entries()) {
+    const childFollows = (out[index + 1]?.depth ?? props.depth) > props.depth;
+    if (row.depth === props.depth && !childFollows) continue;
+    row.tight = childFollows;
+    row.box = row.depth === props.depth ? "start" : childFollows ? "mid" : "end";
+  }
 
   const anim = collapseAnim.value;
   if (anim) {
@@ -507,10 +312,9 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
         </template>
         <!-- 展开箭头：带内置模组或改写目标的行才有（子行自己没有下级）；默认收起 -->
         <template #lead>
-          <button v-if="row.item.jarInJar.length || row.item.mixins.length || row.item.asm.length"
-            class="mod-tree-caret" :class="{ collapsed: !isOpen(modRowKey(row.item)) }"
-            v-tip="isOpen(modRowKey(row.item)) ? t('resource.modCollapse') : t('resource.modExpand')"
-            @click.stop="toggleExpand(modRowKey(row.item))" @pointerdown.stop>
+          <button v-if="row.expandable" class="mod-tree-caret" :class="{ collapsed: !row.open }"
+            :aria-expanded="row.open" v-tip="row.open ? t('resource.modCollapse') : t('resource.modExpand')"
+            @click.stop="toggleExpand(row.key)" @pointerdown.stop>
             <GlyphIcon name="chevron-down" :size="13" :weight="2.4" />
           </button>
           <!-- 占位：没有下级的行也留出箭头的宽度，图标与名字才能对齐成一列 -->
@@ -587,7 +391,7 @@ const visible = computed(() => rows.value.slice(start.value, end.value));
           { 'row-enter': entering.has(row.key), 'row-collapsing': row.collapse }]"
         :style="{ '--row-depth': row.depth, ...collapseStyle(row) }" @click="togglePatches(row.parent)">
         <span class="row-select-gap" />
-        <button class="mod-tree-caret" :class="{ collapsed: !isPatchesOpen(row.parent) }"
+        <button class="mod-tree-caret" :class="{ collapsed: !row.open }" :aria-expanded="row.open"
           @click.stop="togglePatches(row.parent)">
           <GlyphIcon name="chevron-down" :size="12" :weight="2.4" />
         </button>

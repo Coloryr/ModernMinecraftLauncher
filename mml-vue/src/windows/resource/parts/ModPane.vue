@@ -1843,17 +1843,15 @@ const stuckHeads = ref<Set<string>>(new Set());
  */
 function syncStuckHeads() {
   const container = listScroll.container.value;
-  // 表格视图的分组行不吸顶；没滚动时分组头本来就在顶上，也不算"粘住"
-  // —— 否则首屏第一组一进来就是直角半透明
-  if (modView.value !== "list" || !container || container.scrollTop <= 0) {
+  if (!container || container.scrollTop <= 0) {
     if (stuckHeads.value.size) stuckHeads.value = new Set();
     return;
   }
   const edge = container.getBoundingClientRect().top;
   const next = new Set<string>();
   for (const [id, section] of sectionEls) {
-    const head = section.querySelector(".mod-group-head");
-    if (head && head.getBoundingClientRect().top <= edge + 0.5) next.add(id);
+    const head = section.querySelector(".mod-group-head, .mod-group-row")?.getBoundingClientRect();
+    if (head && head.top <= edge + 0.5 && head.bottom > edge) next.add(id);
   }
   // 集合没变就别换引用：滚动时每帧都会走到这里，换一次就是一整屏重渲染
   if (next.size === stuckHeads.value.size && [...next].every((id) => stuckHeads.value.has(id))) return;
@@ -1865,15 +1863,12 @@ function syncStuckHeads() {
 // 吸顶态跟着一起重算：位置变了，哪几个分组头贴在上沿也就变了
 watch(
   [sections, modView, () => groups.collapsed.value, () => groups.order.value],
-  () => {
-    listScroll.bump();
-    syncStuckHeads();
-  },
+  listScroll.bump,
   { flush: "post" },
 );
 
 // 滚动时吸顶态会变（bump 不必重跑：虚拟窗口本来就跟着 scroll.top 算）
-watch([() => listScroll.top.value, () => listScroll.height.value], syncStuckHeads, { flush: "post" });
+watch([listScroll.top, listScroll.height, listScroll.version], syncStuckHeads, { flush: "post" });
 
 const {
   dragKey: draggingSection,
@@ -2170,7 +2165,7 @@ onBeforeUnmount(() => {
           </div>
 
           <section :ref="(el) => bindSection(sec.id, el as Element | null)" class="mod-group mod-group-table"
-            :class="{ 'mod-group-dragging': draggingSection === sec.id }">
+            :class="{ 'mod-group-dragging': draggingSection === sec.id, 'is-stuck': stuckHeads.has(sec.id) }">
             <ModTable :items="sec.items" :busy="busy" :selected-keys="selected" :update-keys="updateKeys" :query="query"
               :group-label="sec.label" :group-key="sec.id" :group-open="isOpen(sec.id)" :custom="sec.custom"
               :dragging-group="draggingSection" :hide-header="idx > 0" :col-widths="colWidths" :sort="sort"

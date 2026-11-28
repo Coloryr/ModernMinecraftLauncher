@@ -293,7 +293,7 @@ function pick(account: AccountStoreDto) {
   /* 顶栏全屏时会更高，按实际占位算，否则菜单底部会被屏幕切掉 */
   max-height: calc(100vh - var(--titlebar-actual-h, var(--titlebar-h)) - 16px);
   overflow-y: scroll;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: stable both-edges;
   /* 见 styles/scrollbar.css */
   background: var(--bg-modal);
   border: 1px solid var(--border);

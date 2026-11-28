@@ -6,10 +6,8 @@
 // 没有行可错峰时（空列表、加载骨架、数据还在路上）整块淡入：子页切换常常先落到
 // 一个还没有行的空页上，只淡标题的话看着就是硬切。
 //
-// 透明高斯模糊（html.bg-frosted）开着时，**淡入不能落在毛玻璃的祖先上**：祖先带不透明度动画，
-// 子树的 backdrop-filter 就采不到背后的背景图，卡片会从毛玻璃退成半透明底板，动画结束才恢复。
-// 位移不受影响（实测：祖先 transform 与元素自己淡入都不破坏模糊，只有祖先 opacity 会），
-// 所以含毛玻璃的容器只做位移，淡入拆给"不是毛玻璃祖先"的元素，见 fadeTargets。
+// 透明高斯模糊开着时，毛玻璃表面与祖先只做位移，从第一帧就能采样、显示背景。
+// 淡入交给前景内容。异步换行的容器用 data-stagger-children 标出，之后插入的卡片也能取到背景。
 import { animations } from "../lib/appearance";
 
 /** 完成回调，Vue Transition 用 */
@@ -41,47 +39,26 @@ function hasBackdrop(el: Element): boolean {
 }
 
 /**
- * 子树里带背景模糊的元素，不含自己
- *
- * - `root`: 要扫描的子树根
- *
- * # 返回值
- *
- * 文档顺序；没有时为空数组
- */
-function frostedInside(root: Element): HTMLElement[] {
-  const out: HTMLElement[] = [];
-  root.querySelectorAll("*").forEach((el) => {
-    if (hasBackdrop(el)) out.push(el as HTMLElement);
-  });
-  return out;
-}
-
-/**
- * 这次淡入该落在哪些元素上
- *
- * 沿"含毛玻璃"的分支往下走，遇到不再包含毛玻璃的元素就停：它连同整棵子树一起淡入。
- * 毛玻璃元素本身也在结果里 —— 它自己的不透明度不影响自己的 backdrop-filter。
+ * 选出可整体淡入的最外层元素；没有毛玻璃的子树合并为一个淡入目标。
  *
  * - `root`: 要淡入的那块
- * - `frosted`: root 子树里的毛玻璃元素，见 {@link frostedInside}
- *
- * # 返回值
- *
- * 需要各自挂一次透明度动画的元素
  */
-function fadeTargets(root: Element, frosted: HTMLElement[]): HTMLElement[] {
-  const out: HTMLElement[] = [];
-  const walk = (node: Element) => {
+function fadeTargets(root: Element): Element[] {
+  const parts: Element[] = [];
+  const collect = (node: Element): boolean => {
+    const start = parts.length;
+    let keepVisible = node.hasAttribute("data-stagger-children") || hasBackdrop(node);
     for (const child of Array.from(node.children)) {
-      // 子元素自己就是毛玻璃不算"祖先"：它自己淡入是安全的
-      const isAncestor = frosted.some((target) => target !== child && child.contains(target));
-      if (isAncestor) walk(child);
-      else out.push(child as HTMLElement);
+      if (collect(child)) keepVisible = true;
     }
+    if (!keepVisible) {
+      parts.length = start;
+      parts.push(node);
+    }
+    return keepVisible;
   };
-  walk(root);
-  return out;
+  collect(root);
+  return parts;
 }
 
 /**
@@ -179,6 +156,9 @@ export function useStaggerEnter(
       made.push(target.animate(frames, { duration: ms, delay, easing: EASING, fill: "both" }));
     };
 
+    const partsToFade = (target: Element) => frosted ? fadeTargets(target) : [target];
+    const fadeFrames: Keyframe[] = [{ opacity: 0 }, {}];
+
     /**
      * 淡入：毛玻璃开着时拆给不会破坏模糊的元素，否则就淡它自己
      *
@@ -186,26 +166,24 @@ export function useStaggerEnter(
      * - `ms` / `delay`: 时长与延迟，单位毫秒
      */
     const fadeIn = (target: Element, ms: number, delay: number) => {
-      const inner = frosted ? frostedInside(target) : [];
-      const parts = inner.length ? fadeTargets(target, inner) : [target as HTMLElement];
-      parts.forEach((part) => make(part, [{ opacity: 0 }, { opacity: 1 }], ms, delay));
+      partsToFade(target).forEach((part) => make(part, fadeFrames, ms, delay));
     };
 
     /**
-     * 位移 + 淡入：含毛玻璃的容器只位移，淡入交给 {@link fadeIn} 拆下去
+     * 位移 + 淡入：含毛玻璃的容器只位移，前景跟着同一节奏淡入
      *
      * - `target`: 要入场的元素
      * - `ms` / `delay`: 时长与延迟，单位毫秒
      * - `shift`: 入场位移，单位像素
      */
     const slideIn = (target: Element, ms: number, delay: number, shift: number) => {
-      const inner = frosted ? frostedInside(target) : [];
-      if (!inner.length) {
+      const parts = partsToFade(target);
+      if (parts[0] === target) {
         make(
           target,
           [
             { opacity: 0, transform: `translateY(${shift}px)` },
-            { opacity: 1, transform: "translateY(0)" },
+            { transform: "translateY(0)" },
           ],
           ms,
           delay,
@@ -218,9 +196,7 @@ export function useStaggerEnter(
         ms,
         delay,
       );
-      fadeTargets(target, inner).forEach((part) => {
-        make(part, [{ opacity: 0 }, { opacity: 1 }], ms, delay);
-      });
+      parts.forEach((part) => make(part, fadeFrames, ms, delay));
     };
 
     // WebKit 在窗口失焦 / 后台时会暂停 Web Animations，finished 可能永远不 resolve。

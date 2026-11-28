@@ -11,7 +11,7 @@ import { showToast } from "../../../lib/toast";
 import { api } from "../../../lib/api";
 import type { ExportEntryDto } from "../../../lib/bindings";
 import FileTreeRow from "./FileTreeRow.vue";
-import { isPickedPath } from "../picked";
+import { fileCheckStates } from "../picked";
 
 const props = defineProps<{
   /** 实例 uuid */
@@ -20,6 +20,7 @@ const props = defineProps<{
   picked: Map<string, unknown>;
   /** 取消勾选的路径；父目录勾着时单独去掉某一条，默认空 */
   unpicked?: Set<string>;
+  selectionLoading?: boolean;
   /** 根目录：game = 游戏目录（默认），instance = 实例目录；「直接压缩」与 MMC 用后者 */
   base?: "game" | "instance";
   /** 初始展开的目录（相对根目录）；默认勾选落在子目录里时靠它露出来 */
@@ -30,7 +31,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   /** 勾选 / 取消勾选一个条目 */
-  (e: "toggle", entry: ExportEntryDto): void;
+  (e: "toggle", entry: ExportEntryDto, checked: boolean): void;
 }>();
 
 /** 相对路径 → 该目录下的子项；根目录用空串当键 */
@@ -39,6 +40,7 @@ const children = ref(new Map<string, ExportEntryDto[]>());
 const opened = ref(new Set<string>());
 /** 正在拉的目录，防重复请求 */
 const loading = ref(new Set<string>());
+const rootError = ref("");
 
 /** 展平后的可见行：只含已展开目录的后代，顺序就是显示顺序 */
 interface TreeRow {
@@ -93,9 +95,11 @@ const pinned = computed<TreeRow | null>(() => {
 /** 没有排除项时共用的空表，免得每渲染一行就新建一个 */
 const NO_UNPICKED: ReadonlySet<string> = new Set();
 
-/** 勾选状态：勾了目录，里面每一条都跟着算勾上 */
-function isChecked(path: string): boolean {
-  return isPickedPath(path, props.picked, props.unpicked ?? NO_UNPICKED);
+const checkStates = computed(() => fileCheckStates(children.value, props.picked, props.unpicked ?? NO_UNPICKED));
+
+function toggleEntry(entry: ExportEntryDto) {
+  if (props.selectionLoading || isLocked(entry.path)) return;
+  emit("toggle", entry, checkStates.value.get(entry.path) !== "checked");
 }
 
 /** 必选条目：勾选框固定勾上并禁用，点了也不改勾选 */
@@ -112,18 +116,19 @@ function listDir(dir: string) {
 
 /** 拉一个目录的内容，拉过就不再拉 */
 async function load(dir: string) {
-  if (children.value.has(dir) || loading.value.has(dir)) return;
-
-  // 这一发回来时可能已经换了实例 / 根目录，那张表整份换掉了：别写进新的那张
   const table = children.value;
-  loading.value.add(dir);
+  const pending = loading.value;
+  if (table.has(dir) || pending.has(dir)) return;
+  pending.add(dir);
   try {
     const list = await listDir(dir);
     if (table === children.value) table.set(dir, list);
   } catch (e) {
-    showToast(tErr(e));
+    if (table !== children.value) return;
+    if (dir) showToast(tErr(e));
+    else rootError.value = tErr(e);
   } finally {
-    loading.value.delete(dir);
+    pending.delete(dir);
   }
 }
 
@@ -150,15 +155,21 @@ watch(rows, () => {
 
 // 换实例或换根目录就把整棵树清掉重来，再把指定的目录展开
 watch(
-  () => [props.uuid, props.base],
-  async () => {
-    children.value = new Map();
-    opened.value = new Set();
+  [() => props.uuid, () => props.base],
+  async (_current, _previous, onCleanup) => {
+    const table = children.value;
+    onCleanup(() => {
+      children.value = new Map();
+      opened.value = new Set();
+      loading.value = new Set();
+    });
+    rootError.value = "";
     resetScroll();
     if (!props.uuid) return;
     await load("");
     for (const dir of props.expand ?? []) {
-      if (!children.value.get("")?.some((e) => e.dir && e.path === dir)) continue;
+      if (table !== children.value) return;
+      if (!table.get("")?.some((e) => e.dir && e.path === dir)) continue;
       opened.value.add(dir);
       await load(dir);
     }
@@ -168,18 +179,32 @@ watch(
 </script>
 
 <template>
-  <div class="tree">
+  <div class="tree" :aria-busy="selectionLoading || loading.has('')">
     <!-- 吸顶行画在滚动区之外，滚动时由前面的脚本换成当前那一层目录 -->
-    <div v-if="pinned" class="tree-pin">
+    <div v-if="pinned && !selectionLoading" class="tree-pin">
       <FileTreeRow :entry="pinned.entry" :depth="pinned.depth" :open="opened.has(pinned.entry.path)"
-        :checked="isChecked(pinned.entry.path)" :locked="isLocked(pinned.entry.path)" pinned
-        @toggle="emit('toggle', $event)" @open="toggleDir" />
+        :loading="loading.has(pinned.entry.path)"
+        :checked="checkStates.get(pinned.entry.path) === 'checked'" :indeterminate="checkStates.get(pinned.entry.path) === 'mixed'"
+        :locked="isLocked(pinned.entry.path)" pinned
+        @toggle="toggleEntry" @open="toggleDir" />
     </div>
     <div ref="scrollEl" class="tree-scroll" @scroll="onScroll">
-      <p v-if="!rows.length" class="empty-tip">{{ t("winExport.noFiles") }}</p>
-      <FileTreeRow v-for="row in rows" :key="row.entry.path" :entry="row.entry" :depth="row.depth"
-        :open="opened.has(row.entry.path)" :checked="isChecked(row.entry.path)" :locked="isLocked(row.entry.path)"
-        @toggle="emit('toggle', $event)" @open="toggleDir" />
+      <div v-if="selectionLoading || loading.has('')" class="px-2" role="status" :aria-label="t('winExport.loadingFiles')">
+        <div v-for="row in 8" :key="row" class="flex h-[27px] items-center gap-2" aria-hidden="true">
+          <span class="sk size-3.5" />
+          <span class="sk sk-line" :class="row % 2 ? 'w40' : 'w60'" />
+        </div>
+      </div>
+      <p v-else-if="!rows.length" class="empty-tip" :class="{ 'load-error': rootError }">
+        {{ rootError || t("winExport.noFiles") }}
+      </p>
+      <template v-else>
+        <FileTreeRow v-for="row in rows" :key="row.entry.path" :entry="row.entry" :depth="row.depth"
+          :open="opened.has(row.entry.path)" :loading="loading.has(row.entry.path)"
+          :checked="checkStates.get(row.entry.path) === 'checked'" :indeterminate="checkStates.get(row.entry.path) === 'mixed'"
+          :locked="isLocked(row.entry.path)"
+          @toggle="toggleEntry" @open="toggleDir" />
+      </template>
     </div>
   </div>
 </template>

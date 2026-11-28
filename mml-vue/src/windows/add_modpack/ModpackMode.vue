@@ -281,6 +281,11 @@ function submitSearch() {
   void search();
 }
 
+function clearSearch() {
+  filter.value = "";
+  submitSearch();
+}
+
 function turnPage(delta: number) {
   const next = page.value + delta;
   if (next < 0 || next > maxPage.value) return;
@@ -425,7 +430,7 @@ watch(source, loadSource);
           <input v-model="filter" class="field-input search-input" :placeholder="t('modpack.searchHint')"
             spellcheck="false" :disabled="searching" @keydown.enter="submitSearch" />
           <button v-if="filter" class="input-clear search-clear" :aria-label="t('common.clearSearch')"
-            @mousedown.prevent @click="filter = ''">
+            @mousedown.prevent @click="clearSearch">
             <GlyphIcon name="close" :size="12" :weight="2.4" />
           </button>
         </div>

@@ -149,9 +149,17 @@ const pickedMods = ref(new Map<string, ExportEntryDto>());
 const pickedFiles = ref(new Map<string, ExportEntryDto>());
 /** 取消勾选的路径：父目录勾着时单独去掉某一条 */
 const unpickedFiles = ref(new Set<string>());
+const filePicksReady = ref(false);
+const filePicksError = ref<string | null>(null);
+const loadingFilePicks = computed(() => !!info.value && !filePicksReady.value && filePicksError.value === null);
 
 /** 每种导出格式各自记住手选的勾选 / 排除，切回来时还原 */
-const filePickCache = new Map<PackId, { picked: Map<string, ExportEntryDto>; unpicked: Set<string> }>();
+const filePickCache = new Map<PackId, {
+  picked: Map<string, ExportEntryDto>;
+  unpicked: Set<string>;
+  mods: Map<string, ExportEntryDto>;
+  autoExcluded: Set<string>;
+}>();
 /** 因为模组已勾选而自动取消的文件：取消勾选模组时按这份表还原 */
 const autoExcluded = ref(new Set<string>());
 /** 路径 → 下载地址；空串表示没填，按 overrides 打包 */
@@ -319,14 +327,6 @@ const mods = computed(() => {
   return list.filter((x) => x.path.toLowerCase().includes(keyword));
 });
 
-/** 勾选项里能填地址的：模组与单个文件，目录不算 */
-const urlRows = computed(() =>
-  [...pickedMods.value.values(), ...pickedFiles.value.values()].filter((x) => !x.dir),
-);
-
-/** 文件树的勾选表按路径判在不在，交给子组件只看键 */
-const pickedFilePaths = computed(() => new Map([...pickedFiles.value].map(([path]) => [path, true])));
-
 /** 文件页的说明：两种去向（overrides / 整包实例）各一句；「直接压缩」不写，免得与下面的勾选行为重复 */
 const fileHint = computed(() => {
   if (pack.value === "mml") return "";
@@ -352,7 +352,7 @@ const tabOptions = computed<
     id: "files",
     labelKey: "winExport.tabFiles",
     icon: "folder",
-    suffix: `${pickedFiles.value.size}`,
+    suffix: filePicksReady.value ? `${pickedFiles.value.size}` : undefined,
   });
   return options;
 });
@@ -362,8 +362,11 @@ const tabOptions = computed<
 /** 拉选中实例的导出信息，实例名作为包名默认值 */
 async function loadInfo() {
   const request = ++infoRequest;
+  ++picksSeq;
   const uuid = currentUuid.value;
   info.value = null;
+  filePicksReady.value = false;
+  filePicksError.value = null;
   pickedMods.value = new Map();
   filePickCache.clear();
   pickedFiles.value = new Map();
@@ -380,6 +383,7 @@ async function loadInfo() {
     // 元数据默认值跟实例走（用户可改）
     packName.value = data.name;
     summary.value = "";
+    loadingInfo.value = false;
     await applyDefaults(data, uuid, request);
   } catch (e) {
     if (request !== infoRequest || uuid !== currentUuid.value) return;
@@ -441,21 +445,15 @@ let picksSeq = 0;
  */
 async function reseedFilePicks(uuid: string) {
   const seq = ++picksSeq;
+  const format = pack.value;
+  filePicksReady.value = false;
+  filePicksError.value = null;
   const picked = new Map<string, ExportEntryDto>();
   const unpicked = new Set<string>();
   try {
-    if (pack.value === "mml") {
-      // 实例根上全勾，运行期目录随后单独排除；`.minecraft` 里面的内容靠继承算上
-      for (const entry of await api.listExportInstanceDir(uuid, "")) picked.set(entry.path, entry);
-      for (const name of DEFAULT_SKIP) {
-        unpicked.add(name);
-        unpicked.add(`${GAME_DIR}/${name}`);
-      }
-    } else if (pack.value === "mmc") {
-      // MMC 包是"一份实例目录"：根上全勾，只剔掉 MML 自己的实例配置与图标；
-      // 运行期目录在 .minecraft 里，按 DEFAULT_SKIP 单独排除
+    if (format === "mml" || format === "mmc") {
       for (const entry of await api.listExportInstanceDir(uuid, "")) {
-        if (!MMC_SKIP.has(entry.path)) picked.set(entry.path, entry);
+        if (format === "mml" || !MMC_SKIP.has(entry.path)) picked.set(entry.path, entry);
       }
       for (const name of DEFAULT_SKIP) {
         unpicked.add(name);
@@ -466,12 +464,13 @@ async function reseedFilePicks(uuid: string) {
         if (!DEFAULT_SKIP.has(entry.path)) picked.set(entry.path, entry);
       }
     }
-    if (seq !== picksSeq || uuid !== currentUuid.value) return;
+    if (seq !== picksSeq || uuid !== currentUuid.value || format !== pack.value) return;
     pickedFiles.value = picked;
     unpickedFiles.value = unpicked;
     syncModExclusions();
+    filePicksReady.value = true;
   } catch (e) {
-    if (seq === picksSeq && uuid === currentUuid.value) showToast(tErr(e));
+    if (seq === picksSeq && uuid === currentUuid.value && format === pack.value) filePicksError.value = tErr(e);
   }
 }
 
@@ -482,19 +481,25 @@ watch(showModsTab, (value) => {
 
 // 两种格式的文件根不同（实例目录 / 游戏目录），切过去时旧的路径不能带过去；
 // 但用户手选的勾选要按格式各自保留，切回来原样还原，别每次切格式都白选一遍。
-watch(pack, (next, prev) => {
-  if (prev) {
-    filePickCache.set(prev, { picked: pickedFiles.value, unpicked: unpickedFiles.value });
+function changeFileFormat(next: PackId, prev: PackId) {
+  ++picksSeq;
+  if (filePicksReady.value) {
+    filePickCache.set(prev, {
+      picked: pickedFiles.value, unpicked: unpickedFiles.value,
+      mods: pickedMods.value, autoExcluded: autoExcluded.value,
+    });
   }
   const cached = filePickCache.get(next);
+  filePicksReady.value = !!cached;
+  filePicksError.value = null;
   pickedFiles.value = cached?.picked ?? new Map();
   unpickedFiles.value = cached?.unpicked ?? new Set();
-  // 模组勾选跟着格式重算：整包格式没有清单，全部按文件打包
-  pickedMods.value = seedModPicks();
-  if (!currentUuid.value) return;
-  if (cached) syncModExclusions();
-  else void reseedFilePicks(currentUuid.value);
-});
+  pickedMods.value = cached?.mods ?? seedModPicks();
+  autoExcluded.value = cached?.autoExcluded ?? new Set();
+  if (info.value && !cached) return reseedFilePicks(currentUuid.value);
+}
+
+watch(pack, changeFileFormat, { flush: "sync" });
 
 /**
  * 模组勾选联动文件树：勾了模组就走清单下载，同名文件不能再打进 overrides
@@ -541,16 +546,29 @@ function toggleMod(entry: ExportEntryDto) {
 }
 
 /** 勾选 / 取消一个文件或目录；取消记成排除项，父目录勾着也能单独去掉，必选条目不动 */
-function toggleFile(entry: ExportEntryDto) {
-  if (isLockedFile(entry.path)) return;
-  if (isPickedPath(entry.path, pickedFiles.value, unpickedFiles.value)) {
-    pickedFiles.value.delete(entry.path);
-    unpickedFiles.value.add(entry.path);
-  } else {
-    // 手动把它勾回来：同一个模组不能既走清单又从文件里打一遍，把模组也跟着取消
-    if (autoExcluded.value.delete(entry.path)) pickedMods.value.delete(entry.path);
+function toggleFile(entry: ExportEntryDto, checked: boolean) {
+  if (!filePicksReady.value || isLockedFile(entry.path)) return;
+  if (entry.dir) {
+    const prefix = `${entry.path}/`;
+    for (const path of pickedFiles.value.keys()) {
+      if (path.startsWith(prefix)) pickedFiles.value.delete(path);
+    }
+    for (const path of unpickedFiles.value) {
+      if (path.startsWith(prefix)) unpickedFiles.value.delete(path);
+    }
+  }
+  if (checked) {
+    for (const path of pickedMods.value.keys()) {
+      if (path === entry.path || (entry.dir && path.startsWith(`${entry.path}/`))) {
+        pickedMods.value.delete(path);
+        autoExcluded.value.delete(path);
+      }
+    }
     unpickedFiles.value.delete(entry.path);
     pickedFiles.value.set(entry.path, entry);
+  } else {
+    pickedFiles.value.delete(entry.path);
+    unpickedFiles.value.add(entry.path);
   }
 }
 
@@ -604,7 +622,7 @@ function setUrl(path: string, value: string) {
   }
 }
 
-watch(currentUuid, loadInfo);
+watch(currentUuid, loadInfo, { flush: "sync" });
 
 /** 切换服务器包里的一个实例；至少保留一个，当前实例被取消时顺延到第一个 */
 function toggleServerInstance(uuid: string) {
@@ -726,11 +744,11 @@ function continueExport() {
 /** 选保存位置后交给 Rust 侧后台导出，进度走 export-progress 事件 */
 async function startExport(confirmed = false) {
   if (serverPack.value && !guiConfig.value) await loadCustomAssets();
+  if (!currentUuid.value || busy.value || loadingInfo.value || !info.value || !filePicksReady.value) return;
   if (!confirmed && serverPack.value && serverOptions.guiConfig && needsLockWarn()) {
     lockWarnOpen.value = true;
     return;
   }
-  if (!currentUuid.value || busy.value || loadingInfo.value || !info.value) return;
   if (serverPack.value && !serverPicked.value.length) return;
   if (!inTauri) return;
   const uuid = currentUuid.value;
@@ -901,6 +919,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   gone = true;
+  ++infoRequest;
+  ++picksSeq;
   unlistenProgress?.();
   unlistenProgress = null;
   unlistenFocus?.();
@@ -1069,17 +1089,6 @@ onBeforeUnmount(() => {
           <div class="tab-body">
             <!-- 整合包信息：写进清单的元数据，配着上面的格式一起看 -->
             <template v-if="shownTab === 'meta'">
-              <p class="sec-hint">
-                {{
-                  showModsTab
-                    ? t("winExport.summaryLine", {
-                      mods: pickedMods.size,
-                      files: pickedFiles.size,
-                      urls: urlRows.filter((x) => (urls.get(x.path) ?? "").length > 0).length,
-                    })
-                    : t("winExport.summaryFiles", { files: pickedFiles.size })
-                }}
-              </p>
               <div class="grid-2">
                 <div>
                   <label class="field-label">{{ t("winExport.metaName") }}</label>
@@ -1154,14 +1163,18 @@ onBeforeUnmount(() => {
             <template v-else>
               <div class="files-pane">
                 <p v-if="fileHint" class="sec-hint">{{ fileHint }}</p>
-                <FilePicker :uuid="currentUuid" :picked="pickedFilePaths" :unpicked="unpickedFiles" :base="fileBase"
+                <FilePicker v-if="filePicksError === null" :uuid="currentUuid" :picked="pickedFiles" :unpicked="unpickedFiles" :base="fileBase"
+                  :selection-loading="loadingFilePicks"
                   :expand="fileExpand" :locked="isLockedFile" @toggle="toggleFile" />
               </div>
             </template>
           </div>
         </template>
       </template>
-      <div v-else-if="loadingInfo" class="hint-full">{{ t("winExport.loading") }}</div>
+      <div v-else-if="loadingInfo" class="hint-full gap-2" role="status">
+        <GlyphIcon name="refresh" :size="16" class="animate-spin" />
+        {{ t("winExport.loading") }}
+      </div>
       <div v-else class="hint-full">{{ t("winExport.pickInstance") }}</div>
     </div>
 
@@ -1169,10 +1182,15 @@ onBeforeUnmount(() => {
     <div class="export-foot">
       <InfoExportButton v-if="!serverPack" :uuid="currentUuid" :name="info?.name ?? ''"
         :disabled="busy || loadingInfo || !info" />
-      <BaseButton size="sm" variant="primary" class="export-submit" :disabled="busy || loadingInfo || !info"
+      <div v-if="filePicksError !== null" class="flex min-w-0 items-center gap-2" role="alert">
+        <span class="truncate text-meta" :title="filePicksError">{{ t('winExport.fileSelectionFailed', { error: filePicksError }) }}</span>
+        <BaseButton size="sm" @click="reseedFilePicks(currentUuid)">{{ t('modpack.retry') }}</BaseButton>
+      </div>
+      <BaseButton size="sm" variant="primary" class="export-submit" :disabled="busy || loadingInfo || !info || !filePicksReady"
+        :aria-busy="loadingFilePicks"
         @click="startExport()">
-        <GlyphIcon name="export" :size="15" :weight="1.8" />
-        {{ running ? t("winExport.exporting") : t("winExport.exportBtn") }}
+        <GlyphIcon :name="loadingFilePicks ? 'refresh' : 'export'" :class="{ 'animate-spin': loadingFilePicks }" :size="15" :weight="1.8" />
+        {{ loadingFilePicks ? t("winExport.loadingFileSelection") : running ? t("winExport.exporting") : t("winExport.exportBtn") }}
       </BaseButton>
     </div>
 

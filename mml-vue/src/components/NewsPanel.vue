@@ -66,7 +66,7 @@ function tagColor(tag: string) {
       </button>
     </div>
 
-    <div class="news-list" :class="{ 'is-loading-dim': loading && items.length > 0 }">
+    <div class="news-list" data-stagger-children :class="{ 'is-loading-dim': loading && items.length > 0 }">
       <!-- 首次加载：骨架卡片，与整合包列表同一套加载观感，形状照着新闻卡 -->
       <template v-if="loading && items.length === 0">
         <div v-for="n in 6" :key="n" class="news-item sk-card">
@@ -173,6 +173,14 @@ function tagColor(tag: string) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 16px;
+}
+
+html.bg-frosted .news-list.is-loading-dim {
+  opacity: 1;
+}
+
+html.bg-frosted .news-list.is-loading-dim .news-item > * {
+  opacity: 0.55;
 }
 
 .news-item {

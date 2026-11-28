@@ -13,11 +13,11 @@ import { computed, provide, ref, watch } from "vue";
 import type { NbtEditDto, NbtKindDto } from "../../../lib/bindings";
 import { t, tErr } from "../../../lib/i18n";
 import { showToast } from "../../../lib/toast";
-import { openConfigNbt, writeConfigNbt } from "../../../lib/api";
+import { openConfigNbt } from "../../../lib/api";
 import SearchBox from "../../../components/ui/SearchBox.vue";
 import { KEYS, readNumber, writeNumber } from "../../../lib/storage";
 import NbtNode from "./NbtNode.vue";
-import { openSession, sessionKey, type NbtSession } from "./nbtSession";
+import { openSession, saveSession, sessionKey, type NbtSession } from "./nbtSession";
 import {
   NBT_EDIT,
   elementKindOf,
@@ -52,7 +52,6 @@ const key = computed(() => sessionKey(props.uuid, props.source, props.file, prop
 /** 当前文件的会话；切文件就是换一份会话，读过的那些原样留着 */
 const session = ref<NbtSession>(openSession(props.uuid, props.source, props.file, props.chunk));
 const loading = ref(false);
-const saving = ref(false);
 /** 搜索词，空串 = 不过滤 */
 const query = ref("");
 
@@ -244,20 +243,10 @@ async function activate() {
 
 /** 保存登记下来的改动；没有改动或正在保存就直接返回 */
 async function save() {
-  const now = session.value;
-  if (saving.value || now.ops.length === 0) return;
-  // 交出去的是普通对象：会话里那份是响应式的，别把代理带进 IPC
-  const ops = now.ops.map((op) => ({ ...op, path: [...op.path] }));
-
-  saving.value = true;
   try {
-    now.sha1 = await writeConfigNbt(props.uuid, props.source, props.file, props.chunk, now.sha1, ops);
-    await load();
-    showToast(t("config.saved"));
+    if (await saveSession(session.value)) showToast(t("config.saved"));
   } catch (e) {
     showToast(tErr(e));
-  } finally {
-    saving.value = false;
   }
 }
 

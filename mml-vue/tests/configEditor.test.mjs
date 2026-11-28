@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
-import { ref, computed } from "vue";
+import { ref, computed, reactive } from "vue";
 import { applyHunks, diffLines, joinLines, splitLines } from "../src/lib/textDiff.ts";
+import { allowConfigClose, configClosePrompt, registerConfigEditor } from "../src/windows/config/closeGuard.ts";
 
 const source = readFileSync(new URL("../src/windows/config/ConfigWindow.vue", import.meta.url), "utf8")
   .split('<script setup lang="ts">')[1].split("</script>")[0];
 const parsed = ts.createSourceFile("ConfigWindow.ts", source, ts.ScriptTarget.Latest, true);
+const declarations = parsed.statements.filter(ts.isVariableStatement).flatMap((node) => node.declarationList.declarations);
+const initializer = (name) => declarations.find((node) => node.name.getText(parsed) === name).initializer.getText(parsed);
 
 function editor(overrides = {}) {
   const state = {
@@ -17,7 +20,9 @@ function editor(overrides = {}) {
     isText: ref(true), saving: ref(false), nbtSaving: ref(false), nbtDirty: ref(false), deleting: ref(false),
     pendingDiscard: ref(null), loading: ref(false), instanceUuid: ref("instance"),
     source: ref(""), expanded: ref(new Set()), query: ref(""), files: ref([]),
+    treeScrollEl: ref(null), treeScrollTop: ref(0),
     TEXT_TYPES: ["json"], clearCleanSessions: async () => {},
+    configClosePrompt, registerConfigEditor, dirtySessions: () => [], hasSavingSessions: () => false,
     requestGeneration: 0,
     rowMenu: ref(null), deleteConfigFile: async () => {},
     // 打开文件时会清掉上一次「查找实体 / 方块」留下的定位目标
@@ -28,15 +33,74 @@ function editor(overrides = {}) {
     ...overrides,
   };
   state.dirty = computed(() => state.text.value !== state.origin.value);
-  const busy = parsed.statements.filter(ts.isVariableStatement).flatMap((node) => node.declarationList.declarations)
-    .find((node) => node.name.getText(parsed) === "busy").initializer.getText(parsed);
-  state.busy = new Function("computed", ...Object.keys(state), `return ${busy}`)(computed, ...Object.values(state));
-  const names = ["allowTextLoss", "answerDiscard", "open", "loadFiles", "pickSource", "saveText", "onRowMenuPick"];
+  state.busy = new Function("computed", ...Object.keys(state), `return ${initializer("busy")}`)(computed, ...Object.values(state));
+  const names = ["allowTextLoss", "answerDiscard", "open", "loadFiles", "pickSource", "saveText", "saveBeforeClose", "onRowMenuPick"];
   const code = parsed.statements.filter((node) => ts.isFunctionDeclaration(node) && names.includes(node.name?.text))
     .map((node) => node.getText(parsed)).join("\n");
-  const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
-  return { state, ...new Function(...Object.keys(state), `${js}\nreturn {${names.join(",")}}`)(...Object.values(state)) };
+  const js = ts.transpileModule(`${code}\nfunction mount() { return ${initializer("unregisterCloseGuard")}; }`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  return { state, ...new Function(...Object.keys(state), `${js}\nreturn {mount, ${names.join(",")}}`)(...Object.values(state)) };
 }
+
+test("关闭确认保护草稿，取消、保存失败和重复关闭都不会放行", async (context) => {
+  let failWrite = true;
+  const e = editor({ writeConfigFile: async () => {
+    if (failWrite) throw new Error("file changed");
+    return "saved-hash";
+  } });
+  context.after(e.mount());
+  for (const [choice, allowed] of [["cancel", false], ["save", false], ["discard", true], ["save", true]]) {
+    const closing = allowConfigClose();
+    assert.equal(await allowConfigClose(), false);
+    configClosePrompt.value(choice);
+    assert.equal(await closing, allowed);
+    assert.equal(configClosePrompt.value, null);
+    assert.equal(e.state.text.value, "edited");
+    if (choice === "discard") failWrite = false;
+    assert.equal(e.state.dirty.value, choice !== "save" || !allowed);
+  }
+  assert.equal(await allowConfigClose(), true);
+  assert.equal(configClosePrompt.value, null);
+});
+
+test("关闭时保存切走的区块，写盘失败和写入期间的新改动均保留", async (context) => {
+  let finishWrite;
+  const sessionSource = readFileSync(new URL("../src/windows/config/parts/nbtSession.ts", import.meta.url), "utf8");
+  const js = ts.transpileModule(sessionSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
+  const sessions = {};
+  const api = {
+    writeConfigNbt: (uuid, source, file, chunk, sha1, ops) => {
+      assert.deepEqual([uuid, source, file, chunk, sha1, ops.length], ["instance", "world", "r.0.0.mca", 17, "original", 1]);
+      return new Promise((resolve, reject) => { finishWrite = { resolve, reject }; });
+    },
+  };
+  new Function("exports", "require", js)(sessions, (name) => name === "vue" ? { reactive } : api);
+  const hiddenChunk = sessions.openSession("instance", "world", "r.0.0.mca", 17);
+  hiddenChunk.sha1 = "original";
+  hiddenChunk.ops.push({ op: "Set", path: ["tag"], value: "1" });
+  hiddenChunk.dirty = true;
+  const e = editor(sessions);
+  context.after(e.mount());
+  e.state.text.value = e.state.origin.value;
+  const failed = allowConfigClose();
+  configClosePrompt.value("save");
+  await Promise.resolve();
+  finishWrite.reject(new Error("file changed"));
+  assert.equal(await failed, false);
+  assert.equal(hiddenChunk.ops.length, 1);
+  assert.equal(hiddenChunk.dirty, true);
+  const closing = allowConfigClose();
+  configClosePrompt.value("save");
+  await Promise.resolve();
+  assert.equal(sessions.hasSavingSessions(), true);
+  hiddenChunk.ops.push({ op: "Set", path: ["tag"], value: "2" });
+  finishWrite.resolve("new-hash");
+  assert.equal(await closing, false);
+  assert.deepEqual(hiddenChunk.ops.map((op) => op.value), ["2"]);
+  assert.equal(hiddenChunk.sha1, "new-hash");
+  assert.equal(sessions.hasSavingSessions(), false);
+});
 
 test("切文件、刷新、换来源取消后保留未保存文本", async () => {
   for (const action of [(e) => e.open({ name: "second.json", fileType: "json" }), (e) => e.loadFiles(), (e) => e.pickSource("world")]) {

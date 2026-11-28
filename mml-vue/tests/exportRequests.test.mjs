@@ -89,7 +89,7 @@ test("实例信息在加载对话框模块前固定目标，不跟随后续切�
 function packFixture(save) {
   const calls = [], errors = [];
   // 单实例导出：不是服务器包窗口，实例多选那几个引用短路不取
-  const state = Object.fromEntries(Object.entries({ currentUuid: "a", preparing: false, loadingInfo: false, progress: null,
+  const state = Object.fromEntries(Object.entries({ currentUuid: "a", preparing: false, loadingInfo: false, filePicksReady: true, progress: null,
     pack: "modrinth", includeLauncher: false, packName: "A", author: "author", version: "1", summary: "summary",
     packLabel: "Modrinth", fileExt: "mrpack", zipLevel: "normal", customLoaderLost: false,
     info: { name: "A", canBundleLauncher: true },
@@ -107,6 +107,20 @@ function packFixture(save) {
   });
   return { ...state, calls, errors, startExport };
 }
+
+test("当前格式默认勾选就绪前禁止打开保存对话框，就绪后使用当前勾选", async () => {
+  const dialogs = [];
+  const state = packFixture(async (options) => { dialogs.push(options); return "a.mrpack"; });
+  state.filePicksReady.value = false;
+  await state.startExport();
+  assert.equal(dialogs.length, 0);
+  assert.deepEqual(state.calls, []);
+  state.pickedFiles.value.set("config", {});
+  state.filePicksReady.value = true;
+  await state.startExport();
+  assert.equal(dialogs.length, 1);
+  assert.deepEqual(state.calls[0][1].files.map((entry) => entry.path), ["config"]);
+});
 
 test("实例包固定保存前的请求，并阻止双击打开第二个保存对话框", async () => {
   const dialog = deferred(), options = [];

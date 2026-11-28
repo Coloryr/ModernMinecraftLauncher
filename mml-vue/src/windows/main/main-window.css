@@ -137,7 +137,7 @@
 
 .main.pane-max .detail {
   transform: translateX(100%);
-  opacity: 0;
+  opacity: var(--page-transition-opacity, 0);
   overflow: hidden;
   pointer-events: none;
 }
@@ -209,20 +209,32 @@
 
 .main.mode-swap .detail,
 .main.mode-swap .list-mode {
-  animation: mode-fade-in 0.22s var(--ease-out);
+  animation: mode-slide-in 0.22s var(--ease-out);
+}
+
+html:not(.bg-frosted) .main.mode-swap .sidebar-slot {
+  animation-name: mode-sidebar-in, mode-fade-in;
+}
+
+html:not(.bg-frosted) .main.mode-swap :is(.detail, .list-mode) {
+  animation-name: mode-slide-in, mode-fade-in;
 }
 
 @keyframes mode-sidebar-in {
   from {
     width: 0;
-    opacity: 0;
+  }
+}
+
+@keyframes mode-slide-in {
+  from {
+    transform: translateY(6px);
   }
 }
 
 @keyframes mode-fade-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
 }
 
@@ -305,7 +317,7 @@
 
 .view-swap-enter-from,
 .view-swap-leave-to {
-  opacity: 0;
+  opacity: var(--page-transition-opacity, 0);
   transform: translateY(-8px);
 }
 
