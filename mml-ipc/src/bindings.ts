@@ -106,6 +106,7 @@ export function createCommands(invoke: Invoke) {
       gameVersions: (source: string) => invoke<string[]>("add_resource_game_versions", { source }),
       lastSource: () => invoke<string>("add_resource_last_source"),
       list: (game: string, source: string, fileType: string, page: number, sort: string, category: string | null, filter: string | null, version: string | null, loader: string | null) => invoke<ProjectDto>("add_resource_list", { game, source, fileType, page, sort, category, filter, version, loader }),
+      mcmodInfo: (game: string, items: string) => invoke<ProjectItemDto[]>("add_resource_mcmod_info", { game, items }),
       saves: (game: string) => invoke<ResourceSaveDto[]>("add_resource_saves", { game }),
       setLastSource: (source: string) => invoke<void>("add_resource_set_last_source", { source }),
       sortType: (source: string) => invoke<string[]>("add_resource_sort_type", { source }),

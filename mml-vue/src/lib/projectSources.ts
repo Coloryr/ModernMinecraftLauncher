@@ -1,6 +1,6 @@
 // 下载源的显示口径：页签顺序、标签、默认选哪个
 //
-// 下载整合包与添加资源两个窗口共用。顺序固定 CurseForge 在左、Modrinth 在右 ——
+// 下载整合包与添加资源两个窗口共用。顺序固定 CurseForge、Modrinth、McMod ——
 // 后端返回的是"支持哪些源"，顺序不代表界面顺序，所以这里重排一次。
 // 没存过偏好时默认 CurseForge；偏好本身落 gui_config.json，见 lib/api.ts 的
 // getAddModpackSource / getAddResourceSource（§7.1：用户数据不进 localStorage）。
@@ -10,10 +10,11 @@ import { t } from "./i18n";
 const LABEL_KEYS: Record<string, string> = {
   curseforge: "modpack.curseforge",
   modrinth: "modpack.modrinth",
+  mcmod: "resource.source.mcmod",
 };
 
 /** 页签顺序；不认识的源排在后面，保持后端给的相对顺序 */
-const ORDER = ["curseforge", "modrinth"];
+const ORDER = ["curseforge", "modrinth", "mcmod"];
 
 /** 没存过偏好时选中的源 */
 const DEFAULT_SOURCE = "curseforge";

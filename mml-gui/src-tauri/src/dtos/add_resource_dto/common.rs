@@ -13,7 +13,7 @@ use mml_net::urls;
 pub struct SourceTypeDto {
     /// 资源类型，即 `FileType` 的字符串形态
     pub file_type: String,
-    /// 下载源：CurseForge / Modrinth
+    /// 下载源：CurseForge / Modrinth；mcmod 表示只有百科条目、没有可下载的项目 ID
     pub source: String,
     /// 项目 ID，即源站的项目标识
     pub pid: String,
@@ -21,14 +21,24 @@ pub struct SourceTypeDto {
     pub fid: String,
 }
 
-/// MC 百科 mcmod.cn 的翻译条目
+/// MC 百科 mcmod.cn 的条目，附带同名项目在 CurseForge / Modrinth 上的 ID
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McmodDto {
     /// 百科页面 ID
     pub mcmod_id: String,
-    /// 百科页面名
+    /// 百科页面名，列表卡片显示的名字
     pub mcmod_name: String,
+    /// CurseForge 项目 ID，没有时为空串
+    pub curseforge_id: String,
+    /// CurseForge 页面地址，可能为空串
+    pub curseforge_url: String,
+    /// Modrinth 项目 ID，没有时为空串
+    pub modrinth_id: String,
+    /// Modrinth 页面地址，可能为空串
+    pub modrinth_url: String,
+    /// 百科页面地址
+    pub mcmod_url: String,
 }
 
 /// 图像条目，如作者头像

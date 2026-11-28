@@ -39,6 +39,7 @@ import { scrollToContentTop } from "../../lib/scrollTop";
 import type {
   FileListItemDto,
   InstanceInfoDto,
+  McmodDto,
   ProjectItemDto,
   ResourceDependencyDto,
   ResourceDependencyFileDto,
@@ -108,6 +109,21 @@ watch(source, (value) => {
   void setAddResourceSource(value).catch(() => { });
 });
 
+/**
+ * 当前类型可用的下载源值
+ *
+ * source 的恢复早于 shownSources 的声明，先把判断抽成函数，避免在 setup 里踩 TDZ。
+ */
+function allowedSourceValues(): string[] {
+  if (type.value === "save") {
+    return sources.value.filter((s) => s.value === "curseforge").map((s) => s.value);
+  }
+  if (type.value !== "mod") {
+    return sources.value.filter((s) => s.value !== "mcmod").map((s) => s.value);
+  }
+  return sources.value.map((s) => s.value);
+}
+
 // 读上次选的源：失败就当没选过
 (async () => {
   try {
@@ -116,7 +132,7 @@ watch(source, (value) => {
       savedSource.value = saved;
       // 列表已经拉回来过（存档类型下会被强制成 CurseForge，这里别再动）
       if (!isSaveType.value) {
-        source.value = pickSource(sources.value.map((item) => item.value), saved);
+        source.value = pickSource(allowedSourceValues(), saved);
       }
     }
   } catch {
@@ -129,7 +145,7 @@ watch(source, (value) => {
 // 上次存的源可能已经不在列表里（后端改了支持的平台）：落回默认源，免得筛出空列表
 watch(sources, (list) => {
   if (list.length) {
-    source.value = pickSource(list.map((item) => item.value), source.value);
+    source.value = pickSource(allowedSourceValues(), source.value);
   }
 });
 
@@ -188,6 +204,8 @@ const items = ref<ProjectItemDto[]>([]);
 const total = ref(0);
 const page = ref(0);
 const searching = ref(false);
+/** mcmod 卡片正在补在线信息：列表先显示名字与占位图，补完再换图标 / 简介 */
+const mcmodLoading = ref(false);
 const error = ref("");
 
 /** 结果区内容序号：换成另一批结果时 +1，列表整块重挂，卡片才能重新进场 */
@@ -202,6 +220,9 @@ const { enter: enterList, leave: leaveList } = useStaggerEnter(".pack-item", {
 
 /** 详情页展示的项目；null = 收起。详情与版本列表的状态都在共用组件里 */
 const detailItem = ref<ProjectItemDto | null>(null);
+
+/** mcmod 条目在两个源都有：等用户选打开哪一个；null = 没有弹窗 */
+const projectPickItem = ref<ProjectItemDto | null>(null);
 
 // 收藏在别处被改（收藏窗口删掉一条）时，这里的星标跟着重算
 useCollectStars(() => (detailItem.value ? [...items.value, detailItem.value] : items.value));
@@ -242,9 +263,15 @@ const pageActive = usePageActive();
 // 弹窗打开时 Esc 先收弹窗，别让底下的项目详情被关掉
 useModalKeys((e) => {
   if (e.key !== "Escape" || !pageActive.value) return;
-  if (!depSkipAsk.value && !depFile.value && !savePickFile.value && !pendingFile.value) return;
+  if (!depSkipAsk.value && !depFile.value && !savePickFile.value && !pendingFile.value && !projectPickItem.value) {
+    return;
+  }
   // 文档上的监听先于 window 上的详情监听，拦住它，本次 Esc 只关弹窗
   e.stopPropagation();
+  if (projectPickItem.value) {
+    projectPickItem.value = null;
+    return;
+  }
   if (depSkipAsk.value) {
     depSkipAsk.value = false;
     return;
@@ -265,17 +292,21 @@ const bodyRef = ref<HTMLElement | null>(null);
 
 const maxPage = computed(() => Math.max(0, Math.ceil(total.value / PAGE_SIZE) - 1));
 
-/** 当前类型下要列出来的下载源：存档只有 CurseForge 有，Modrinth 没有 world 类型 */
-const shownSources = computed(() =>
-  type.value === "save"
-    ? sources.value.filter((s) => s.value === "curseforge")
-    : sources.value,
-);
+/** 当前类型下要列出来的下载源：存档只有 CurseForge；mcmod 只支持模组 */
+const shownSources = computed(() => {
+  const allowed = new Set(allowedSourceValues());
+  return sources.value.filter((s) => allowed.has(s.value));
+});
 
 /** 拉取下载源列表；没存过已选源时默认 CurseForge */
 async function loadSources() {
   try {
-    sources.value = sourceOptions(await api.getModpackSources());
+    const list = sourceOptions(await api.getModpackSources());
+    // mcmod 不在后端的整合包源列表里：只给添加资源窗口补一个页签
+    if (!list.some((item) => item.value === "mcmod")) {
+      list.push({ value: "mcmod", label: t("resource.source.mcmod") });
+    }
+    sources.value = list;
   } catch (e) {
     error.value = tErr(e);
     return;
@@ -284,8 +315,11 @@ async function loadSources() {
     error.value = t("modpack.sourceFail");
     return;
   }
-  // 已选源（上次保存的那个）还在列表里就留着，别被默认值盖掉
-  source.value = pickSource(sources.value.map((item) => item.value), source.value || savedSource.value);
+  // 已选源（上次保存的那个）还在当前类型可用的源里就留着，别被默认值盖掉
+  source.value = pickSource(
+    shownSources.value.map((item) => item.value),
+    source.value || savedSource.value,
+  );
 }
 
 /**
@@ -348,6 +382,8 @@ async function loadSource() {
 
 /** 搜索代次：新的一发开始后，旧一发的返回全部丢弃 */
 let searchSeq = 0;
+/** mcmod 在线信息补全代次：换搜索 / 换页后旧结果丢弃 */
+let mcmodSeq = 0;
 
 async function search() {
   // 没有实例也照搜：那是"先逛、下载时再选实例"的模式，后端按空实例处理（没有已装标记）
@@ -361,6 +397,8 @@ async function search() {
     sort.value = sorts.value[0];
   }
   const mine = ++searchSeq;
+  mcmodSeq += 1;
+  mcmodLoading.value = false;
   searching.value = true;
   try {
     const res = await api.searchResources(
@@ -379,6 +417,10 @@ async function search() {
     total.value = res.count;
     error.value = "";
     listView.value += 1;
+    // 百科列表已经能看了：在线信息慢慢补，别让搜索等一页网络请求
+    if (source.value === "mcmod" && type.value === "mod") {
+      void loadMcmodInfo(mine);
+    }
   } catch (e) {
     if (mine !== searchSeq) return;
     // 后端不认排序 → 换成该类型的第一个可用排序重试一次
@@ -399,6 +441,55 @@ async function search() {
   } finally {
     if (mine === searchSeq) searching.value = false;
   }
+}
+
+/**
+ * 给当前这页 mcmod 卡片补在线信息
+ *
+ * 列表已经渲染出来了；这里只补图标 / 简介 / 下载量，失败就保留名字与占位图。
+ *
+ * - `seq`: 发起时的搜索代次，换了一页就丢弃结果
+ */
+async function loadMcmodInfo(seq: number) {
+  const entries = items.value
+    .map((item) => item.mcmod)
+    .filter((entry): entry is McmodDto => !!entry && !!(entry.modrinthId || entry.curseforgeId));
+  if (!entries.length) {
+    mcmodLoading.value = false;
+    return;
+  }
+
+  const mine = ++mcmodSeq;
+  mcmodLoading.value = true;
+  try {
+    const list = await api.getMcmodInfo(instanceUuid.value, JSON.stringify(entries));
+    if (mine !== mcmodSeq || seq !== searchSeq) return;
+    applyMcmodInfo(list);
+  } catch {
+    // 补不上就保留占位，别把已经显示出来的列表清掉
+  } finally {
+    if (mine === mcmodSeq) mcmodLoading.value = false;
+  }
+}
+
+/**
+ * 把补好的条目按百科 ID 合并回列表
+ *
+ * - `list`: 后端返回的条目，`mcmod.mcmodId` 是合并键
+ */
+function applyMcmodInfo(list: ProjectItemDto[]) {
+  const byId = new Map<string, ProjectItemDto>();
+  for (const item of list) {
+    if (item.mcmod) byId.set(item.mcmod.mcmodId, item);
+  }
+  if (!byId.size) return;
+
+  items.value = items.value.map((item) => {
+    const info = item.mcmod ? byId.get(item.mcmod.mcmodId) : undefined;
+    if (!info) return item;
+    // 名字以百科中文名为准；其余字段用补好的
+    return { ...info, name: item.name };
+  });
 }
 
 // F5 重跑当前搜索；详情页打开时 F5 交给详情页自己的版本列表
@@ -438,10 +529,73 @@ function turnPage(delta: number) {
 /** 列表卡片上的「已下载 / 下载中」角标，与整合包窗口、详情页共用一份判定 */
 const { projectInstalled, projectRunning } = useDownloadBadges(resourceStatus);
 
-/** 打开详情：正文 / 截图与版本列表由共用组件并行加载 */
-function openDetail(item: ProjectItemDto) {
+/** 打开详情页；条目本身已带完整信息 */
+function showProject(item: ProjectItemDto) {
   detailItem.value = item;
   detailOpen.value = true;
+}
+
+/**
+ * 点开列表项
+ *
+ * mcmod 条目先看两个源：都有时让用户选，只有一个时直接进对应项目；
+ * 两个都没有时没有可打开的详情，改为打开百科页面。
+ */
+function openDetail(item: ProjectItemDto) {
+  if (item.source.source === "mcmod") {
+    if (item.url) void api.openUrl(item.url).catch(() => { });
+    return;
+  }
+  const modrinth = item.mcmod?.modrinthId ?? "";
+  const curseforge = item.mcmod?.curseforgeId ?? "";
+  if (modrinth && curseforge) {
+    projectPickItem.value = item;
+    return;
+  }
+  const only = modrinth ? "modrinth" : curseforge ? "curseforge" : "";
+  if (only && item.source.source !== only) {
+    void pickProjectItem(only, item);
+    return;
+  }
+  showProject(item);
+}
+
+/**
+ * 进入指定的项目源
+ *
+ * 选中的源与条目现有的源不同时，按源 + 项目 ID 现取一份：详情页头部要的图标、
+ * 下载量、更新时间跟着换，不能拿另一个源的数据凑。
+ *
+ * - `source`: 要进入的源
+ * - `item`: 待打开的条目；缺省取弹窗里那一条
+ */
+async function pickProjectItem(
+  source: "modrinth" | "curseforge",
+  item: ProjectItemDto | null = projectPickItem.value,
+) {
+  if (!item?.mcmod) return;
+  projectPickItem.value = null;
+  const pid = source === "modrinth" ? item.mcmod.modrinthId : item.mcmod.curseforgeId;
+  if (!pid) return;
+  if (item.source.source === source && item.source.pid === pid) {
+    showProject(item);
+    return;
+  }
+  try {
+    const real = await api.collectProjectItem(source, pid, type.value);
+    if (!real) {
+      showToast(t("addResource.projectUnavailable"));
+      return;
+    }
+    // 名字仍用百科的中文名；详情与下载走选中的源
+    real.name = item.name;
+    real.mcmod = item.mcmod;
+    real.download = item.download;
+    real.downloadNow = item.downloadNow;
+    showProject(real);
+  } catch (e) {
+    showToast(tErr(e));
+  }
 }
 
 /** 收起详情；标题栏上的返回键与 Esc 都走这里 */
@@ -450,16 +604,26 @@ function closeDetail() {
   detailOpen.value = false;
 }
 
+/**
+ * 详情 / 文件 / 下载实际使用的源
+ *
+ * mcmod 条目在打开详情前已经落到用户选中的 CurseForge 或 Modrinth，
+ * 这里直接用条目自己的源；列表页的 mcmod 页签只用于搜索。
+ */
+function activeSource(): string {
+  return detailItem.value?.source.source || source.value;
+}
+
 /** 详情页取数：资源接口按实例取，加载器过滤留给列表页 */
 function loadDetail(pid: string) {
-  return api.getResourceDetail(source.value, pid);
+  return api.getResourceDetail(activeSource(), pid);
 }
 
 /** 详情页取版本列表；资源接口按实例取数 */
 function loadFiles(pid: string, pageNo: number, fileVersion: string | null) {
   return api.getResourceFiles(
     instanceUuid.value,
-    source.value,
+    activeSource(),
     pid,
     type.value,
     pageNo,
@@ -560,7 +724,7 @@ async function openDeps(pid: string, file: FileListItemDto) {
   try {
     const list = await api.getResourceDependencies(
       instanceUuid.value,
-      source.value,
+      activeSource(),
       pid,
       file.source.fid,
       type.value,
@@ -646,7 +810,7 @@ async function startDownloads(picked: { pid: string; fid: string }[]) {
     try {
       await api.downloadResource(
         instanceUuid.value,
-        source.value,
+        activeSource(),
         dep.pid,
         dep.fid,
         type.value,
@@ -713,7 +877,7 @@ async function doDownload(
   try {
     await api.downloadResource(
       instanceUuid.value,
-      source.value,
+      activeSource(),
       pid,
       file.source.fid,
       type.value,
@@ -741,8 +905,11 @@ watch(type, () => {
     }
     return;
   }
-  // 离开存档类型：回到用户上次选的源
-  source.value = pickSource(sources.value.map((item) => item.value), savedSource.value);
+  // 离开存档类型：回到用户上次选的源；当前类型不支持 mcmod 时会被过滤掉
+  source.value = pickSource(
+    shownSources.value.map((item) => item.value),
+    savedSource.value,
+  );
 });
 
 onMounted(async () => {
@@ -967,8 +1134,9 @@ onActivated(async () => {
           <div v-else-if="error" key="err" class="empty-tip load-error" role="alert">{{ error }}</div>
           <div v-else-if="items.length === 0" key="empty" class="empty-tip">{{ t("addResource.empty") }}</div>
           <div v-else :key="`items-${listView}`" class="flex shrink-0 flex-col gap-2">
-            <ProjectCard v-for="item in items" :key="item.source.pid" :item="item" :filter="filter"
+            <ProjectCard v-for="item in items" :key="item.mcmod?.mcmodId ?? item.source.pid" :item="item" :filter="filter"
               :installed="projectInstalled(item)" :running="projectRunning(item)"
+              :loading="mcmodLoading && !!item.mcmod && item.source.source !== 'mcmod'"
               @star="toggleStar" @open="openDetail" />
           </div>
         </Transition>
@@ -1100,10 +1268,22 @@ onActivated(async () => {
         </div>
       </BaseModal>
 
+      <!-- mcmod 项目在两个源都有条目：让用户选打开哪一个 -->
+      <BaseModal v-if="projectPickItem" :title="t('addResource.chooseProject')" :width="420" below-titlebar
+        :closable="false" @close="projectPickItem = null">
+        <p class="modal-text">{{ t("addResource.chooseProjectHint", { name: projectPickItem.name }) }}</p>
+        <div class="modal-actions">
+          <BaseButton @click="projectPickItem = null">{{ t("actions.cancel") }}</BaseButton>
+          <BaseButton @click="pickProjectItem('curseforge')">{{ t("modpack.curseforge") }}</BaseButton>
+          <BaseButton variant="accent" @click="pickProjectItem('modrinth')">{{ t("modpack.modrinth") }}</BaseButton>
+        </div>
+      </BaseModal>
+
       <!-- 项目详情：与下载整合包窗口共用同一份实现 -->
       <ProjectDetailPage :item="detailItem" :versions="versions" :initial-version="version"
         :action-label="t('addResource.download')" :status="resourceStatus" :load-detail="loadDetail"
-        :load-files="loadFiles" :shortcuts-disabled="!!depFile || depSkipAsk || !!savePickFile || !!pendingFile"
+        :load-files="loadFiles"
+        :shortcuts-disabled="!!depFile || depSkipAsk || !!savePickFile || !!pendingFile || !!projectPickItem"
         @close="closeDetail" @download="download" />
     </div>
   </WindowFrame>

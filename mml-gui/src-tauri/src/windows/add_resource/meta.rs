@@ -53,6 +53,7 @@ pub async fn add_resource_categories(
         ModPackType::Modrinth => modrinth::get_categories(file_type)
             .await
             .map_err(|err| err.to_string()),
+        ModPackType::McMod => Ok(HashMap::new()),
         _ => Err(String::from(err_keys::SOURCE_TYPE)),
     }
 }
@@ -84,6 +85,8 @@ pub fn add_resource_sort_type(source: String) -> Result<Vec<String>, String> {
             ModrinthSortType::Newest.to_string(),
             ModrinthSortType::Updated.to_string(),
         ]),
+        // mcmod 接口只有名称搜索；给一个占位排序，前端照常走同一套下拉
+        ModPackType::McMod => Ok(vec![String::from("relevance")]),
         _ => Err(String::from(err_keys::SOURCE_TYPE)),
     }
 }
@@ -107,6 +110,7 @@ pub async fn add_resource_game_versions(source: String) -> Result<Vec<String>, S
         ModPackType::Modrinth => modrinth::get_game_versions()
             .await
             .map_err(|err| err.to_string()),
+        ModPackType::McMod => Ok(super::mcmod::versions().await),
         _ => Err(err_keys::SOURCE_TYPE.to_string()),
     }
 }

@@ -2352,6 +2352,11 @@ export default {
   "addResource.chooseInstance": "Choose an instance",
   "addResource.chooseInstanceHint": "Which instance should this go into? Download starts right after you pick.",
   "addResource.saveSourceLimit": "World downloads are only available on CurseForge",
+  "addResource.noOnlineInfo": "No online info",
+  "addResource.loadingInfo": "Loading online info…",
+  "addResource.chooseProject": "Choose project source",
+  "addResource.chooseProjectHint": "“{name}” exists on both Modrinth and CurseForge. Choose which one to open.",
+  "addResource.projectUnavailable": "This project is unavailable on the selected source",
   "err.saveNotFound": "Choose a world first",
 
   // Window titles

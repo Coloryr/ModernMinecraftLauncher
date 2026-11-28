@@ -6,3 +6,5 @@
 pub(crate) mod detail;
 mod query;
 pub(crate) mod search;
+
+pub(crate) use self::query::check_download_now;

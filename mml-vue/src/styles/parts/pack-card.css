@@ -104,6 +104,13 @@
   background: var(--accent-soft);
 }
 
+/* mcmod 条目没有在线图标时垫实例的原版占位图；占位图是绝对定位，容器要自己定位 */
+.pack-icon-vanilla {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
 .pack-info {
   flex: 1;
   min-width: 0;

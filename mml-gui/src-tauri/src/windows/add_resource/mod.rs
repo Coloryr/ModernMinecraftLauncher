@@ -22,6 +22,7 @@ use uuid::Uuid;
 pub(crate) mod dependency;
 pub(crate) mod download;
 pub(crate) mod list;
+pub(super) mod mcmod;
 pub(crate) mod meta;
 pub(crate) mod status;
 

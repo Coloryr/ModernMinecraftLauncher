@@ -10,6 +10,11 @@ export type SourceTypeDto = {
 export type McmodDto = {
   mcmodId: string,
   mcmodName: string,
+  curseforgeId: string,
+  curseforgeUrl: string,
+  modrinthId: string,
+  modrinthUrl: string,
+  mcmodUrl: string,
 };
 
 export type PicDto = {

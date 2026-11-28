@@ -2353,6 +2353,11 @@ export default {
   "addResource.chooseInstance": "选择实例",
   "addResource.chooseInstanceHint": "这个资源装进哪个实例？选定后开始下载。",
   "addResource.saveSourceLimit": "存档下载仅支持 CurseForge 源",
+  "addResource.noOnlineInfo": "没有在线信息",
+  "addResource.loadingInfo": "正在获取在线信息…",
+  "addResource.chooseProject": "选择项目来源",
+  "addResource.chooseProjectHint": "「{name}」在 Modrinth 和 CurseForge 都有条目，选择要打开哪一个。",
+  "addResource.projectUnavailable": "这个项目在所选来源不可用",
   "err.saveNotFound": "请先选择一个存档",
 
   // 窗口标题

@@ -12,6 +12,10 @@
 - 自定义主页面多了自己的持久存储：`window.mml.read_custom_config()` /
   `write_custom_config(text)` 读写运行目录的 `.custom_config`，内容按字符串原样保存，
   组件路线与 iframe 路线都能用；`read_cutsom_config()` 保留为兼容拼写。
+- 添加资源支持 McMod 搜索：新增 McMod 页签，按中文名 / 版本 / 加载器调用
+  `api.coloryr.com/findmod`。列表先显示百科名字与占位图，图标 / 简介 / 下载量等随后从
+  Modrinth 补，没有 Modrinth 条目再退回 CurseForge；两个源都有的项目点开时先选进入哪一个。
+  两个源都没有 ID 的条目显示「没有在线信息」、用原版实例图标占位，点开打开百科页面。
 
 ## 0.1.14
 

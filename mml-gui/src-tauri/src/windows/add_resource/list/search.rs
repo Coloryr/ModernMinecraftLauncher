@@ -10,7 +10,7 @@ use mml_net::curseforge_api::{self, CurseFogreArg, CurseForgeSortType};
 use mml_net::modrinth_api::{self, ModrinthSearchArg, ModrinthSortType};
 
 use crate::collect_utils;
-use crate::dtos::add_resource_dto::{ProjectDto, ProjectItemDto};
+use crate::dtos::add_resource_dto::{McmodDto, ProjectDto, ProjectItemDto};
 use crate::err_keys;
 
 use super::query::{ListQuery, check_download_now, parse_query};
@@ -176,6 +176,48 @@ pub async fn add_resource_list(
                 count: list.total_hits,
             })
         }
+        ModPackType::McMod => {
+            if file_type != FileType::Mod {
+                return Err(String::from(err_keys::FILE_TYPE_NOT_FOUND));
+            }
+            crate::windows::add_resource::mcmod::search(
+                file_type,
+                uuid.as_ref(),
+                &info,
+                filter.as_deref(),
+                page,
+                version.as_deref(),
+                mod_loader,
+            )
+            .await
+        }
         _ => Err(String::from(err_keys::SOURCE_TYPE)),
     }
+}
+
+/// 补 mcmod 条目的在线信息
+///
+/// 列表先由 `add_resource_list` 返回名字与占位，前端渲染后再调这里补图标 / 简介 / 下载量。
+///
+/// - `game`: 实例 uuid，空串表示浏览模式
+/// - `items`: `McmodDto` 数组的 JSON 文本
+///
+/// # 返回值
+///
+/// 补好在线信息的条目；Modrinth 优先，取不到再用 CurseForge
+#[gui_macros::ipc_group("add_resource")]
+#[gui_macros::command]
+pub async fn add_resource_mcmod_info(
+    game: String,
+    items: String,
+) -> Result<Vec<ProjectItemDto>, String> {
+    let ListQuery {
+        uuid,
+        info,
+        file_type,
+        ..
+    } = parse_query(&game, "mcmod", "mod", None)?;
+    let entries: Vec<McmodDto> = serde_json::from_str(&items).map_err(|err| err.to_string())?;
+
+    Ok(crate::windows::add_resource::mcmod::enrich(file_type, uuid.as_ref(), &info, entries).await)
 }

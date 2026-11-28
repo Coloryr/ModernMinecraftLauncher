@@ -85,7 +85,7 @@ pub(super) fn parse_query(
 /// # 返回值
 ///
 /// 该项目下有任一文件在下载即为 `true`
-pub(super) fn check_download_now(game: Option<&Uuid>, pid: &str) -> bool {
+pub(crate) fn check_download_now(game: Option<&Uuid>, pid: &str) -> bool {
     let Some(game) = game else {
         return false;
     };

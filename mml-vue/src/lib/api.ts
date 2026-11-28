@@ -76,6 +76,7 @@ import type {
   DebugLaunchDto,
   ProjectDetailDto,
   ProjectDto,
+  ProjectItemDto,
   ResourceDependencyDto,
   ResourceSaveDto,
   ResourceStatusDto,
@@ -683,6 +684,22 @@ export const api = {
    */
   async getResourceDetail(source: string, projectId: string): Promise<ProjectDetailDto> {
     return commands.addResource.detail(source, projectId);
+  },
+
+  /**
+   * 补 mcmod 条目的在线信息
+   *
+   * 列表先返回名字与占位，前端渲染完再调这里补图标 / 简介 / 下载量。
+   *
+   * - `game`: 实例 uuid，空串表示浏览模式
+   * - `items`: 百科条目数组的 JSON 文本
+   *
+   * # 返回值
+   *
+   * 补好在线信息的条目
+   */
+  async getMcmodInfo(game: string, items: string): Promise<ProjectItemDto[]> {
+    return commands.addResource.mcmodInfo(game, items);
   },
 
   /**

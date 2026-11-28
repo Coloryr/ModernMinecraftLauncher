@@ -6,6 +6,7 @@
 import { computed } from "vue";
 import AsyncImage from "./ui/AsyncImage.vue";
 import AuthorTag from "./ui/AuthorTag.vue";
+import InstancePlaceholder from "./InstancePlaceholder.vue";
 import HighlightText from "./ui/HighlightText.vue";
 import { formatCount, t } from "../lib/i18n";
 import { formatDate } from "../lib/format";
@@ -23,6 +24,8 @@ const props = defineProps<{
   installed?: boolean;
   /** 项目是否有文件正在下载 */
   running?: boolean;
+  /** 在线信息是否还在加载：mcmod 条目先显示名字，补图标 / 简介期间用 */
+  loading?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -44,8 +47,8 @@ function onStar(e: MouseEvent) {
 
 <template>
   <div class="pack-item">
-    <!-- 收藏星标（右上角）：点击收藏 / 取消收藏 -->
-    <button class="pack-star" :class="{ on: item.isStar }"
+    <!-- 收藏星标（右上角）：点击收藏 / 取消收藏；mcmod 没有在线项目 ID 时不能收藏 -->
+    <button v-if="item.canStar" class="pack-star" :class="{ on: item.isStar }"
       v-tip="item.isStar ? t('modpack.unstar') : t('modpack.star')" @click.stop="onStar">
       <svg viewBox="0 0 24 24" width="17" height="17" stroke-width="2" stroke-linejoin="round">
         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
@@ -54,6 +57,10 @@ function onStar(e: MouseEvent) {
     <div class="pack-main" role="button" tabindex="0" @click="emit('open', item)"
       @keydown.enter.prevent="emit('open', item)" @keydown.space.prevent="emit('open', item)">
       <AsyncImage v-if="item.image" class="pack-icon" :src="item.image" alt="" />
+      <!-- mcmod 条目没有在线图标时用实例的原版占位图，不再画名字首字母 -->
+      <div v-else-if="item.mcmod" class="pack-icon pack-icon-vanilla">
+        <InstancePlaceholder loader="normal" />
+      </div>
       <div v-else class="pack-icon pack-icon-fallback">{{ item.name.slice(0, 1).toUpperCase() }}</div>
       <div class="pack-info">
         <div class="pack-name">
@@ -63,7 +70,12 @@ function onStar(e: MouseEvent) {
           <span v-if="installed" class="pack-badge">{{ t("modpack.installed") }}</span>
           <span v-else-if="running" class="pack-badge busy">{{ t("modpack.downloading") }}</span>
         </div>
-        <div class="pack-desc">{{ item.summary }}</div>
+        <div class="pack-desc">
+          <template v-if="loading">{{ t("addResource.loadingInfo") }}</template>
+          <template v-else>
+            {{ item.source.source === "mcmod" ? t("addResource.noOnlineInfo") : item.summary }}
+          </template>
+        </div>
         <div v-if="item.tag.length" class="pack-tags">
           <span v-for="tag in tags.shown" :key="tag.name" class="pack-tag">
             <span v-if="tag.svg" class="tag-svg" v-html="svgIcon(tag.svg)"></span>
@@ -73,7 +85,7 @@ function onStar(e: MouseEvent) {
           <!-- 超过上限的标签用省略号顶上，别把最后一个切掉一半 -->
           <span v-if="tags.more" class="pack-tag pack-tag-more" v-tip="hiddenTagTip(tags.hidden)">…</span>
         </div>
-        <div class="pack-meta">
+        <div v-if="item.downloadCount || item.date" class="pack-meta">
           {{ t("modpack.downloads", { n: formatCount(item.downloadCount) }) }}
           <template v-if="item.date"> · {{ formatDate(item.date) }}</template>
         </div>
